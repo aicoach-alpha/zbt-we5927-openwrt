@@ -1,0 +1,8 @@
+{
+	"admin/network/we5927_lte": {
+		"title": "4G / Dual SIM",
+		"order": 55,
+		"action": { "type": "view", "path": "we5927_lte" },
+		"depends": { "acl": [ "luci-app-we5927-lte" ] }
+	}
+}

@@ -1,0 +1,12 @@
+*.bin
+*.img
+*.trx
+*.tar
+*.tar.gz
+*.backup
+*.bak
+*.key
+*.pem
+*.log
+.DS_Store
+Thumbs.db

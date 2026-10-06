@@ -1,0 +1,47 @@
+{
+	"luci-app-we5927-lte": {
+		"description": "Grant access to WE5927 LTE and dual-SIM manager",
+		"read": {
+			"file": {
+				"/usr/sbin/we5927-lte status": [
+					"exec"
+				],
+				"/usr/sbin/we5927-lte status-fast": [
+					"exec"
+				]
+			},
+			"uci": [
+				"we5927_lte",
+				"network",
+				"firewall"
+			]
+		},
+		"write": {
+			"file": {
+				"/usr/sbin/we5927-lte reconnect": [
+					"exec"
+				],
+				"/usr/sbin/we5927-lte power-cycle": [
+					"exec"
+				],
+				"/usr/sbin/we5927-lte usb-repair": [
+					"exec"
+				],
+				"/usr/sbin/we5927-lte sim 1": [
+					"exec"
+				],
+				"/usr/sbin/we5927-lte sim 2": [
+					"exec"
+				],
+				"/etc/init.d/we5927-lte restart": [
+					"exec"
+				]
+			},
+			"uci": [
+				"we5927_lte",
+				"network",
+				"firewall"
+			]
+		}
+	}
+}
