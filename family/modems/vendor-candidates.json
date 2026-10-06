@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "source": "factual compatibility mapping independently derived from the inspected ZBT WE2825-2SIM vendor image; vendor scripts are not redistributed",
+  "status": "reference-only",
+  "candidates": [
+    {"profile":"quectel-ec20-ec25","usb_id":"2c7c:0125","vendor_data_hint":"ttyUSB2","vendor_at_hint":"ttyUSB3","requires_model_probe":true},
+    {"profile":"quectel-ec20-family","usb_id":"2c7c:0306","vendor_data_hint":"ttyUSB2","vendor_at_hint":"ttyUSB3","requires_model_probe":true},
+    {"profile":"quectel-ec20-family","usb_id":"2c7c:0620","vendor_data_hint":"ttyUSB2","vendor_at_hint":"ttyUSB3","requires_model_probe":true},
+    {"profile":"quectel-ec200t","usb_id":"2c7c:6026","vendor_data_hint":"ttyUSB1","vendor_at_hint":"ttyUSB2","requires_model_probe":false},
+    {"profile":"quectel-ec200u","usb_id":"2c7c:6002","vendor_data_hint":"ttyUSB1","vendor_at_hint":"ttyUSB1","requires_model_probe":false},
+    {"profile":"quectel-ec200a","usb_id":"2c7c:6005","vendor_data_hint":"ttyUSB1","vendor_at_hint":"ttyUSB1","requires_model_probe":false},
+    {"profile":"simcom-sim7600","usb_id":"1e0e:9001","vendor_data_hint":"ttyUSB2","vendor_at_hint":"ttyUSB3","requires_model_probe":false},
+    {"profile":"simcom-a7600c","usb_id":"1e0e:9011","vendor_data_hint":"ttyUSB1","vendor_at_hint":"ttyUSB2","requires_model_probe":false},
+    {"profile":"fibocom-l716-l718","usb_id":"2cb7:0001","vendor_data_hint":"ttyUSB0","vendor_at_hint":"ttyUSB2","requires_model_probe":true},
+    {"profile":"fibocom-nl668","usb_id":"1508:1001","vendor_data_hint":"ttyUSB2","vendor_at_hint":"ttyUSB1","requires_model_probe":false},
+    {"profile":"quectel-rm500","usb_id":"2c7c:0800","vendor_data_hint":"ttyUSB0","vendor_at_hint":"ttyUSB2","requires_model_probe":false},
+    {"profile":"quectel-rm520n","usb_id":"2c7c:0801","vendor_data_hint":"ttyUSB0","vendor_at_hint":"ttyUSB2","requires_model_probe":false},
+    {"profile":"fibocom-fm150","usb_id":"2cb7:0109","vendor_data_hint":"ttyUSB1","vendor_at_hint":"ttyUSB1","requires_model_probe":true},
+    {"profile":"fibocom-fm150","usb_id":"2cb7:0104","vendor_data_hint":"ttyUSB1","vendor_at_hint":"ttyUSB1","requires_model_probe":true},
+    {"profile":"fibocom-fm150","usb_id":"2cb7:0105","vendor_data_hint":"ttyUSB1","vendor_at_hint":"ttyUSB1","requires_model_probe":true},
+    {"profile":"fibocom-fm150","usb_id":"2cb7:010a","vendor_data_hint":"ttyUSB1","vendor_at_hint":"ttyUSB1","requires_model_probe":true}
+  ],
+  "policy": [
+    "Reference-only entries are never auto-enabled for flashing or modem control.",
+    "A candidate is promoted to a supported modem profile only after USB topology, AT port, data mode and recovery behavior are verified on real hardware."
+  ]
+}

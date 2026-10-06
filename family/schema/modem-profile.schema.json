@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ZBT community modem profile",
+  "type": "object",
+  "required": ["schema_version","id","status"],
+  "properties": {
+    "schema_version": {"type":"integer","const":1},
+    "id": {"type":"string"},
+    "status": {"enum":["tested","community-tested","reference-only","discovery","unsupported"]},
+    "usb_ids": {"type":"array","items":{"type":"string","pattern":"^[0-9a-fA-F]{4}:[0-9a-fA-F]{4}$"}},
+    "data_modes": {"type":"array","items":{"type":"string"}},
+    "default_data_interface": {"type":["string","null"]},
+    "at": {"type":"object"},
+    "health": {"type":"object"},
+    "recovery": {"type":"object"},
+    "notes": {"type":"array","items":{"type":"string"}}
+  },
+  "additionalProperties": true
+}
