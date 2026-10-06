@@ -1,0 +1,26 @@
+#!/bin/sh
+# Non-destructive first-boot defaults for WE5927 / WE2825-2SIM.
+# Existing network and Wi-Fi settings are preserved on sysupgrade.
+
+uci -q set system.@system[0].hostname='WE5927-OpenWrt'
+
+if ! uci -q get network.lan.ipaddr >/dev/null 2>&1; then
+	uci -q set network.lan.ipaddr='192.168.1.1'
+	uci -q set network.lan.netmask='255.255.255.0'
+	uci -q commit network
+fi
+
+# On a clean install create wireless config, but keep the radio disabled
+# until the administrator sets a password. Never overwrite an existing SSID/key.
+if [ ! -s /etc/config/wireless ]; then
+	wifi config >/dev/null 2>&1 || true
+	for radio in $(uci -q show wireless | sed -n "s/^wireless\.\([^=]*\)=wifi-device$/\1/p"); do
+		uci -q set "wireless.$radio.disabled=1"
+	done
+	uci -q commit wireless
+fi
+
+uci -q commit system
+/etc/init.d/uhttpd enable >/dev/null 2>&1 || true
+/etc/init.d/dropbear enable >/dev/null 2>&1 || true
+exit 0

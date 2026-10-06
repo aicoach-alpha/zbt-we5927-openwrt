@@ -10,3 +10,7 @@
 *.log
 .DS_Store
 Thumbs.db
+
+# Public release artifacts are intentionally versioned.
+!releases/**/*.bin
+!releases/**/*.manifest

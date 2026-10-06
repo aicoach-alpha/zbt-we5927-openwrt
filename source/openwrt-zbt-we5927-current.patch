@@ -1,0 +1,1606 @@
+diff --git a/package/we5927-lte/Makefile b/package/we5927-lte/Makefile
+new file mode 100644
+index 0000000..aa974c0
+--- /dev/null
++++ b/package/we5927-lte/Makefile
+@@ -0,0 +1,54 @@
++include $(TOPDIR)/rules.mk
++
++PKG_NAME:=we5927-lte
++PKG_RELEASE:=2
++
++include $(INCLUDE_DIR)/package.mk
++
++define Package/we5927-lte
++  SECTION:=net
++  CATEGORY:=Network
++  TITLE:=ZBT WE5927 LTE / Dual-SIM manager
++  DEPENDS:=+luci-base +rpcd +uhttpd +jsonfilter +kmod-usb-core +kmod-usb2 +kmod-usb-ohci +kmod-usb-net +kmod-usb-net-cdc-ether +kmod-usb-net-rndis +kmod-usb-serial +kmod-usb-serial-wwan +kmod-usb-serial-option
++endef
++
++define Package/we5927-lte/description
++ LTE automation for ZBT WE5927 / WE2825-2SIM.
++ CX07E 05c6:902e RNDIS, AT control, reconnect, modem power-cycle and dual-SIM failover.
++endef
++
++define Build/Prepare
++	mkdir -p $(PKG_BUILD_DIR)
++	$(CP) ./src/we5927-at.c $(PKG_BUILD_DIR)/
++endef
++
++define Build/Compile
++	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -o $(PKG_BUILD_DIR)/we5927-at $(PKG_BUILD_DIR)/we5927-at.c $(TARGET_LDFLAGS)
++endef
++
++define Package/we5927-lte/conffiles
++/etc/config/we5927_lte
++endef
++
++define Package/we5927-lte/install
++	$(INSTALL_DIR) $(1)/usr/sbin
++	$(INSTALL_BIN) $(PKG_BUILD_DIR)/we5927-at $(1)/usr/sbin/we5927-at
++	$(INSTALL_BIN) ./files/usr/sbin/we5927-lte $(1)/usr/sbin/we5927-lte
++	$(INSTALL_DIR) $(1)/etc/init.d
++	$(INSTALL_BIN) ./files/etc/init.d/we5927-lte $(1)/etc/init.d/we5927-lte
++	$(INSTALL_DIR) $(1)/etc/config
++	$(INSTALL_CONF) ./files/etc/config/we5927_lte $(1)/etc/config/we5927_lte
++	$(INSTALL_DIR) $(1)/etc/uci-defaults
++	$(INSTALL_BIN) ./files/etc/uci-defaults/98-we5927-websafe $(1)/etc/uci-defaults/98-we5927-websafe
++	$(INSTALL_BIN) ./files/etc/uci-defaults/99-we5927-lte $(1)/etc/uci-defaults/99-we5927-lte
++	$(INSTALL_DIR) $(1)/etc/hotplug.d/usb
++	$(INSTALL_BIN) ./files/etc/hotplug.d/usb/30-we5927-lte $(1)/etc/hotplug.d/usb/30-we5927-lte
++	$(INSTALL_DIR) $(1)/www/luci-static/resources/view
++	$(INSTALL_DATA) ./files/www/luci-static/resources/view/we5927_lte.js $(1)/www/luci-static/resources/view/we5927_lte.js
++	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
++	$(INSTALL_DATA) ./files/usr/share/luci/menu.d/luci-app-we5927-lte.json $(1)/usr/share/luci/menu.d/luci-app-we5927-lte.json
++	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
++	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/luci-app-we5927-lte.json $(1)/usr/share/rpcd/acl.d/luci-app-we5927-lte.json
++endef
++
++$(eval $(call BuildPackage,we5927-lte))
+diff --git a/package/we5927-lte/files/etc/config/we5927_lte b/package/we5927-lte/files/etc/config/we5927_lte
+new file mode 100644
+index 0000000..64b533f
+--- /dev/null
++++ b/package/we5927-lte/files/etc/config/we5927_lte
+@@ -0,0 +1,20 @@
++config modem 'main'
++	option enabled '1'
++	option apn 'internet'
++	option at_port '/dev/ttyUSB2'
++	option data_if 'usb0'
++	option metric '5'
++	option ping_host '1.1.1.1'
++	option ping_interval '30'
++	option fail_threshold '6'
++	option hard_reset_after '2'
++	option auto_failover '0'
++	option sim_failover_after '2'
++	option sim '1'
++	option sim1_value '1'
++	option sim2_value '0'
++	option modem_gpio '1'
++	option sim_gpio '46'
++	option modem_active '1'
++	option usb_vid '05c6'
++	option usb_pid '902e'
+diff --git a/package/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte b/package/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte
+new file mode 100755
+index 0000000..5e6f3e8
+--- /dev/null
++++ b/package/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte
+@@ -0,0 +1,13 @@
++#!/bin/sh
++[ "$ACTION" = add ] || exit 0
++case "$PRODUCT" in
++	5c6/902e/*|05c6/902e/*) ;;
++	*) exit 0 ;;
++esac
++
++logger -t we5927-lte "CX07E USB modem added ($PRODUCT)"
++(
++	sleep 2
++	/usr/sbin/we5927-lte usb-repair >/dev/null 2>&1 || true
++	ifup lte >/dev/null 2>&1 || true
++) &
+diff --git a/package/we5927-lte/files/etc/init.d/we5927-lte b/package/we5927-lte/files/etc/init.d/we5927-lte
+new file mode 100755
+index 0000000..28d871c
+--- /dev/null
++++ b/package/we5927-lte/files/etc/init.d/we5927-lte
+@@ -0,0 +1,22 @@
++#!/bin/sh /etc/rc.common
++START=70
++STOP=89
++USE_PROCD=1
++
++start_service() {
++	local enabled
++	config_load we5927_lte
++	config_get_bool enabled main enabled 1
++	[ "$enabled" = 1 ] || return 0
++
++	procd_open_instance
++	procd_set_param command /usr/sbin/we5927-lte daemon
++	procd_set_param respawn 10 5 0
++	procd_set_param stdout 1
++	procd_set_param stderr 1
++	procd_close_instance
++}
++
++service_triggers() {
++	procd_add_reload_trigger we5927_lte network firewall
++}
+diff --git a/package/we5927-lte/files/etc/uci-defaults/98-we5927-websafe b/package/we5927-lte/files/etc/uci-defaults/98-we5927-websafe
+new file mode 100755
+index 0000000..61e7db1
+--- /dev/null
++++ b/package/we5927-lte/files/etc/uci-defaults/98-we5927-websafe
+@@ -0,0 +1,26 @@
++#!/bin/sh
++# Non-destructive first-boot defaults for WE5927 / WE2825-2SIM.
++# Existing network and Wi-Fi settings are preserved on sysupgrade.
++
++uci -q set system.@system[0].hostname='WE5927-OpenWrt'
++
++if ! uci -q get network.lan.ipaddr >/dev/null 2>&1; then
++	uci -q set network.lan.ipaddr='192.168.1.1'
++	uci -q set network.lan.netmask='255.255.255.0'
++	uci -q commit network
++fi
++
++# On a clean install create wireless config, but keep the radio disabled
++# until the administrator sets a password. Never overwrite an existing SSID/key.
++if [ ! -s /etc/config/wireless ]; then
++	wifi config >/dev/null 2>&1 || true
++	for radio in $(uci -q show wireless | sed -n "s/^wireless\.\([^=]*\)=wifi-device$/\1/p"); do
++		uci -q set "wireless.$radio.disabled=1"
++	done
++	uci -q commit wireless
++fi
++
++uci -q commit system
++/etc/init.d/uhttpd enable >/dev/null 2>&1 || true
++/etc/init.d/dropbear enable >/dev/null 2>&1 || true
++exit 0
+diff --git a/package/we5927-lte/files/etc/uci-defaults/99-we5927-lte b/package/we5927-lte/files/etc/uci-defaults/99-we5927-lte
+new file mode 100755
+index 0000000..651c45b
+--- /dev/null
++++ b/package/we5927-lte/files/etc/uci-defaults/99-we5927-lte
+@@ -0,0 +1,48 @@
++#!/bin/sh
++# LTE defaults. Preserve existing user settings when upgrading.
++
++get_or_set() {
++	local option="$1"
++	local value="$2"
++	uci -q get "we5927_lte.main.$option" >/dev/null 2>&1 || 		uci -q set "we5927_lte.main.$option=$value"
++}
++
++get_or_set enabled 1
++get_or_set sim 1
++get_or_set sim1_value 1
++get_or_set sim2_value 0
++get_or_set modem_gpio 1
++get_or_set sim_gpio 46
++get_or_set ping_host 1.1.1.1
++get_or_set ping_interval 30
++get_or_set fail_threshold 6
++get_or_set hard_reset_after 2
++get_or_set auto_failover 0
++get_or_set sim_failover_after 2
++uci -q commit we5927_lte
++
++if [ "$(uci -q get network.lte)" != "interface" ]; then
++	uci -q batch <<'EOF'
++set network.lte=interface
++set network.lte.device='usb0'
++set network.lte.proto='dhcp'
++set network.lte.metric='5'
++set network.lte.peerdns='0'
++add_list network.lte.dns='94.140.14.14'
++add_list network.lte.dns='94.140.15.15'
++EOF
++	uci -q commit network
++fi
++
++if [ "$(uci -q get network.wan)" = "interface" ] && ! uci -q get network.wan.metric >/dev/null 2>&1; then
++	uci -q set network.wan.metric='3'
++	uci -q commit network
++fi
++
++wan_zone="$(uci -q show firewall | sed -n "s/^\(firewall\.@zone\[[0-9]\+\]\)\.name='wan'$/\1/p" | head -n1)"
++if [ -n "$wan_zone" ] && ! uci -q get "${wan_zone}.network" | grep -qw lte; then
++	uci add_list "${wan_zone}.network=lte"
++	uci commit firewall
++fi
++
++exit 0
+diff --git a/package/we5927-lte/files/usr/sbin/we5927-lte b/package/we5927-lte/files/usr/sbin/we5927-lte
+new file mode 100755
+index 0000000..407b2c3
+--- /dev/null
++++ b/package/we5927-lte/files/usr/sbin/we5927-lte
+@@ -0,0 +1,826 @@
++#!/bin/sh
++TAG=we5927-lte
++CFG=we5927_lte.main
++STATE=/tmp/we5927-lte.state
++STATUS_CACHE=/tmp/we5927-lte.status.json
++STATUS_CACHE_TS=/tmp/we5927-lte.status.ts
++STATUS_CACHE_LOCK=/tmp/we5927-lte.status.lock
++
++log() {
++	logger -t "$TAG" "$*"
++	echo "$*" >&2
++}
++
++cfg() {
++	uci -q get "$CFG.$1"
++}
++
++enabled() {
++	local v
++	v="$(cfg enabled)"
++	[ -n "$v" ] || v=1
++	[ "$v" = "1" ]
++}
++
++gpio_path() {
++	local n="$1"
++	local p=""
++
++	case "$n" in
++		1)
++			[ -e /sys/class/gpio/modem_power/value ] && p=/sys/class/gpio/modem_power
++			;;
++		46)
++			[ -e /sys/class/gpio/sim_select/value ] && p=/sys/class/gpio/sim_select
++			;;
++	esac
++
++	if [ -z "$p" ]; then
++		p="/sys/class/gpio/gpio$n"
++		if [ ! -e "$p/value" ]; then
++			echo "$n" > /sys/class/gpio/export 2>/dev/null || true
++			sleep 1
++		fi
++		[ -e "$p/value" ] || return 1
++		[ -e "$p/direction" ] && echo out > "$p/direction" 2>/dev/null || true
++	fi
++
++	echo "$p"
++}
++
++gpio_set() {
++	local n="$1"
++	local v="$2"
++	local p
++	p="$(gpio_path "$n")" || return 1
++	echo "$v" > "$p/value"
++}
++
++gpio_get() {
++	local p
++	p="$(gpio_path "$1")" || return 1
++	cat "$p/value"
++}
++
++port_responds() {
++	local p="$1"
++	[ -c "$p" ] || return 1
++	/usr/sbin/we5927-at "$p" AT 700 >/dev/null 2>&1
++}
++
++at_port() {
++	local t p preferred devpath
++	preferred="$(cfg at_port)"
++
++	# CX07E verified AT function is USB interface 1.4.
++	# Resolve the current ttyUSB name from sysfs instead of probing ports,
++	# because probing the non-AT 1.5 function can enter uninterruptible I/O.
++	for t in /sys/class/tty/ttyUSB*; do
++		[ -e "$t/device" ] || continue
++		devpath="$(readlink -f "$t/device" 2>/dev/null || true)"
++		case "$devpath" in
++			*/1-1:1.4/*)
++				p="/dev/$(basename "$t")"
++				[ -c "$p" ] && {
++					echo "$p"
++					return 0
++				}
++				;;
++		esac
++	done
++
++	# Safe fallbacks only. Never auto-probe ttyUSB3 (USB interface 1.5).
++	for p in "$preferred" /dev/ttyUSB2 /dev/ttyUSB1 /dev/ttyUSB0; do
++		[ -n "$p" ] || continue
++		[ -c "$p" ] && {
++			echo "$p"
++			return 0
++		}
++	done
++
++	echo "$preferred"
++	return 1
++}
++
++at() {
++	local p
++	local timeout
++	local rc
++	p="$(at_port)"
++	timeout="$2"
++	[ -n "$timeout" ] || timeout=2500
++	[ -c "$p" ] || return 1
++
++	# Serialize AT access between the watchdog daemon and LuCI status/actions.
++	# util-linux flock is part of the selected LuCI/OpenWrt image.
++	(
++		# Never let LuCI/status wait indefinitely behind a stuck AT client.
++		flock -n -x 9 || exit 75
++		/usr/sbin/we5927-at "$p" "$1" "$timeout"
++	) 9>/var/lock/we5927-at.lock
++	rc=$?
++	return "$rc"
++}
++
++usb_device_dir() {
++	local d vid pid
++	vid="$(cfg usb_vid)"
++	pid="$(cfg usb_pid)"
++	[ -n "$vid" ] || vid=05c6
++	[ -n "$pid" ] || pid=902e
++
++	for d in /sys/bus/usb/devices/*; do
++		[ -f "$d/idVendor" ] || continue
++		[ -f "$d/idProduct" ] || continue
++		[ "$(cat "$d/idVendor" 2>/dev/null)" = "$vid" ] || continue
++		[ "$(cat "$d/idProduct" 2>/dev/null)" = "$pid" ] || continue
++		echo "$d"
++		return 0
++	done
++	return 1
++}
++
++driver_name() {
++	local x
++	x="$(readlink -f "$1/driver" 2>/dev/null)" || return 1
++	basename "$x"
++}
++
++repair_rndis() {
++	local dev base i cls sub proto drv ctrl=""
++
++	dev="$(usb_device_dir)" || return 1
++	base="$(basename "$dev")"
++
++	modprobe rndis_host >/dev/null 2>&1 || true
++
++	for i in "$dev":1.*; do
++		[ -d "$i" ] || continue
++		cls="$(cat "$i/bInterfaceClass" 2>/dev/null)"
++		sub="$(cat "$i/bInterfaceSubClass" 2>/dev/null)"
++		proto="$(cat "$i/bInterfaceProtocol" 2>/dev/null)"
++		drv="$(driver_name "$i" 2>/dev/null || true)"
++
++		if [ "$cls" = "e0" ] && [ "$sub" = "01" ] && [ "$proto" = "03" ]; then
++			ctrl="$(basename "$i")"
++			[ "$drv" = "option" ] && echo "$(basename "$i")" > /sys/bus/usb/drivers/option/unbind 2>/dev/null || true
++		elif [ "$cls" = "0a" ]; then
++			[ "$drv" = "option" ] && echo "$(basename "$i")" > /sys/bus/usb/drivers/option/unbind 2>/dev/null || true
++		fi
++	done
++
++	[ -n "$ctrl" ] || return 1
++	drv="$(driver_name "/sys/bus/usb/devices/$ctrl" 2>/dev/null || true)"
++	if [ "$drv" != "rndis_host" ]; then
++		echo "$ctrl" > /sys/bus/usb/drivers/rndis_host/bind 2>/dev/null || true
++	fi
++
++	local n=0
++	while [ "$n" -lt 10 ]; do
++		ip link show usb0 >/dev/null 2>&1 && return 0
++		n=$((n + 1))
++		sleep 1
++	done
++	return 1
++}
++
++usb_repair() {
++	modprobe usbserial >/dev/null 2>&1 || true
++	modprobe usb_wwan >/dev/null 2>&1 || true
++	modprobe option >/dev/null 2>&1 || true
++	modprobe cdc_ether >/dev/null 2>&1 || true
++	modprobe rndis_host >/dev/null 2>&1 || true
++
++	bind_option
++	sleep 1
++	repair_rndis || true
++}
++
++bind_option() {
++	local vid pid
++	vid="$(cfg usb_vid)"
++	pid="$(cfg usb_pid)"
++	[ -n "$vid" ] || vid=05c6
++	[ -n "$pid" ] || pid=902e
++
++	# Safe to retry: duplicate IDs return an error which we intentionally ignore.
++	# This makes serial AT binding robust even if another ttyUSB device exists.
++	if [ -w /sys/bus/usb-serial/drivers/option1/new_id ]; then
++		echo "$vid $pid" > /sys/bus/usb-serial/drivers/option1/new_id 2>/dev/null || true
++	fi
++}
++
++wait_at() {
++	local i p
++	i=0
++	usb_repair
++
++	while [ "$i" -lt 30 ]; do
++		p="$(at_port)"
++		if [ -c "$p" ] && at AT 1000 >/dev/null 2>&1; then
++			return 0
++		fi
++		[ $((i % 5)) -eq 0 ] && usb_repair
++		i=$((i + 1))
++		sleep 1
++	done
++
++	return 1
++}
++
++ensure_network() {
++	local dev metric z
++
++	dev="$(cfg data_if)"
++	metric="$(cfg metric)"
++	[ -n "$dev" ] || dev=usb0
++	[ -n "$metric" ] || metric=5
++
++	[ "$(uci -q get network.lte)" = "interface" ] || uci set network.lte=interface
++	uci set network.lte.device="$dev"
++	uci set network.lte.proto=dhcp
++	uci set network.lte.metric="$metric"
++	uci set network.lte.peerdns=1
++	uci commit network
++
++	z="$(uci -q show firewall | sed -n "s/^\(firewall\.@zone\[[0-9]\+\]\)\.name='wan'$/\1/p" | head -n1)"
++	if [ -n "$z" ] && ! uci -q get "$z.network" | grep -qw lte; then
++		uci add_list "$z.network=lte"
++		uci commit firewall
++		/etc/init.d/firewall reload >/dev/null 2>&1 || true
++	fi
++}
++
++set_sim() {
++	local slot n v
++
++	slot="$1"
++	n="$(cfg sim_gpio)"
++	[ -n "$n" ] || n=46
++
++	case "$slot" in
++		1)
++			v="$(cfg sim1_value)"
++			[ -n "$v" ] || v=1
++			;;
++		2)
++			v="$(cfg sim2_value)"
++			[ -n "$v" ] || v=0
++			;;
++		*)
++			echo "usage: $0 sim 1|2" >&2
++			return 2
++			;;
++	esac
++
++	gpio_set "$n" "$v" || return 1
++	uci set "$CFG.sim=$slot"
++	uci commit we5927_lte
++	echo "sim=$slot" > "$STATE"
++	log "SIM selector changed to SIM$slot (GPIO$n value=$v)"
++}
++
++power_on() {
++	local n active
++	n="$(cfg modem_gpio)"
++	active="$(cfg modem_active)"
++	[ -n "$n" ] || n=1
++	[ -n "$active" ] || active=1
++	gpio_set "$n" "$active"
++}
++
++power_cycle() {
++	local n active off
++
++	n="$(cfg modem_gpio)"
++	active="$(cfg modem_active)"
++	[ -n "$n" ] || n=1
++	[ -n "$active" ] || active=1
++
++	if [ "$active" = "1" ]; then
++		off=0
++	else
++		off=1
++	fi
++
++	log "Hard power-cycle modem on GPIO$n"
++	gpio_set "$n" "$off" || true
++	sleep 3
++	gpio_set "$n" "$active" || true
++	sleep 10
++
++	usb_repair
++	wait_at || true
++	ifup lte >/dev/null 2>&1 || true
++}
++
++apply_apn() {
++	local apn
++
++	apn="$(cfg apn)"
++	[ -n "$apn" ] || apn=internet
++
++	wait_at || return 1
++
++	at "AT+CGDCONT=1,\"IPV4V6\",\"$apn\"" 3000 >/dev/null 2>&1 || \
++	at "AT+CGDCONT=1,\"IP\",\"$apn\"" 3000 >/dev/null 2>&1 || true
++}
++
++sim_ready() {
++	wait_at || return 1
++	at 'AT+CPIN?' 2000 2>/dev/null | grep -q 'READY'
++}
++
++soft_reconnect() {
++	log "Soft reconnect modem (CFUN)"
++	wait_at || return 1
++	apply_apn || true
++
++	at "AT+CFUN=0" 3000 >/dev/null 2>&1 || true
++	sleep 3
++	at "AT+CFUN=1" 8000 >/dev/null 2>&1 || true
++	sleep 6
++
++	usb_repair
++	ifup lte >/dev/null 2>&1 || true
++}
++
++data_ok() {
++	local dev host
++
++	dev="$(cfg data_if)"
++	host="$(cfg ping_host)"
++	[ -n "$dev" ] || dev=usb0
++	[ -n "$host" ] || host=1.1.1.1
++
++	ip link show "$dev" >/dev/null 2>&1 || return 1
++	ip -4 addr show dev "$dev" | grep -q "inet " || return 1
++
++	ping -I "$dev" -c 1 -W 2 "$host" >/dev/null 2>&1 && return 0
++	[ "$host" = "8.8.8.8" ] || ping -I "$dev" -c 1 -W 2 8.8.8.8 >/dev/null 2>&1
++}
++
++clean_line() {
++	tr '\r\n' '  ' | sed 's/[[:space:]][[:space:]]*/ /g; s/^ //; s/ $//'
++}
++
++
++refresh_status_cache() {
++	. /usr/share/libubox/jshn.sh
++	local tmp model_check imei_check operator_check
++	tmp="$STATUS_CACHE.$$"
++
++	status_json >"$tmp" 2>/dev/null || {
++		rm -f "$tmp"
++		return 1
++	}
++
++	json_load "$(cat "$tmp" 2>/dev/null)" 2>/dev/null || {
++		rm -f "$tmp"
++		return 1
++	}
++	json_get_var model_check model
++	json_get_var imei_check imei
++	json_get_var operator_check operator
++
++	[ -n "$model_check$imei_check$operator_check" ] || {
++		rm -f "$tmp"
++		return 1
++	}
++
++	mv "$tmp" "$STATUS_CACHE"
++	date +%s >"$STATUS_CACHE_TS"
++	return 0
++}
++
++maybe_refresh_status_cache() {
++	local now last
++	now="$(date +%s 2>/dev/null)"
++	last="$(cat "$STATUS_CACHE_TS" 2>/dev/null)"
++	case "$last" in
++		''|*[!0-9]*) last=0 ;;
++	esac
++
++	[ -n "$now" ] || return 0
++	if [ ! -s "$STATUS_CACHE" ] || [ $((now - last)) -ge 60 ]; then
++		(
++			mkdir "$STATUS_CACHE_LOCK" 2>/dev/null || exit 0
++			trap 'rmdir "$STATUS_CACHE_LOCK" 2>/dev/null' 0 1 2 15
++			"$0" refresh-cache >/dev/null 2>&1
++		) >/dev/null 2>&1 &
++	fi
++}
++
++status_fast_json() {
++	. /usr/share/libubox/jshn.sh
++
++	local dev sim p ip4 gateway online
++	local manufacturer model revision imei iccid sim_status operator access_tech
++	local registration eps_registration circuit_registration registration_status
++	local packet_attach packet_status extended_error csq signal_percent signal_dbm registration_denied
++
++	manufacturer=""
++	model=""
++	revision=""
++	imei=""
++	iccid=""
++	sim_status=""
++	operator=""
++	access_tech=""
++	registration=""
++	eps_registration=""
++	circuit_registration=""
++	registration_status=""
++	packet_attach=""
++	packet_status=""
++	extended_error=""
++	csq=""
++	signal_percent=""
++	signal_dbm=""
++	registration_denied=0
++
++	if [ -s "$STATUS_CACHE" ] && json_load "$(cat "$STATUS_CACHE" 2>/dev/null)" 2>/dev/null; then
++		json_get_var manufacturer manufacturer
++		json_get_var model model
++		json_get_var revision revision
++		json_get_var imei imei
++		json_get_var iccid iccid
++		json_get_var sim_status sim_status
++		json_get_var operator operator
++		json_get_var access_tech access_tech
++		json_get_var registration registration
++		json_get_var eps_registration eps_registration
++		json_get_var circuit_registration circuit_registration
++		json_get_var registration_status registration_status
++		json_get_var packet_attach packet_attach
++		json_get_var packet_status packet_status
++		json_get_var extended_error extended_error
++		json_get_var csq csq
++		json_get_var signal_percent signal_percent
++		json_get_var signal_dbm signal_dbm
++		json_get_var registration_denied registration_denied
++	fi
++
++	dev="$(cfg data_if)"
++	sim="$(cfg sim)"
++	p="$(at_port)"
++	[ -n "$dev" ] || dev=usb0
++	[ -n "$sim" ] || sim=1
++	[ -n "$p" ] || p=/dev/ttyUSB2
++
++	ip4="$(ip -4 -o addr show dev "$dev" 2>/dev/null | awk '{print $4}' | head -1)"
++	gateway="$(ip route show default dev "$dev" 2>/dev/null | awk '/default via/ {print $3; exit}')"
++	online=0
++	[ -n "$ip4" ] && [ -n "$gateway" ] && online=1
++
++	json_init
++	json_add_boolean enabled "$(enabled && echo 1 || echo 0)"
++	json_add_string board "ZBT-WE5927 / WE2825-2SIM"
++	json_add_string wifi "2.4 GHz single-band"
++	json_add_string mode "RNDIS"
++	json_add_string data_interface "$dev"
++	json_add_string ipv4 "$ip4"
++	json_add_string gateway "$gateway"
++	json_add_int sim "$sim"
++	json_add_string at_port "$p"
++	json_add_string manufacturer "$manufacturer"
++	json_add_string model "$model"
++	json_add_string revision "$revision"
++	json_add_string imei "$imei"
++	json_add_string iccid "$iccid"
++	json_add_string sim_status "$sim_status"
++	json_add_string operator "$operator"
++	json_add_string access_tech "$access_tech"
++	json_add_string registration "$registration"
++	json_add_string eps_registration "$eps_registration"
++	json_add_string circuit_registration "$circuit_registration"
++	json_add_string registration_status "$registration_status"
++	json_add_string packet_attach "$packet_attach"
++	json_add_string packet_status "$packet_status"
++	json_add_string extended_error "$extended_error"
++	json_add_string csq "$csq"
++	case "$signal_percent" in
++		''|*[!0-9]*) ;;
++		*) json_add_int signal_percent "$signal_percent" ;;
++	esac
++	case "$signal_dbm" in
++		''|'-'|*[!0-9-]*) ;;
++		*) json_add_int signal_dbm "$signal_dbm" ;;
++	esac
++	case "$registration_denied" in
++		1|true) json_add_boolean registration_denied 1 ;;
++		*) json_add_boolean registration_denied 0 ;;
++	esac
++	json_add_boolean online "$online"
++	json_add_string status_source "cached-safe"
++	json_dump
++
++	maybe_refresh_status_cache
++}
++
++status_json() {
++	. /usr/share/libubox/jshn.sh
++
++	local dev p sim
++	local cpin iccid cops csq cgreg cereg creg cgatt ceer ati model manufacturer revision imei ip4 pct n dbm
++	local operator_name access_code access_tech reg_code reg_status attach_code attach_status denied gateway
++
++	dev="$(cfg data_if)"
++	p="$(at_port)"
++	sim="$(cfg sim)"
++	[ -n "$dev" ] || dev=usb0
++	[ -n "$sim" ] || sim=1
++
++	cpin=""
++	iccid=""
++	cops=""
++	csq=""
++	cgreg=""
++	cereg=""
++	creg=""
++	cgatt=""
++	ceer=""
++	ati=""
++	model=""
++	manufacturer=""
++	revision=""
++	imei=""
++	ip4=""
++	pct=0
++	dbm=""
++	operator_name=""
++	access_code=""
++	access_tech=""
++	reg_code=""
++	reg_status=""
++	attach_code=""
++	attach_status=""
++	denied=0
++	gateway=""
++
++	if [ -c "$p" ] && at 'AT' 700 >/dev/null 2>&1; then
++		cpin="$(at 'AT+CPIN?' 1200 2>/dev/null | grep '+CPIN:' | tail -1 | cut -d: -f2- | clean_line)"
++		iccid="$(at 'AT+ICCID' 1200 2>/dev/null | sed -n 's/.*ICCID:[[:space:]]*\([0-9A-Fa-f]*\).*/\1/p' | tail -1 | sed 's/[Ff]$//')"
++		cops="$(at 'AT+COPS?' 1200 2>/dev/null | grep '+COPS:' | tail -1 | clean_line)"
++		csq="$(at 'AT+CSQ' 1200 2>/dev/null | grep '+CSQ:' | tail -1 | clean_line)"
++		cgreg="$(at 'AT+CGREG?' 1200 2>/dev/null | grep '+CGREG:' | tail -1 | clean_line)"
++		cereg="$(at 'AT+CEREG?' 1200 2>/dev/null | grep '+CEREG:' | tail -1 | clean_line)"
++		creg="$(at 'AT+CREG?' 1200 2>/dev/null | grep '+CREG:' | tail -1 | clean_line)"
++		cgatt="$(at 'AT+CGATT?' 1200 2>/dev/null | grep '+CGATT:' | tail -1 | clean_line)"
++		ceer="$(at 'AT+CEER' 1500 2>/dev/null | grep -vE '^(AT|OK|ERROR)[[:space:]]*$' | clean_line)"
++		ati="$(at 'ATI' 1500 2>/dev/null)"
++		manufacturer="$(echo "$ati" | sed -n 's/^[[:space:]]*Manufacturer:[[:space:]]*//p' | head -1 | clean_line)"
++		model="$(echo "$ati" | sed -n 's/^[[:space:]]*Model:[[:space:]]*//p' | head -1 | clean_line)"
++		revision="$(echo "$ati" | sed -n 's/^[[:space:]]*Revision:[[:space:]]*//p' | head -1 | clean_line)"
++		imei="$(echo "$ati" | sed -n 's/.*IMEI:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1 | tr -dc '0-9')"
++		[ -n "$imei" ] || imei="$(at 'AT+CGSN' 1200 2>/dev/null | grep -E '^[[:space:]]*[0-9]{15}[[:space:]]*$' | tail -1 | tr -dc '0-9')"
++	fi
++
++	ip4="$(ip -4 -o addr show dev "$dev" 2>/dev/null | awk '{print $4}' | head -1)"
++	gateway="$(ip route show default dev "$dev" 2>/dev/null | awk '/default via/ {print $3; exit}')"
++
++	n="$(echo "$csq" | sed -n 's/.*+CSQ:[[:space:]]*\([0-9][0-9]*\).*/\1/p')"
++	case "$n" in
++		""|99)
++			pct=0
++			;;
++		*)
++			[ "$n" -gt 31 ] && n=31
++			pct=$((n * 100 / 31))
++			dbm=$((-113 + 2 * n))
++			;;
++	esac
++
++	operator_name="$(echo "$cops" | sed -n 's/.*+COPS:[^"]*"\([^"]*\)".*/\1/p')"
++	access_code="$(echo "$cops" | sed -n 's/.*,[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p')"
++	case "$access_code" in
++		0) access_tech="GSM" ;;
++		2) access_tech="UMTS" ;;
++		7) access_tech="LTE" ;;
++		9) access_tech="LTE NB-IoT" ;;
++		11|12) access_tech="5G NR" ;;
++		*) access_tech="$access_code" ;;
++	esac
++
++	reg_code="$(echo "$cereg" | sed -n 's/.*+CEREG:[[:space:]]*[0-9][0-9]*,[[:space:]]*\([0-9][0-9]*\).*/\1/p')"
++	[ -n "$reg_code" ] || reg_code="$(echo "$cereg" | sed -n 's/.*+CEREG:[[:space:]]*\([0-9][0-9]*\).*/\1/p')"
++	case "$reg_code" in
++		1) reg_status="Registered (home)" ;;
++		5) reg_status="Registered (roaming)" ;;
++		2) reg_status="Searching" ;;
++		3) reg_status="Registration denied"; denied=1 ;;
++		4) reg_status="Unknown" ;;
++		0) reg_status="Not registered" ;;
++		*) reg_status="$cereg" ;;
++	esac
++
++	attach_code="$(echo "$cgatt" | sed -n 's/.*+CGATT:[[:space:]]*\([01]\).*/\1/p')"
++	case "$attach_code" in
++		1) attach_status="Attached" ;;
++		0) attach_status="Detached" ;;
++		*) attach_status="$cgatt" ;;
++	esac
++
++	json_init
++	json_add_boolean enabled "$(enabled && echo 1 || echo 0)"
++	json_add_string board "ZBT-WE5927 / WE2825-2SIM"
++	json_add_string wifi "2.4 GHz single-band"
++	json_add_string mode "RNDIS"
++	json_add_string data_interface "$dev"
++	json_add_string ipv4 "$ip4"
++	json_add_string gateway "$gateway"
++	json_add_int sim "$sim"
++	json_add_string at_port "$p"
++	json_add_string manufacturer "$manufacturer"
++	json_add_string model "$model"
++	json_add_string revision "$revision"
++	json_add_string imei "$imei"
++	json_add_string iccid "$iccid"
++	json_add_string sim_status "$cpin"
++	json_add_string operator "$operator_name"
++	json_add_string access_tech "$access_tech"
++	json_add_string registration "$cgreg"
++	json_add_string eps_registration "$cereg"
++	json_add_string circuit_registration "$creg"
++	json_add_string registration_status "$reg_status"
++	json_add_string packet_attach "$cgatt"
++	json_add_string packet_status "$attach_status"
++	json_add_string extended_error "$ceer"
++	json_add_boolean registration_denied "$denied"
++	json_add_string csq "$csq"
++	json_add_int signal_percent "$pct"
++	[ -n "$dbm" ] && json_add_int signal_dbm "$dbm"
++
++	if data_ok; then
++		json_add_boolean online 1
++	else
++		json_add_boolean online 0
++	fi
++
++	json_dump
++}
++
++auto_switch_sim() {
++	local old="$1" new="$2" i
++
++	log "automatic dual-SIM failover trial: SIM$old -> SIM$new"
++	set_sim "$new" || return 1
++	power_cycle
++
++	if ! sim_ready; then
++		log "SIM$new not detected; reverting to SIM$old"
++		set_sim "$old" || true
++		power_cycle
++		apply_apn || true
++		ifup lte >/dev/null 2>&1 || true
++		return 1
++	fi
++
++	apply_apn || true
++	ifup lte >/dev/null 2>&1 || true
++
++	i=0
++	while [ "$i" -lt 12 ]; do
++		data_ok && {
++			log "automatic dual-SIM failover succeeded on SIM$new"
++			return 0
++		}
++		i=$((i + 1))
++		sleep 2
++	done
++
++	log "SIM$new has no working data; reverting to SIM$old"
++	set_sim "$old" || true
++	power_cycle
++	apply_apn || true
++	ifup lte >/dev/null 2>&1 || true
++	return 1
++}
++
++daemon() {
++	local failures recoveries threshold interval hard_after auto sim_after sim next
++
++	failures=0
++	recoveries=0
++	enabled || exit 0
++
++	ensure_network
++	power_on || true
++
++	sim="$(cfg sim)"
++	[ "$sim" = "2" ] || sim=1
++	set_sim "$sim" >/dev/null 2>&1 || true
++
++	usb_repair
++	wait_at || log "AT port not ready yet"
++
++	if ! sim_ready && [ "$(cfg auto_failover)" != "0" ]; then
++		if [ "$sim" = "1" ]; then next=2; else next=1; fi
++		auto_switch_sim "$sim" "$next" && sim="$next"
++	fi
++
++	apply_apn || true
++	ifup lte >/dev/null 2>&1 || true
++
++	threshold="$(cfg fail_threshold)"
++	interval="$(cfg ping_interval)"
++	hard_after="$(cfg hard_reset_after)"
++	auto="$(cfg auto_failover)"
++	sim_after="$(cfg sim_failover_after)"
++
++	[ -n "$threshold" ] || threshold=6
++	[ -n "$interval" ] || interval=10
++	[ -n "$hard_after" ] || hard_after=2
++	[ -n "$auto" ] || auto=1
++	[ -n "$sim_after" ] || sim_after=3
++
++	log "service started: RNDIS $(cfg data_if), APN=$(cfg apn), SIM$sim"
++
++	while enabled; do
++		if data_ok; then
++			failures=0
++			recoveries=0
++		else
++			failures=$((failures + 1))
++			log "connectivity failure $failures/$threshold"
++
++			if [ "$failures" -ge "$threshold" ]; then
++				failures=0
++				recoveries=$((recoveries + 1))
++
++				log "Interface-first LTE recovery: ifdown/ifup"
++				ifdown lte >/dev/null 2>&1 || true
++				sleep 2
++				ifup lte >/dev/null 2>&1 || true
++				sleep 8
++
++				if data_ok; then
++					log "LTE interface recovery succeeded"
++					recoveries=0
++					continue
++				fi
++
++				soft_reconnect || true
++				sleep 8
++
++				if ! data_ok && [ $((recoveries % hard_after)) -eq 0 ]; then
++					power_cycle
++				fi
++
++				if ! data_ok && [ "$auto" = "1" ] && [ $((recoveries % sim_after)) -eq 0 ]; then
++					sim="$(cfg sim)"
++					if [ "$sim" = "1" ]; then
++						next=2
++					else
++						next=1
++					fi
++
++					auto_switch_sim "$sim" "$next" || true
++				fi
++			fi
++		fi
++
++		sleep "$interval"
++	done
++}
++
++case "$1" in
++	daemon)
++		daemon
++		;;
++	status-fast)
++		status_fast_json
++		;;
++	status)
++		status_fast_json
++		;;
++	status-full)
++		status_json
++		;;
++	refresh-cache)
++		refresh_status_cache
++		;;
++	reconnect)
++		soft_reconnect
++		;;
++	power-cycle)
++		power_cycle
++		;;
++	sim)
++		set_sim "$2"
++		power_cycle
++		apply_apn
++		ifup lte >/dev/null 2>&1 || true
++		;;
++	usb-repair)
++		usb_repair
++		ifup lte >/dev/null 2>&1 || true
++		;;
++	restart)
++		/etc/init.d/we5927-lte restart
++		;;
++	*)
++		echo "usage: $0 {status|reconnect|power-cycle|usb-repair|sim 1|sim 2|restart}" >&2
++		exit 2
++		;;
++esac
+diff --git a/package/we5927-lte/files/usr/share/luci/menu.d/luci-app-we5927-lte.json b/package/we5927-lte/files/usr/share/luci/menu.d/luci-app-we5927-lte.json
+new file mode 100644
+index 0000000..568b9a8
+--- /dev/null
++++ b/package/we5927-lte/files/usr/share/luci/menu.d/luci-app-we5927-lte.json
+@@ -0,0 +1,8 @@
++{
++	"admin/network/we5927_lte": {
++		"title": "4G / Dual SIM",
++		"order": 55,
++		"action": { "type": "view", "path": "we5927_lte" },
++		"depends": { "acl": [ "luci-app-we5927-lte" ] }
++	}
++}
+diff --git a/package/we5927-lte/files/usr/share/rpcd/acl.d/luci-app-we5927-lte.json b/package/we5927-lte/files/usr/share/rpcd/acl.d/luci-app-we5927-lte.json
+new file mode 100644
+index 0000000..f22fff4
+--- /dev/null
++++ b/package/we5927-lte/files/usr/share/rpcd/acl.d/luci-app-we5927-lte.json
+@@ -0,0 +1,47 @@
++{
++	"luci-app-we5927-lte": {
++		"description": "Grant access to WE5927 LTE and dual-SIM manager",
++		"read": {
++			"file": {
++				"/usr/sbin/we5927-lte status": [
++					"exec"
++				],
++				"/usr/sbin/we5927-lte status-fast": [
++					"exec"
++				]
++			},
++			"uci": [
++				"we5927_lte",
++				"network",
++				"firewall"
++			]
++		},
++		"write": {
++			"file": {
++				"/usr/sbin/we5927-lte reconnect": [
++					"exec"
++				],
++				"/usr/sbin/we5927-lte power-cycle": [
++					"exec"
++				],
++				"/usr/sbin/we5927-lte usb-repair": [
++					"exec"
++				],
++				"/usr/sbin/we5927-lte sim 1": [
++					"exec"
++				],
++				"/usr/sbin/we5927-lte sim 2": [
++					"exec"
++				],
++				"/etc/init.d/we5927-lte restart": [
++					"exec"
++				]
++			},
++			"uci": [
++				"we5927_lte",
++				"network",
++				"firewall"
++			]
++		}
++	}
++}
+diff --git a/package/we5927-lte/files/www/luci-static/resources/view/we5927_lte.js b/package/we5927-lte/files/www/luci-static/resources/view/we5927_lte.js
+new file mode 100644
+index 0000000..0298c4a
+--- /dev/null
++++ b/package/we5927-lte/files/www/luci-static/resources/view/we5927_lte.js
+@@ -0,0 +1,161 @@
++'use strict';
++'require view';
++'require form';
++'require fs';
++'require uci';
++'require ui';
++
++function yesno(v) {
++	return v ? _('Online') : _('Offline');
++}
++
++function statusTable(st) {
++	var sig = '-';
++	if (st.signal_percent != null)
++		sig = st.signal_percent + '%' + (st.signal_dbm != null ? ' (' + st.signal_dbm + ' dBm)' : '');
++
++	var rows = [
++		[ _('Connection'), yesno(st.online) ],
++		[ _('Active SIM'), st.sim ? 'SIM ' + st.sim : '-' ],
++		[ _('IPv4'), st.ipv4 || '-' ],
++		[ _('Gateway'), st.gateway || '-' ],
++		[ _('Signal'), sig ],
++		[ _('SIM status'), st.sim_status || '-' ],
++		[ _('Operator'), st.operator || '-' ],
++		[ _('Access technology'), st.access_tech || '-' ],
++		[ _('Registration status'), st.registration_status || '-' ],
++		[ _('Packet attach'), st.packet_status || st.packet_attach || '-' ],
++		[ _('Registration denied'), st.registration_denied ? _('Yes') : _('No') ],
++		[ _('Extended network error'), st.extended_error || '-' ],
++		[ _('ICCID'), st.iccid || '-' ],
++		[ _('Manufacturer'), st.manufacturer || '-' ],
++		[ _('Modem'), st.model || '-' ],
++		[ _('Revision'), st.revision || '-' ],
++		[ _('IMEI'), st.imei || '-' ],
++		[ _('Data interface'), st.data_interface || '-' ],
++		[ _('AT port'), st.at_port || '-' ],
++		[ _('Data mode'), st.mode || '-' ],
++		[ _('Wi-Fi hardware'), st.wifi || '2.4 GHz single-band' ]
++	];
++
++	return E('table', { 'class': 'table' },
++		rows.map(function(r) {
++			return E('tr', {}, [
++				E('td', { 'style': 'width:35%;font-weight:bold' }, [ r[0] ]),
++				E('td', {}, [ String(r[1]) ])
++			]);
++		})
++	);
++}
++
++return view.extend({
++	load: function() {
++		return Promise.all([
++			uci.load('we5927_lte'),
++			fs.exec('/usr/sbin/we5927-lte', [ 'status-fast' ]).catch(function(e) {
++				return { stdout: '', stderr: String(e) };
++			})
++		]);
++	},
++
++	render: function(data) {
++		var res = data[1] || {};
++		var st = {};
++
++		try {
++			st = JSON.parse(res.stdout || '{}');
++		}
++		catch (e) {
++			st = { error: res.stdout || res.stderr || String(e) };
++		}
++
++		var refresh = E('button', {
++			'class': 'btn cbi-button cbi-button-action',
++			'click': function() { window.location.reload(); }
++		}, [ _('Refresh status') ]);
++
++		var live = E('div', { 'class': 'cbi-section' }, [
++			E('h3', {}, [ _('Live 4G status') ]),
++			st.error ? E('div', { 'class': 'alert-message warning' }, [ st.error ]) : statusTable(st),
++			E('div', { 'style': 'margin-top:10px' }, [ refresh ])
++		]);
++
++		var m = new form.Map('we5927_lte', _('4G / Dual SIM'),
++			_('LTE automation for ZBT-WE5927 / WE2825-2SIM. This unit has 2.4 GHz Wi-Fi only. 4G data uses usb0/RNDIS and AT control uses the CX07E serial interface.'));
++
++		var s = m.section(form.NamedSection, 'main', 'modem', _('LTE settings'));
++		s.addremove = false;
++
++		var o = s.option(form.Flag, 'enabled', _('Enable LTE automation'));
++		o.default = o.enabled;
++
++		o = s.option(form.Value, 'apn', _('APN'));
++		o.placeholder = 'internet';
++		o.rmempty = false;
++
++		o = s.option(form.ListValue, 'sim', _('Preferred SIM'));
++		o.value('1', _('SIM 1'));
++		o.value('2', _('SIM 2'));
++
++		o = s.option(form.Flag, 'auto_failover', _('Automatic SIM failover'));
++		o.default = o.enabled;
++		o.description = _('If repeated modem recovery fails, switch to the other SIM and power-cycle the modem.');
++
++		o = s.option(form.Value, 'ping_host', _('Connectivity test host'));
++		o.placeholder = '1.1.1.1';
++		o.datatype = 'host';
++
++		o = s.option(form.Value, 'ping_interval', _('Check interval (seconds)'));
++		o.datatype = 'uinteger';
++
++		o = s.option(form.Value, 'fail_threshold', _('Failures before reconnect'));
++		o.datatype = 'uinteger';
++
++		o = s.option(form.Value, 'hard_reset_after', _('Reconnect cycles before modem power-cycle'));
++		o.datatype = 'uinteger';
++
++		o = s.option(form.Value, 'sim_failover_after', _('Recovery cycles before switching SIM'));
++		o.datatype = 'uinteger';
++
++		function actionButton(label, args, style, confirmText) {
++			return E('button', {
++				'class': 'btn cbi-button cbi-button-' + (style || 'action'),
++				'style': 'margin-right:8px;margin-bottom:8px',
++				'click': function(ev) {
++					ev.preventDefault();
++					if (confirmText && !confirm(confirmText))
++						return;
++
++					ev.currentTarget.disabled = true;
++					fs.exec('/usr/sbin/we5927-lte', args).then(function(out) {
++						ui.addNotification(null, E('p', {}, [
++							out.stdout || out.stderr || _('Command completed')
++						]));
++					}).catch(function(e) {
++						ui.addNotification(null, E('p', {}, [ String(e) ]), 'error');
++					}).finally(function() {
++						ev.currentTarget.disabled = false;
++					});
++				}
++			}, [ label ]);
++		}
++
++		var actions = E('div', { 'class': 'cbi-section' }, [
++			E('h3', {}, [ _('Manual actions') ]),
++			E('div', {}, [
++				actionButton(_('Repair USB / RNDIS'), [ 'usb-repair' ], 'action'),
++				actionButton(_('Reconnect 4G'), [ 'reconnect' ], 'apply'),
++				actionButton(_('Power-cycle modem'), [ 'power-cycle' ], 'reset',
++					_('Power-cycle the LTE modem now? Internet will be interrupted temporarily.')),
++				actionButton(_('Switch to SIM 1'), [ 'sim', '1' ], 'apply',
++					_('Switch to SIM 1 and restart the LTE modem?')),
++				actionButton(_('Switch to SIM 2'), [ 'sim', '2' ], 'apply',
++					_('Switch to SIM 2 and restart the LTE modem?'))
++			])
++		]);
++
++		return m.render().then(function(node) {
++			return E([], [ live, node, actions ]);
++		});
++	}
++});
+diff --git a/package/we5927-lte/src/we5927-at.c b/package/we5927-lte/src/we5927-at.c
+new file mode 100644
+index 0000000..f05004c
+--- /dev/null
++++ b/package/we5927-lte/src/we5927-at.c
+@@ -0,0 +1,71 @@
++#include <errno.h>
++#include <fcntl.h>
++#include <poll.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <termios.h>
++#include <time.h>
++#include <unistd.h>
++
++static long ms_now(void) {
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
++}
++
++int main(int argc, char **argv) {
++	const char *dev, *cmd;
++	int timeout_ms = 2500, fd, rc = 1;
++	struct termios tio;
++	char tx[512], buf[512];
++	long deadline;
++
++	if (argc < 3 || argc > 4) {
++		fprintf(stderr, "usage: %s /dev/ttyUSB1 'AT+CMD' [timeout_ms]\n", argv[0]);
++		return 2;
++	}
++	dev = argv[1]; cmd = argv[2];
++	if (argc == 4) timeout_ms = atoi(argv[3]);
++	if (timeout_ms < 100) timeout_ms = 100;
++	if (timeout_ms > 30000) timeout_ms = 30000;
++
++	fd = open(dev, O_RDWR | O_NOCTTY | O_NONBLOCK);
++	if (fd < 0) { perror(dev); return 3; }
++
++	if (tcgetattr(fd, &tio) != 0) { perror("tcgetattr"); close(fd); return 3; }
++	cfmakeraw(&tio);
++	cfsetispeed(&tio, B115200);
++	cfsetospeed(&tio, B115200);
++	tio.c_cflag |= CLOCAL | CREAD;
++	tio.c_cflag &= ~CRTSCTS;
++	tio.c_cc[VMIN] = 0;
++	tio.c_cc[VTIME] = 0;
++	if (tcsetattr(fd, TCSANOW, &tio) != 0) { perror("tcsetattr"); close(fd); return 3; }
++	tcflush(fd, TCIOFLUSH);
++
++	if (snprintf(tx, sizeof(tx), "%s\r", cmd) >= (int)sizeof(tx)) { close(fd); return 2; }
++	if (write(fd, tx, strlen(tx)) < 0) { perror("write"); close(fd); return 3; }
++
++	deadline = ms_now() + timeout_ms;
++	while (ms_now() < deadline) {
++		struct pollfd pfd = { .fd = fd, .events = POLLIN };
++		int left = (int)(deadline - ms_now());
++		int pr = poll(&pfd, 1, left > 250 ? 250 : left);
++		if (pr < 0 && errno != EINTR) break;
++		if (pr <= 0) continue;
++		if (pfd.revents & POLLIN) {
++			ssize_t n = read(fd, buf, sizeof(buf)-1);
++			if (n > 0) {
++				buf[n] = '\0';
++				fputs(buf, stdout);
++				fflush(stdout);
++				if (strstr(buf, "\r\nOK\r\n") || strstr(buf, "\nOK\r") || strstr(buf, "\nOK\n")) rc = 0;
++				if (strstr(buf, "\r\nERROR\r\n") || strstr(buf, "+CME ERROR") || strstr(buf, "+CMS ERROR")) rc = 1;
++				if (rc == 0 || strstr(buf, "ERROR")) break;
++			}
++		}
++	}
++	close(fd);
++	return rc;
++}
+diff --git a/target/linux/ramips/dts/mt7628an_zbtlink_zbt-we5927.dts b/target/linux/ramips/dts/mt7628an_zbtlink_zbt-we5927.dts
+new file mode 100644
+index 0000000..dbe02fb
+--- /dev/null
++++ b/target/linux/ramips/dts/mt7628an_zbtlink_zbt-we5927.dts
+@@ -0,0 +1,193 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++
++#include "mt7628an.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/leds/common.h>
++
++/ {
++	compatible = "zbtlink,zbt-we5927", "mediatek,mt7628an-soc";
++	model = "Zbtlink ZBT-WE5927";
++
++/*
++ * This WE2825-2SIM unit is physically single-band 2.4 GHz.
++ * The vendor image is shared with related WE5927 variants and contains
++ * PCIe/MT76x2 data, but runtime exposes only the integrated MT7628 radio.
++ */
++
++	aliases {
++		led-boot = &led_wlan;
++		led-failsafe = &led_wlan;
++		led-upgrade = &led_wlan;
++		label-mac-device = &wmac;
++	};
++
++	keys {
++		compatible = "gpio-keys";
++
++		reset {
++			label = "reset";
++			gpios = <&gpio 38 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_RESTART>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		lan1 {
++			gpios = <&gpio 43 GPIO_ACTIVE_LOW>;
++			color = <LED_COLOR_ID_GREEN>;
++			function = LED_FUNCTION_LAN;
++			function-enumerator = <1>;
++		};
++
++		lan2 {
++			gpios = <&gpio 42 GPIO_ACTIVE_LOW>;
++			color = <LED_COLOR_ID_GREEN>;
++			function = LED_FUNCTION_LAN;
++			function-enumerator = <2>;
++		};
++
++		lan3 {
++			gpios = <&gpio 41 GPIO_ACTIVE_LOW>;
++			color = <LED_COLOR_ID_GREEN>;
++			function = LED_FUNCTION_LAN;
++			function-enumerator = <3>;
++		};
++
++		wan {
++			gpios = <&gpio 39 GPIO_ACTIVE_LOW>;
++			color = <LED_COLOR_ID_GREEN>;
++			function = LED_FUNCTION_WAN;
++		};
++
++		led_wlan: wlan2g {
++			gpios = <&gpio 44 GPIO_ACTIVE_LOW>;
++			color = <LED_COLOR_ID_GREEN>;
++			function = LED_FUNCTION_WLAN;
++			linux,default-trigger = "phy0tpt";
++		};
++	};
++
++	/*
++	 * Confirmed from the real vendor rootfs:
++	 * netcard.device.module_gpio=1, active=1;
++	 * netcard.device.sim_switch_gpio=46, default=1.
++	 */
++	gpio_export {
++		compatible = "gpio-export";
++
++		modem_power {
++			gpio-export,name = "modem_power";
++			gpio-export,output = <1>;
++			gpios = <&gpio 1 GPIO_ACTIVE_HIGH>;
++		};
++
++		sim_select {
++			gpio-export,name = "sim_select";
++			gpio-export,output = <1>;
++			gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	/*
++	 * Vendor anyversion config sets doggpio=37, dogtype=1 and
++	 * feed_dog.sh flips GPIO37 once per second.  A 2 s hardware
++	 * margin makes the kernel watchdog core refresh at a safe cadence.
++	 */
++	watchdog {
++		compatible = "linux,wdt-gpio";
++		gpios = <&gpio 37 GPIO_ACTIVE_HIGH>;
++		hw_algo = "toggle";
++		hw_margin_ms = <2000>;
++		always-running;
++	};
++};
++
++&spi0 {
++	status = "okay";
++
++	flash@0 {
++		compatible = "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <10000000>;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition@0 {
++				label = "u-boot";
++				reg = <0x0 0x30000>;
++				read-only;
++			};
++
++			partition@30000 {
++				label = "u-boot-env";
++				reg = <0x30000 0x10000>;
++				read-only;
++			};
++
++			factory: partition@40000 {
++				label = "factory";
++				reg = <0x40000 0x10000>;
++				read-only;
++
++				nvmem-layout {
++					compatible = "fixed-layout";
++					#address-cells = <1>;
++					#size-cells = <1>;
++
++					eeprom_factory_0: eeprom@0 {
++						reg = <0x0 0x400>;
++					};
++
++					macaddr_factory_28: macaddr@28 {
++						reg = <0x28 0x6>;
++					};
++				};
++			};
++
++			partition@50000 {
++				compatible = "denx,uimage";
++				label = "firmware";
++				reg = <0x50000 0x7a0000>;
++			};
++
++			partition@7f0000 {
++				label = "art";
++				reg = <0x7f0000 0x10000>;
++				read-only;
++			};
++		};
++	};
++};
++
++&state_default {
++	gpio {
++		groups = "gpio", "i2s", "refclk", "uart1", "wdt",
++			 "p4led_an", "p3led_an", "p2led_an",
++			 "p1led_an", "p0led_an", "wled_an";
++		function = "gpio";
++	};
++};
++
++
++&wmac {
++	status = "okay";
++
++	nvmem-cells = <&eeprom_factory_0>;
++	nvmem-cell-names = "eeprom";
++};
++
++&ethernet {
++	nvmem-cells = <&macaddr_factory_28>;
++	nvmem-cell-names = "mac-address";
++};
++
++&sdhci {
++	status = "okay";
++};
+diff --git a/target/linux/ramips/image/mt76x8.mk b/target/linux/ramips/image/mt76x8.mk
+index 96b3aeb..032770b 100644
+--- a/target/linux/ramips/image/mt76x8.mk
++++ b/target/linux/ramips/image/mt76x8.mk
+@@ -1449,6 +1449,15 @@ define Device/zbtlink_zbt-we1226
+ endef
+ TARGET_DEVICES += zbtlink_zbt-we1226
+ 
++define Device/zbtlink_zbt-we5927
++  IMAGE_SIZE := 7808k
++  DEVICE_VENDOR := Zbtlink
++  DEVICE_MODEL := ZBT-WE5927
++  SUPPORTED_DEVICES += zbt-we5927
++  DEVICE_PACKAGES := luci we5927-lte kmod-usb2 kmod-usb-ohci kmod-usb-net-rndis kmod-usb-serial-option
++endef
++TARGET_DEVICES += zbtlink_zbt-we5927
++
+ define Device/zbtlink_zbt-we2426-b
+   IMAGE_SIZE := 7872k
+   DEVICE_VENDOR := Zbtlink
+diff --git a/target/linux/ramips/mt76x8/base-files/etc/board.d/02_network b/target/linux/ramips/mt76x8/base-files/etc/board.d/02_network
+index fbd21f5..83afc14 100644
+--- a/target/linux/ramips/mt76x8/base-files/etc/board.d/02_network
++++ b/target/linux/ramips/mt76x8/base-files/etc/board.d/02_network
+@@ -176,6 +176,10 @@ ramips_setup_interfaces()
+ 			"2:lan" "3:lan" "6@eth0"
+ 		ucidef_set_interface_wan "eth1"
+ 		;;
++	zbtlink,zbt-we5927)
++		ucidef_add_switch "switch0" \
++			"0:lan:4" "1:lan:3" "2:lan:2" "3:lan:1" "4:wan" "6@eth0"
++		;;
+ 	netgear,r6020|\
+ 	netgear,r6080|\
+ 	netgear,r6120|\
+@@ -296,7 +300,8 @@ ramips_setup_macs()
+ 	wavlink,wl-wn531a3|\
+ 	wavlink,wl-wn577a2|\
+ 	wavlink,wl-wn578a2|\
+-	zbtlink,zbt-we2426-b)
++	zbtlink,zbt-we2426-b|\
++	zbtlink,zbt-we5927)
+ 		wan_mac=$(mtd_get_mac_binary factory 0x2e)
+ 		label_mac=$(mtd_get_mac_binary factory 0x4)
+ 		;;

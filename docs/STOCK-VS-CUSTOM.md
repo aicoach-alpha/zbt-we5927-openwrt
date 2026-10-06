@@ -157,8 +157,9 @@ The tested unit had approximately:
 - Tuned to one hardware/modem combination; it is less generic than the factory AnyWiFi stack.
 - Tiny overlay leaves little space for optional packages.
 - Full SQM is not currently practical on the tested image because matching kernel modules are not available from the configured feed.
-- The current AT helper on the live router is binary-only; this repository does not redistribute it until a source-built replacement is available.
-- A reproducible public sysupgrade image still needs to be built and tested before being offered as a release asset.
+- The project remains unofficial and must be matched to the exact board/modem combination.
+- The public sysupgrade image is a release candidate for compatible OpenWrt installs, not a vendor-web-UI factory image.
+- The source-built AT helper is included, but broader clean-flash and hardware-variant testing is still limited.
 
 ## Which one should you use?
 

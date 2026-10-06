@@ -2,7 +2,15 @@
 
 Community firmware overlay and LTE/Dual-SIM management stack for the **ZBT WE5927 / WE2825-2SIM** MT7628 family.
 
-> **Status:** tested on one WE5927/WE2825-2SIM unit with a CX07E LTE modem in RNDIS mode. This repository is currently a **source/overlay release**, not a universal flash image. Do not flash images from this project onto a different WE5927 hardware variant without verifying the board, flash layout, GPIOs and modem first.
+> **Status:** tested on one WE5927/WE2825-2SIM unit with a CX07E LTE modem in RNDIS mode. A public **sysupgrade release candidate** is available for the tested board identity. It is not a universal image and must not be flashed onto another WE5927 hardware variant without verifying the board, flash layout, GPIOs and modem first.
+
+## Public binary release
+
+The first public build is under [`releases/v2026.10.06`](releases/v2026.10.06/).
+
+The final sysupgrade image was copied to the live router and passed OpenWrt's own `sysupgrade -T` compatibility check. Installation and recovery notes are in [`docs/INSTALL.md`](docs/INSTALL.md).
+
+**This is an OpenWrt sysupgrade image, not a vendor-web-UI factory image.**
 
 ## Tested hardware
 
@@ -160,11 +168,11 @@ docs/
   STOCK-VS-CUSTOM.md
 ```
 
-## Important limitation: AT helper
+## Source-built AT helper
 
-The running firmware currently uses a small MIPS helper at `/usr/sbin/we5927-at` to perform bounded serial AT transactions. Its source was not present on the router when this repository was prepared, so the first public revision intentionally does **not** redistribute an opaque binary of uncertain provenance.
+The firmware uses a small MIPS helper at `/usr/sbin/we5927-at` for bounded serial AT transactions. Its C source is included at [`source/we5927-lte/src/we5927-at.c`](source/we5927-lte/src/we5927-at.c) and the public image contains the helper built for `mipsel_24kc` with the OpenWrt toolchain.
 
-That means the overlay in this repository is useful for documentation, review and development, but a clean reproducible flash image will only be published after the AT helper is replaced with a source-built implementation and the resulting image is tested on hardware.
+The release source bundle also contains the package Makefile, target DTS, build configuration and OpenWrt patch used for this board.
 
 ## Safety
 

@@ -1,0 +1,48 @@
+#!/bin/sh
+# LTE defaults. Preserve existing user settings when upgrading.
+
+get_or_set() {
+	local option="$1"
+	local value="$2"
+	uci -q get "we5927_lte.main.$option" >/dev/null 2>&1 || 		uci -q set "we5927_lte.main.$option=$value"
+}
+
+get_or_set enabled 1
+get_or_set sim 1
+get_or_set sim1_value 1
+get_or_set sim2_value 0
+get_or_set modem_gpio 1
+get_or_set sim_gpio 46
+get_or_set ping_host 1.1.1.1
+get_or_set ping_interval 30
+get_or_set fail_threshold 6
+get_or_set hard_reset_after 2
+get_or_set auto_failover 0
+get_or_set sim_failover_after 2
+uci -q commit we5927_lte
+
+if [ "$(uci -q get network.lte)" != "interface" ]; then
+	uci -q batch <<'EOF'
+set network.lte=interface
+set network.lte.device='usb0'
+set network.lte.proto='dhcp'
+set network.lte.metric='5'
+set network.lte.peerdns='0'
+add_list network.lte.dns='94.140.14.14'
+add_list network.lte.dns='94.140.15.15'
+EOF
+	uci -q commit network
+fi
+
+if [ "$(uci -q get network.wan)" = "interface" ] && ! uci -q get network.wan.metric >/dev/null 2>&1; then
+	uci -q set network.wan.metric='3'
+	uci -q commit network
+fi
+
+wan_zone="$(uci -q show firewall | sed -n "s/^\(firewall\.@zone\[[0-9]\+\]\)\.name='wan'$/\1/p" | head -n1)"
+if [ -n "$wan_zone" ] && ! uci -q get "${wan_zone}.network" | grep -qw lte; then
+	uci add_list "${wan_zone}.network=lte"
+	uci commit firewall
+fi
+
+exit 0

@@ -1,0 +1,193 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+#include "mt7628an.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "zbtlink,zbt-we5927", "mediatek,mt7628an-soc";
+	model = "Zbtlink ZBT-WE5927";
+
+/*
+ * This WE2825-2SIM unit is physically single-band 2.4 GHz.
+ * The vendor image is shared with related WE5927 variants and contains
+ * PCIe/MT76x2 data, but runtime exposes only the integrated MT7628 radio.
+ */
+
+	aliases {
+		led-boot = &led_wlan;
+		led-failsafe = &led_wlan;
+		led-upgrade = &led_wlan;
+		label-mac-device = &wmac;
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset {
+			label = "reset";
+			gpios = <&gpio 38 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		lan1 {
+			gpios = <&gpio 43 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_LAN;
+			function-enumerator = <1>;
+		};
+
+		lan2 {
+			gpios = <&gpio 42 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_LAN;
+			function-enumerator = <2>;
+		};
+
+		lan3 {
+			gpios = <&gpio 41 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_LAN;
+			function-enumerator = <3>;
+		};
+
+		wan {
+			gpios = <&gpio 39 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_WAN;
+		};
+
+		led_wlan: wlan2g {
+			gpios = <&gpio 44 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_WLAN;
+			linux,default-trigger = "phy0tpt";
+		};
+	};
+
+	/*
+	 * Confirmed from the real vendor rootfs:
+	 * netcard.device.module_gpio=1, active=1;
+	 * netcard.device.sim_switch_gpio=46, default=1.
+	 */
+	gpio_export {
+		compatible = "gpio-export";
+
+		modem_power {
+			gpio-export,name = "modem_power";
+			gpio-export,output = <1>;
+			gpios = <&gpio 1 GPIO_ACTIVE_HIGH>;
+		};
+
+		sim_select {
+			gpio-export,name = "sim_select";
+			gpio-export,output = <1>;
+			gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	/*
+	 * Vendor anyversion config sets doggpio=37, dogtype=1 and
+	 * feed_dog.sh flips GPIO37 once per second.  A 2 s hardware
+	 * margin makes the kernel watchdog core refresh at a safe cadence.
+	 */
+	watchdog {
+		compatible = "linux,wdt-gpio";
+		gpios = <&gpio 37 GPIO_ACTIVE_HIGH>;
+		hw_algo = "toggle";
+		hw_margin_ms = <2000>;
+		always-running;
+	};
+};
+
+&spi0 {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <10000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0 0x30000>;
+				read-only;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x30000 0x10000>;
+				read-only;
+			};
+
+			factory: partition@40000 {
+				label = "factory";
+				reg = <0x40000 0x10000>;
+				read-only;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					eeprom_factory_0: eeprom@0 {
+						reg = <0x0 0x400>;
+					};
+
+					macaddr_factory_28: macaddr@28 {
+						reg = <0x28 0x6>;
+					};
+				};
+			};
+
+			partition@50000 {
+				compatible = "denx,uimage";
+				label = "firmware";
+				reg = <0x50000 0x7a0000>;
+			};
+
+			partition@7f0000 {
+				label = "art";
+				reg = <0x7f0000 0x10000>;
+				read-only;
+			};
+		};
+	};
+};
+
+&state_default {
+	gpio {
+		groups = "gpio", "i2s", "refclk", "uart1", "wdt",
+			 "p4led_an", "p3led_an", "p2led_an",
+			 "p1led_an", "p0led_an", "wled_an";
+		function = "gpio";
+	};
+};
+
+
+&wmac {
+	status = "okay";
+
+	nvmem-cells = <&eeprom_factory_0>;
+	nvmem-cell-names = "eeprom";
+};
+
+&ethernet {
+	nvmem-cells = <&macaddr_factory_28>;
+	nvmem-cell-names = "mac-address";
+};
+
+&sdhci {
+	status = "okay";
+};
