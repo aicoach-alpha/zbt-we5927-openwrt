@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "cx07e",
+  "status": "tested",
+  "manufacturer_family": "Qualcomm-based",
+  "usb_ids": ["05c6:902e"],
+  "data_modes": ["rndis"],
+  "default_data_interface": "usb0",
+  "at": {
+    "strategy": "usb-interface-map",
+    "verified_usb_interface": "1.4",
+    "usual_tty": "/dev/ttyUSB2",
+    "never_auto_probe_usb_interface": ["1.5"]
+  },
+  "health": {
+    "sim_query": "AT+CPIN?",
+    "operator_query": "AT+COPS?",
+    "signal_query": "AT+CSQ",
+    "packet_attach_query": "AT+CGATT?"
+  },
+  "recovery": {
+    "soft": ["AT+CFUN=0", "AT+CFUN=1"],
+    "hard": "board-modem-power-gpio"
+  },
+  "notes": [
+    "Validated on the public WE2825-2SIM/WE5927 profile.",
+    "RNDIS interface is DHCP-managed."
+  ]
+}
