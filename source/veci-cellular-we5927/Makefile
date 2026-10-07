@@ -26,4 +26,11 @@ define Package/veci-cellular-we5927/install
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/veci-cellular-we5927.json $(1)/usr/share/rpcd/acl.d/veci-cellular-we5927.json
 endef
 
+define Package/veci-cellular-we5927/postinst
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] || {
+	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+}
+endef
+
 $(eval $(call BuildPackage,veci-cellular-we5927))

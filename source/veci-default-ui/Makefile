@@ -33,4 +33,11 @@ define Package/veci-default-ui/install
 	$(INSTALL_BIN) ./files/etc/uci-defaults/98-veci-default-ui $(1)/etc/uci-defaults/98-veci-default-ui
 endef
 
+define Package/veci-default-ui/postinst
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] || {
+	/usr/sbin/veci-default-ui enable >/dev/null 2>&1 || true
+}
+endef
+
 $(eval $(call BuildPackage,veci-default-ui))
