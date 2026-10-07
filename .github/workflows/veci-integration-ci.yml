@@ -43,6 +43,7 @@ jobs:
           test -f /tmp/openwrt/package/veci-default-ui/Makefile
           test -f /tmp/openwrt/package/veci-cellular-we5927/Makefile
           grep -qx 'PKG_NAME:=veci' /tmp/openwrt/package/veci/Makefile
+          grep -q '<base href="/veci/" />' /tmp/openwrt/package/veci/veci/index.html
 
       - name: Verify generic and hardware-specific boundary
         run: |
