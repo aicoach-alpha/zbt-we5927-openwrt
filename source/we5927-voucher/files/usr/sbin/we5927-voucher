@@ -1,0 +1,90 @@
+#!/bin/sh
+
+CFG=we5927_voucher
+DB="$(uci -q get ${CFG}.main.db_path)"
+[ -n "$DB" ] || DB=/etc/we5927-voucher/vouchers.db
+DIR="${DB%/*}"
+
+die() {
+	echo "error: $*" >&2
+	exit 1
+}
+
+ensure_db() {
+	mkdir -p "$DIR" || die "cannot create $DIR"
+	touch "$DB" || die "cannot create $DB"
+	chmod 600 "$DB" 2>/dev/null || true
+}
+
+rand_num() {
+	n="$(od -An -N4 -tu4 /dev/urandom 2>/dev/null | tr -d ' ')"
+	[ -n "$n" ] || n="$(date +%s)"
+	echo "$n"
+}
+
+duration_minutes() {
+	case "$1" in
+		1h|1) echo 60 ;;
+		2h|2) echo 120 ;;
+		3h|3) echo 180 ;;
+		*) return 1 ;;
+	esac
+}
+
+create_voucher() {
+	mins="$(duration_minutes "$1")" || die "duration must be 1h, 2h or 3h"
+	ensure_db
+
+	r="$(rand_num)"
+	user="GST-$(printf '%04d' $((r % 10000)))"
+	while grep -q "^${user}|" "$DB" 2>/dev/null; do
+		r="$(rand_num)"
+		user="GST-$(printf '%04d' $((r % 10000)))"
+	done
+
+	r="$(rand_num)"
+	pass="$(printf '%06d' $((r % 1000000)))"
+	salt="$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
+	[ -n "$salt" ] || die "cannot generate salt"
+	hash="$(printf '%s' "${salt}:${pass}" | sha256sum | awk '{print $1}')"
+	maxdev="$(uci -q get ${CFG}.main.max_devices)"
+	[ -n "$maxdev" ] || maxdev=1
+
+	# user|salt|hash|duration_min|max_devices|first_login|expiry|state
+	printf '%s|%s|%s|%s|%s|0|0|unused\n' \
+		"$user" "$salt" "$hash" "$mins" "$maxdev" >> "$DB"
+
+	echo "username=$user"
+	echo "password=$pass"
+	echo "duration_minutes=$mins"
+	echo "max_devices=$maxdev"
+	echo "note=password is shown once and is not stored in plaintext"
+}
+
+list_vouchers() {
+	ensure_db
+	printf '%-12s %-8s %-7s %-12s %-12s %-10s\n' USER MINUTES DEVICES FIRST_LOGIN EXPIRY STATE
+	awk -F'|' '{printf "%-12s %-8s %-7s %-12s %-12s %-10s\\n",$1,$4,$5,$6,$7,$8}' "$DB"
+}
+
+disable_voucher() {
+	[ -n "$1" ] || die "username required"
+	ensure_db
+	tmp="${DB}.tmp.$$"
+	awk -F'|' -v u="$1" 'BEGIN{OFS="|"} {$8=($1==u ? "disabled" : $8); print}' "$DB" > "$tmp" || die "update failed"
+	mv "$tmp" "$DB" || die "update failed"
+	chmod 600 "$DB" 2>/dev/null || true
+}
+
+case "$1" in
+	create) create_voucher "$2" ;;
+	list) list_vouchers ;;
+	disable) disable_voucher "$2" ;;
+	*)
+		echo "usage:"
+		echo "  we5927-voucher create 1h|2h|3h"
+		echo "  we5927-voucher list"
+		echo "  we5927-voucher disable USER"
+		exit 2
+		;;
+esac
