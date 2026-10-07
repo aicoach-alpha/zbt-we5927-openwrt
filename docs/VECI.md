@@ -86,6 +86,14 @@ methods:
 
 ## Build order
 
+For a one-command build from a clean pinned OpenWrt tree:
+
+```sh
+JOBS=4 ./scripts/build-veci-firmware.sh /path/to/openwrt
+```
+
+The script verifies the exact OpenWrt commit, requires a clean source tree, applies the firmware overlay, resolves the pinned VeCI source, installs feeds, builds the image, and rejects an image larger than the 7808 KiB device budget.
+
 For a reproducible firmware build:
 
 1. checkout the OpenWrt source commit recorded in `source/openwrt-source-commit.txt`;
