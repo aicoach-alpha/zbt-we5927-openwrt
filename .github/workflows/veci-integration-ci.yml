@@ -1,0 +1,51 @@
+name: VeCI firmware integration CI
+
+on:
+  push:
+    paths:
+      - 'source/veci.commit'
+      - 'source/veci-default-ui/**'
+      - 'source/veci-cellular-we5927/**'
+      - 'scripts/prepare-veci.sh'
+      - 'docs/VECI.md'
+      - '.github/workflows/veci-integration-ci.yml'
+  pull_request:
+    paths:
+      - 'source/veci.commit'
+      - 'source/veci-default-ui/**'
+      - 'source/veci-cellular-we5927/**'
+      - 'scripts/prepare-veci.sh'
+      - 'docs/VECI.md'
+      - '.github/workflows/veci-integration-ci.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell syntax
+        run: |
+          sh -n scripts/prepare-veci.sh
+          sh -n source/veci-default-ui/files/usr/sbin/veci-default-ui
+          sh -n source/veci-default-ui/files/etc/uci-defaults/98-veci-default-ui
+          sh -n source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
+
+      - name: JSON syntax
+        run: |
+          python3 -m json.tool source/veci-cellular-we5927/files/usr/share/rpcd/acl.d/veci-cellular-we5927.json >/dev/null
+
+      - name: Resolve pinned VeCI source
+        run: |
+          mkdir -p /tmp/openwrt/package
+          ./scripts/prepare-veci.sh /tmp/openwrt
+          test -f /tmp/openwrt/package/veci/Makefile
+          test -f /tmp/openwrt/package/veci-default-ui/Makefile
+          test -f /tmp/openwrt/package/veci-cellular-we5927/Makefile
+          grep -qx 'PKG_NAME:=veci' /tmp/openwrt/package/veci/Makefile
+
+      - name: Verify generic and hardware-specific boundary
+        run: |
+          ! grep -RniE 'WE5927|WE2825|ZBT' /tmp/openwrt/package/veci/veci
+          grep -q 'status-fast' source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
+          ! grep -qiE 'imei|iccid' source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
