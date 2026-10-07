@@ -1,27 +1,35 @@
 #!/bin/sh
 
-# Safe staging only. Do not expose a guest SSID during package installation.
+# Safe staging only. Package installation must not expose a guest SSID or
+# change the user's existing openNDS service state.
 
-uci -q get network.guest >/dev/null || {
-	uci set network.guest='interface'
-	uci set network.guest.proto='static'
-	uci set network.guest.ipaddr='192.168.20.1'
-	uci set network.guest.netmask='255.255.255.0'
+uci -q get network.voucher_guest_dev >/dev/null || {
+	uci set network.voucher_guest_dev='device'
+	uci set network.voucher_guest_dev.name='br-voucher'
+	uci set network.voucher_guest_dev.type='bridge'
 }
 
-uci -q get dhcp.guest >/dev/null || {
-	uci set dhcp.guest='dhcp'
-	uci set dhcp.guest.interface='guest'
-	uci set dhcp.guest.start='100'
-	uci set dhcp.guest.limit='100'
-	uci set dhcp.guest.leasetime='1h'
+uci -q get network.voucher_guest >/dev/null || {
+	uci set network.voucher_guest='interface'
+	uci set network.voucher_guest.device='br-voucher'
+	uci set network.voucher_guest.proto='static'
+	uci set network.voucher_guest.ipaddr='192.168.20.1'
+	uci set network.voucher_guest.netmask='255.255.255.0'
+}
+
+uci -q get dhcp.voucher_guest >/dev/null || {
+	uci set dhcp.voucher_guest='dhcp'
+	uci set dhcp.voucher_guest.interface='voucher_guest'
+	uci set dhcp.voucher_guest.start='100'
+	uci set dhcp.voucher_guest.limit='100'
+	uci set dhcp.voucher_guest.leasetime='1h'
 }
 
 if ! uci -q get wireless.voucher_guest >/dev/null; then
 	uci set wireless.voucher_guest='wifi-iface'
 	uci set wireless.voucher_guest.device='radio0'
 	uci set wireless.voucher_guest.mode='ap'
-	uci set wireless.voucher_guest.network='guest'
+	uci set wireless.voucher_guest.network='voucher_guest'
 	uci set wireless.voucher_guest.ssid='WIFI-Alpha-Guest'
 	uci set wireless.voucher_guest.encryption='none'
 	uci set wireless.voucher_guest.isolate='1'
@@ -31,9 +39,5 @@ fi
 uci commit network
 uci commit dhcp
 uci commit wireless
-
-# Never let a fresh package install put a captive portal on the private LAN.
-# Runtime enablement will explicitly bind openNDS to the guest bridge.
-[ -x /etc/init.d/opennds ] && /etc/init.d/opennds disable >/dev/null 2>&1 || true
 
 exit 0
