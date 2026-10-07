@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=we5927-voucher
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -20,6 +20,7 @@ endef
 
 define Package/we5927-voucher/conffiles
 /etc/config/we5927_voucher
+/etc/we5927-voucher/vouchers.db
 endef
 
 define Build/Compile
@@ -32,7 +33,10 @@ define Package/we5927-voucher/install
 	$(INSTALL_BIN) ./files/etc/uci-defaults/95-we5927-voucher $(1)/etc/uci-defaults/95-we5927-voucher
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/usr/sbin/we5927-voucher $(1)/usr/sbin/we5927-voucher
+	$(INSTALL_DIR) $(1)/usr/lib/opennds
+	$(INSTALL_BIN) ./files/usr/lib/opennds/theme_we5927_voucher.sh $(1)/usr/lib/opennds/theme_we5927_voucher.sh
 	$(INSTALL_DIR) $(1)/etc/we5927-voucher
+	$(INSTALL_CONF) ./files/etc/we5927-voucher/vouchers.db $(1)/etc/we5927-voucher/vouchers.db
 endef
 
 $(eval $(call BuildPackage,we5927-voucher))
