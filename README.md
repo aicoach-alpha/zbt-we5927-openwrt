@@ -4,6 +4,14 @@ Community firmware overlay and LTE/Dual-SIM management stack for the **ZBT WE592
 
 > **Status:** tested on one WE5927/WE2825-2SIM unit with a CX07E LTE modem in RNDIS mode. A public **sysupgrade release candidate** is available for the tested board identity. It is not a universal image and must not be flashed onto another WE5927 hardware variant without verifying the board, flash layout, GPIOs and modem first.
 
+## Indonesia voucher / hotspot legal notice
+
+If you use the voucher/captive-portal feature in Indonesia, read **[docs/INDONESIA-LEGAL-NOTICE.md](docs/INDONESIA-LEGAL-NOTICE.md)** before commercial deployment.
+
+The voucher feature is only a technical access-control mechanism. It does **not** grant permission to resell an ISP/mobile-operator connection. Commercial resale can fall under Indonesia's Jual Kembali Jasa Telekomunikasi framework and may require a proper provider cooperation arrangement and related obligations. Complimentary guest Wi-Fi is a different use case, but operators must still comply with their ISP contract and applicable law.
+
+Do not rely on this firmware, an NIB, or a KBLI code alone as proof that a hotspot business is lawful.
+
 ## Public binary release
 
 The first public build is under [`releases/v2026.10.06`](releases/v2026.10.06/).
