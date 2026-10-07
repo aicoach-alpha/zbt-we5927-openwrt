@@ -1,0 +1,300 @@
+#!/bin/sh
+
+CFG=we5927_voucher
+DB="$(uci -q get ${CFG}.main.db_path)"
+[ -n "$DB" ] || DB=/etc/we5927-voucher/vouchers.db
+DIR="${DB%/*}"
+LOCKDIR=/tmp/we5927-voucher.lock
+
+die() {
+	echo "error: $*" >&2
+	exit 1
+}
+
+acquire_lock() {
+	tries=0
+	while ! mkdir "$LOCKDIR" 2>/dev/null; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 10 ] || return 1
+		sleep 1
+	done
+	trap 'rmdir "$LOCKDIR" 2>/dev/null || true' 0 INT TERM
+	return 0
+}
+
+ensure_db() {
+	mkdir -p "$DIR" || die "cannot create $DIR"
+	touch "$DB" || die "cannot create $DB"
+	chmod 600 "$DB" 2>/dev/null || true
+}
+
+duration_minutes() {
+	case "$1" in
+		1h|1) echo 60 ;;
+		2h|2) echo 120 ;;
+		3h|3) echo 180 ;;
+		*) return 1 ;;
+	esac
+}
+
+random_username() {
+	n="$(od -An -N4 -tu4 /dev/urandom 2>/dev/null | tr -d ' ')"
+	[ -n "$n" ] || n="$(date +%s)"
+	printf 'GST-%04d' $((n % 10000))
+}
+
+random_password() {
+	pass="$(LC_ALL=C tr -dc 'A-Z0-9' </dev/urandom 2>/dev/null | head -c 8)"
+	[ "${#pass}" -eq 8 ] || return 1
+	printf '%s' "$pass"
+}
+
+hash_password() {
+	printf '%s' "$1:$2" | sha256sum | awk '{print $1}'
+}
+
+normalize_mac() {
+	printf '%s' "$1" | tr 'A-F' 'a-f'
+}
+
+replace_record() {
+	user="$1"
+	replacement="$2"
+	tmp="${DB}.tmp.$$"
+	awk -F'|' -v u="$user" -v r="$replacement" 'BEGIN{found=0} $1==u {print r; found=1; next} {print} END{if(!found) exit 3}' "$DB" > "$tmp" || { rm -f "$tmp"; return 1; }
+	mv "$tmp" "$DB" || { rm -f "$tmp"; return 1; }
+	chmod 600 "$DB" 2>/dev/null || true
+}
+
+get_record() {
+	awk -F'|' -v u="$1" '$1==u {print; exit}' "$DB"
+}
+
+create_voucher() {
+	mins="$(duration_minutes "$1")" || die "duration must be 1h, 2h or 3h"
+	ensure_db
+	acquire_lock || die "voucher database is busy"
+
+	user="$(random_username)"
+	while grep -q "^${user}|" "$DB" 2>/dev/null; do user="$(random_username)"; done
+	pass="$(random_password)" || die "cannot generate password"
+	salt="$(od -An -N16 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
+	[ -n "$salt" ] || die "cannot generate salt"
+	hash="$(hash_password "$salt" "$pass")"
+	maxdev="$(uci -q get ${CFG}.main.max_devices)"
+	[ -n "$maxdev" ] || maxdev=1
+
+	# user|salt|hash|duration_min|max_devices|first_login|expiry|state|bound_macs
+	printf '%s|%s|%s|%s|%s|0|0|unused|\n' "$user" "$salt" "$hash" "$mins" "$maxdev" >> "$DB"
+
+	echo "username=$user"
+	echo "password=$pass"
+	echo "duration_minutes=$mins"
+	echo "max_devices=$maxdev"
+	echo "note=password is shown once and is not stored in plaintext"
+}
+
+verify_voucher() {
+	user="$1"
+	pass="$2"
+	mac="$(normalize_mac "$3")"
+	ensure_db
+	acquire_lock || { echo "INVALID|busy"; return 1; }
+
+	echo "$user" | grep -Eq '^GST-[0-9]{4}$' || { echo 'INVALID|username'; return 1; }
+	echo "$pass" | grep -Eq '^[A-Z0-9]{8}$' || { echo 'INVALID|password'; return 1; }
+	echo "$mac" | grep -Eq '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || { echo 'INVALID|mac'; return 1; }
+
+	record="$(get_record "$user")"
+	[ -n "$record" ] || { echo 'INVALID|not_found'; return 1; }
+	oldifs="$IFS"; IFS='|'
+	set -- $record
+	IFS="$oldifs"
+	r_user="$1"; salt="$2"; stored_hash="$3"; mins="$4"; maxdev="$5"; first="$6"; expiry="$7"; state="$8"; bound="$9"
+
+	[ "$state" != 'disabled' ] || { echo 'INVALID|disabled'; return 1; }
+	calc="$(hash_password "$salt" "$pass")"
+	[ "$calc" = "$stored_hash" ] || { echo 'INVALID|credentials'; return 1; }
+
+	now="$(date +%s)"
+	if [ "$expiry" -gt 0 ] 2>/dev/null && [ "$now" -ge "$expiry" ]; then
+		replacement="$r_user|$salt|$stored_hash|$mins|$maxdev|$first|$expiry|expired|$bound"
+		replace_record "$r_user" "$replacement" >/dev/null 2>&1 || true
+		echo 'INVALID|expired'
+		return 1
+	fi
+
+	if [ "$state" = 'unused' ] || [ "$first" -eq 0 ] 2>/dev/null; then
+		first="$now"
+		expiry=$((now + mins * 60))
+		state='active'
+		bound="$mac"
+		replacement="$r_user|$salt|$stored_hash|$mins|$maxdev|$first|$expiry|$state|$bound"
+		replace_record "$r_user" "$replacement" || { echo 'INVALID|db_write'; return 1; }
+	else
+		case ",$bound," in
+			*,"$mac",*) ;;
+			*)
+				count=0
+				[ -n "$bound" ] && count="$(printf '%s' "$bound" | awk -F',' '{print NF}')"
+				[ "$count" -lt "$maxdev" ] 2>/dev/null || { echo 'INVALID|device_limit'; return 1; }
+				bound="${bound:+$bound,}$mac"
+				replacement="$r_user|$salt|$stored_hash|$mins|$maxdev|$first|$expiry|active|$bound"
+				replace_record "$r_user" "$replacement" || { echo 'INVALID|db_write'; return 1; }
+				;;
+		esac
+	fi
+
+	remaining=$(((expiry - now + 59) / 60))
+	[ "$remaining" -gt 0 ] 2>/dev/null || { echo 'INVALID|expired'; return 1; }
+	echo "VALID|$remaining|$r_user"
+	return 0
+}
+
+list_vouchers() {
+	ensure_db
+	printf '%-12s %-8s %-7s %-12s %-12s %-10s %s\n' USER MINUTES DEVICES FIRST_LOGIN EXPIRY STATE BOUND_MACS
+	awk -F'|' '{printf "%-12s %-8s %-7s %-12s %-12s %-10s %s\n",$1,$4,$5,$6,$7,$8,$9}' "$DB"
+}
+
+disable_voucher() {
+	[ -n "$1" ] || die "username required"
+	ensure_db
+	acquire_lock || die "voucher database is busy"
+	record="$(get_record "$1")"
+	[ -n "$record" ] || die "voucher not found"
+	oldifs="$IFS"; IFS='|'; set -- $record; IFS="$oldifs"
+	replace_record "$1" "$1|$2|$3|$4|$5|$6|$7|disabled|$9" || die "update failed"
+}
+
+extend_voucher() {
+	user="$1"
+	extra="$(duration_minutes "$2")" || die "extension must be 1h, 2h or 3h"
+	ensure_db
+	acquire_lock || die "voucher database is busy"
+	record="$(get_record "$user")"
+	[ -n "$record" ] || die "voucher not found"
+	oldifs="$IFS"; IFS='|'; set -- $record; IFS="$oldifs"
+	mins=$4; expiry=$7; state=$8
+	if [ "$state" = 'unused' ]; then
+		mins=$((mins + extra))
+	else
+		now="$(date +%s)"
+		[ "$expiry" -gt "$now" ] 2>/dev/null || expiry="$now"
+		expiry=$((expiry + extra * 60))
+		[ "$state" = 'disabled' ] || state='active'
+	fi
+	replace_record "$user" "$1|$2|$3|$mins|$5|$6|$expiry|$state|$9" || die "update failed"
+	echo "extended=$user minutes=$extra"
+}
+
+configure_hotspot() {
+	# This is an explicit admin action; package installation itself keeps the guest SSID disabled.
+	uci set network.voucher_guest_dev='device'
+	uci set network.voucher_guest_dev.name='br-voucher'
+	uci set network.voucher_guest_dev.type='bridge'
+	uci set network.voucher_guest='interface'
+	uci set network.voucher_guest.device='br-voucher'
+	uci set network.voucher_guest.proto='static'
+	uci set network.voucher_guest.ipaddr='192.168.20.1'
+	uci set network.voucher_guest.netmask='255.255.255.0'
+
+	uci set dhcp.voucher_guest='dhcp'
+	uci set dhcp.voucher_guest.interface='voucher_guest'
+	uci set dhcp.voucher_guest.start='100'
+	uci set dhcp.voucher_guest.limit='100'
+	uci set dhcp.voucher_guest.leasetime='1h'
+
+	uci set wireless.voucher_guest='wifi-iface'
+	uci set wireless.voucher_guest.device='radio0'
+	uci set wireless.voucher_guest.mode='ap'
+	uci set wireless.voucher_guest.network='voucher_guest'
+	uci set wireless.voucher_guest.ssid="$(uci -q get ${CFG}.main.guest_ssid || echo WIFI-Alpha-Guest)"
+	uci set wireless.voucher_guest.encryption='none'
+	uci set wireless.voucher_guest.isolate='1'
+	uci set wireless.voucher_guest.disabled='0'
+
+	uci set firewall.voucher_guest='zone'
+	uci set firewall.voucher_guest.name='voucher_guest'
+	uci set firewall.voucher_guest.network='voucher_guest'
+	uci set firewall.voucher_guest.input='REJECT'
+	uci set firewall.voucher_guest.output='ACCEPT'
+	uci set firewall.voucher_guest.forward='REJECT'
+
+	uci set firewall.voucher_guest_dns='rule'
+	uci set firewall.voucher_guest_dns.name='Voucher-Guest-DNS'
+	uci set firewall.voucher_guest_dns.src='voucher_guest'
+	uci set firewall.voucher_guest_dns.dest_port='53'
+	uci set firewall.voucher_guest_dns.proto='tcp udp'
+	uci set firewall.voucher_guest_dns.target='ACCEPT'
+
+	uci set firewall.voucher_guest_dhcp='rule'
+	uci set firewall.voucher_guest_dhcp.name='Voucher-Guest-DHCP'
+	uci set firewall.voucher_guest_dhcp.src='voucher_guest'
+	uci set firewall.voucher_guest_dhcp.dest_port='67'
+	uci set firewall.voucher_guest_dhcp.proto='udp'
+	uci set firewall.voucher_guest_dhcp.target='ACCEPT'
+
+	uci set firewall.voucher_guest_portal='rule'
+	uci set firewall.voucher_guest_portal.name='Voucher-Guest-openNDS'
+	uci set firewall.voucher_guest_portal.src='voucher_guest'
+	uci set firewall.voucher_guest_portal.dest_port='2050'
+	uci set firewall.voucher_guest_portal.proto='tcp'
+	uci set firewall.voucher_guest_portal.target='ACCEPT'
+
+	uci set firewall.voucher_guest_wan='forwarding'
+	uci set firewall.voucher_guest_wan.src='voucher_guest'
+	uci set firewall.voucher_guest_wan.dest='wan'
+
+	section="$(uci -q show opennds | sed -n 's/^opennds\.\([^=]*\)=opennds$/\1/p' | head -n1)"
+	[ -n "$section" ] || { uci add opennds opennds >/dev/null; section="@opennds[-1]"; }
+	uci set opennds.$section.enabled='1'
+	uci set opennds.$section.gatewayinterface='br-voucher'
+	uci set opennds.$section.gatewayname='WIFI-Alpha Guest'
+	uci set opennds.$section.login_option_enabled='3'
+	uci set opennds.$section.themespec_path='/usr/lib/opennds/theme_we5927_voucher.sh'
+	uci set opennds.$section.sessiontimeout='180'
+	uci set opennds.$section.checkinterval='15'
+
+	uci set ${CFG}.main.enabled='1'
+	uci commit network; uci commit dhcp; uci commit wireless; uci commit firewall; uci commit opennds; uci commit ${CFG}
+
+	/etc/init.d/network reload
+	/etc/init.d/dnsmasq restart
+	/etc/init.d/firewall restart
+	wifi reload
+	/etc/init.d/opennds enable
+	/etc/init.d/opennds restart
+	echo 'hotspot=enabled ssid=WIFI-Alpha-Guest network=192.168.20.0/24'
+}
+
+disable_hotspot() {
+	uci set wireless.voucher_guest.disabled='1' 2>/dev/null || true
+	uci set ${CFG}.main.enabled='0'
+	uci commit wireless; uci commit ${CFG}
+	/etc/init.d/opennds stop 2>/dev/null || true
+	/etc/init.d/opennds disable 2>/dev/null || true
+	wifi reload
+	echo 'hotspot=disabled'
+}
+
+case "$1" in
+	create) create_voucher "$2" ;;
+	verify) verify_voucher "$2" "$3" "$4" ;;
+	list) list_vouchers ;;
+	disable) disable_voucher "$2" ;;
+	extend) extend_voucher "$2" "$3" ;;
+	enable-hotspot) configure_hotspot ;;
+	disable-hotspot) disable_hotspot ;;
+	*)
+		echo 'usage:'
+		echo '  we5927-voucher create 1h|2h|3h'
+		echo '  we5927-voucher verify USER PASSWORD MAC'
+		echo '  we5927-voucher list'
+		echo '  we5927-voucher disable USER'
+		echo '  we5927-voucher extend USER 1h|2h|3h'
+		echo '  we5927-voucher enable-hotspot'
+		echo '  we5927-voucher disable-hotspot'
+		exit 2
+		;;
+esac

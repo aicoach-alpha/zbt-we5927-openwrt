@@ -1,0 +1,57 @@
+name: Voucher hotspot CI
+
+on:
+  push:
+    branches:
+      - feat/voucher-hotspot-v1
+  pull_request:
+    paths:
+      - 'source/we5927-voucher/**'
+      - 'docs/VOUCHER-HOTSPOT.md'
+      - '.github/workflows/voucher-ci.yml'
+
+jobs:
+  shell-and-voucher-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: |
+          sh -n source/we5927-voucher/files/usr/sbin/we5927-voucher
+          sh -n source/we5927-voucher/files/etc/uci-defaults/95-we5927-voucher
+          sh -n source/we5927-voucher/files/usr/lib/opennds/theme_we5927_voucher.sh
+      - name: Voucher lifecycle mock test
+        run: |
+          set -eu
+          T=/tmp/we5927-voucher-ci
+          mkdir -p "$T/bin" "$T/db"
+          cat > "$T/bin/uci" <<'EOF'
+          #!/bin/sh
+          case "$*" in
+            '-q get we5927_voucher.main.db_path') echo /tmp/we5927-voucher-ci/db/vouchers.db ;;
+            '-q get we5927_voucher.main.max_devices') echo 1 ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod +x "$T/bin/uci"
+          cp source/we5927-voucher/files/usr/sbin/we5927-voucher "$T/we5927-voucher"
+          chmod +x "$T/we5927-voucher"
+          export PATH="$T/bin:$PATH"
+          out="$($T/we5927-voucher create 1h)"
+          user="$(printf '%s\n' "$out" | sed -n 's/^username=//p')"
+          pass="$(printf '%s\n' "$out" | sed -n 's/^password=//p')"
+          test -n "$user"
+          test -n "$pass"
+          test "$($T/we5927-voucher verify "$user" "$pass" aa:bb:cc:dd:ee:01 | cut -d'|' -f1)" = VALID
+          test "$($T/we5927-voucher verify "$user" "$pass" aa:bb:cc:dd:ee:01 | cut -d'|' -f1)" = VALID
+          if $T/we5927-voucher verify "$user" "$pass" aa:bb:cc:dd:ee:02; then
+            echo 'second device unexpectedly accepted' >&2
+            exit 1
+          fi
+          $T/we5927-voucher extend "$user" 1h
+          $T/we5927-voucher disable "$user"
+          if $T/we5927-voucher verify "$user" "$pass" aa:bb:cc:dd:ee:01; then
+            echo 'disabled voucher unexpectedly accepted' >&2
+            exit 1
+          fi
+          echo 'voucher lifecycle OK'
