@@ -1,0 +1,72 @@
+name: OpenWrt VeCI config preflight
+
+on:
+  push:
+    paths:
+      - 'source/openwrt-we5927.config'
+      - 'source/openwrt-zbt-we5927-current.patch'
+      - 'source/openwrt-source-commit.txt'
+      - 'source/we5927-lte/**'
+      - 'source/veci.commit'
+      - 'source/veci-default-ui/**'
+      - 'source/veci-cellular-we5927/**'
+      - 'scripts/prepare-veci.sh'
+      - '.github/workflows/openwrt-veci-config-ci.yml'
+  pull_request:
+    paths:
+      - 'source/openwrt-we5927.config'
+      - 'source/openwrt-zbt-we5927-current.patch'
+      - 'source/openwrt-source-commit.txt'
+      - 'source/we5927-lte/**'
+      - 'source/veci.commit'
+      - 'source/veci-default-ui/**'
+      - 'source/veci-cellular-we5927/**'
+      - 'scripts/prepare-veci.sh'
+      - '.github/workflows/openwrt-veci-config-ci.yml'
+
+jobs:
+  defconfig:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout firmware integration
+        uses: actions/checkout@v4
+        with:
+          path: firmware
+
+      - name: Checkout pinned OpenWrt
+        run: |
+          OPENWRT_COMMIT="$(tr -d '[:space:]' < firmware/source/openwrt-source-commit.txt)"
+          git clone --filter=blob:none https://github.com/openwrt/openwrt.git openwrt
+          git -C openwrt checkout "$OPENWRT_COMMIT"
+
+      - name: Apply WE5927 board/package patch
+        run: |
+          git -C openwrt apply "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
+
+      - name: Install feeds
+        working-directory: openwrt
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Add pinned VeCI packages
+        run: |
+          firmware/scripts/prepare-veci.sh "$GITHUB_WORKSPACE/openwrt"
+
+      - name: Resolve firmware configuration
+        working-directory: openwrt
+        run: |
+          cp ../firmware/source/openwrt-we5927.config .config
+          make defconfig
+
+      - name: Verify VeCI and board selections
+        working-directory: openwrt
+        run: |
+          grep -q '^CONFIG_TARGET_ramips=y' .config
+          grep -q '^CONFIG_TARGET_ramips_mt76x8=y' .config
+          grep -q '^CONFIG_PACKAGE_we5927-lte=y' .config
+          grep -q '^CONFIG_PACKAGE_veci=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-default-ui=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-cellular-we5927=y' .config
+          ./scripts/diffconfig.sh | grep -E 'WE5927|we5927|veci|ramips|mt76x8' || true
