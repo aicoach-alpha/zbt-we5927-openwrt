@@ -7,6 +7,7 @@ on:
       - 'source/veci-default-ui/**'
       - 'source/veci-cellular-we5927/**'
       - 'scripts/prepare-veci.sh'
+      - 'scripts/build-veci-firmware.sh'
       - 'docs/VECI.md'
       - '.github/workflows/veci-integration-ci.yml'
   pull_request:
@@ -15,6 +16,7 @@ on:
       - 'source/veci-default-ui/**'
       - 'source/veci-cellular-we5927/**'
       - 'scripts/prepare-veci.sh'
+      - 'scripts/build-veci-firmware.sh'
       - 'docs/VECI.md'
       - '.github/workflows/veci-integration-ci.yml'
 
@@ -31,6 +33,17 @@ jobs:
           sh -n source/veci-default-ui/files/usr/sbin/veci-default-ui
           sh -n source/veci-default-ui/files/etc/uci-defaults/98-veci-default-ui
           sh -n source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
+
+      - name: Build helper accepts Git worktrees
+        run: |
+          git worktree add --detach /tmp/veci-ci-worktree HEAD
+          set +e
+          output="$(./scripts/build-veci-firmware.sh /tmp/veci-ci-worktree 2>&1)"
+          rc=$?
+          set -e
+          git worktree remove --force /tmp/veci-ci-worktree
+          test "$rc" -ne 0
+          printf '%s\n' "$output" | grep -q 'OpenWrt source commit mismatch'
 
       - name: JSON syntax
         run: |

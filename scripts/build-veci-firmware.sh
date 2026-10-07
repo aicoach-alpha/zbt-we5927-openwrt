@@ -9,7 +9,7 @@ JOBS="${JOBS:-4}"
 	exit 2
 }
 
-[ -d "$OPENWRT_ROOT/.git" ] || {
+git -C "$OPENWRT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
 	echo "error: $OPENWRT_ROOT is not a Git OpenWrt tree" >&2
 	exit 1
 }
