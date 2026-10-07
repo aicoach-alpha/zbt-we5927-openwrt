@@ -1,5 +1,7 @@
 # Guest voucher hotspot v1
 
+> **Indonesia compliance notice:** Before using this feature to charge users for Internet access in Indonesia, read [INDONESIA-LEGAL-NOTICE.md](INDONESIA-LEGAL-NOTICE.md). This firmware does not authorize resale of an ISP/operator connection and does not make a commercial hotspot lawful by itself.
+
 This feature adds an isolated guest SSID with time-limited voucher authentication without turning the WE5927 into a heavy RADIUS/SQL appliance.
 
 ## Goals
