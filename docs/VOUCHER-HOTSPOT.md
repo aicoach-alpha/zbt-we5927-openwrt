@@ -19,13 +19,13 @@ This feature adds an isolated guest SSID with time-limited voucher authenticatio
 
 guest Wi-Fi client -> WIFI-Alpha-Guest -> guest/br-guest -> openNDS captive portal -> voucher verifier -> Internet/LTE
 
-openNDS remains responsible for captive-portal interception, client sessions and timeout enforcement. The project-specific voucher layer is responsible only for credential validation, first-login activation, expiry, device limits and LuCI/CLI management.
+openNDS remains responsible for captive-portal interception, client sessions and timeout enforcement. A project ThemeSpec performs the username/password form and calls the project voucher verifier. The voucher layer owns credential validation, first-login activation, expiry, device limits and LuCI/CLI management.
 
 ## Why openNDS
 
-openNDS is a small nftables-based captive portal available for OpenWrt and supports per-client session timeout/quota overrides through BinAuth. Its default BinAuth also maintains the authenticated-client database used for restoring sessions after an openNDS restart.
+openNDS is a small nftables-based captive portal available for OpenWrt and supports per-client session timeout/quota overrides from ThemeSpec as well as BinAuth. The voucher ThemeSpec validates the credential before calling `auth_log` and passes only the remaining voucher time as the client session timeout.
 
-Do not replace the stock `binauth_log.sh` directly. The implementation should hook the supported `custombinauth.sh` path so openNDS auth-restore behavior is retained.
+The stock `binauth_log.sh` is deliberately left intact so openNDS can keep its normal authenticated-client database and service-restart restore behavior. This feature does not replace the BinAuth executable.
 
 ## Network isolation
 
@@ -44,11 +44,11 @@ The feature must never silently convert the private SSID into a captive portal.
 
 ## Voucher record
 
-Persistent voucher metadata stays small: username, salted password hash, duration, maximum devices, first-login epoch, expiry epoch, and state.
+Persistent voucher metadata stays small: username, salted password hash, duration, maximum devices, first-login epoch, expiry epoch, state and bound guest-device MAC address(es).
 
-Plain-text passwords are displayed only when a voucher is created. They are not stored persistently.
+Plain-text passwords are displayed only when a voucher is created. They are not stored persistently. Passwords are generated as eight random uppercase alphanumeric characters; users should never reuse a personal password for a guest voucher.
 
-Active openNDS session state belongs in tmpfs. Voucher activation/expiry metadata remains persistent so a reboot cannot reset the timer.
+Active openNDS session state belongs in tmpfs. Voucher activation/expiry metadata remains persistent so a reboot cannot reset the timer. To protect the small NOR flash, the persistent voucher file is not rewritten for every packet or every normal same-device login; writes happen only for lifecycle changes such as voucher creation, first activation, device binding, extension, disablement or expiry.
 
 ## First-login semantics
 
@@ -66,7 +66,6 @@ Installing/building the package must not expose an open guest SSID automatically
 - `we5927-voucher create 2h`
 - `we5927-voucher create 3h`
 - `we5927-voucher list`
-- `we5927-voucher active`
 - `we5927-voucher disable USER`
 - `we5927-voucher extend USER 1h`
 
@@ -87,8 +86,8 @@ Installing/building the package must not expose an open guest SSID automatically
 5. Verify wrong credentials remain captive.
 6. Verify a second device is rejected when max_devices=1.
 7. Verify expiry deauthenticates the client.
-8. Restart openNDS and verify the remaining session is restored.
-9. Reboot the router and verify voucher expiry is not reset.
+8. Restart openNDS and verify its normal authenticated-client restore still works.
+9. Reboot the router, log in again, and verify the voucher receives only its remaining time rather than a fresh duration.
 10. Verify private Wi-Fi, LTE recovery and LuCI remain unaffected.
 
 Until these checks pass, the feature stays a development feature and is not included in the public stable image.
