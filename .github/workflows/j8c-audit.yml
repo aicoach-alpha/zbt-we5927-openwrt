@@ -1,0 +1,111 @@
+name: J8c artifact audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/j8c-audit.yml'
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout firmware integration
+        uses: actions/checkout@v4
+
+      - name: Download J8c firmware candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: veci-j8c-maintenance-candidate
+          path: j8c-firmware
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 37747673838
+
+      - name: Download J8c matched app feed
+        uses: actions/download-artifact@v4
+        with:
+          name: veci-j8c-matched-app-feed
+          path: j8c-feed
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 37747673838
+
+      - name: Build matching apk-tools host utility
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build pkg-config libssl-dev zlib1g-dev
+          git clone --filter=blob:none https://github.com/alpinelinux/apk-tools.git apk-tools
+          git -C apk-tools checkout b5a31c0d865342ad80be10d68f1bb3d3ad9b0866
+          meson setup apk-tools/build apk-tools             -Dprefix=/usr             -Ddocs=disabled             -Dhelp=disabled             -Dlua=disabled             -Dpython=disabled             -Dtests=disabled             -Dzstd=disabled             -Dcrypto_backend=openssl             -Durl_backend=wget
+          ninja -C apk-tools/build src/apk
+          apk-tools/build/src/apk --version
+
+      - name: Dump exact package metadata
+        shell: bash
+        run: |
+          set -euxo pipefail
+          APK="$GITHUB_WORKSPACE/apk-tools/build/src/apk"
+          OUT="$GITHUB_WORKSPACE/j8c-audit"
+          mkdir -p "$OUT/apk-json" "$OUT/index-json"
+          while IFS= read -r -d '' f; do
+            base="$(basename "$f")"
+            "$APK" adbdump --format json "$f" > "$OUT/apk-json/${base}.json"
+          done < <(find "$GITHUB_WORKSPACE/j8c-feed" -type f -name '*.apk' -print0)
+          while IFS= read -r -d '' f; do
+            rel="${f#"$GITHUB_WORKSPACE/j8c-feed/"}"
+            safe="$(printf '%s' "$rel" | tr '/ ' '__')"
+            "$APK" adbdump --format json "$f" > "$OUT/index-json/${safe}.json"
+          done < <(find "$GITHUB_WORKSPACE/j8c-feed" -type f -name 'packages.adb' -print0)
+
+      - name: Build audit summary
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          import json, pathlib, hashlib, re, os
+          root=pathlib.Path('j8c-audit')
+          fw=pathlib.Path('j8c-firmware')
+          feed=pathlib.Path('j8c-feed')
+          selected_prefixes=(
+              'sqm-scripts-','luci-app-sqm-','ddns-scripts-','ddns-scripts-services-',
+              'luci-app-ddns-','wireguard-tools-','luci-proto-wireguard-',
+              'simple-captive-portal-','uspot-','uspot-www-','uspotfilter-',
+              'kmod-ifb-','kmod-sched-cake-','kmod-sched-core-','kmod-sched-bpf-',
+              'kmod-wireguard-'
+          )
+          rows=[]
+          for p in sorted(feed.rglob('*.apk')):
+              if p.name.startswith(selected_prefixes):
+                  meta_path=root/'apk-json'/(p.name+'.json')
+                  try:
+                      meta=json.loads(meta_path.read_text())
+                  except Exception as e:
+                      meta={'_parse_error':str(e)}
+                  rows.append({'file':str(p.relative_to(feed)),'file_size':p.stat().st_size,'metadata':meta})
+          sysimgs=list(fw.glob('*sysupgrade.bin'))
+          summary={
+              'sysupgrade':[],
+              'selected_packages':rows,
+              'feed_apk_count':sum(1 for _ in feed.rglob('*.apk')),
+              'feed_apk_bytes':sum(p.stat().st_size for p in feed.rglob('*.apk')),
+          }
+          for p in sysimgs:
+              summary['sysupgrade'].append({
+                  'file':p.name,
+                  'size':p.stat().st_size,
+                  'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+              })
+          (root/'audit-summary.json').write_text(json.dumps(summary,indent=2,sort_keys=True))
+          print(json.dumps(summary,indent=2,sort_keys=True)[:12000])
+          PY
+
+      - name: Upload J8c audit metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-j8c-artifact-audit
+          path: j8c-audit/
+          retention-days: 14
