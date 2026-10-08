@@ -76,15 +76,20 @@ jobs:
         working-directory: openwrt
         run: |
           set -eu
-          ./scripts/config -m CONFIG_PACKAGE_sqm-scripts
-          ./scripts/config -m CONFIG_PACKAGE_luci-app-sqm
-          ./scripts/config -m CONFIG_PACKAGE_ddns-scripts
-          ./scripts/config -m CONFIG_PACKAGE_luci-app-ddns
-          ./scripts/config -m CONFIG_PACKAGE_wireguard-tools
-          ./scripts/config -m CONFIG_PACKAGE_luci-proto-wireguard
-          ./scripts/config -m CONFIG_PACKAGE_simple-captive-portal
-          ./scripts/config -m CONFIG_PACKAGE_uspot
-          ./scripts/config -m CONFIG_PACKAGE_uspot-www
+          set_module() {
+            symbol="$1"
+            sed -i "/^CONFIG_${symbol}=/d;/^# CONFIG_${symbol} is not set$/d" .config
+            printf 'CONFIG_%s=m\n' "$symbol" >> .config
+          }
+          set_module PACKAGE_sqm-scripts
+          set_module PACKAGE_luci-app-sqm
+          set_module PACKAGE_ddns-scripts
+          set_module PACKAGE_luci-app-ddns
+          set_module PACKAGE_wireguard-tools
+          set_module PACKAGE_luci-proto-wireguard
+          set_module PACKAGE_simple-captive-portal
+          set_module PACKAGE_uspot
+          set_module PACKAGE_uspot-www
           make defconfig
           grep -q '^CONFIG_PACKAGE_sqm-scripts=m' .config
           grep -q '^CONFIG_PACKAGE_ddns-scripts=m' .config
