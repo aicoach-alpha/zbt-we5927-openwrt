@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-default-ui
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -9,7 +9,7 @@ define Package/veci-default-ui
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI default landing page
-  DEPENDS:=+veci +uhttpd
+  DEPENDS:=+veci +uhttpd +px5g-mbedtls
 endef
 
 define Package/veci-default-ui/description
@@ -30,6 +30,7 @@ define Package/veci-default-ui/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/usr/sbin/veci-default-ui $(1)/usr/sbin/veci-default-ui
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/97-veci-https-defaults $(1)/etc/uci-defaults/97-veci-https-defaults
 	$(INSTALL_BIN) ./files/etc/uci-defaults/98-veci-default-ui $(1)/etc/uci-defaults/98-veci-default-ui
 endef
 
