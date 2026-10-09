@@ -104,7 +104,7 @@ jobs:
 
       - name: Verify Router App lifecycle guards
         run: |
-          if grep -RFn '[ -n "${IPKG_INSTROOT}" ]' source/veci-app-*/Makefile; then
+          if grep -RFn '[ -n "${IPKG_INSTROOT}" ]' source/veci-app-*/Makefile source/veci-update-we5927/Makefile; then
             echo "Runtime lifecycle scripts must escape IPKG_INSTROOT for OpenWrt make expansion."
             exit 1
           fi
