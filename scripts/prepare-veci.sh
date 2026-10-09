@@ -49,7 +49,7 @@ rm -rf "$DEST"
 mkdir -p "$DEST"
 cp -a "$TMP/tree/." "$DEST/"
 
-for package in veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci-app-guest veci-app-sqm veci-app-ddns veci-app-wireguard veci-app-voucher; do
+for package in veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci-app-guest veci-app-sqm veci-app-ddns veci-app-wireguard veci-app-voucher veci-update-we5927; do
 	rm -rf "$OPENWRT_ROOT/package/$package"
 	cp -a "$SELF_DIR/source/$package" "$OPENWRT_ROOT/package/$package"
 done
@@ -77,3 +77,4 @@ echo "  default:   $OPENWRT_ROOT/package/veci-default-ui"
 echo "  cellular:  $OPENWRT_ROOT/package/veci-cellular-we5927"
 echo "  app catalog: $OPENWRT_ROOT/package/veci-app-catalog-we5927"
 echo "  app wrappers: guest sqm ddns wireguard voucher"
+echo "  update profile: $OPENWRT_ROOT/package/veci-update-we5927"
