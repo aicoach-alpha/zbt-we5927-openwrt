@@ -115,7 +115,33 @@ jobs:
           grep -q '^CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
           grep -q '^CONFIG_PACKAGE_veci-app-voucher=m' .config
           grep -q '^CONFIG_SIGNED_PACKAGES=y' .config
-          grep -q '^CONFIG_SIGN_EACH_PACKAGE=y' .config
+
+      - name: Prepare persistent VeCI firmware signing identity
+        working-directory: openwrt
+        shell: bash
+        env:
+          VECI_SIGNING_KEY_B64: ${{ secrets.VECI_FIRMWARE_SIGNING_KEY_B64 }}
+          VECI_SIGNING_PUB_B64: ${{ secrets.VECI_FIRMWARE_SIGNING_PUB_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$VECI_SIGNING_KEY_B64" || { echo "::error::Missing VECI_FIRMWARE_SIGNING_KEY_B64"; exit 1; }
+          test -n "$VECI_SIGNING_PUB_B64" || { echo "::error::Missing VECI_FIRMWARE_SIGNING_PUB_B64"; exit 1; }
+
+          printf '%s' "$VECI_SIGNING_KEY_B64" | base64 -d > key-build
+          printf '%s' "$VECI_SIGNING_PUB_B64" | base64 -d > key-build.pub
+          chmod 600 key-build
+          chmod 644 key-build.pub
+
+          make package/system/usign/host/compile package/system/ucert/host/compile
+          test -x staging_dir/host/bin/usign
+          test -x staging_dir/host/bin/ucert
+          staging_dir/host/bin/ucert -I -c key-build.ucert -p key-build.pub -s key-build
+
+          KEY_ID="$(staging_dir/host/bin/usign -F -p key-build.pub)"
+          test -n "$KEY_ID"
+          mkdir -p package/veci-update-we5927/files/etc/veci/firmware-keys
+          cp key-build.pub "package/veci-update-we5927/files/etc/veci/firmware-keys/$KEY_ID"
+          echo "VECI_IMAGE_KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
 
       - name: Build firmware and exact-ABI apps together
         working-directory: openwrt
@@ -137,6 +163,15 @@ jobs:
           test -f "$IMAGE"
           test -n "$MANIFEST"
           test -f "$MANIFEST"
+
+          CERT="$GITHUB_WORKSPACE/veci-image.ucert"
+          rm -f "$CERT"
+          staging_dir/host/bin/fwtool -q -s "$CERT" "$IMAGE"
+          test -s "$CERT"
+          mkdir -p "$GITHUB_WORKSPACE/veci-image-keys"
+          cp key-build.pub "$GITHUB_WORKSPACE/veci-image-keys/$VECI_IMAGE_KEY_ID"
+          staging_dir/host/bin/fwtool -q -T -s /dev/null "$IMAGE" | \
+            staging_dir/host/bin/ucert -V -m - -c "$CERT" -P "$GITHUB_WORKSPACE/veci-image-keys"
 
           FW_NAME="veci-we5927-${TAG}-sysupgrade.bin"
           cp "$IMAGE" "$RELEASE/$FW_NAME"
@@ -223,6 +258,8 @@ jobs:
               "firmware_url": os.environ["FW_URL"],
               "sha256": os.environ["FW_SHA"],
               "size": int(os.environ["FW_SIZE"]),
+              "signed": True,
+              "signing_key_id": os.environ["VECI_IMAGE_KEY_ID"],
               "notes_url": os.environ["NOTES_URL"],
               "app_feed_base_url": f"https://raw.githubusercontent.com/{os.environ['GITHUB_REPOSITORY']}/app-feed/feeds/{os.environ['BUILD_ID']}",
           }
