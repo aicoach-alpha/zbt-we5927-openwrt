@@ -25,6 +25,8 @@ define Build/Compile
 endef
 
 define Package/veci-default-ui/install
+	$(INSTALL_DIR) $(1)/etc
+	$(INSTALL_DATA) ./files/etc/veci-release.json $(1)/etc/veci-release.json
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/etc/config/veci_default_ui $(1)/etc/config/veci_default_ui
 	$(INSTALL_DIR) $(1)/usr/sbin
