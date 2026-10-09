@@ -47,6 +47,9 @@ jobs:
           sh -n source/veci-app-voucher/files/usr/libexec/rpcd/veci.app.voucher
           sh -n source/veci-app-voucher/files/usr/sbin/veci-voucher-cleaner
           sh -n source/veci-app-voucher/files/etc/init.d/veci-voucher-cleaner
+          sh -n source/veci-update-we5927/files/etc/uci-defaults/96-veci-update-we5927
+          sh -n source/veci-update-we5927/files/etc/init.d/veci-update-agent
+          sh -n source/veci-update-we5927/files/usr/sbin/veci-update-agent
 
       - name: Build helper accepts Git worktrees
         run: |
@@ -76,6 +79,7 @@ jobs:
           test -f /tmp/openwrt/package/veci-app-ddns/Makefile
           test -f /tmp/openwrt/package/veci-app-wireguard/Makefile
           test -f /tmp/openwrt/package/veci-app-voucher/Makefile
+          test -f /tmp/openwrt/package/veci-update-we5927/Makefile
           grep -qx 'PKG_NAME:=veci' /tmp/openwrt/package/veci/Makefile
           grep -q '<base href="/veci/" />' /tmp/openwrt/package/veci/veci/index.html
 
