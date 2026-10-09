@@ -287,15 +287,46 @@ method_action() {
 	esac
 }
 
+
+method_cleanup() {
+	disable_portal >/dev/null 2>&1 || true
+
+	for section in veci_guest_dhcp veci_guest_dns veci_guest_portal veci_guest_forward veci_guest_restrict veci_guest_cpd veci_guest_ipset veci_guest_zone; do
+		uci -q delete "firewall.$section" 2>/dev/null || true
+	done
+	uci -q delete dhcp.veci_guest 2>/dev/null || true
+	uci -q delete wireless.veci_guest 2>/dev/null || true
+	uci -q delete network.veci_guest 2>/dev/null || true
+	uci -q delete uhttpd.veci_guest 2>/dev/null || true
+
+	uci commit firewall >/dev/null 2>&1 || true
+	uci commit dhcp >/dev/null 2>&1 || true
+	uci commit wireless >/dev/null 2>&1 || true
+	uci commit network >/dev/null 2>&1 || true
+	uci commit uhttpd >/dev/null 2>&1 || true
+
+	uci -q delete veci_guest.main 2>/dev/null || true
+	uci commit veci_guest >/dev/null 2>&1 || true
+
+	service_restart network || true
+	service_restart dnsmasq || true
+	service_restart firewall || true
+	service_restart uhttpd || true
+	service_restart uspot || true
+	wifi reload >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
 case "$1" in
 	list)
-		printf '{ "status": {}, "save": { "ssid": "str", "idle_timeout": "str", "session_timeout": "str" }, "action": { "action": "str" } }\n'
+		printf '{ "status": {}, "save": { "ssid": "str", "idle_timeout": "str", "session_timeout": "str" }, "action": { "action": "str" }, "cleanup": {} }\n'
 		;;
 	call)
 		case "$2" in
 			status) method_status ;;
 			save) method_save ;;
 			action) method_action ;;
+			cleanup) method_cleanup ;;
 			*) printf '{ "error": "method_not_found" }\n' ;;
 		esac
 		;;
