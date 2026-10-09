@@ -54,6 +54,23 @@ for package in veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci
 	cp -a "$SELF_DIR/source/$package" "$OPENWRT_ROOT/package/$package"
 done
 
+BUILD_ID="$(git -C "$SELF_DIR" rev-parse HEAD)"
+OPENWRT_PIN="$(tr -d '[:space:]' < "$SELF_DIR/source/openwrt-source-commit.txt")"
+case "$BUILD_ID:$OPENWRT_PIN" in
+	????????????????????????????????????????:????????????????????????????????????????) ;;
+	*) echo "error: invalid firmware release identity" >&2; exit 1 ;;
+esac
+
+mkdir -p "$OPENWRT_ROOT/package/veci-default-ui/files/etc"
+cat > "$OPENWRT_ROOT/package/veci-default-ui/files/etc/veci-release.json" <<EOF
+{
+	"schema": 1,
+	"build_id": "$BUILD_ID",
+	"veci_commit": "$PIN",
+	"openwrt_commit": "$OPENWRT_PIN"
+}
+EOF
+
 echo "Prepared VeCI $PIN"
 echo "  core:      $DEST"
 echo "  default:   $OPENWRT_ROOT/package/veci-default-ui"
