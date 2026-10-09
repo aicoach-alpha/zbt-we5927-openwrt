@@ -71,6 +71,12 @@ cat > "$OPENWRT_ROOT/package/veci-default-ui/files/etc/veci-release.json" <<EOF
 }
 EOF
 
+if [ "${VECI_PUBLISHED_RELEASE:-0}" = "1" ]; then
+	printf 'published\n' > "$OPENWRT_ROOT/package/veci-default-ui/files/etc/veci-release-channel"
+else
+	printf 'development\n' > "$OPENWRT_ROOT/package/veci-default-ui/files/etc/veci-release-channel"
+fi
+
 echo "Prepared VeCI $PIN"
 echo "  core:      $DEST"
 echo "  default:   $OPENWRT_ROOT/package/veci-default-ui"
