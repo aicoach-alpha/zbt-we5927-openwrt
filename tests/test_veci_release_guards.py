@@ -12,12 +12,32 @@ ROOT = Path(__file__).resolve().parents[1]
 CORE = ROOT / "source" / "veci.commit"
 GUEST = ROOT / "source/veci-app-guest/files/usr/libexec/rpcd/veci.app.guest"
 VOUCHER = ROOT / "source/veci-app-voucher/files/usr/libexec/rpcd/veci.app.voucher"
+CELLULAR = ROOT / "source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular"
+CELLULAR_ACL = ROOT / "source/veci-cellular-we5927/files/usr/share/rpcd/acl.d/veci-cellular-we5927.json"
 UPDATE_AGENT = ROOT / "source/veci-update-we5927/files/usr/sbin/veci-update-agent"
 UPDATER_PROFILE = ROOT / "source/veci-update-we5927/files/etc/uci-defaults/96-veci-update-we5927"
-SCRIPT_PATHS = [GUEST, VOUCHER, UPDATE_AGENT, UPDATER_PROFILE]
+SCRIPT_PATHS = [GUEST, VOUCHER, CELLULAR, UPDATE_AGENT, UPDATER_PROFILE]
 
 
 class ReleaseSafetyTests(unittest.TestCase):
+    def test_modem_identity_is_opt_in_and_never_in_polling_status(self):
+        import json
+
+        provider = CELLULAR.read_text()
+        status = provider.split("status() {", 1)[1].split("\n}", 1)[0]
+        identity = provider.split("identity() {", 1)[1].split("\n}", 1)[0]
+        self.assertNotIn('json_add_string imei', status)
+        self.assertNotIn('json_add_string iccid', status)
+        self.assertIn('json_add_string imei "$imei"', identity)
+        self.assertIn('json_add_string source "router_modem_at_cache"', identity)
+        self.assertIn('cache_age_seconds', identity)
+        self.assertIn('???????????????', identity)
+        self.assertIn("identity) identity", provider)
+
+        acl = json.loads(CELLULAR_ACL.read_text())
+        self.assertIn("identity", acl["veci-cellular-we5927"]["read"]["ubus"]["veci.cellular"])
+        self.assertNotIn("identity", acl["veci-cellular-we5927"]["write"]["ubus"]["veci.cellular"])
+
     def test_firmware_is_pinned_to_immutable_commit(self):
         self.assertRegex(CORE.read_text().strip(), r"^[0-9a-f]{40}$")
 
