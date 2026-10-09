@@ -140,7 +140,7 @@ set firewall.veci_guest_forward=rule
 set firewall.veci_guest_forward.name='VeCI guest authenticated forward'
 set firewall.veci_guest_forward.src='veci_guest'
 set firewall.veci_guest_forward.dest='wan'
-set firewall.veci_guest_forward.proto='all'
+set firewall.veci_guest_forward.proto='any'
 set firewall.veci_guest_forward.target='ACCEPT'
 set firewall.veci_guest_forward.ipset='uspot'
 
@@ -155,7 +155,7 @@ set wireless.veci_guest.device='radio0'
 set wireless.veci_guest.mode='ap'
 set wireless.veci_guest.network='veci_guest'
 set wireless.veci_guest.encryption='none'
-set wireless.veci_guest.disabled='0'
+set wireless.veci_guest.disabled='1'
 
 set uhttpd.veci_guest=uhttpd
 delete uhttpd.veci_guest.listen_http
@@ -186,6 +186,8 @@ EOF
 
 enable_portal() {
 	provision_base || return 1
+	uci set wireless.veci_guest.disabled='0'
+	uci commit wireless
 	idle="$(uci -q get veci_guest.main.idle_timeout 2>/dev/null || printf '600')"
 	session="$(uci -q get veci_guest.main.session_timeout 2>/dev/null || printf '3600')"
 	uci -q batch <<EOF
@@ -210,6 +212,10 @@ EOF
 disable_portal() {
 	uci -q delete uspot.veci_guest
 	uci commit uspot
+	if uci -q get wireless.veci_guest >/dev/null 2>&1; then
+		uci set wireless.veci_guest.disabled='1'
+		uci commit wireless
+	fi
 
 	original="$(uci -q get veci_guest.main.original_listen_http 2>/dev/null || true)"
 	uci -q delete uhttpd.veci_guest
@@ -223,6 +229,7 @@ disable_portal() {
 
 	service_restart uspot || true
 	service_restart uhttpd || true
+	wifi reload >/dev/null 2>&1 || true
 	return 0
 }
 
