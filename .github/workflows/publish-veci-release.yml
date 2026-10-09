@@ -100,7 +100,6 @@ jobs:
           set_module PACKAGE_luci-app-ddns
           set_module PACKAGE_wireguard-tools
           set_module PACKAGE_luci-proto-wireguard
-          set_module PACKAGE_simple-captive-portal
           set_module PACKAGE_uspot
           set_module PACKAGE_uspot-www
           set_module PACKAGE_veci-app-guest
