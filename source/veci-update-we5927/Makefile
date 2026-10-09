@@ -32,7 +32,7 @@ endef
 
 define Package/veci-update-we5927/postinst
 #!/bin/sh
-[ -n "${IPKG_INSTROOT}" ] || {
+[ -n "$${IPKG_INSTROOT}" ] || {
 	/etc/init.d/veci-update-agent enable >/dev/null 2>&1 || true
 	/etc/init.d/veci-update-agent restart >/dev/null 2>&1 || true
 }
