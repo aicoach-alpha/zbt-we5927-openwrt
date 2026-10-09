@@ -24,6 +24,17 @@ endef
 define Package/veci-app-wireguard/install
 	$(INSTALL_DIR) $(1)/usr/share/veci/apps-installed
 	touch $(1)/usr/share/veci/apps-installed/wireguard
+	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
+	$(INSTALL_BIN) ./files/usr/libexec/rpcd/veci.app.wireguard $(1)/usr/libexec/rpcd/veci.app.wireguard
+	$(INSTALL_DIR) $(1)/www/veci-apps
+	$(INSTALL_DATA) ./files/www/veci-apps/wireguard.js $(1)/www/veci-apps/wireguard.js
+endef
+
+define Package/veci-app-wireguard/postinst
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] || {
+	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+}
 endef
 
 $(eval $(call BuildPackage,veci-app-wireguard))
