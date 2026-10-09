@@ -155,9 +155,33 @@ method_revoke() {
 	printf '{ "ok": true }\n'
 }
 
+
+method_cleanup() {
+	for section in $(uci -q show network 2>/dev/null | sed -n 's/^network\.\(veci_peer_[A-Za-z0-9_]*\)=wireguard_veci_wg$/\1/p'); do
+		uci -q delete "network.$section"
+	done
+	uci -q delete network.veci_wg 2>/dev/null || true
+
+	zone="$(lan_zone_ref)"
+	if [ -n "$zone" ]; then
+		uci -q del_list "firewall.$zone.network=veci_wg" 2>/dev/null || true
+		uci commit firewall || {
+			printf '{ "ok": false, "error": "firewall_commit_failed" }\n'
+			return
+		}
+	fi
+
+	uci commit network || {
+		printf '{ "ok": false, "error": "network_commit_failed" }\n'
+		return
+	}
+	ubus call network reload >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
 case "$1" in
 	list)
-		printf '{ "status": {}, "save": { "enabled": "bool", "address": "str", "listen_port": "int", "lan_access": "bool" }, "create": { "description": "str", "public_key": "str", "allowed_ip": "str", "endpoint_host": "str", "endpoint_port": "str", "persistent_keepalive": "str" }, "revoke": { "id": "str" } }\n'
+		printf '{ "status": {}, "save": { "enabled": "bool", "address": "str", "listen_port": "int", "lan_access": "bool" }, "create": { "description": "str", "public_key": "str", "allowed_ip": "str", "endpoint_host": "str", "endpoint_port": "str", "persistent_keepalive": "str" }, "revoke": { "id": "str" }, "cleanup": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -165,6 +189,7 @@ case "$1" in
 			save) method_save ;;
 			create) method_create ;;
 			revoke) method_revoke ;;
+			cleanup) method_cleanup ;;
 			*) printf '{ "error": "method_not_found" }\n' ;;
 		esac
 		;;
