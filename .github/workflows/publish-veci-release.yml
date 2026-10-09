@@ -240,14 +240,22 @@ jobs:
           mkdir -p "$DEST"
           cp -a "$GITHUB_WORKSPACE/release-feed/." "$DEST/"
 
-          export CHANNEL_PATH="$GITHUB_WORKSPACE/publish/channel-stable.json"
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            RELEASE_CHANNEL='prerelease'
+            CHANNEL_FILE='channel-prerelease.json'
+          else
+            RELEASE_CHANNEL='stable'
+            CHANNEL_FILE='channel-stable.json'
+          fi
+          export RELEASE_CHANNEL
+          export CHANNEL_PATH="$GITHUB_WORKSPACE/publish/$CHANNEL_FILE"
           export FW_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$FW_NAME"
           export NOTES_URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG"
           python3 - <<'PY'
           import json, os
           data = {
               "schema": 1,
-              "channel": "stable",
+              "channel": os.environ["RELEASE_CHANNEL"],
               "available": True,
               "version": os.environ["RELEASE_TAG"],
               "build_id": os.environ["BUILD_ID"],
@@ -271,7 +279,7 @@ jobs:
           cd "$GITHUB_WORKSPACE/publish"
           git config user.name "VeCI Release Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add "feeds/$BUILD_ID" channel-stable.json
+          git add "feeds/$BUILD_ID" "$CHANNEL_FILE"
           git commit -m "Publish VeCI feed $RELEASE_TAG ($BUILD_ID)"
           git push origin app-feed
 
@@ -281,5 +289,5 @@ jobs:
           name: "veci-release-${{ inputs.release_tag }}"
           path: |
             release-output/
-            publish/channel-stable.json
+            publish/channel-*.json
           retention-days: 30
