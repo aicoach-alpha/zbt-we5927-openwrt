@@ -56,7 +56,7 @@ jobs:
           git -C openwrt apply "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
 
       - name: Install VeCI feed dependency closure
-        run: firmware/scripts/install-veci-feeds.sh "$GITHUB_WORKSPACE/openwrt"
+        run: sh firmware/scripts/install-veci-feeds.sh "$GITHUB_WORKSPACE/openwrt"
 
       - name: Add pinned VeCI packages
         run: |
