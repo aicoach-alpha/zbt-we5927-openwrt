@@ -1,0 +1,117 @@
+#!/bin/sh
+
+clean_token() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9._:@-'
+}
+
+safe_text() {
+	value="$1"
+	max="$2"
+	flat="$(printf '%s' "$value" | tr -d '\r\n')"
+	[ "$flat" = "$value" ] && [ "${#value}" -le "$max" ]
+}
+
+method_status() {
+	enabled="$(uci -q get ddns.veci.enabled 2>/dev/null || printf '0')"
+	service="$(uci -q get ddns.veci.service_name 2>/dev/null || printf 'cloudflare.com-v4')"
+	lookup_host="$(uci -q get ddns.veci.lookup_host 2>/dev/null || true)"
+	domain="$(uci -q get ddns.veci.domain 2>/dev/null || true)"
+	username="$(uci -q get ddns.veci.username 2>/dev/null || true)"
+	network="$(uci -q get ddns.veci.ip_network 2>/dev/null || printf 'lte')"
+	password="$(uci -q get ddns.veci.password 2>/dev/null || true)"
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	[ "$enabled" = "1" ] && json_add_boolean enabled 1 || json_add_boolean enabled 0
+	json_add_string service "$(clean_token "$service")"
+	json_add_string lookup_host "$(clean_token "$lookup_host")"
+	json_add_string domain "$(clean_token "$domain")"
+	json_add_string username "$username"
+	json_add_string network "$(clean_token "$network")"
+	[ -n "$password" ] && json_add_boolean password_set 1 || json_add_boolean password_set 0
+	json_dump
+}
+
+method_save() {
+	input="$(cat)"
+	enabled="$(printf '%s' "$input" | jsonfilter -e '@.enabled' 2>/dev/null)"
+	service="$(printf '%s' "$input" | jsonfilter -e '@.service' 2>/dev/null)"
+	lookup_host="$(printf '%s' "$input" | jsonfilter -e '@.lookup_host' 2>/dev/null)"
+	domain="$(printf '%s' "$input" | jsonfilter -e '@.domain' 2>/dev/null)"
+	username="$(printf '%s' "$input" | jsonfilter -e '@.username' 2>/dev/null)"
+	password="$(printf '%s' "$input" | jsonfilter -e '@.password' 2>/dev/null)"
+	network="$(printf '%s' "$input" | jsonfilter -e '@.network' 2>/dev/null)"
+
+	case "$enabled" in
+		1|true) enabled=1 ;;
+		0|false|'') enabled=0 ;;
+		*) printf '{ "ok": false, "error": "invalid_enabled" }\n'; return ;;
+	esac
+	case "$service" in
+		cloudflare.com-v4|duckdns.org|no-ip.com) ;;
+		*) printf '{ "ok": false, "error": "unsupported_provider" }\n'; return ;;
+	esac
+
+	safe_lookup="$(clean_token "$lookup_host")"
+	safe_domain="$(clean_token "$domain")"
+	safe_network="$(clean_token "$network")"
+	[ -n "$lookup_host" ] && [ "$safe_lookup" = "$lookup_host" ] || {
+		printf '{ "ok": false, "error": "invalid_lookup_host" }\n'
+		return
+	}
+	[ -n "$domain" ] && [ "$safe_domain" = "$domain" ] || {
+		printf '{ "ok": false, "error": "invalid_domain" }\n'
+		return
+	}
+	[ -n "$network" ] && [ "$safe_network" = "$network" ] || {
+		printf '{ "ok": false, "error": "invalid_network" }\n'
+		return
+	}
+	safe_text "$username" 128 || {
+		printf '{ "ok": false, "error": "invalid_username" }\n'
+		return
+	}
+	safe_text "$password" 512 || {
+		printf '{ "ok": false, "error": "invalid_password" }\n'
+		return
+	}
+
+	uci -q set ddns.veci=service
+	uci -q set "ddns.veci.enabled=$enabled"
+	uci -q set "ddns.veci.service_name=$service"
+	uci -q set "ddns.veci.lookup_host=$lookup_host"
+	uci -q set "ddns.veci.domain=$domain"
+	uci -q set "ddns.veci.username=$username"
+	uci -q set "ddns.veci.interface=$network"
+	uci -q set "ddns.veci.ip_source=network"
+	uci -q set "ddns.veci.ip_network=$network"
+	uci -q set "ddns.veci.use_ipv6=0"
+	uci -q set "ddns.veci.use_https=1"
+	uci -q set "ddns.veci.use_api_check=0"
+	if [ -n "$password" ]; then
+		uci -q set "ddns.veci.password=$password"
+	fi
+	uci commit ddns || {
+		printf '{ "ok": false, "error": "uci_commit_failed" }\n'
+		return
+	}
+
+	if /etc/init.d/ddns restart >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "ddns_restart_failed" }\n'
+	fi
+}
+
+case "$1" in
+	list)
+		printf '{ "status": {}, "save": { "enabled": "bool", "service": "str", "lookup_host": "str", "domain": "str", "username": "str", "password": "str", "network": "str" } }\n'
+		;;
+	call)
+		case "$2" in
+			status) method_status ;;
+			save) method_save ;;
+			*) printf '{ "error": "method_not_found" }\n' ;;
+		esac
+		;;
+esac
