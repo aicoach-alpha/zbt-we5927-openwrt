@@ -1,0 +1,8 @@
+{
+	"id": "guest",
+	"name": "Guest portal",
+	"description": "Captive portal for guest access",
+	"tier": "S",
+	"packages": ["veci-app-guest"],
+	"remove_packages": ["veci-app-guest"]
+}
