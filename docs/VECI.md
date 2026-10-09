@@ -120,6 +120,10 @@ VeCI must not become the public stable default until all of these pass:
 - `veci-default-ui disable` -> original landing page;
 - router reboot;
 - LTE recovery regression;
+- Router Apps end-to-end: Guest portal, Smart Queue, Dynamic DNS, WireGuard and Voucher install/configure/remove tests;
+- exact-ABI VeCI app feed validation with no blind package upgrade;
+- native VeCI firmware updater: manual image validation plus GitHub release-channel discovery;
+- firmware board/target/checksum validation before any install action;
 - `sysupgrade -T` on the exact release image.
 
-The existing RC1 remains the recovery baseline until a VeCI-enabled image passes those gates.
+No official/final router flash is performed while any Router App or firmware-update gate above remains incomplete. The existing RC1 remains the recovery baseline until a VeCI-enabled image passes every gate and the operator explicitly approves the final flash.
