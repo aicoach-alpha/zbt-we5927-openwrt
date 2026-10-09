@@ -37,4 +37,11 @@ define Package/veci-app-ddns/postinst
 }
 endef
 
+define Package/veci-app-ddns/prerm
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] || {
+	ubus call veci.app.ddns cleanup '{}' >/dev/null 2>&1 || true
+}
+endef
+
 $(eval $(call BuildPackage,veci-app-ddns))
