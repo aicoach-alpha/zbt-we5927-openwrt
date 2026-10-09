@@ -101,6 +101,19 @@ jobs:
           done
           grep -q 'veci-app-voucher' source/veci-app-catalog-we5927/files/usr/share/veci/apps/voucher.json
 
+      - name: Verify Router App lifecycle guards
+        run: |
+          if grep -RFn '[ -n "${IPKG_INSTROOT}" ]' source/veci-app-*/Makefile; then
+            echo "Runtime lifecycle scripts must escape IPKG_INSTROOT for OpenWrt make expansion."
+            exit 1
+          fi
+          grep -q 'cleanup) method_cleanup' source/veci-app-guest/files/usr/libexec/rpcd/veci.app.guest
+          grep -q 'cleanup) method_cleanup' source/veci-app-sqm/files/usr/libexec/rpcd/veci.app.sqm
+          grep -q 'cleanup) method_cleanup' source/veci-app-ddns/files/usr/libexec/rpcd/veci.app.ddns
+          grep -q 'cleanup) method_cleanup' source/veci-app-wireguard/files/usr/libexec/rpcd/veci.app.wireguard
+          grep -q 'cleanup) method_cleanup_all' source/veci-app-voucher/files/usr/libexec/rpcd/veci.app.voucher
+          grep -q "cleanupExpired" source/veci-app-voucher/files/usr/sbin/veci-voucher-cleaner
+
       - name: Verify generic and hardware-specific boundary
         run: |
           ! grep -RniE 'WE5927|WE2825|ZBT' /tmp/openwrt/package/veci/veci
