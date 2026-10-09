@@ -90,14 +90,28 @@ EOF
 	fi
 }
 
+
+method_cleanup() {
+	if uci -q get sqm.veci >/dev/null 2>&1; then
+		uci -q delete sqm.veci
+		uci commit sqm || {
+			printf '{ "ok": false, "error": "uci_commit_failed" }\n'
+			return
+		}
+	fi
+	/etc/init.d/sqm restart >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
 case "$1" in
 	list)
-		printf '{ "status": {}, "save": { "enabled": "bool", "interface": "str", "download": "str", "upload": "str", "qdisc": "str", "script": "str" } }\n'
+		printf '{ "status": {}, "save": { "enabled": "bool", "interface": "str", "download": "str", "upload": "str", "qdisc": "str", "script": "str" }, "cleanup": {} }\n'
 		;;
 	call)
 		case "$2" in
 			status) method_status ;;
 			save) method_save ;;
+			cleanup) method_cleanup ;;
 			*) printf '{ "error": "method_not_found" }\n' ;;
 		esac
 		;;
