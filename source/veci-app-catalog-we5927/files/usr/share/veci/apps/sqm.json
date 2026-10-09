@@ -3,6 +3,11 @@
 	"name": "Smart Queue",
 	"description": "Traffic shaping and queue management",
 	"tier": "S",
-	"packages": ["veci-app-sqm"],
-	"remove_packages": ["veci-app-sqm"]
+	"packages": [
+		"veci-app-sqm"
+	],
+	"remove_packages": [
+		"veci-app-sqm"
+	],
+	"module": "/veci-apps/sqm.js"
 }
