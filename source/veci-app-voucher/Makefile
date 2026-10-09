@@ -45,10 +45,15 @@ endef
 
 define Package/veci-app-voucher/prerm
 #!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] || {
+[ -n "${IPKG_INSTROOT}" ] || {
 	ubus call veci.app.voucher cleanup '{}' >/dev/null 2>&1 || true
 	/etc/init.d/veci-voucher-cleaner stop >/dev/null 2>&1 || true
 	/etc/init.d/veci-voucher-cleaner disable >/dev/null 2>&1 || true
+	if uci -q get uspot.veci_guest >/dev/null 2>&1; then
+		uci set uspot.veci_guest.auth_mode='click-to-continue'
+		uci commit uspot
+		/etc/init.d/uspot restart >/dev/null 2>&1 || true
+	fi
 }
 endef
 
