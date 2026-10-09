@@ -35,6 +35,7 @@ class ReleaseSafetyTests(unittest.TestCase):
         self.assertIn("identity) identity", provider)
         self.assertIn("identityLive) identity_live", provider)
         self.assertIn('json_add_string source "at_cgsn_live"', provider)
+        acl = json.loads(CELLULAR_ACL.read_text())
         self.assertIn("identityLive", acl["veci-cellular-we5927"]["read"]["ubus"]["veci.cellular"])
         self.assertNotIn("identityLive", acl["veci-cellular-we5927"]["write"]["ubus"]["veci.cellular"])
         modem = (ROOT / "source/we5927-lte/files/usr/sbin/we5927-lte").read_text()
@@ -43,7 +44,6 @@ class ReleaseSafetyTests(unittest.TestCase):
         self.assertIn("\timei-read)", modem)
         self.assertNotIn("AT+EGMR", modem)
 
-        acl = json.loads(CELLULAR_ACL.read_text())
         self.assertIn("identity", acl["veci-cellular-we5927"]["read"]["ubus"]["veci.cellular"])
         self.assertNotIn("identity", acl["veci-cellular-we5927"]["write"]["ubus"]["veci.cellular"])
 
