@@ -39,7 +39,7 @@ endef
 
 define Package/veci-app-sqm/prerm
 #!/bin/sh
-[ -n "${IPKG_INSTROOT}" ] || {
+[ -n "$${IPKG_INSTROOT}" ] || {
 	ubus call veci.app.sqm cleanup '{}' >/dev/null 2>&1 || true
 }
 endef
