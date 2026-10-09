@@ -23,7 +23,12 @@ $base/packages/mipsel_24kc/video/packages.adb
 EOF
 
 uci -q get veci.main >/dev/null 2>&1 || uci set veci.main=core
-uci set veci.main.app_feed_enabled='1'
+release_channel="$(cat /etc/veci-release-channel 2>/dev/null || printf 'development')"
+if [ "$release_channel" = "published" ]; then
+	uci set veci.main.app_feed_enabled='1'
+else
+	uci set veci.main.app_feed_enabled='0'
+fi
 uci set veci.main.app_feed_build_id="$build_id"
 uci set veci.main.app_feed_base_url="$base"
 uci commit veci
