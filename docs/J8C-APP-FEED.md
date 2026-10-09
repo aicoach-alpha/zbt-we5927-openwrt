@@ -16,13 +16,15 @@ VeCI must never perform a blind `apk upgrade`.
 
 Packages that touch the kernel, networking core or firmware base are upgraded by rebuilding and testing a coherent firmware image.
 
-Optional apps are shipped as modules in the matched VeCI package feed:
+Optional apps are exposed to VeCI through small wrapper packages built from the same immutable source set as the firmware:
 
-- Smart Queue: `sqm-scripts`, `luci-app-sqm` and exact-ABI kernel dependencies.
-- Dynamic DNS: `ddns-scripts`, `luci-app-ddns`.
-- WireGuard: `wireguard-tools`, `luci-proto-wireguard` and exact-ABI `kmod-wireguard`.
-- Guest portal candidates: `simple-captive-portal` and `uspot`/ `uspot-www`; choose after measured flash/RAM cost.
-- Voucher: VeCI-specific package, not yet implemented.
+- `veci-app-guest` -> `uspot` + `uspot-www`.
+- `veci-app-sqm` -> `sqm-scripts` + `luci-app-sqm` and exact-ABI kernel dependencies.
+- `veci-app-ddns` -> `ddns-scripts` + `luci-app-ddns`.
+- `veci-app-wireguard` -> `wireguard-tools` + `luci-proto-wireguard` and exact-ABI kernel dependencies.
+- `veci-app-voucher` remains blocked until its guest-credential provider is implemented and tested.
+
+The base image contains only `veci-app-catalog-we5927`, which installs root-owned app manifests. VeCI Core never accepts arbitrary package names from the browser; install/remove actions resolve only through those manifests.
 
 `opennds` is not selected for this baseline because it is not present in the pinned OpenWrt 25.12 packages branch used by this reproducible build.
 
