@@ -39,7 +39,7 @@ endef
 
 define Package/veci-app-ddns/prerm
 #!/bin/sh
-[ -n "${IPKG_INSTROOT}" ] || {
+[ -n "$${IPKG_INSTROOT}" ] || {
 	ubus call veci.app.ddns cleanup '{}' >/dev/null 2>&1 || true
 }
 endef
