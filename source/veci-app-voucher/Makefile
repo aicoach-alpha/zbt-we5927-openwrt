@@ -36,7 +36,7 @@ endef
 
 define Package/veci-app-voucher/postinst
 #!/bin/sh
-[ -n "${IPKG_INSTROOT}" ] || {
+[ -n "$${IPKG_INSTROOT}" ] || {
 	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
 	/etc/init.d/veci-voucher-cleaner enable >/dev/null 2>&1 || true
 	/etc/init.d/veci-voucher-cleaner restart >/dev/null 2>&1 || true
@@ -46,6 +46,7 @@ endef
 define Package/veci-app-voucher/prerm
 #!/bin/sh
 [ -n "${IPKG_INSTROOT}" ] || {
+	ubus call veci.app.voucher cleanup '{}' >/dev/null 2>&1 || true
 	/etc/init.d/veci-voucher-cleaner stop >/dev/null 2>&1 || true
 	/etc/init.d/veci-voucher-cleaner disable >/dev/null 2>&1 || true
 }
