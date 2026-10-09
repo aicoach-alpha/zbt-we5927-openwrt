@@ -144,4 +144,6 @@ jobs:
         run: |
           ! grep -RniE 'WE5927|WE2825|ZBT' /tmp/openwrt/package/veci/veci
           grep -q 'status-fast' source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
-          ! grep -qiE 'imei|iccid' source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
+          ! sed -n '/^status() {/,/^}/p' source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular | grep -qE 'json_add_string (imei|iccid)'
+          grep -q 'identity) identity' source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
+          grep -q '"identity"' source/veci-cellular-we5927/files/usr/share/rpcd/acl.d/veci-cellular-we5927.json
