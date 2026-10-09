@@ -68,6 +68,64 @@ status() {
 	json_dump
 }
 
+# Sensitive identity is intentionally excluded from the frequently polled status.
+# This is an authenticated, explicit-on-demand read from the router AT status cache,
+# not a query to the W907 web UI. Never persist or log the IMEI here.
+identity() {
+	[ -x "$LTE" ] || {
+		emit_error "lte_manager_missing"
+		return
+	}
+
+	raw="$("$LTE" status-fast 2>/dev/null)" || {
+		emit_error "status_failed"
+		return
+	}
+	. /usr/share/libubox/jshn.sh
+	json_load "$raw" 2>/dev/null || {
+		emit_error "invalid_status"
+		return
+	}
+	json_get_var imei imei
+	json_get_var status_source status_source
+
+	# Do not reveal random identifiers if the AT parser/cache is invalid.
+	case "$imei" in
+		???????????????) ;;
+		*) imei='' ;;
+	esac
+	case "$imei" in
+		''|*[!0-9]*) imei='' ;;
+	esac
+
+	age=0
+	cache_age_known=0
+	if [ -r /tmp/we5927-lte.status.ts ]; then
+		ts="$(cat /tmp/we5927-lte.status.ts 2>/dev/null)"
+		now="$(date +%s 2>/dev/null)"
+		case "$ts:$now" in
+			*[!0-9:]*) ;;
+			:)
+				;;
+			*)
+				if [ -n "$ts" ] && [ -n "$now" ] && [ "$now" -ge "$ts" ] 2>/dev/null; then
+					age=$((now - ts))
+					cache_age_known=1
+				fi
+				;;
+		esac
+	fi
+
+	json_init
+	[ -n "$imei" ] && json_add_boolean available 1 || json_add_boolean available 0
+	json_add_string imei "$imei"
+	json_add_string source "router_modem_at_cache"
+	json_add_string status_source "$status_source"
+	[ "$cache_age_known" -eq 1 ] && json_add_int cache_age_seconds "$age" || json_add_int cache_age_seconds -1
+	[ "$cache_age_known" -eq 0 ] || [ "$age" -gt 300 ] && json_add_boolean stale 1 || json_add_boolean stale 0
+	json_dump
+}
+
 reconnect() {
 	[ -x "$LTE" ] || {
 		emit_error "lte_manager_missing"
@@ -94,11 +152,12 @@ switch_sim() {
 
 case "$1" in
 	list)
-		printf '{ "status": {}, "reconnect": {}, "switchSim": { "sim": "int" } }\n'
+		printf '{ "status": {}, "identity": {}, "reconnect": {}, "switchSim": { "sim": "int" } }\n'
 		;;
 	call)
 		case "$2" in
 			status) status ;;
+			identity) identity ;;
 			reconnect) reconnect ;;
 			switchSim) switch_sim ;;
 			*) emit_error "method_not_found" ;;
