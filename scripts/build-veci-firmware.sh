@@ -48,6 +48,11 @@ grep -q '^CONFIG_TARGET_ramips_mt76x8_DEVICE_zbtlink_zbt-we5927=y' .config
 grep -q '^CONFIG_PACKAGE_veci=y' .config
 grep -q '^CONFIG_PACKAGE_veci-default-ui=y' .config
 grep -q '^CONFIG_PACKAGE_veci-cellular-we5927=y' .config
+grep -q '^CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
+grep -q '^CONFIG_PACKAGE_veci-app-guest=m' .config
+grep -q '^CONFIG_PACKAGE_veci-app-sqm=m' .config
+grep -q '^CONFIG_PACKAGE_veci-app-ddns=m' .config
+grep -q '^CONFIG_PACKAGE_veci-app-wireguard=m' .config
 grep -q '^CONFIG_PACKAGE_px5g-mbedtls=y' .config
 
 make -j"$JOBS"
