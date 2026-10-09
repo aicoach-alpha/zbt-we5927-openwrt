@@ -24,6 +24,8 @@ endef
 define Package/veci-app-catalog-we5927/install
 	$(INSTALL_DIR) $(1)/usr/share/veci/apps
 	$(INSTALL_DATA) ./files/usr/share/veci/apps/*.json $(1)/usr/share/veci/apps/
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/95-veci-app-feed-we5927 $(1)/etc/uci-defaults/95-veci-app-feed-we5927
 endef
 
 $(eval $(call BuildPackage,veci-app-catalog-we5927))
