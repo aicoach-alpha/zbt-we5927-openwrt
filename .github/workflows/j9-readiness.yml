@@ -20,7 +20,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: j9-offline-${ github.ref }
+  group: j9-offline-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      J8C_RUN_ID: ${ inputs.j8c_run_id || '37913407078' }
+      J8C_RUN_ID: ${{ inputs.j8c_run_id || '37913407078' }}
     steps:
       - uses: actions/checkout@v4
       - name: Non-live gate regression suite
@@ -41,17 +41,17 @@ jobs:
         with:
           name: veci-j8c-maintenance-candidate
           path: j9-input/firmware
-          repository: ${ github.repository }
-          run-id: ${ env.J8C_RUN_ID }
-          github-token: ${ github.token }
+          repository: ${{ github.repository }}
+          run-id: ${{ env.J8C_RUN_ID }}
+          github-token: ${{ github.token }}
       - name: Download paired app feed from SAME run
         uses: actions/download-artifact@v4
         with:
           name: veci-j8c-matched-app-feed
           path: j9-input/feed
-          repository: ${ github.repository }
-          run-id: ${ env.J8C_RUN_ID }
-          github-token: ${ github.token }
+          repository: ${{ github.repository }}
+          run-id: ${{ env.J8C_RUN_ID }}
+          github-token: ${{ github.token }}
       - name: Fail-closed J9 offline integrity / ABI audit
         run: |
           python3 scripts/j9_offline_audit.py \
