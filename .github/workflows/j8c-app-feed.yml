@@ -13,6 +13,7 @@ on:
       - 'source/veci-update-we5927/**'
       - 'source/veci-app-*/**'
       - 'scripts/prepare-veci.sh'
+      - 'scripts/install-veci-feeds.sh'
       - '.github/workflows/j8c-app-feed.yml'
 
 
@@ -67,11 +68,8 @@ jobs:
           git -C openwrt apply "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
           firmware/scripts/prepare-veci.sh "$GITHUB_WORKSPACE/openwrt"
 
-      - name: Install pinned feeds
-        working-directory: openwrt
-        run: |
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+      - name: Install pinned VeCI feed dependency closure
+        run: firmware/scripts/install-veci-feeds.sh "$GITHUB_WORKSPACE/openwrt"
 
       - name: Resolve base firmware config
         working-directory: openwrt
