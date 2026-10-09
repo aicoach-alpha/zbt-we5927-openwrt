@@ -17,9 +17,6 @@ $base/targets/ramips/mt76x8/packages/packages.adb
 $base/packages/mipsel_24kc/base/packages.adb
 $base/packages/mipsel_24kc/luci/packages.adb
 $base/packages/mipsel_24kc/packages/packages.adb
-$base/packages/mipsel_24kc/routing/packages.adb
-$base/packages/mipsel_24kc/telephony/packages.adb
-$base/packages/mipsel_24kc/video/packages.adb
 EOF
 
 uci -q get veci.main >/dev/null 2>&1 || uci set veci.main=core
