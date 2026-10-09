@@ -78,7 +78,7 @@ jobs:
           set -eu
           git -C openwrt apply --check "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
           git -C openwrt apply "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
-          firmware/scripts/prepare-veci.sh "$GITHUB_WORKSPACE/openwrt"
+          VECI_PUBLISHED_RELEASE=1 firmware/scripts/prepare-veci.sh "$GITHUB_WORKSPACE/openwrt"
 
       - name: Install pinned feeds
         working-directory: openwrt
