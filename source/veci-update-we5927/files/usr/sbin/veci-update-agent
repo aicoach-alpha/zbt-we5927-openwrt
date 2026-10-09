@@ -72,10 +72,29 @@ check_once() {
 	sha="$(printf '%s' "$result" | jsonfilter -e '@.sha256' 2>/dev/null)"
 	validate="$(ubus call veci firmwareValidate "{ \"expected_sha256\": \"$sha\" }" 2>/dev/null || true)"
 	validated="$(printf '%s' "$validate" | jsonfilter -e '@.validated' 2>/dev/null)"
-	if [ "$validated" = "true" ]; then
-		record_status staged validated_ready
-	else
+	signature_verified="$(printf '%s' "$validate" | jsonfilter -e '@.signature_verified' 2>/dev/null)"
+	apply_token="$(printf '%s' "$validate" | jsonfilter -e '@.apply_token' 2>/dev/null)"
+	if [ "$validated" != "true" ]; then
 		record_status error validation_failed
+		return
+	fi
+
+	if [ "$(uci -q get veci.update.auto_install 2>/dev/null)" != "1" ]; then
+		record_status staged validated_ready
+		return
+	fi
+
+	[ "$signature_verified" = "true" ] && [ -n "$apply_token" ] || {
+		record_status blocked signature_required
+		return
+	}
+
+	apply="$(ubus call veci firmwareApply "{ \"apply_token\": \"$apply_token\", \"keep_settings\": true }" 2>/dev/null || true)"
+	apply_ok="$(printf '%s' "$apply" | jsonfilter -e '@.ok' 2>/dev/null)"
+	if [ "$apply_ok" = "true" ]; then
+		record_status applying rebooting
+	else
+		record_status error automatic_install_failed
 	fi
 }
 
