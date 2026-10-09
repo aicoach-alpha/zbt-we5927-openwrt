@@ -100,21 +100,34 @@ jobs:
           set_module PACKAGE_veci-app-wireguard
           set_module PACKAGE_veci-app-voucher
           make defconfig
-          grep -q '^CONFIG_PACKAGE_sqm-scripts=m' .config
-          grep -q '^CONFIG_PACKAGE_ddns-scripts=m' .config
-          grep -q '^CONFIG_PACKAGE_wireguard-tools=m' .config
-          grep -q '^CONFIG_PACKAGE_uspot=m' .config
-          grep -q '^CONFIG_PACKAGE_veci=y' .config
-          grep -q '^CONFIG_PACKAGE_veci-default-ui=y' .config
-          grep -q '^CONFIG_PACKAGE_veci-cellular-we5927=y' .config
-          grep -q '^CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
-          grep -q '^CONFIG_PACKAGE_veci-app-guest=m' .config
-          grep -q '^CONFIG_PACKAGE_veci-app-sqm=m' .config
-          grep -q '^CONFIG_PACKAGE_veci-app-ddns=m' .config
-          grep -q '^CONFIG_PACKAGE_veci-app-wireguard=m' .config
-          grep -q '^CONFIG_PACKAGE_veci-app-voucher=m' .config
-          grep -q '^CONFIG_SIGNED_PACKAGES=y' .config
-          grep -q '^CONFIG_SIGN_EACH_PACKAGE=y' .config
+
+          require_config() {
+            symbol="$1"
+            expected="$2"
+            actual="$(grep -E "^CONFIG_${symbol}=|^# CONFIG_${symbol} is not set$" .config | tail -n 1 || true)"
+            echo "J8CFG ${symbol}: expected=${expected} actual=${actual:-missing}"
+            [ "$actual" = "CONFIG_${symbol}=${expected}" ] || {
+              echo "::error::J8 Kconfig mismatch for ${symbol}: expected ${expected}, got ${actual:-missing}"
+              return 1
+            }
+          }
+
+          require_config PACKAGE_sqm-scripts m
+          require_config PACKAGE_ddns-scripts m
+          require_config PACKAGE_wireguard-tools m
+          require_config PACKAGE_uspot m
+          require_config PACKAGE_veci y
+          require_config PACKAGE_veci-default-ui y
+          require_config PACKAGE_veci-cellular-we5927 y
+          require_config PACKAGE_veci-update-we5927 y
+          require_config PACKAGE_veci-app-catalog-we5927 y
+          require_config PACKAGE_veci-app-guest m
+          require_config PACKAGE_veci-app-sqm m
+          require_config PACKAGE_veci-app-ddns m
+          require_config PACKAGE_veci-app-wireguard m
+          require_config PACKAGE_veci-app-voucher m
+          require_config SIGNED_PACKAGES y
+          require_config SIGN_EACH_PACKAGE y
 
       - name: Build firmware and exact-ABI optional packages
         working-directory: openwrt
