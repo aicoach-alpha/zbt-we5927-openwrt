@@ -3,6 +3,11 @@
 	"name": "Dynamic DNS",
 	"description": "Dynamic hostname updates",
 	"tier": "S",
-	"packages": ["veci-app-ddns"],
-	"remove_packages": ["veci-app-ddns"]
+	"packages": [
+		"veci-app-ddns"
+	],
+	"remove_packages": [
+		"veci-app-ddns"
+	],
+	"module": "/veci-apps/ddns.js"
 }
