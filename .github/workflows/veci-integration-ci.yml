@@ -68,6 +68,15 @@ jobs:
         run: |
           python3 -m json.tool source/veci-cellular-we5927/files/usr/share/rpcd/acl.d/veci-cellular-we5927.json >/dev/null
 
+      - name: Check native app module syntax
+        run: |
+          node --check source/veci-app-guest/files/www/veci-apps/guest.js
+          node --check source/veci-app-sqm/files/www/veci-apps/sqm.js
+          node --check source/veci-app-ddns/files/www/veci-apps/ddns.js
+          node --check source/veci-app-wireguard/files/www/veci-apps/wireguard.js
+          node --check source/veci-app-voucher/files/www/veci-apps/voucher.js
+          python3 -m json.tool releases/channel-stable.json >/dev/null
+
       - name: Resolve pinned VeCI source
         run: |
           mkdir -p /tmp/openwrt/package
