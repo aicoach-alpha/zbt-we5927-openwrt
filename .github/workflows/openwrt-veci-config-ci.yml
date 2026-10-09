@@ -10,6 +10,7 @@ on:
       - 'source/veci.commit'
       - 'source/veci-default-ui/**'
       - 'source/veci-cellular-we5927/**'
+      - 'source/veci-app-*/**'
       - 'scripts/prepare-veci.sh'
       - '.github/workflows/openwrt-veci-config-ci.yml'
   pull_request:
@@ -21,6 +22,7 @@ on:
       - 'source/veci.commit'
       - 'source/veci-default-ui/**'
       - 'source/veci-cellular-we5927/**'
+      - 'source/veci-app-*/**'
       - 'scripts/prepare-veci.sh'
       - '.github/workflows/openwrt-veci-config-ci.yml'
 
@@ -69,4 +71,9 @@ jobs:
           grep -q '^CONFIG_PACKAGE_veci=y' .config
           grep -q '^CONFIG_PACKAGE_veci-default-ui=y' .config
           grep -q '^CONFIG_PACKAGE_veci-cellular-we5927=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-guest=m' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-sqm=m' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-ddns=m' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-wireguard=m' .config
           ./scripts/diffconfig.sh | grep -E 'WE5927|we5927|veci|ramips|mt76x8' || true
