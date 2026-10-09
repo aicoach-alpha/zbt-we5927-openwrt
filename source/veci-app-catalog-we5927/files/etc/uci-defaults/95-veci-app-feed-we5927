@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+release_file='/etc/veci-release.json'
+[ -r "$release_file" ] || exit 0
+
+build_id="$(jsonfilter -i "$release_file" -e '@.build_id' 2>/dev/null || true)"
+case "$build_id" in
+	????????????????????????????????????????) ;;
+	*) exit 0 ;;
+esac
+
+base="https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/feeds/$build_id"
+mkdir -p /etc/apk/repositories.d
+cat > /etc/apk/repositories.d/veci-apps.list <<EOF
+$base/targets/ramips/mt76x8/packages/packages.adb
+$base/packages/mipsel_24kc/base/packages.adb
+$base/packages/mipsel_24kc/luci/packages.adb
+$base/packages/mipsel_24kc/packages/packages.adb
+$base/packages/mipsel_24kc/routing/packages.adb
+$base/packages/mipsel_24kc/telephony/packages.adb
+$base/packages/mipsel_24kc/video/packages.adb
+EOF
+
+uci -q get veci.main >/dev/null 2>&1 || uci set veci.main=core
+uci set veci.main.app_feed_enabled='1'
+uci set veci.main.app_feed_build_id="$build_id"
+uci set veci.main.app_feed_base_url="$base"
+uci commit veci
+
+exit 0
