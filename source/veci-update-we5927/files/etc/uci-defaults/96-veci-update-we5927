@@ -14,4 +14,6 @@ uci -q get veci.update.auto_install >/dev/null 2>&1 || uci set veci.update.auto_
 uci -q get veci.update.check_interval >/dev/null 2>&1 || uci set veci.update.check_interval='21600'
 uci commit veci
 
+/etc/init.d/veci-update-agent enable >/dev/null 2>&1 || true
+
 exit 0
