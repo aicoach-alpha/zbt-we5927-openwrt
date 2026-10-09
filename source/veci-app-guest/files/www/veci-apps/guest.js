@@ -10,7 +10,7 @@ export default {
 					<div>
 						<p class="eyebrow">ROUTER APP</p>
 						<h2>${escapeHtml(app.name || 'Guest portal')}</h2>
-						<p>Create an isolated guest Wi-Fi with a click-to-continue captive portal.</p>
+						<p>Create an isolated guest Wi-Fi with a captive portal managed by VeCI.</p>
 					</div>
 					<button id="guest-back" class="button button-secondary" type="button">Back to Apps</button>
 				</div>
@@ -24,7 +24,7 @@ export default {
 						<div class="detail-list">
 							<div><span>Guest gateway</span><strong>${escapeHtml(status.guest_ip || '10.20.0.1')}</strong></div>
 							<div><span>Radio</span><strong>${escapeHtml(status.radio || 'radio0')}</strong></div>
-							<div><span>Authentication</span><strong>Click to continue</strong></div>
+							<div><span>Authentication</span><strong>${status.auth_mode === 'credentials' ? 'Voucher credentials' : 'Click to continue'}</strong></div>
 						</div>
 						<div class="panel-actions">
 							${!status.configured ? '<button id="guest-provision" class="button button-primary" type="button">Provision guest network</button>' : ''}
