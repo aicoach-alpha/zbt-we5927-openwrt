@@ -39,6 +39,11 @@ method_status() {
 	lan_ip="$(uci -q get network.lan.ipaddr 2>/dev/null || true)"
 	guest_ip="$(uci -q get network.veci_guest.ipaddr 2>/dev/null || printf '10.20.0.1')"
 	radio="$(uci -q get wireless.veci_guest.device 2>/dev/null || printf 'radio0')"
+	auth_mode="$(uci -q get uspot.veci_guest.auth_mode 2>/dev/null || printf 'click-to-continue')"
+	case "$auth_mode" in
+		credentials|click-to-continue) ;;
+		*) auth_mode='click-to-continue' ;;
+	esac
 
 	. /usr/share/libubox/jshn.sh
 	json_init
@@ -50,7 +55,7 @@ method_status() {
 	json_add_string lan_ip "$lan_ip"
 	json_add_string guest_ip "$guest_ip"
 	json_add_string radio "$radio"
-	json_add_string auth_mode "click-to-continue"
+	json_add_string auth_mode "$auth_mode"
 	json_dump
 }
 
@@ -190,9 +195,159 @@ enable_portal() {
 	uci commit wireless
 	idle="$(uci -q get veci_guest.main.idle_timeout 2>/dev/null || printf '600')"
 	session="$(uci -q get veci_guest.main.session_timeout 2>/dev/null || printf '3600')"
+	auth_mode='click-to-continue'
+	if uci -q show veci_voucher 2>/dev/null | grep -q '=voucher
+set uspot.veci_guest.interface='veci_guest'
+set uspot.veci_guest.setname='uspot'
+set uspot.veci_guest.idle_timeout='$idle'
+set uspot.veci_guest.session_timeout='$session'
+EOF
+	uci commit uspot
+
+	service_restart network || true
+	service_restart dnsmasq || true
+	service_restart firewall || true
+	service_restart uhttpd || true
+	service_restart uspot || true
+	wifi reload >/dev/null 2>&1 || true
+	return 0
+}
+
+disable_portal() {
+	uci -q delete uspot.veci_guest
+	uci commit uspot
+	if uci -q get wireless.veci_guest >/dev/null 2>&1; then
+		uci set wireless.veci_guest.disabled='1'
+		uci commit wireless
+	fi
+
+	original="$(uci -q get veci_guest.main.original_listen_http 2>/dev/null || true)"
+	uci -q delete uhttpd.veci_guest
+	if [ -n "$original" ]; then
+		uci -q delete uhttpd.main.listen_http
+		for listener in $original; do
+			uci add_list uhttpd.main.listen_http="$listener"
+		done
+	fi
+	uci commit uhttpd
+
+	service_restart uspot || true
+	service_restart uhttpd || true
+	wifi reload >/dev/null 2>&1 || true
+	return 0
+}
+
+method_save() {
+	input="$(cat)"
+	ssid="$(printf '%s' "$input" | jsonfilter -e '@.ssid' 2>/dev/null)"
+	idle="$(printf '%s' "$input" | jsonfilter -e '@.idle_timeout' 2>/dev/null)"
+	session="$(printf '%s' "$input" | jsonfilter -e '@.session_timeout' 2>/dev/null)"
+
+	safe_ssid="$(clean_ssid "$ssid")"
+	[ -n "$ssid" ] && [ "$safe_ssid" = "$ssid" ] && [ "${#ssid}" -le 32 ] || {
+		printf '{ "ok": false, "error": "invalid_ssid" }\n'
+		return
+	}
+	number_in_range "$idle" 60 86400 || {
+		printf '{ "ok": false, "error": "invalid_idle_timeout" }\n'
+		return
+	}
+	number_in_range "$session" 0 604800 || {
+		printf '{ "ok": false, "error": "invalid_session_timeout" }\n'
+		return
+	}
+
+	save_preferences "$ssid" "$idle" "$session"
+	if uci -q get wireless.veci_guest >/dev/null 2>&1; then
+		uci set wireless.veci_guest.ssid="$ssid"
+		uci commit wireless
+		wifi reload >/dev/null 2>&1 || true
+	fi
+	if uci -q get uspot.veci_guest >/dev/null 2>&1; then
+		uci set uspot.veci_guest.idle_timeout="$idle"
+		uci set uspot.veci_guest.session_timeout="$session"
+		uci commit uspot
+		service_restart uspot || true
+	fi
+	printf '{ "ok": true }\n'
+}
+
+method_action() {
+	input="$(cat)"
+	action="$(printf '%s' "$input" | jsonfilter -e '@.action' 2>/dev/null)"
+	case "$action" in
+		provision)
+			if provision_base; then
+				service_restart network || true
+				service_restart dnsmasq || true
+				service_restart firewall || true
+				service_restart uhttpd || true
+				wifi reload >/dev/null 2>&1 || true
+				printf '{ "ok": true }\n'
+			fi
+			;;
+		enable)
+			if enable_portal; then printf '{ "ok": true }\n'; fi
+			;;
+		disable)
+			if disable_portal; then printf '{ "ok": true }\n'; fi
+			;;
+		*)
+			printf '{ "ok": false, "error": "unsupported_action" }\n'
+			;;
+	esac
+}
+
+
+method_cleanup() {
+	disable_portal >/dev/null 2>&1 || true
+
+	for section in veci_guest_dhcp veci_guest_dns veci_guest_portal veci_guest_forward veci_guest_restrict veci_guest_cpd veci_guest_ipset veci_guest_zone; do
+		uci -q delete "firewall.$section" 2>/dev/null || true
+	done
+	uci -q delete dhcp.veci_guest 2>/dev/null || true
+	uci -q delete wireless.veci_guest 2>/dev/null || true
+	uci -q delete network.veci_guest 2>/dev/null || true
+	uci -q delete uhttpd.veci_guest 2>/dev/null || true
+
+	uci commit firewall >/dev/null 2>&1 || true
+	uci commit dhcp >/dev/null 2>&1 || true
+	uci commit wireless >/dev/null 2>&1 || true
+	uci commit network >/dev/null 2>&1 || true
+	uci commit uhttpd >/dev/null 2>&1 || true
+
+	uci -q delete veci_guest.main 2>/dev/null || true
+	uci commit veci_guest >/dev/null 2>&1 || true
+
+	service_restart network || true
+	service_restart dnsmasq || true
+	service_restart firewall || true
+	service_restart uhttpd || true
+	service_restart uspot || true
+	wifi reload >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
+case "$1" in
+	list)
+		printf '{ "status": {}, "save": { "ssid": "str", "idle_timeout": "str", "session_timeout": "str" }, "action": { "action": "str" }, "cleanup": {} }\n'
+		;;
+	call)
+		case "$2" in
+			status) method_status ;;
+			save) method_save ;;
+			action) method_action ;;
+			cleanup) method_cleanup ;;
+			*) printf '{ "error": "method_not_found" }\n' ;;
+		esac
+		;;
+esac
+; then
+		auth_mode='credentials'
+	fi
 	uci -q batch <<EOF
 set uspot.veci_guest=uspot
-set uspot.veci_guest.auth_mode='click-to-continue'
+set uspot.veci_guest.auth_mode='$auth_mode'
 set uspot.veci_guest.interface='veci_guest'
 set uspot.veci_guest.setname='uspot'
 set uspot.veci_guest.idle_timeout='$idle'
