@@ -11,6 +11,7 @@ fi
 uci -q get veci.update.auto_check >/dev/null 2>&1 || uci set veci.update.auto_check='1'
 uci -q get veci.update.auto_download >/dev/null 2>&1 || uci set veci.update.auto_download='0'
 uci -q get veci.update.auto_install >/dev/null 2>&1 || uci set veci.update.auto_install='0'
+uci -q get veci.update.auto_keep_settings >/dev/null 2>&1 || uci set veci.update.auto_keep_settings='1'
 uci -q get veci.update.check_interval >/dev/null 2>&1 || uci set veci.update.check_interval='21600'
 uci commit veci
 
