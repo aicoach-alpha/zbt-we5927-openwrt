@@ -5,7 +5,8 @@
 			"ubus": {
 				"veci.cellular": [
 					"status",
-					"identity"
+					"identity",
+					"identityLive"
 				]
 			}
 		},

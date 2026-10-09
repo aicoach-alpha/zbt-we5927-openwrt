@@ -411,6 +411,450 @@ maybe_refresh_status_cache() {
 	fi
 }
 
+
+# Deliberately read-only and on demand; never used by the poller.
+# This issues AT+CGSN only through the serialized, bounded AT transport.
+imei_read_json() {
+	local response number
+	response="$(at 'AT+CGSN' 1500 2>/dev/null)" || {
+		printf '{ "ok": false, "error": "modem_at_busy_or_unavailable" }\n'
+		return
+	}
+	number="$(printf '%s\n' "$response" | tr -d '\r' | grep -E '^[[:space:]]*[0-9]{15}[[:space:]]*
+	. /usr/share/libubox/jshn.sh
+
+	local dev sim p ip4 gateway online
+	local manufacturer model revision imei iccid sim_status operator access_tech
+	local registration eps_registration circuit_registration registration_status
+	local packet_attach packet_status extended_error csq signal_percent signal_dbm registration_denied
+
+	manufacturer=""
+	model=""
+	revision=""
+	imei=""
+	iccid=""
+	sim_status=""
+	operator=""
+	access_tech=""
+	registration=""
+	eps_registration=""
+	circuit_registration=""
+	registration_status=""
+	packet_attach=""
+	packet_status=""
+	extended_error=""
+	csq=""
+	signal_percent=""
+	signal_dbm=""
+	registration_denied=0
+
+	if [ -s "$STATUS_CACHE" ] && json_load "$(cat "$STATUS_CACHE" 2>/dev/null)" 2>/dev/null; then
+		json_get_var manufacturer manufacturer
+		json_get_var model model
+		json_get_var revision revision
+		json_get_var imei imei
+		json_get_var iccid iccid
+		json_get_var sim_status sim_status
+		json_get_var operator operator
+		json_get_var access_tech access_tech
+		json_get_var registration registration
+		json_get_var eps_registration eps_registration
+		json_get_var circuit_registration circuit_registration
+		json_get_var registration_status registration_status
+		json_get_var packet_attach packet_attach
+		json_get_var packet_status packet_status
+		json_get_var extended_error extended_error
+		json_get_var csq csq
+		json_get_var signal_percent signal_percent
+		json_get_var signal_dbm signal_dbm
+		json_get_var registration_denied registration_denied
+	fi
+
+	dev="$(cfg data_if)"
+	sim="$(cfg sim)"
+	p="$(at_port)"
+	[ -n "$dev" ] || dev=usb0
+	[ -n "$sim" ] || sim=1
+	[ -n "$p" ] || p=/dev/ttyUSB2
+
+	ip4="$(ip -4 -o addr show dev "$dev" 2>/dev/null | awk '{print $4}' | head -1)"
+	gateway="$(ip route show default dev "$dev" 2>/dev/null | awk '/default via/ {print $3; exit}')"
+	online=0
+	[ -n "$ip4" ] && [ -n "$gateway" ] && online=1
+
+	json_init
+	json_add_boolean enabled "$(enabled && echo 1 || echo 0)"
+	json_add_string board "ZBT-WE5927 / WE2825-2SIM"
+	json_add_string wifi "2.4 GHz single-band"
+	json_add_string mode "RNDIS"
+	json_add_string data_interface "$dev"
+	json_add_string ipv4 "$ip4"
+	json_add_string gateway "$gateway"
+	json_add_int sim "$sim"
+	json_add_string at_port "$p"
+	json_add_string manufacturer "$manufacturer"
+	json_add_string model "$model"
+	json_add_string revision "$revision"
+	json_add_string imei "$imei"
+	json_add_string iccid "$iccid"
+	json_add_string sim_status "$sim_status"
+	json_add_string operator "$operator"
+	json_add_string access_tech "$access_tech"
+	json_add_string registration "$registration"
+	json_add_string eps_registration "$eps_registration"
+	json_add_string circuit_registration "$circuit_registration"
+	json_add_string registration_status "$registration_status"
+	json_add_string packet_attach "$packet_attach"
+	json_add_string packet_status "$packet_status"
+	json_add_string extended_error "$extended_error"
+	json_add_string csq "$csq"
+	case "$signal_percent" in
+		''|*[!0-9]*) ;;
+		*) json_add_int signal_percent "$signal_percent" ;;
+	esac
+	case "$signal_dbm" in
+		''|'-'|*[!0-9-]*) ;;
+		*) json_add_int signal_dbm "$signal_dbm" ;;
+	esac
+	case "$registration_denied" in
+		1|true) json_add_boolean registration_denied 1 ;;
+		*) json_add_boolean registration_denied 0 ;;
+	esac
+	json_add_boolean online "$online"
+	json_add_string status_source "cached-safe"
+	json_dump
+
+	maybe_refresh_status_cache
+}
+
+status_json() {
+	. /usr/share/libubox/jshn.sh
+
+	local dev p sim
+	local cpin iccid cops csq cgreg cereg creg cgatt ceer ati model manufacturer revision imei ip4 pct n dbm
+	local operator_name access_code access_tech reg_code reg_status attach_code attach_status denied gateway
+
+	dev="$(cfg data_if)"
+	p="$(at_port)"
+	sim="$(cfg sim)"
+	[ -n "$dev" ] || dev=usb0
+	[ -n "$sim" ] || sim=1
+
+	cpin=""
+	iccid=""
+	cops=""
+	csq=""
+	cgreg=""
+	cereg=""
+	creg=""
+	cgatt=""
+	ceer=""
+	ati=""
+	model=""
+	manufacturer=""
+	revision=""
+	imei=""
+	ip4=""
+	pct=0
+	dbm=""
+	operator_name=""
+	access_code=""
+	access_tech=""
+	reg_code=""
+	reg_status=""
+	attach_code=""
+	attach_status=""
+	denied=0
+	gateway=""
+
+	if [ -c "$p" ] && at 'AT' 700 >/dev/null 2>&1; then
+		cpin="$(at 'AT+CPIN?' 1200 2>/dev/null | grep '+CPIN:' | tail -1 | cut -d: -f2- | clean_line)"
+		iccid="$(at 'AT+ICCID' 1200 2>/dev/null | sed -n 's/.*ICCID:[[:space:]]*\([0-9A-Fa-f]*\).*/\1/p' | tail -1 | sed 's/[Ff]$//')"
+		cops="$(at 'AT+COPS?' 1200 2>/dev/null | grep '+COPS:' | tail -1 | clean_line)"
+		csq="$(at 'AT+CSQ' 1200 2>/dev/null | grep '+CSQ:' | tail -1 | clean_line)"
+		cgreg="$(at 'AT+CGREG?' 1200 2>/dev/null | grep '+CGREG:' | tail -1 | clean_line)"
+		cereg="$(at 'AT+CEREG?' 1200 2>/dev/null | grep '+CEREG:' | tail -1 | clean_line)"
+		creg="$(at 'AT+CREG?' 1200 2>/dev/null | grep '+CREG:' | tail -1 | clean_line)"
+		cgatt="$(at 'AT+CGATT?' 1200 2>/dev/null | grep '+CGATT:' | tail -1 | clean_line)"
+		ceer="$(at 'AT+CEER' 1500 2>/dev/null | grep -vE '^(AT|OK|ERROR)[[:space:]]*$' | clean_line)"
+		ati="$(at 'ATI' 1500 2>/dev/null)"
+		manufacturer="$(echo "$ati" | sed -n 's/^[[:space:]]*Manufacturer:[[:space:]]*//p' | head -1 | clean_line)"
+		model="$(echo "$ati" | sed -n 's/^[[:space:]]*Model:[[:space:]]*//p' | head -1 | clean_line)"
+		revision="$(echo "$ati" | sed -n 's/^[[:space:]]*Revision:[[:space:]]*//p' | head -1 | clean_line)"
+		imei="$(echo "$ati" | sed -n 's/.*IMEI:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1 | tr -dc '0-9')"
+		[ -n "$imei" ] || imei="$(at 'AT+CGSN' 1200 2>/dev/null | grep -E '^[[:space:]]*[0-9]{15}[[:space:]]*$' | tail -1 | tr -dc '0-9')"
+	fi
+
+	ip4="$(ip -4 -o addr show dev "$dev" 2>/dev/null | awk '{print $4}' | head -1)"
+	gateway="$(ip route show default dev "$dev" 2>/dev/null | awk '/default via/ {print $3; exit}')"
+
+	n="$(echo "$csq" | sed -n 's/.*+CSQ:[[:space:]]*\([0-9][0-9]*\).*/\1/p')"
+	case "$n" in
+		""|99)
+			pct=0
+			;;
+		*)
+			[ "$n" -gt 31 ] && n=31
+			pct=$((n * 100 / 31))
+			dbm=$((-113 + 2 * n))
+			;;
+	esac
+
+	operator_name="$(echo "$cops" | sed -n 's/.*+COPS:[^"]*"\([^"]*\)".*/\1/p')"
+	access_code="$(echo "$cops" | sed -n 's/.*,[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p')"
+	case "$access_code" in
+		0) access_tech="GSM" ;;
+		2) access_tech="UMTS" ;;
+		7) access_tech="LTE" ;;
+		9) access_tech="LTE NB-IoT" ;;
+		11|12) access_tech="5G NR" ;;
+		*) access_tech="$access_code" ;;
+	esac
+
+	reg_code="$(echo "$cereg" | sed -n 's/.*+CEREG:[[:space:]]*[0-9][0-9]*,[[:space:]]*\([0-9][0-9]*\).*/\1/p')"
+	[ -n "$reg_code" ] || reg_code="$(echo "$cereg" | sed -n 's/.*+CEREG:[[:space:]]*\([0-9][0-9]*\).*/\1/p')"
+	case "$reg_code" in
+		1) reg_status="Registered (home)" ;;
+		5) reg_status="Registered (roaming)" ;;
+		2) reg_status="Searching" ;;
+		3) reg_status="Registration denied"; denied=1 ;;
+		4) reg_status="Unknown" ;;
+		0) reg_status="Not registered" ;;
+		*) reg_status="$cereg" ;;
+	esac
+
+	attach_code="$(echo "$cgatt" | sed -n 's/.*+CGATT:[[:space:]]*\([01]\).*/\1/p')"
+	case "$attach_code" in
+		1) attach_status="Attached" ;;
+		0) attach_status="Detached" ;;
+		*) attach_status="$cgatt" ;;
+	esac
+
+	json_init
+	json_add_boolean enabled "$(enabled && echo 1 || echo 0)"
+	json_add_string board "ZBT-WE5927 / WE2825-2SIM"
+	json_add_string wifi "2.4 GHz single-band"
+	json_add_string mode "RNDIS"
+	json_add_string data_interface "$dev"
+	json_add_string ipv4 "$ip4"
+	json_add_string gateway "$gateway"
+	json_add_int sim "$sim"
+	json_add_string at_port "$p"
+	json_add_string manufacturer "$manufacturer"
+	json_add_string model "$model"
+	json_add_string revision "$revision"
+	json_add_string imei "$imei"
+	json_add_string iccid "$iccid"
+	json_add_string sim_status "$cpin"
+	json_add_string operator "$operator_name"
+	json_add_string access_tech "$access_tech"
+	json_add_string registration "$cgreg"
+	json_add_string eps_registration "$cereg"
+	json_add_string circuit_registration "$creg"
+	json_add_string registration_status "$reg_status"
+	json_add_string packet_attach "$cgatt"
+	json_add_string packet_status "$attach_status"
+	json_add_string extended_error "$ceer"
+	json_add_boolean registration_denied "$denied"
+	json_add_string csq "$csq"
+	json_add_int signal_percent "$pct"
+	[ -n "$dbm" ] && json_add_int signal_dbm "$dbm"
+
+	if data_ok; then
+		json_add_boolean online 1
+	else
+		json_add_boolean online 0
+	fi
+
+	json_dump
+}
+
+auto_switch_sim() {
+	local old="$1" new="$2" i
+
+	log "automatic dual-SIM failover trial: SIM$old -> SIM$new"
+	set_sim "$new" || return 1
+	power_cycle
+
+	if ! sim_ready; then
+		log "SIM$new not detected; reverting to SIM$old"
+		set_sim "$old" || true
+		power_cycle
+		apply_apn || true
+		ifup lte >/dev/null 2>&1 || true
+		return 1
+	fi
+
+	apply_apn || true
+	ifup lte >/dev/null 2>&1 || true
+
+	i=0
+	while [ "$i" -lt 12 ]; do
+		data_ok && {
+			log "automatic dual-SIM failover succeeded on SIM$new"
+			return 0
+		}
+		i=$((i + 1))
+		sleep 2
+	done
+
+	log "SIM$new has no working data; reverting to SIM$old"
+	set_sim "$old" || true
+	power_cycle
+	apply_apn || true
+	ifup lte >/dev/null 2>&1 || true
+	return 1
+}
+
+daemon() {
+	local failures recoveries threshold interval hard_after auto sim_after sim next
+
+	failures=0
+	recoveries=0
+	enabled || exit 0
+
+	ensure_network
+	power_on || true
+
+	sim="$(cfg sim)"
+	[ "$sim" = "2" ] || sim=1
+	set_sim "$sim" >/dev/null 2>&1 || true
+
+	usb_repair
+	wait_at || log "AT port not ready yet"
+
+	if ! sim_ready && [ "$(cfg auto_failover)" != "0" ]; then
+		if [ "$sim" = "1" ]; then next=2; else next=1; fi
+		auto_switch_sim "$sim" "$next" && sim="$next"
+	fi
+
+	apply_apn || true
+	ifup lte >/dev/null 2>&1 || true
+
+	threshold="$(cfg fail_threshold)"
+	interval="$(cfg ping_interval)"
+	hard_after="$(cfg hard_reset_after)"
+	auto="$(cfg auto_failover)"
+	sim_after="$(cfg sim_failover_after)"
+
+	[ -n "$threshold" ] || threshold=6
+	[ -n "$interval" ] || interval=10
+	[ -n "$hard_after" ] || hard_after=2
+	[ -n "$auto" ] || auto=1
+	[ -n "$sim_after" ] || sim_after=3
+
+	log "service started: RNDIS $(cfg data_if), APN=$(cfg apn), SIM$sim"
+
+	while enabled; do
+		if data_ok; then
+			failures=0
+			recoveries=0
+		else
+			failures=$((failures + 1))
+			log "connectivity failure $failures/$threshold"
+
+			if [ "$failures" -ge "$threshold" ]; then
+				failures=0
+				recoveries=$((recoveries + 1))
+
+				log "Interface-first LTE recovery: ifdown/ifup"
+				ifdown lte >/dev/null 2>&1 || true
+				sleep 2
+				ifup lte >/dev/null 2>&1 || true
+				sleep 8
+
+				if data_ok; then
+					log "LTE interface recovery succeeded"
+					recoveries=0
+					continue
+				fi
+
+				soft_reconnect || true
+				sleep 8
+
+				if ! data_ok && [ $((recoveries % hard_after)) -eq 0 ]; then
+					power_cycle
+				fi
+
+				if ! data_ok && [ "$auto" = "1" ] && [ $((recoveries % sim_after)) -eq 0 ]; then
+					sim="$(cfg sim)"
+					if [ "$sim" = "1" ]; then
+						next=2
+					else
+						next=1
+					fi
+
+					auto_switch_sim "$sim" "$next" || true
+				fi
+			fi
+		fi
+
+		sleep "$interval"
+	done
+}
+
+case "$1" in
+	daemon)
+		daemon
+		;;
+	status-fast)
+		status_fast_json
+		;;
+	status)
+		status_fast_json
+		;;
+	status-full)
+		status_json
+		;;
+	imei-read)
+		imei_read_json
+		;;
+	refresh-cache)
+		refresh_status_cache
+		;;
+	reconnect)
+		soft_reconnect
+		;;
+	power-cycle)
+		power_cycle
+		;;
+	sim)
+		set_sim "$2"
+		power_cycle
+		apply_apn
+		ifup lte >/dev/null 2>&1 || true
+		;;
+	usb-repair)
+		usb_repair
+		ifup lte >/dev/null 2>&1 || true
+		;;
+	restart)
+		/etc/init.d/we5927-lte restart
+		;;
+	*)
+		echo "usage: $0 {status|reconnect|power-cycle|usb-repair|sim 1|sim 2|restart}" >&2
+		exit 2
+		;;
+esac
+ | head -n 1 | tr -dc '0-9')"
+	case "$number" in
+		???????????????) ;;
+		*) number='' ;;
+	esac
+	case "$number" in
+		''|*[!0-9]*)
+			printf '{ "ok": false, "error": "modem_imei_not_returned" }\n'
+			return
+			;;
+	esac
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_boolean ok 1
+	json_add_string imei "$number"
+	json_add_string source 'at_cgsn_live'
+	json_dump
+}
+
 status_fast_json() {
 	. /usr/share/libubox/jshn.sh
 

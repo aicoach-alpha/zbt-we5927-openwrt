@@ -126,6 +126,26 @@ identity() {
 	json_dump
 }
 
+
+# On-demand AT+CGSN only. No IMEI is included in routine status polling.
+# A failed/busy AT port is reported as unavailable, not a fabricated identity.
+identity_live() {
+	[ -x "$LTE" ] || { emit_error "lte_manager_missing"; return; }
+	raw="$("$LTE" imei-read 2>/dev/null)" || { emit_error "at_query_failed"; return; }
+	. /usr/share/libubox/jshn.sh
+	json_load "$raw" 2>/dev/null || { emit_error "invalid_at_response"; return; }
+	json_get_var ok ok
+	json_get_var imei imei
+	case "$ok" in 1|true) ;; *) emit_error "at_query_unavailable"; return ;; esac
+	case "$imei" in ???????????????) ;; *) emit_error "invalid_modem_identity"; return ;; esac
+	case "$imei" in *[!0-9]*) emit_error "invalid_modem_identity"; return ;; esac
+	json_init
+	json_add_boolean available 1
+	json_add_string imei "$imei"
+	json_add_string source "at_cgsn_live"
+	json_dump
+}
+
 reconnect() {
 	[ -x "$LTE" ] || {
 		emit_error "lte_manager_missing"
@@ -152,12 +172,13 @@ switch_sim() {
 
 case "$1" in
 	list)
-		printf '{ "status": {}, "identity": {}, "reconnect": {}, "switchSim": { "sim": "int" } }\n'
+		printf '{ "status": {}, "identity": {}, "identityLive": {}, "reconnect": {}, "switchSim": { "sim": "int" } }\n'
 		;;
 	call)
 		case "$2" in
 			status) status ;;
 			identity) identity ;;
+			identityLive) identity_live ;;
 			reconnect) reconnect ;;
 			switchSim) switch_sim ;;
 			*) emit_error "method_not_found" ;;
