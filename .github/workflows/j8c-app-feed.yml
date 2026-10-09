@@ -10,6 +10,7 @@ on:
       - 'source/veci.commit'
       - 'source/veci-default-ui/**'
       - 'source/veci-cellular-we5927/**'
+      - 'source/veci-update-we5927/**'
       - 'source/veci-app-*/**'
       - 'scripts/prepare-veci.sh'
       - '.github/workflows/j8c-app-feed.yml'
@@ -116,6 +117,8 @@ jobs:
           grep -q '^CONFIG_PACKAGE_veci-app-ddns=m' .config
           grep -q '^CONFIG_PACKAGE_veci-app-wireguard=m' .config
           grep -q '^CONFIG_PACKAGE_veci-app-voucher=m' .config
+          grep -q '^CONFIG_SIGNED_PACKAGES=y' .config
+          grep -q '^CONFIG_SIGN_EACH_PACKAGE=y' .config
 
       - name: Build firmware and exact-ABI optional packages
         working-directory: openwrt
