@@ -1,0 +1,8 @@
+{
+	"id": "sqm",
+	"name": "Smart Queue",
+	"description": "Traffic shaping and queue management",
+	"tier": "S",
+	"packages": ["veci-app-sqm"],
+	"remove_packages": ["veci-app-sqm"]
+}
