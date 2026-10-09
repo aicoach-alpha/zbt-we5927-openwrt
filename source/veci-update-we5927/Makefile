@@ -11,7 +11,7 @@ define Package/veci-update-we5927
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI firmware update profile for ZBT-WE5927
-  DEPENDS:=+veci +uclient-fetch
+  DEPENDS:=+veci +uclient-fetch +ucert
 endef
 
 define Package/veci-update-we5927/description
@@ -28,6 +28,10 @@ define Package/veci-update-we5927/install
 	$(INSTALL_BIN) ./files/etc/init.d/veci-update-agent $(1)/etc/init.d/veci-update-agent
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/usr/sbin/veci-update-agent $(1)/usr/sbin/veci-update-agent
+	if [ -d ./files/etc/veci/firmware-keys ]; then \
+		$(INSTALL_DIR) $(1)/etc/veci/firmware-keys; \
+		$(CP) ./files/etc/veci/firmware-keys/. $(1)/etc/veci/firmware-keys/; \
+	fi
 endef
 
 define Package/veci-update-we5927/postinst
