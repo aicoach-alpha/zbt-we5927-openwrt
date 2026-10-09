@@ -89,7 +89,9 @@ check_once() {
 		return
 	}
 
-	apply="$(ubus call veci firmwareApply "{ \"apply_token\": \"$apply_token\", \"keep_settings\": true }" 2>/dev/null || true)"
+	keep_settings='true'
+	[ "$(uci -q get veci.update.auto_keep_settings 2>/dev/null)" = "0" ] && keep_settings='false'
+	apply="$(ubus call veci firmwareApply "{ \"apply_token\": \"$apply_token\", \"keep_settings\": $keep_settings }" 2>/dev/null || true)"
 	apply_ok="$(printf '%s' "$apply" | jsonfilter -e '@.ok' 2>/dev/null)"
 	if [ "$apply_ok" = "true" ]; then
 		record_status applying rebooting
