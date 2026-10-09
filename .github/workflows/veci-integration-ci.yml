@@ -69,6 +69,9 @@ jobs:
         run: |
           python3 -m json.tool source/veci-cellular-we5927/files/usr/share/rpcd/acl.d/veci-cellular-we5927.json >/dev/null
 
+      - name: Non-live release safety regression
+        run: python3 -m unittest discover -s tests -p 'test_veci_release_guards.py' -v
+
       - name: Check native app module syntax
         run: |
           node --check source/veci-app-guest/files/www/veci-apps/guest.js
