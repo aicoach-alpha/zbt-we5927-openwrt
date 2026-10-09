@@ -1,0 +1,302 @@
+#!/bin/sh
+
+bool_json() {
+	[ "$1" = "1" ] && printf true || printf false
+}
+
+clean_ssid() {
+	printf '%s' "$1" | tr -d '\r\n'
+}
+
+number_in_range() {
+	case "$1" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$1" -ge "$2" ] 2>/dev/null && [ "$1" -le "$3" ] 2>/dev/null
+}
+
+service_restart() {
+	[ -x "/etc/init.d/$1" ] && "/etc/init.d/$1" restart >/dev/null 2>&1
+}
+
+guest_configured() {
+	uci -q get network.veci_guest >/dev/null 2>&1 &&
+		uci -q get dhcp.veci_guest >/dev/null 2>&1 &&
+		uci -q get firewall.veci_guest_zone >/dev/null 2>&1 &&
+		uci -q get wireless.veci_guest >/dev/null 2>&1 &&
+		uci -q get uhttpd.veci_guest >/dev/null 2>&1
+}
+
+method_status() {
+	ssid="$(uci -q get veci_guest.main.ssid 2>/dev/null || printf 'VeCI-Guest')"
+	idle="$(uci -q get veci_guest.main.idle_timeout 2>/dev/null || printf '600')"
+	session="$(uci -q get veci_guest.main.session_timeout 2>/dev/null || printf '3600')"
+	enabled=0
+	uci -q get uspot.veci_guest >/dev/null 2>&1 && enabled=1
+	configured=0
+	guest_configured && configured=1
+
+	lan_ip="$(uci -q get network.lan.ipaddr 2>/dev/null || true)"
+	guest_ip="$(uci -q get network.veci_guest.ipaddr 2>/dev/null || printf '10.20.0.1')"
+	radio="$(uci -q get wireless.veci_guest.device 2>/dev/null || printf 'radio0')"
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_boolean configured "$configured"
+	json_add_boolean enabled "$enabled"
+	json_add_string ssid "$ssid"
+	json_add_string idle_timeout "$idle"
+	json_add_string session_timeout "$session"
+	json_add_string lan_ip "$lan_ip"
+	json_add_string guest_ip "$guest_ip"
+	json_add_string radio "$radio"
+	json_add_string auth_mode "click-to-continue"
+	json_dump
+}
+
+save_preferences() {
+	ssid="$1"
+	idle="$2"
+	session="$3"
+
+	uci -q batch <<EOF
+set veci_guest.main=settings
+set veci_guest.main.ssid='$ssid'
+set veci_guest.main.idle_timeout='$idle'
+set veci_guest.main.session_timeout='$session'
+EOF
+	uci commit veci_guest
+}
+
+provision_base() {
+	lan_ip="$(uci -q get network.lan.ipaddr 2>/dev/null || true)"
+	[ -n "$lan_ip" ] || {
+		printf '{ "ok": false, "error": "lan_ip_unavailable" }\n'
+		return 1
+	}
+
+	original="$(uci -q get uhttpd.main.listen_http 2>/dev/null || true)"
+	if [ -n "$original" ] && [ -z "$(uci -q get veci_guest.main.original_listen_http 2>/dev/null)" ]; then
+		uci set veci_guest.main.original_listen_http="$original"
+		uci commit veci_guest
+	fi
+
+	uci -q batch <<'EOF'
+set network.veci_guest=interface
+set network.veci_guest.proto='static'
+set network.veci_guest.ipaddr='10.20.0.1'
+set network.veci_guest.netmask='255.255.255.0'
+
+set dhcp.veci_guest=dhcp
+set dhcp.veci_guest.interface='veci_guest'
+set dhcp.veci_guest.start='100'
+set dhcp.veci_guest.limit='100'
+set dhcp.veci_guest.leasetime='2h'
+
+set firewall.veci_guest_zone=zone
+set firewall.veci_guest_zone.name='veci_guest'
+delete firewall.veci_guest_zone.network
+add_list firewall.veci_guest_zone.network='veci_guest'
+set firewall.veci_guest_zone.input='REJECT'
+set firewall.veci_guest_zone.output='ACCEPT'
+set firewall.veci_guest_zone.forward='REJECT'
+
+set firewall.veci_guest_ipset=ipset
+set firewall.veci_guest_ipset.name='uspot'
+delete firewall.veci_guest_ipset.match
+add_list firewall.veci_guest_ipset.match='src_mac'
+
+set firewall.veci_guest_cpd=redirect
+set firewall.veci_guest_cpd.name='VeCI guest captive redirect'
+set firewall.veci_guest_cpd.src='veci_guest'
+set firewall.veci_guest_cpd.src_dport='80'
+set firewall.veci_guest_cpd.proto='tcp'
+set firewall.veci_guest_cpd.target='DNAT'
+set firewall.veci_guest_cpd.reflection='0'
+set firewall.veci_guest_cpd.ipset='!uspot'
+
+set firewall.veci_guest_dhcp=rule
+set firewall.veci_guest_dhcp.name='VeCI guest DHCP'
+set firewall.veci_guest_dhcp.src='veci_guest'
+set firewall.veci_guest_dhcp.proto='udp'
+set firewall.veci_guest_dhcp.dest_port='67'
+set firewall.veci_guest_dhcp.target='ACCEPT'
+
+set firewall.veci_guest_dns=rule
+set firewall.veci_guest_dns.name='VeCI guest DNS'
+set firewall.veci_guest_dns.src='veci_guest'
+set firewall.veci_guest_dns.proto='tcp udp'
+set firewall.veci_guest_dns.dest_port='53'
+set firewall.veci_guest_dns.target='ACCEPT'
+
+set firewall.veci_guest_portal=rule
+set firewall.veci_guest_portal.name='VeCI guest portal'
+set firewall.veci_guest_portal.src='veci_guest'
+set firewall.veci_guest_portal.proto='tcp'
+set firewall.veci_guest_portal.dest_port='80'
+set firewall.veci_guest_portal.target='ACCEPT'
+
+set firewall.veci_guest_forward=rule
+set firewall.veci_guest_forward.name='VeCI guest authenticated forward'
+set firewall.veci_guest_forward.src='veci_guest'
+set firewall.veci_guest_forward.dest='wan'
+set firewall.veci_guest_forward.proto='all'
+set firewall.veci_guest_forward.target='ACCEPT'
+set firewall.veci_guest_forward.ipset='uspot'
+
+set firewall.veci_guest_restrict=rule
+set firewall.veci_guest_restrict.name='VeCI guest restrict router access'
+set firewall.veci_guest_restrict.src='veci_guest'
+set firewall.veci_guest_restrict.dest_ip='!10.20.0.1'
+set firewall.veci_guest_restrict.target='DROP'
+
+set wireless.veci_guest=wifi-iface
+set wireless.veci_guest.device='radio0'
+set wireless.veci_guest.mode='ap'
+set wireless.veci_guest.network='veci_guest'
+set wireless.veci_guest.encryption='none'
+set wireless.veci_guest.disabled='0'
+
+set uhttpd.veci_guest=uhttpd
+delete uhttpd.veci_guest.listen_http
+add_list uhttpd.veci_guest.listen_http='10.20.0.1:80'
+set uhttpd.veci_guest.redirect_https='0'
+set uhttpd.veci_guest.max_requests='5'
+set uhttpd.veci_guest.no_dirlists='1'
+set uhttpd.veci_guest.home='/www-uspot'
+delete uhttpd.veci_guest.ucode_prefix
+add_list uhttpd.veci_guest.ucode_prefix='/hotspot=/usr/share/uspot/handler.uc'
+add_list uhttpd.veci_guest.ucode_prefix='/cpd=/usr/share/uspot/handler-cpd.uc'
+set uhttpd.veci_guest.error_page='/cpd'
+EOF
+
+	uci -q delete uhttpd.main.listen_http
+	uci add_list uhttpd.main.listen_http="$lan_ip:80"
+
+	ssid="$(uci -q get veci_guest.main.ssid 2>/dev/null || printf 'VeCI-Guest')"
+	uci set wireless.veci_guest.ssid="$ssid"
+
+	uci commit network
+	uci commit dhcp
+	uci commit firewall
+	uci commit wireless
+	uci commit uhttpd
+	return 0
+}
+
+enable_portal() {
+	provision_base || return 1
+	idle="$(uci -q get veci_guest.main.idle_timeout 2>/dev/null || printf '600')"
+	session="$(uci -q get veci_guest.main.session_timeout 2>/dev/null || printf '3600')"
+	uci -q batch <<EOF
+set uspot.veci_guest=uspot
+set uspot.veci_guest.auth_mode='click-to-continue'
+set uspot.veci_guest.interface='veci_guest'
+set uspot.veci_guest.setname='uspot'
+set uspot.veci_guest.idle_timeout='$idle'
+set uspot.veci_guest.session_timeout='$session'
+EOF
+	uci commit uspot
+
+	service_restart network || true
+	service_restart dnsmasq || true
+	service_restart firewall || true
+	service_restart uhttpd || true
+	service_restart uspot || true
+	wifi reload >/dev/null 2>&1 || true
+	return 0
+}
+
+disable_portal() {
+	uci -q delete uspot.veci_guest
+	uci commit uspot
+
+	original="$(uci -q get veci_guest.main.original_listen_http 2>/dev/null || true)"
+	uci -q delete uhttpd.veci_guest
+	if [ -n "$original" ]; then
+		uci -q delete uhttpd.main.listen_http
+		for listener in $original; do
+			uci add_list uhttpd.main.listen_http="$listener"
+		done
+	fi
+	uci commit uhttpd
+
+	service_restart uspot || true
+	service_restart uhttpd || true
+	return 0
+}
+
+method_save() {
+	input="$(cat)"
+	ssid="$(printf '%s' "$input" | jsonfilter -e '@.ssid' 2>/dev/null)"
+	idle="$(printf '%s' "$input" | jsonfilter -e '@.idle_timeout' 2>/dev/null)"
+	session="$(printf '%s' "$input" | jsonfilter -e '@.session_timeout' 2>/dev/null)"
+
+	ssid="$(clean_ssid "$ssid")"
+	[ -n "$ssid" ] && [ "${#ssid}" -le 32 ] || {
+		printf '{ "ok": false, "error": "invalid_ssid" }\n'
+		return
+	}
+	number_in_range "$idle" 60 86400 || {
+		printf '{ "ok": false, "error": "invalid_idle_timeout" }\n'
+		return
+	}
+	number_in_range "$session" 0 604800 || {
+		printf '{ "ok": false, "error": "invalid_session_timeout" }\n'
+		return
+	}
+
+	save_preferences "$ssid" "$idle" "$session"
+	if uci -q get wireless.veci_guest >/dev/null 2>&1; then
+		uci set wireless.veci_guest.ssid="$ssid"
+		uci commit wireless
+		wifi reload >/dev/null 2>&1 || true
+	fi
+	if uci -q get uspot.veci_guest >/dev/null 2>&1; then
+		uci set uspot.veci_guest.idle_timeout="$idle"
+		uci set uspot.veci_guest.session_timeout="$session"
+		uci commit uspot
+		service_restart uspot || true
+	fi
+	printf '{ "ok": true }\n'
+}
+
+method_action() {
+	input="$(cat)"
+	action="$(printf '%s' "$input" | jsonfilter -e '@.action' 2>/dev/null)"
+	case "$action" in
+		provision)
+			if provision_base; then
+				service_restart network || true
+				service_restart dnsmasq || true
+				service_restart firewall || true
+				service_restart uhttpd || true
+				wifi reload >/dev/null 2>&1 || true
+				printf '{ "ok": true }\n'
+			fi
+			;;
+		enable)
+			if enable_portal; then printf '{ "ok": true }\n'; fi
+			;;
+		disable)
+			if disable_portal; then printf '{ "ok": true }\n'; fi
+			;;
+		*)
+			printf '{ "ok": false, "error": "unsupported_action" }\n'
+			;;
+	esac
+}
+
+case "$1" in
+	list)
+		printf '{ "status": {}, "save": { "ssid": "str", "idle_timeout": "str", "session_timeout": "str" }, "action": { "action": "str" } }\n'
+		;;
+	call)
+		case "$2" in
+			status) method_status ;;
+			save) method_save ;;
+			action) method_action ;;
+			*) printf '{ "error": "method_not_found" }\n' ;;
+		esac
+		;;
+esac
