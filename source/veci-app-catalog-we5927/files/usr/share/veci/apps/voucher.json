@@ -3,6 +3,11 @@
 	"name": "Voucher",
 	"description": "Time-limited guest access vouchers",
 	"tier": "S",
-	"packages": ["veci-app-voucher"],
-	"remove_packages": ["veci-app-voucher"]
+	"packages": [
+		"veci-app-voucher"
+	],
+	"remove_packages": [
+		"veci-app-voucher"
+	],
+	"enabled": false
 }
