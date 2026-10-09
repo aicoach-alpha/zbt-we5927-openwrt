@@ -37,7 +37,7 @@ git -C "$OPENWRT_ROOT" apply "$PATCH"
 "$SELF_DIR/scripts/prepare-veci.sh" "$OPENWRT_ROOT"
 cp "$SELF_DIR/source/openwrt-we5927.config" "$OPENWRT_ROOT/.config"
 
-"$SELF_DIR/scripts/install-veci-feeds.sh" "$OPENWRT_ROOT"
+sh "$SELF_DIR/scripts/install-veci-feeds.sh" "$OPENWRT_ROOT"
 
 cd "$OPENWRT_ROOT"
 make defconfig
