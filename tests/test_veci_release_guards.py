@@ -70,6 +70,24 @@ class ReleaseSafetyTests(unittest.TestCase):
         ):
             self.assertIn(token, publish)
 
+    def test_router_app_feed_matches_j8c_indexes(self):
+        config = (
+            ROOT
+            / "source/veci-app-catalog-we5927/files/etc/uci-defaults/95-veci-app-feed-we5927"
+        ).read_text()
+        expected = [
+            "$base/targets/ramips/mt76x8/packages/packages.adb",
+            "$base/packages/mipsel_24kc/base/packages.adb",
+            "$base/packages/mipsel_24kc/luci/packages.adb",
+            "$base/packages/mipsel_24kc/packages/packages.adb",
+        ]
+        configured = [
+            line.strip()
+            for line in config.splitlines()
+            if line.startswith("$base/") and line.endswith("/packages.adb")
+        ]
+        self.assertEqual(configured, expected)
+
     def test_app_packages_built_as_modules(self):
         wf = (ROOT / ".github/workflows/j8c-app-feed.yml").read_text()
         for name in ("guest", "sqm", "ddns", "wireguard", "voucher"):
