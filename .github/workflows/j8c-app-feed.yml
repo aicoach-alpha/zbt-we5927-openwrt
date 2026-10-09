@@ -14,6 +14,11 @@ on:
       - 'scripts/prepare-veci.sh'
       - '.github/workflows/j8c-app-feed.yml'
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-24.04
