@@ -156,7 +156,11 @@ jobs:
             echo "Matched kernel packages:"
             find bin/targets/ramips/mt76x8/packages -type f -name 'kmod-*.apk' -printf '%s %f\n' | sort -n || true
           } > "$OUT/J8C-INVENTORY.txt"
-          sha256sum "$OUT"/* > "$OUT/J8C-SHA256SUMS.txt"
+          (
+            cd "$OUT"
+            sha256sum J8C-INVENTORY.txt target-sha256sums *sysupgrade.bin *.manifest > J8C-SHA256SUMS.txt
+            sha256sum -c J8C-SHA256SUMS.txt
+          )
 
       - name: Stage matched package feed tree
         working-directory: openwrt
