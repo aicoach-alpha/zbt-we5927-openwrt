@@ -103,14 +103,28 @@ method_save() {
 	fi
 }
 
+
+method_cleanup() {
+	if uci -q get ddns.veci >/dev/null 2>&1; then
+		uci -q delete ddns.veci
+		uci commit ddns || {
+			printf '{ "ok": false, "error": "uci_commit_failed" }\n'
+			return
+		}
+	fi
+	/etc/init.d/ddns restart >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
 case "$1" in
 	list)
-		printf '{ "status": {}, "save": { "enabled": "bool", "service": "str", "lookup_host": "str", "domain": "str", "username": "str", "password": "str", "network": "str" } }\n'
+		printf '{ "status": {}, "save": { "enabled": "bool", "service": "str", "lookup_host": "str", "domain": "str", "username": "str", "password": "str", "network": "str" }, "cleanup": {} }\n'
 		;;
 	call)
 		case "$2" in
 			status) method_status ;;
 			save) method_save ;;
+			cleanup) method_cleanup ;;
 			*) printf '{ "error": "method_not_found" }\n' ;;
 		esac
 		;;
