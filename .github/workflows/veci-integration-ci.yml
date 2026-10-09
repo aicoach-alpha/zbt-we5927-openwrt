@@ -38,6 +38,7 @@ jobs:
       - name: Shell syntax
         run: |
           sh -n scripts/prepare-veci.sh
+          sh -n scripts/install-veci-feeds.sh
           sh -n scripts/build-veci-firmware.sh
           sh -n source/veci-default-ui/files/usr/sbin/veci-default-ui
           sh -n source/veci-default-ui/files/etc/uci-defaults/98-veci-default-ui
