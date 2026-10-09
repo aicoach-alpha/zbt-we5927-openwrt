@@ -26,6 +26,11 @@ on:
       - 'scripts/prepare-veci.sh'
       - '.github/workflows/openwrt-veci-config-ci.yml'
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   defconfig:
     runs-on: ubuntu-24.04
