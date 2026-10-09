@@ -24,6 +24,17 @@ endef
 define Package/veci-app-sqm/install
 	$(INSTALL_DIR) $(1)/usr/share/veci/apps-installed
 	touch $(1)/usr/share/veci/apps-installed/sqm
+	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
+	$(INSTALL_BIN) ./files/usr/libexec/rpcd/veci.app.sqm $(1)/usr/libexec/rpcd/veci.app.sqm
+	$(INSTALL_DIR) $(1)/www/veci-apps
+	$(INSTALL_DATA) ./files/www/veci-apps/sqm.js $(1)/www/veci-apps/sqm.js
+endef
+
+define Package/veci-app-sqm/postinst
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] || {
+	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+}
 endef
 
 $(eval $(call BuildPackage,veci-app-sqm))
