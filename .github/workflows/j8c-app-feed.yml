@@ -10,6 +10,7 @@ on:
       - 'source/veci.commit'
       - 'source/veci-default-ui/**'
       - 'source/veci-cellular-we5927/**'
+      - 'source/veci-app-*/**'
       - 'scripts/prepare-veci.sh'
       - '.github/workflows/j8c-app-feed.yml'
 
@@ -90,6 +91,10 @@ jobs:
           set_module PACKAGE_simple-captive-portal
           set_module PACKAGE_uspot
           set_module PACKAGE_uspot-www
+          set_module PACKAGE_veci-app-guest
+          set_module PACKAGE_veci-app-sqm
+          set_module PACKAGE_veci-app-ddns
+          set_module PACKAGE_veci-app-wireguard
           make defconfig
           grep -q '^CONFIG_PACKAGE_sqm-scripts=m' .config
           grep -q '^CONFIG_PACKAGE_ddns-scripts=m' .config
@@ -99,6 +104,11 @@ jobs:
           grep -q '^CONFIG_PACKAGE_veci=y' .config
           grep -q '^CONFIG_PACKAGE_veci-default-ui=y' .config
           grep -q '^CONFIG_PACKAGE_veci-cellular-we5927=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-guest=m' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-sqm=m' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-ddns=m' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-wireguard=m' .config
 
       - name: Build firmware and exact-ABI optional packages
         working-directory: openwrt
@@ -123,7 +133,7 @@ jobs:
             echo "video: $VIDEO_COMMIT"
             echo
             echo "Selected app APKs:"
-            find bin -type f \(               -name 'sqm-scripts-*.apk' -o               -name 'luci-app-sqm-*.apk' -o               -name 'ddns-scripts-*.apk' -o               -name 'luci-app-ddns-*.apk' -o               -name 'wireguard-tools-*.apk' -o               -name 'luci-proto-wireguard-*.apk' -o               -name 'simple-captive-portal-*.apk' -o               -name 'uspot-*.apk' -o               -name 'uspot-www-*.apk'             \) -printf '%s %p\n' | sort -n
+            find bin -type f \(               -name 'sqm-scripts-*.apk' -o               -name 'luci-app-sqm-*.apk' -o               -name 'ddns-scripts-*.apk' -o               -name 'luci-app-ddns-*.apk' -o               -name 'wireguard-tools-*.apk' -o               -name 'luci-proto-wireguard-*.apk' -o               -name 'simple-captive-portal-*.apk' -o               -name 'uspot-*.apk' -o               -name 'uspot-www-*.apk' -o               -name 'veci-app-guest-*.apk' -o               -name 'veci-app-sqm-*.apk' -o               -name 'veci-app-ddns-*.apk' -o               -name 'veci-app-wireguard-*.apk'             \) -printf '%s %p\n' | sort -n
             echo
             echo "Matched kernel packages:"
             find bin/targets/ramips/mt76x8/packages -type f -name 'kmod-*.apk' -printf '%s %f\n' | sort -n || true
