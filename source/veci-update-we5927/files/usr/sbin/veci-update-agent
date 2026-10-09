@@ -1,0 +1,86 @@
+#!/bin/sh
+
+STATUS_FILE='/tmp/veci-update-agent.status'
+DEFAULT_INTERVAL=21600
+
+clean_interval() {
+	value="$1"
+	case "$value" in
+		''|*[!0-9]*) printf '%s' "$DEFAULT_INTERVAL"; return ;;
+	esac
+	if [ "$value" -lt 3600 ] 2>/dev/null; then
+		printf '3600'
+	elif [ "$value" -gt 86400 ] 2>/dev/null; then
+		printf '86400'
+	else
+		printf '%s' "$value"
+	fi
+}
+
+record_status() {
+	state="$1"
+	detail="$2"
+	printf '%s %s %s\n' "$(date +%s)" "$state" "$detail" > "$STATUS_FILE"
+}
+
+check_once() {
+	[ "$(uci -q get veci.update.auto_check 2>/dev/null)" = "1" ] || {
+		record_status disabled auto_check_off
+		return
+	}
+
+	result="$(ubus call veci firmwareRemoteCheck '{}' 2>/dev/null || true)"
+	[ -n "$result" ] || {
+		record_status error remote_check_failed
+		return
+	}
+
+	ok="$(printf '%s' "$result" | jsonfilter -e '@.ok' 2>/dev/null)"
+	available="$(printf '%s' "$result" | jsonfilter -e '@.available' 2>/dev/null)"
+	compatible="$(printf '%s' "$result" | jsonfilter -e '@.compatible' 2>/dev/null)"
+	update_available="$(printf '%s' "$result" | jsonfilter -e '@.update_available' 2>/dev/null)"
+
+	[ "$ok" = "true" ] || {
+		record_status error invalid_manifest
+		return
+	}
+	[ "$available" = "true" ] || {
+		record_status ok no_release
+		return
+	}
+	[ "$compatible" = "true" ] || {
+		record_status blocked incompatible_board
+		return
+	}
+	[ "$update_available" = "true" ] || {
+		record_status ok up_to_date
+		return
+	}
+
+	if [ "$(uci -q get veci.update.auto_download 2>/dev/null)" != "1" ]; then
+		record_status available manual_download
+		return
+	fi
+
+	download="$(ubus call veci firmwareRemoteDownload '{}' 2>/dev/null || true)"
+	download_ok="$(printf '%s' "$download" | jsonfilter -e '@.ok' 2>/dev/null)"
+	[ "$download_ok" = "true" ] || {
+		record_status error download_failed
+		return
+	}
+
+	sha="$(printf '%s' "$result" | jsonfilter -e '@.sha256' 2>/dev/null)"
+	validate="$(ubus call veci firmwareValidate "{ \"expected_sha256\": \"$sha\" }" 2>/dev/null || true)"
+	validated="$(printf '%s' "$validate" | jsonfilter -e '@.validated' 2>/dev/null)"
+	if [ "$validated" = "true" ]; then
+		record_status staged validated_ready
+	else
+		record_status error validation_failed
+	fi
+}
+
+while true; do
+	check_once
+	interval="$(clean_interval "$(uci -q get veci.update.check_interval 2>/dev/null || true)")"
+	sleep "$interval"
+done
