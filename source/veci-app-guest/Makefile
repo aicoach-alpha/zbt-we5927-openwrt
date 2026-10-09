@@ -32,14 +32,14 @@ endef
 
 define Package/veci-app-guest/postinst
 #!/bin/sh
-[ -n "${IPKG_INSTROOT}" ] || {
+[ -n "$${IPKG_INSTROOT}" ] || {
 	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
 }
 endef
 
 define Package/veci-app-guest/prerm
 #!/bin/sh
-[ -n "${IPKG_INSTROOT}" ] || {
+[ -n "$${IPKG_INSTROOT}" ] || {
 	ubus call veci.app.guest cleanup '{}' >/dev/null 2>&1 || true
 }
 endef
