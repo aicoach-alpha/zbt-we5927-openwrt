@@ -30,6 +30,18 @@ sync_mode() {
 	fi
 }
 
+
+disconnect_voucher_clients() {
+	code="$1"
+	clients="$(ubus call uspot client_list '{"uspot":"veci_guest"}' 2>/dev/null | jsonfilter -e '@.veci_guest[*]' 2>/dev/null || true)"
+	for mac in $clients; do
+		[ -n "$mac" ] || continue
+		user="$(ubus call uspot client_get "{ \"uspot\": \"veci_guest\", \"address\": \"$mac\" }" 2>/dev/null | jsonfilter -e '@.username' 2>/dev/null || true)"
+		[ "$user" = "$code" ] || continue
+		ubus call uspot client_remove "{ \"uspot\": \"veci_guest\", \"address\": \"$mac\" }" >/dev/null 2>&1 || true
+	done
+}
+
 cleanup_expired() {
 	now="$(date +%s)"
 	changed=0
@@ -39,6 +51,8 @@ cleanup_expired() {
 			''|*[!0-9]*) expires=0 ;;
 		esac
 		if [ "$expires" -gt 0 ] 2>/dev/null && [ "$expires" -le "$now" ] 2>/dev/null; then
+			code="$(uci -q get veci_voucher.$section.code 2>/dev/null || true)"
+			[ -n "$code" ] && disconnect_voucher_clients "$code"
 			uci -q delete "veci_voucher.$section"
 			uci -q delete "uspot.veci_voucher_$section"
 			changed=1
@@ -131,6 +145,7 @@ method_revoke() {
 		printf '{ "ok": false, "error": "voucher_not_found" }\n'
 		return
 	}
+	disconnect_voucher_clients "$code"
 	uci -q delete "veci_voucher.$section"
 	uci -q delete "uspot.veci_voucher_$section"
 	uci commit veci_voucher
