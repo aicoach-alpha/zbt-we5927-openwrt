@@ -81,7 +81,7 @@ jobs:
           VECI_PUBLISHED_RELEASE=1 firmware/scripts/prepare-veci.sh "$GITHUB_WORKSPACE/openwrt"
 
       - name: Install pinned VeCI feed dependency closure
-        run: firmware/scripts/install-veci-feeds.sh "$GITHUB_WORKSPACE/openwrt"
+        run: sh firmware/scripts/install-veci-feeds.sh "$GITHUB_WORKSPACE/openwrt"
 
       - name: Resolve firmware and app-feed configuration
         working-directory: openwrt
