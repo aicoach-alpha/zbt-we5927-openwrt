@@ -5,7 +5,7 @@ uci -q get veci.update >/dev/null 2>&1 || uci set veci.update=update
 
 current_url="$(uci -q get veci.update.manifest_url 2>/dev/null || true)"
 if [ -z "$current_url" ]; then
-	uci set veci.update.manifest_url='https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/main/releases/channel-stable.json'
+	uci set veci.update.manifest_url='https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json'
 fi
 
 uci -q get veci.update.auto_check >/dev/null 2>&1 || uci set veci.update.auto_check='1'
