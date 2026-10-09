@@ -35,6 +35,13 @@ jobs:
           sh -n source/veci-default-ui/files/usr/sbin/veci-default-ui
           sh -n source/veci-default-ui/files/etc/uci-defaults/98-veci-default-ui
           sh -n source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
+          sh -n source/veci-app-guest/files/usr/libexec/rpcd/veci.app.guest
+          sh -n source/veci-app-sqm/files/usr/libexec/rpcd/veci.app.sqm
+          sh -n source/veci-app-ddns/files/usr/libexec/rpcd/veci.app.ddns
+          sh -n source/veci-app-wireguard/files/usr/libexec/rpcd/veci.app.wireguard
+          sh -n source/veci-app-voucher/files/usr/libexec/rpcd/veci.app.voucher
+          sh -n source/veci-app-voucher/files/usr/sbin/veci-voucher-cleaner
+          sh -n source/veci-app-voucher/files/etc/init.d/veci-voucher-cleaner
 
       - name: Build helper accepts Git worktrees
         run: |
@@ -63,6 +70,7 @@ jobs:
           test -f /tmp/openwrt/package/veci-app-sqm/Makefile
           test -f /tmp/openwrt/package/veci-app-ddns/Makefile
           test -f /tmp/openwrt/package/veci-app-wireguard/Makefile
+          test -f /tmp/openwrt/package/veci-app-voucher/Makefile
           grep -qx 'PKG_NAME:=veci' /tmp/openwrt/package/veci/Makefile
           grep -q '<base href="/veci/" />' /tmp/openwrt/package/veci/veci/index.html
 
