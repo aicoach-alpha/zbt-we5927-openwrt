@@ -1,0 +1,160 @@
+#!/bin/sh
+
+safe_code() {
+	case "$1" in
+		''|*[!A-Za-z0-9]*) return 1 ;;
+	esac
+	[ "${#1}" -ge 6 ] && [ "${#1}" -le 20 ]
+}
+
+safe_duration() {
+	case "$1" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$1" -ge 300 ] 2>/dev/null && [ "$1" -le 604800 ] 2>/dev/null
+}
+
+section_for_code() {
+	printf 'v_%s' "$(printf '%s' "$1" | tr 'A-Z' 'a-z')"
+}
+
+ensure_guest_ready() {
+	uci -q get uspot.veci_guest >/dev/null 2>&1 || return 1
+}
+
+sync_mode() {
+	if uci -q get uspot.veci_guest >/dev/null 2>&1; then
+		uci set uspot.veci_guest.auth_mode='credentials'
+		uci commit uspot
+		/etc/init.d/uspot restart >/dev/null 2>&1 || true
+	fi
+}
+
+cleanup_expired() {
+	now="$(date +%s)"
+	changed=0
+	for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
+		expires="$(uci -q get veci_voucher.$section.expires 2>/dev/null || printf '0')"
+		case "$expires" in
+			''|*[!0-9]*) expires=0 ;;
+		esac
+		if [ "$expires" -gt 0 ] 2>/dev/null && [ "$expires" -le "$now" ] 2>/dev/null; then
+			uci -q delete "veci_voucher.$section"
+			uci -q delete "uspot.veci_voucher_$section"
+			changed=1
+		fi
+	done
+	if [ "$changed" -eq 1 ]; then
+		uci commit veci_voucher
+		uci commit uspot
+		/etc/init.d/uspot restart >/dev/null 2>&1 || true
+	fi
+}
+
+method_status() {
+	cleanup_expired
+	now="$(date +%s)"
+	guest_ready=0
+	ensure_guest_ready && guest_ready=1
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_boolean guest_ready "$guest_ready"
+	json_add_array vouchers
+	for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
+		code="$(uci -q get veci_voucher.$section.code 2>/dev/null || true)"
+		expires="$(uci -q get veci_voucher.$section.expires 2>/dev/null || printf '0')"
+		created="$(uci -q get veci_voucher.$section.created 2>/dev/null || printf '0')"
+		remaining=0
+		if [ "$expires" -gt "$now" ] 2>/dev/null; then remaining=$((expires - now)); fi
+		json_add_object
+		json_add_string code "$code"
+		json_add_int created "$created"
+		json_add_int expires "$expires"
+		json_add_int remaining "$remaining"
+		json_close_object
+	done
+	json_close_array
+	json_dump
+}
+
+method_create() {
+	input="$(cat)"
+	code="$(printf '%s' "$input" | jsonfilter -e '@.code' 2>/dev/null)"
+	duration="$(printf '%s' "$input" | jsonfilter -e '@.duration' 2>/dev/null)"
+	safe_code "$code" || {
+		printf '{ "ok": false, "error": "invalid_code" }\n'
+		return
+	}
+	safe_duration "$duration" || {
+		printf '{ "ok": false, "error": "invalid_duration" }\n'
+		return
+	}
+	ensure_guest_ready || {
+		printf '{ "ok": false, "error": "guest_portal_not_enabled" }\n'
+		return
+	}
+
+	section="$(section_for_code "$code")"
+	if uci -q get "veci_voucher.$section" >/dev/null 2>&1; then
+		printf '{ "ok": false, "error": "voucher_exists" }\n'
+		return
+	fi
+
+	now="$(date +%s)"
+	expires=$((now + duration))
+	uci -q batch <<EOF
+set veci_voucher.$section=voucher
+set veci_voucher.$section.code='$code'
+set veci_voucher.$section.created='$now'
+set veci_voucher.$section.expires='$expires'
+set uspot.veci_voucher_$section=credentials
+set uspot.veci_voucher_$section.uspot='veci_guest'
+set uspot.veci_voucher_$section.username='$code'
+set uspot.veci_voucher_$section.password='$code'
+EOF
+	uci commit veci_voucher
+	uci commit uspot
+	sync_mode
+	printf '{ "ok": true, "code": "%s", "expires": %s }\n' "$code" "$expires"
+}
+
+method_revoke() {
+	input="$(cat)"
+	code="$(printf '%s' "$input" | jsonfilter -e '@.code' 2>/dev/null)"
+	safe_code "$code" || {
+		printf '{ "ok": false, "error": "invalid_code" }\n'
+		return
+	}
+	section="$(section_for_code "$code")"
+	uci -q get "veci_voucher.$section" >/dev/null 2>&1 || {
+		printf '{ "ok": false, "error": "voucher_not_found" }\n'
+		return
+	}
+	uci -q delete "veci_voucher.$section"
+	uci -q delete "uspot.veci_voucher_$section"
+	uci commit veci_voucher
+	uci commit uspot
+	/etc/init.d/uspot restart >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
+method_cleanup() {
+	cleanup_expired
+	printf '{ "ok": true }\n'
+}
+
+case "$1" in
+	list)
+		printf '{ "status": {}, "create": { "code": "str", "duration": "str" }, "revoke": { "code": "str" }, "cleanup": {} }\n'
+		;;
+	call)
+		case "$2" in
+			status) method_status ;;
+			create) method_create ;;
+			revoke) method_revoke ;;
+			cleanup) method_cleanup ;;
+			*) printf '{ "error": "method_not_found" }\n' ;;
+		esac
+		;;
+esac
