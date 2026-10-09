@@ -144,16 +144,32 @@ method_cleanup() {
 	printf '{ "ok": true }\n'
 }
 
+
+method_cleanup_all() {
+	for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
+		uci -q delete "veci_voucher.$section"
+		uci -q delete "uspot.veci_voucher_$section"
+	done
+	uci commit veci_voucher >/dev/null 2>&1 || true
+	if uci -q get uspot.veci_guest >/dev/null 2>&1; then
+		uci set uspot.veci_guest.auth_mode='click-to-continue'
+	fi
+	uci commit uspot >/dev/null 2>&1 || true
+	/etc/init.d/uspot restart >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
 case "$1" in
 	list)
-		printf '{ "status": {}, "create": { "code": "str", "duration": "str" }, "revoke": { "code": "str" }, "cleanup": {} }\n'
+		printf '{ "status": {}, "create": { "code": "str", "duration": "str" }, "revoke": { "code": "str" }, "cleanupExpired": {}, "cleanup": {} }\n'
 		;;
 	call)
 		case "$2" in
 			status) method_status ;;
 			create) method_create ;;
 			revoke) method_revoke ;;
-			cleanup) method_cleanup ;;
+			cleanupExpired) method_cleanup ;;
+			cleanup) method_cleanup_all ;;
 			*) printf '{ "error": "method_not_found" }\n' ;;
 		esac
 		;;
