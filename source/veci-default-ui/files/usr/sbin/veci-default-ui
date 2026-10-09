@@ -1,0 +1,78 @@
+#!/bin/sh
+set -eu
+
+CFG=veci_default_ui.main
+
+capture_original() {
+	[ "$(uci -q get $CFG.captured || echo 0)" = "1" ] && return 0
+
+	uci -q delete $CFG.original_index_page || true
+	current="$(uci -q get uhttpd.main.index_page || true)"
+	[ -n "$current" ] || current="index.html"
+
+	for page in $current; do
+		[ -n "$page" ] && uci add_list $CFG.original_index_page="$page"
+	done
+
+	uci set $CFG.captured='1'
+	uci commit veci_default_ui
+}
+
+apply_pages() {
+	mode="$1"
+	uci -q delete uhttpd.main.index_page || true
+
+	if [ "$mode" = "enable" ]; then
+		uci add_list uhttpd.main.index_page='veci/index.html'
+	fi
+
+	original="$(uci -q get $CFG.original_index_page || true)"
+	[ -n "$original" ] || original='index.html'
+
+	for page in $original; do
+		[ "$page" = 'veci/index.html' ] && continue
+		uci add_list uhttpd.main.index_page="$page"
+	done
+
+	uci commit uhttpd
+}
+
+reload_uhttpd() {
+	/etc/init.d/uhttpd reload >/dev/null 2>&1 || /etc/init.d/uhttpd restart >/dev/null 2>&1 || true
+}
+
+enable() {
+	[ -f /www/veci/index.html ] || {
+		echo "error: /www/veci/index.html is missing" >&2
+		exit 1
+	}
+	capture_original
+	apply_pages enable
+	uci set $CFG.enabled='1'
+	uci commit veci_default_ui
+	reload_uhttpd
+	echo "VeCI is the default web UI. LuCI remains at /cgi-bin/luci/."
+}
+
+disable() {
+	capture_original
+	apply_pages disable
+	uci set $CFG.enabled='0'
+	uci commit veci_default_ui
+	reload_uhttpd
+	echo "Restored the original uHTTPd index page order."
+}
+
+status() {
+	echo "enabled=$(uci -q get $CFG.enabled || echo 0)"
+	echo "index_page=$(uci -q get uhttpd.main.index_page || echo index.html)"
+	echo "veci=$(test -f /www/veci/index.html && echo present || echo missing)"
+	echo "luci=$(test -e /www/cgi-bin/luci && echo present || echo unknown)"
+}
+
+case "${1:-status}" in
+	enable) enable ;;
+	disable) disable ;;
+	status) status ;;
+	*) echo "usage: veci-default-ui enable|disable|status" >&2; exit 2 ;;
+esac

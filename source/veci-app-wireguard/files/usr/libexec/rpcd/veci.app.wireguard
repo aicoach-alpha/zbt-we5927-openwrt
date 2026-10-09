@@ -1,0 +1,196 @@
+#!/bin/sh
+
+clean_token() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9._:@/-'
+}
+
+clean_text() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9 ._:-'
+}
+
+valid_uint() {
+	case "$1" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$1" -ge "$2" ] 2>/dev/null && [ "$1" -le "$3" ] 2>/dev/null
+}
+
+valid_cidr() {
+	value="$1"
+	safe="$(clean_token "$value")"
+	[ -n "$value" ] && [ "$safe" = "$value" ] && [ "${#value}" -le 64 ] && printf '%s' "$value" | grep -q '/'
+}
+
+lan_zone_ref() {
+	uci -q show firewall 2>/dev/null | sed -n "s/^firewall\.\([^=]*\)\.name='lan'$/\1/p" | head -n 1
+}
+
+lan_attached() {
+	zone="$(lan_zone_ref)"
+	[ -n "$zone" ] || return 1
+	uci -q get "firewall.$zone.network" 2>/dev/null | tr ' ' '\n' | grep -qx 'veci_wg'
+}
+
+ensure_private_key() {
+	private="$(uci -q get network.veci_wg.private_key 2>/dev/null || true)"
+	if [ -z "$private" ]; then
+		private="$(wg genkey 2>/dev/null)" || return 1
+		[ -n "$private" ] || return 1
+		uci -q set "network.veci_wg.private_key=$private"
+	fi
+	printf '%s' "$private"
+}
+
+method_status() {
+	enabled="$(uci -q get network.veci_wg.auto 2>/dev/null || printf '0')"
+	address="$(uci -q get network.veci_wg.addresses 2>/dev/null | awk '{ print $1 }')"
+	listen_port="$(uci -q get network.veci_wg.listen_port 2>/dev/null || printf '51820')"
+	private="$(uci -q get network.veci_wg.private_key 2>/dev/null || true)"
+	public=''
+	if [ -n "$private" ] && command -v wg >/dev/null 2>&1; then
+		public="$(printf '%s' "$private" | wg pubkey 2>/dev/null || true)"
+	fi
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	[ "$enabled" = "1" ] && json_add_boolean enabled 1 || json_add_boolean enabled 0
+	json_add_string address "$(clean_token "$address")"
+	json_add_int listen_port "$listen_port"
+	json_add_string public_key "$public"
+	lan_attached && json_add_boolean lan_access 1 || json_add_boolean lan_access 0
+	json_add_array peers
+	for section in $(uci -q show network 2>/dev/null | sed -n 's/^network\.\(veci_peer_[A-Za-z0-9_]*\)=wireguard_veci_wg$/\1/p'); do
+		json_add_object ""
+		json_add_string id "$section"
+		json_add_string description "$(clean_text "$(uci -q get "network.$section.description" 2>/dev/null || true)")"
+		json_add_string public_key "$(uci -q get "network.$section.public_key" 2>/dev/null || true)"
+		json_add_string allowed_ip "$(clean_token "$(uci -q get "network.$section.allowed_ips" 2>/dev/null | awk '{ print $1 }')")"
+		json_add_string endpoint_host "$(clean_token "$(uci -q get "network.$section.endpoint_host" 2>/dev/null || true)")"
+		json_add_string endpoint_port "$(uci -q get "network.$section.endpoint_port" 2>/dev/null || true)"
+		json_add_string persistent_keepalive "$(uci -q get "network.$section.persistent_keepalive" 2>/dev/null || true)"
+		json_close_object
+	done
+	json_close_array
+	json_dump
+}
+
+method_save() {
+	input="$(cat)"
+	enabled="$(printf '%s' "$input" | jsonfilter -e '@.enabled' 2>/dev/null)"
+	address="$(printf '%s' "$input" | jsonfilter -e '@.address' 2>/dev/null)"
+	listen_port="$(printf '%s' "$input" | jsonfilter -e '@.listen_port' 2>/dev/null)"
+	lan_access="$(printf '%s' "$input" | jsonfilter -e '@.lan_access' 2>/dev/null)"
+
+	case "$enabled" in 1|true) enabled=1 ;; 0|false|'') enabled=0 ;; *) printf '{ "ok": false, "error": "invalid_enabled" }\n'; return ;; esac
+	case "$lan_access" in 1|true) lan_access=1 ;; 0|false|'') lan_access=0 ;; *) printf '{ "ok": false, "error": "invalid_lan_access" }\n'; return ;; esac
+	valid_cidr "$address" || { printf '{ "ok": false, "error": "invalid_address" }\n'; return; }
+	valid_uint "$listen_port" 1 65535 || { printf '{ "ok": false, "error": "invalid_listen_port" }\n'; return; }
+	command -v wg >/dev/null 2>&1 || { printf '{ "ok": false, "error": "wireguard_tools_missing" }\n'; return; }
+
+	uci -q set network.veci_wg=interface
+	uci -q set network.veci_wg.proto=wireguard
+	uci -q set "network.veci_wg.auto=$enabled"
+	uci -q set "network.veci_wg.listen_port=$listen_port"
+	uci -q delete network.veci_wg.addresses 2>/dev/null || true
+	uci -q add_list "network.veci_wg.addresses=$address"
+	ensure_private_key >/dev/null || { printf '{ "ok": false, "error": "key_generation_failed" }\n'; return; }
+
+	zone="$(lan_zone_ref)"
+	if [ -n "$zone" ]; then
+		if [ "$lan_access" = "1" ]; then
+			lan_attached || uci -q add_list "firewall.$zone.network=veci_wg"
+		else
+			uci -q del_list "firewall.$zone.network=veci_wg" 2>/dev/null || true
+		fi
+		uci commit firewall
+	fi
+	uci commit network || { printf '{ "ok": false, "error": "uci_commit_failed" }\n'; return; }
+	ubus call network reload >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
+method_create() {
+	input="$(cat)"
+	description="$(printf '%s' "$input" | jsonfilter -e '@.description' 2>/dev/null)"
+	public_key="$(printf '%s' "$input" | jsonfilter -e '@.public_key' 2>/dev/null)"
+	allowed_ip="$(printf '%s' "$input" | jsonfilter -e '@.allowed_ip' 2>/dev/null)"
+	endpoint_host="$(printf '%s' "$input" | jsonfilter -e '@.endpoint_host' 2>/dev/null)"
+	endpoint_port="$(printf '%s' "$input" | jsonfilter -e '@.endpoint_port' 2>/dev/null)"
+	keepalive="$(printf '%s' "$input" | jsonfilter -e '@.persistent_keepalive' 2>/dev/null)"
+
+	[ "$(clean_text "$description")" = "$description" ] && [ "${#description}" -le 64 ] || { printf '{ "ok": false, "error": "invalid_description" }\n'; return; }
+	printf '%s' "$public_key" | grep -Eq '^[A-Za-z0-9+/]{43}=$' || { printf '{ "ok": false, "error": "invalid_public_key" }\n'; return; }
+	valid_cidr "$allowed_ip" || { printf '{ "ok": false, "error": "invalid_allowed_ip" }\n'; return; }
+	if [ -n "$endpoint_host" ]; then
+		[ "$(clean_token "$endpoint_host")" = "$endpoint_host" ] && [ "${#endpoint_host}" -le 253 ] || { printf '{ "ok": false, "error": "invalid_endpoint" }\n'; return; }
+	fi
+	if [ -n "$endpoint_port" ]; then valid_uint "$endpoint_port" 1 65535 || { printf '{ "ok": false, "error": "invalid_endpoint_port" }\n'; return; }; fi
+	if [ -n "$keepalive" ]; then valid_uint "$keepalive" 0 65535 || { printf '{ "ok": false, "error": "invalid_keepalive" }\n'; return; }; else keepalive=0; fi
+
+	suffix="$(cat /proc/sys/kernel/random/uuid 2>/dev/null | tr -d '-' | cut -c1-8)"
+	[ -n "$suffix" ] || suffix="$(date +%s)"
+	section="veci_peer_$suffix"
+	uci -q set "network.$section=wireguard_veci_wg"
+	uci -q set "network.$section.description=$description"
+	uci -q set "network.$section.public_key=$public_key"
+	uci -q add_list "network.$section.allowed_ips=$allowed_ip"
+	uci -q set "network.$section.route_allowed_ips=1"
+	uci -q set "network.$section.persistent_keepalive=$keepalive"
+	if [ -n "$endpoint_host" ]; then uci -q set "network.$section.endpoint_host=$endpoint_host"; fi
+	if [ -n "$endpoint_port" ]; then uci -q set "network.$section.endpoint_port=$endpoint_port"; fi
+	uci commit network || { printf '{ "ok": false, "error": "uci_commit_failed" }\n'; return; }
+	ubus call network reload >/dev/null 2>&1 || true
+	printf '{ "ok": true, "id": "%s" }\n' "$section"
+}
+
+method_revoke() {
+	input="$(cat)"
+	id="$(printf '%s' "$input" | jsonfilter -e '@.id' 2>/dev/null)"
+	case "$id" in veci_peer_[A-Za-z0-9_]*) ;; *) printf '{ "ok": false, "error": "invalid_peer_id" }\n'; return ;; esac
+	type="$(uci -q get "network.$id" 2>/dev/null || true)"
+	[ "$type" = "wireguard_veci_wg" ] || { printf '{ "ok": false, "error": "peer_not_found" }\n'; return; }
+	uci -q delete "network.$id"
+	uci commit network
+	ubus call network reload >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
+
+method_cleanup() {
+	for section in $(uci -q show network 2>/dev/null | sed -n 's/^network\.\(veci_peer_[A-Za-z0-9_]*\)=wireguard_veci_wg$/\1/p'); do
+		uci -q delete "network.$section"
+	done
+	uci -q delete network.veci_wg 2>/dev/null || true
+
+	zone="$(lan_zone_ref)"
+	if [ -n "$zone" ]; then
+		uci -q del_list "firewall.$zone.network=veci_wg" 2>/dev/null || true
+		uci commit firewall || {
+			printf '{ "ok": false, "error": "firewall_commit_failed" }\n'
+			return
+		}
+	fi
+
+	uci commit network || {
+		printf '{ "ok": false, "error": "network_commit_failed" }\n'
+		return
+	}
+	ubus call network reload >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
+case "$1" in
+	list)
+		printf '{ "status": {}, "save": { "enabled": "bool", "address": "str", "listen_port": "int", "lan_access": "bool" }, "create": { "description": "str", "public_key": "str", "allowed_ip": "str", "endpoint_host": "str", "endpoint_port": "str", "persistent_keepalive": "str" }, "revoke": { "id": "str" }, "cleanup": {} }\n'
+		;;
+	call)
+		case "$2" in
+			status) method_status ;;
+			save) method_save ;;
+			create) method_create ;;
+			revoke) method_revoke ;;
+			cleanup) method_cleanup ;;
+			*) printf '{ "error": "method_not_found" }\n' ;;
+		esac
+		;;
+esac

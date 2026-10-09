@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+uci -q get veci.update >/dev/null 2>&1 || uci set veci.update=update
+
+current_url="$(uci -q get veci.update.manifest_url 2>/dev/null || true)"
+if [ -z "$current_url" ]; then
+	uci set veci.update.manifest_url='https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json'
+fi
+
+uci -q get veci.update.auto_check >/dev/null 2>&1 || uci set veci.update.auto_check='1'
+uci -q get veci.update.auto_download >/dev/null 2>&1 || uci set veci.update.auto_download='0'
+uci -q get veci.update.auto_install >/dev/null 2>&1 || uci set veci.update.auto_install='0'
+uci -q get veci.update.auto_keep_settings >/dev/null 2>&1 || uci set veci.update.auto_keep_settings='1'
+uci -q get veci.update.check_interval >/dev/null 2>&1 || uci set veci.update.check_interval='21600'
+uci commit veci
+
+/etc/init.d/veci-update-agent enable >/dev/null 2>&1 || true
+
+exit 0

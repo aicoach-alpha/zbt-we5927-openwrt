@@ -1,0 +1,118 @@
+#!/bin/sh
+
+clean_token() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9._:-'
+}
+
+number_in_range() {
+	case "$1" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$1" -ge "$2" ] 2>/dev/null && [ "$1" -le "$3" ] 2>/dev/null
+}
+
+method_status() {
+	enabled="$(uci -q get sqm.veci.enabled 2>/dev/null || printf '0')"
+	interface="$(uci -q get sqm.veci.interface 2>/dev/null || true)"
+	download="$(uci -q get sqm.veci.download 2>/dev/null || true)"
+	upload="$(uci -q get sqm.veci.upload 2>/dev/null || true)"
+	qdisc="$(uci -q get sqm.veci.qdisc 2>/dev/null || printf 'cake')"
+	script="$(uci -q get sqm.veci.script 2>/dev/null || printf 'piece_of_cake.qos')"
+	recommended="$(ip route show default 2>/dev/null | awk 'NR==1 { print $5 }')"
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	[ "$enabled" = "1" ] && json_add_boolean enabled 1 || json_add_boolean enabled 0
+	json_add_string interface "$(clean_token "$interface")"
+	json_add_string recommended_interface "$(clean_token "$recommended")"
+	json_add_string download "$download"
+	json_add_string upload "$upload"
+	json_add_string qdisc "$(clean_token "$qdisc")"
+	json_add_string script "$(clean_token "$script")"
+	json_dump
+}
+
+method_save() {
+	input="$(cat)"
+	enabled="$(printf '%s' "$input" | jsonfilter -e '@.enabled' 2>/dev/null)"
+	interface="$(printf '%s' "$input" | jsonfilter -e '@.interface' 2>/dev/null)"
+	download="$(printf '%s' "$input" | jsonfilter -e '@.download' 2>/dev/null)"
+	upload="$(printf '%s' "$input" | jsonfilter -e '@.upload' 2>/dev/null)"
+	qdisc="$(printf '%s' "$input" | jsonfilter -e '@.qdisc' 2>/dev/null)"
+	script="$(printf '%s' "$input" | jsonfilter -e '@.script' 2>/dev/null)"
+
+	safe_interface="$(clean_token "$interface")"
+	[ -n "$interface" ] && [ "$safe_interface" = "$interface" ] || {
+		printf '{ "ok": false, "error": "invalid_interface" }\n'
+		return
+	}
+	number_in_range "$download" 64 2000000 || {
+		printf '{ "ok": false, "error": "invalid_download_rate" }\n'
+		return
+	}
+	number_in_range "$upload" 64 2000000 || {
+		printf '{ "ok": false, "error": "invalid_upload_rate" }\n'
+		return
+	}
+	case "$qdisc" in
+		cake|fq_codel) ;;
+		*) printf '{ "ok": false, "error": "invalid_qdisc" }\n'; return ;;
+	esac
+	case "$script" in
+		piece_of_cake.qos|layer_cake.qos|simple.qos) ;;
+		*) printf '{ "ok": false, "error": "invalid_script" }\n'; return ;;
+	esac
+	case "$enabled" in
+		1|true) enabled=1 ;;
+		0|false|'') enabled=0 ;;
+		*) printf '{ "ok": false, "error": "invalid_enabled" }\n'; return ;;
+	esac
+
+	uci -q batch <<EOF
+set sqm.veci=queue
+set sqm.veci.enabled='$enabled'
+set sqm.veci.interface='$safe_interface'
+set sqm.veci.download='$download'
+set sqm.veci.upload='$upload'
+set sqm.veci.qdisc='$qdisc'
+set sqm.veci.script='$script'
+set sqm.veci.linklayer='none'
+EOF
+	uci commit sqm || {
+		printf '{ "ok": false, "error": "uci_commit_failed" }\n'
+		return
+	}
+
+	if /etc/init.d/sqm restart >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "sqm_restart_failed" }\n'
+	fi
+}
+
+
+method_cleanup() {
+	if uci -q get sqm.veci >/dev/null 2>&1; then
+		uci -q delete sqm.veci
+		uci commit sqm || {
+			printf '{ "ok": false, "error": "uci_commit_failed" }\n'
+			return
+		}
+	fi
+	/etc/init.d/sqm restart >/dev/null 2>&1 || true
+	printf '{ "ok": true }\n'
+}
+
+case "$1" in
+	list)
+		printf '{ "status": {}, "save": { "enabled": "bool", "interface": "str", "download": "str", "upload": "str", "qdisc": "str", "script": "str" }, "cleanup": {} }\n'
+		;;
+	call)
+		case "$2" in
+			status) method_status ;;
+			save) method_save ;;
+			cleanup) method_cleanup ;;
+			*) printf '{ "error": "method_not_found" }\n' ;;
+		esac
+		;;
+esac

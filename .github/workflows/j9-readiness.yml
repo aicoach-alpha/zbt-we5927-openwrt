@@ -1,0 +1,79 @@
+name: J9 offline release readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      j8c_run_id:
+        description: "Successful J8c run ID; both artifacts MUST come from this same run"
+        type: string
+        required: true
+        default: '37913407078'
+  push:
+    paths:
+      - '.github/workflows/j9-readiness.yml'
+      - 'scripts/j9_offline_audit.py'
+      - 'tests/test_j9_offline_audit.py'
+      - 'docs/J9-UAT-READINESS.md'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: j9-offline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      J8C_RUN_ID: ${{ inputs.j8c_run_id || '37913407078' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Non-live gate regression suite
+        run: python3 -m unittest discover -s tests -p 'test_j9_offline_audit.py' -v
+      - name: Validate J8c run ID
+        run: |
+          case "$J8C_RUN_ID" in ''|*[!0-9]*) echo "Invalid run ID"; exit 1 ;; esac
+      - name: Download J8c firmware from selected run
+        uses: actions/download-artifact@v4
+        with:
+          name: veci-j8c-maintenance-candidate
+          path: j9-input/firmware
+          repository: ${{ github.repository }}
+          run-id: ${{ env.J8C_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download paired app feed from SAME run
+        uses: actions/download-artifact@v4
+        with:
+          name: veci-j8c-matched-app-feed
+          path: j9-input/feed
+          repository: ${{ github.repository }}
+          run-id: ${{ env.J8C_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Fail-closed J9 offline integrity / ABI audit
+        run: |
+          python3 scripts/j9_offline_audit.py \
+            --firmware j9-input/firmware \
+            --feed j9-input/feed \
+            --run-id "$J8C_RUN_ID" \
+            --report j9-readiness.json
+      - name: Assert NO_GO without UAT
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('j9-readiness.json'))
+          assert r['j9']=='OFFLINE_PASS'
+          assert r['release_decision']=='NO_GO'
+          assert r['gates']['live_router_uat']=='NOT_TESTED'
+          print('OFFLINE PASS / LIVE NO_GO / NO DEVICE TOUCHED')
+          PY
+      - name: Archive readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-j9-readiness-report
+          path: j9-readiness.json
+          if-no-files-found: warn
+          retention-days: 14

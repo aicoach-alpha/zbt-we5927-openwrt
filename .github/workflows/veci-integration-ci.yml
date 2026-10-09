@@ -1,0 +1,149 @@
+name: VeCI firmware integration CI
+
+on:
+  push:
+    paths:
+      - 'source/veci.commit'
+      - 'source/veci-default-ui/**'
+      - 'source/veci-cellular-we5927/**'
+      - 'source/veci-update-we5927/**'
+      - 'source/veci-app-*/**'
+      - 'scripts/prepare-veci.sh'
+      - 'scripts/build-veci-firmware.sh'
+      - 'docs/VECI.md'
+      - 'tests/**'
+      - '.github/workflows/veci-integration-ci.yml'
+  pull_request:
+    paths:
+      - 'source/veci.commit'
+      - 'source/veci-default-ui/**'
+      - 'source/veci-cellular-we5927/**'
+      - 'source/veci-update-we5927/**'
+      - 'source/veci-app-*/**'
+      - 'scripts/prepare-veci.sh'
+      - 'scripts/build-veci-firmware.sh'
+      - 'docs/VECI.md'
+      - 'tests/**'
+      - '.github/workflows/veci-integration-ci.yml'
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell syntax
+        run: |
+          sh -n scripts/prepare-veci.sh
+          sh -n scripts/install-veci-feeds.sh
+          sh -n scripts/build-veci-firmware.sh
+          sh -n source/veci-default-ui/files/usr/sbin/veci-default-ui
+          sh -n source/veci-default-ui/files/etc/uci-defaults/98-veci-default-ui
+          sh -n source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
+          sh -n source/veci-app-guest/files/usr/libexec/rpcd/veci.app.guest
+          sh -n source/veci-app-sqm/files/usr/libexec/rpcd/veci.app.sqm
+          sh -n source/veci-app-ddns/files/usr/libexec/rpcd/veci.app.ddns
+          sh -n source/veci-app-wireguard/files/usr/libexec/rpcd/veci.app.wireguard
+          sh -n source/veci-app-voucher/files/usr/libexec/rpcd/veci.app.voucher
+          sh -n source/veci-app-voucher/files/usr/sbin/veci-voucher-cleaner
+          sh -n source/veci-app-voucher/files/etc/init.d/veci-voucher-cleaner
+          sh -n source/veci-update-we5927/files/etc/uci-defaults/96-veci-update-we5927
+          sh -n source/veci-update-we5927/files/etc/init.d/veci-update-agent
+          sh -n source/veci-update-we5927/files/usr/sbin/veci-update-agent
+
+      - name: Build helper accepts Git worktrees
+        run: |
+          git worktree add --detach /tmp/veci-ci-worktree HEAD
+          set +e
+          output="$(./scripts/build-veci-firmware.sh /tmp/veci-ci-worktree 2>&1)"
+          rc=$?
+          set -e
+          git worktree remove --force /tmp/veci-ci-worktree
+          test "$rc" -ne 0
+          printf '%s\n' "$output" | grep -q 'OpenWrt source commit mismatch'
+
+      - name: JSON syntax
+        run: |
+          python3 -m json.tool source/veci-cellular-we5927/files/usr/share/rpcd/acl.d/veci-cellular-we5927.json >/dev/null
+
+      - name: Non-live release safety regression
+        run: python3 -m unittest discover -s tests -p 'test_veci_release_guards.py' -v
+
+      - name: Check native app module syntax
+        run: |
+          node --check source/veci-app-guest/files/www/veci-apps/guest.js
+          node --check source/veci-app-sqm/files/www/veci-apps/sqm.js
+          node --check source/veci-app-ddns/files/www/veci-apps/ddns.js
+          node --check source/veci-app-wireguard/files/www/veci-apps/wireguard.js
+          node --check source/veci-app-voucher/files/www/veci-apps/voucher.js
+          python3 -m json.tool releases/channel-stable.json >/dev/null
+
+      - name: Resolve pinned VeCI source
+        run: |
+          mkdir -p /tmp/openwrt/package
+          ./scripts/prepare-veci.sh /tmp/openwrt
+          test -f /tmp/openwrt/package/veci/Makefile
+          test -f /tmp/openwrt/package/veci-default-ui/Makefile
+          test -f /tmp/openwrt/package/veci-cellular-we5927/Makefile
+          test -f /tmp/openwrt/package/veci-app-catalog-we5927/Makefile
+          test -f /tmp/openwrt/package/veci-app-guest/Makefile
+          test -f /tmp/openwrt/package/veci-app-sqm/Makefile
+          test -f /tmp/openwrt/package/veci-app-ddns/Makefile
+          test -f /tmp/openwrt/package/veci-app-wireguard/Makefile
+          test -f /tmp/openwrt/package/veci-app-voucher/Makefile
+          test -f /tmp/openwrt/package/veci-update-we5927/Makefile
+          grep -qx 'PKG_NAME:=veci' /tmp/openwrt/package/veci/Makefile
+          grep -q '<base href="/veci/" />' /tmp/openwrt/package/veci/veci/index.html
+
+      - name: Verify published firmware never downgrades to unsigned mode
+        run: |
+          sh -ec '
+            . /tmp/openwrt/package/veci/files/rpcd-veci
+            cat() {
+              if [ "$1" = "/etc/veci-release-channel" ]; then
+                printf "published\\n"
+              else
+                command cat "$@"
+              fi
+            }
+            firmware_keys_present() { return 1; }
+            firmware_signature_required
+            if firmware_verify_signature /tmp/veci-test-nonexistent-image.bin; then
+              echo "Security regression: unsigned image was accepted" >&2
+              exit 1
+            fi
+            echo "FAIL_CLOSED_PUBLISHED_NO_KEY_PASS"
+          '
+
+      - name: Validate app catalog JSON
+        run: |
+          for manifest in source/veci-app-catalog-we5927/files/usr/share/veci/apps/*.json; do
+            python3 -m json.tool "$manifest" >/dev/null
+          done
+          grep -q 'veci-app-voucher' source/veci-app-catalog-we5927/files/usr/share/veci/apps/voucher.json
+
+      - name: Verify Router App lifecycle guards
+        run: |
+          if grep -RFn '[ -n "${IPKG_INSTROOT}" ]' source/veci-app-*/Makefile source/veci-update-we5927/Makefile; then
+            echo "Runtime lifecycle scripts must escape IPKG_INSTROOT for OpenWrt make expansion."
+            exit 1
+          fi
+          grep -q 'cleanup) method_cleanup' source/veci-app-guest/files/usr/libexec/rpcd/veci.app.guest
+          grep -q 'cleanup) method_cleanup' source/veci-app-sqm/files/usr/libexec/rpcd/veci.app.sqm
+          grep -q 'cleanup) method_cleanup' source/veci-app-ddns/files/usr/libexec/rpcd/veci.app.ddns
+          grep -q 'cleanup) method_cleanup' source/veci-app-wireguard/files/usr/libexec/rpcd/veci.app.wireguard
+          grep -q 'cleanup) method_cleanup_all' source/veci-app-voucher/files/usr/libexec/rpcd/veci.app.voucher
+          grep -q "cleanupExpired" source/veci-app-voucher/files/usr/sbin/veci-voucher-cleaner
+
+      - name: Verify generic and hardware-specific boundary
+        run: |
+          ! grep -RniE 'WE5927|WE2825|ZBT' /tmp/openwrt/package/veci/veci
+          grep -q 'status-fast' source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
+          ! sed -n '/^status() {/,/^}/p' source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular | grep -qE 'json_add_string (imei|iccid)'
+          grep -q 'identity) identity' source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular
+          grep -q '"identity"' source/veci-cellular-we5927/files/usr/share/rpcd/acl.d/veci-cellular-we5927.json
