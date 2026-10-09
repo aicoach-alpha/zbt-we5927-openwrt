@@ -132,7 +132,9 @@ export default {
 					if (!allowed) return;
 					setBusy(button, true, 'Revoking…');
 					try {
-						const result = await api.call('veci.app.wireguard', 'revoke', { id: button.dataset.peerRevoke });
+						const result = await api.call('veci.app.wireguard', 'revoke', {
+							id: button.dataset.peerRevoke
+						});
 						if (!result.ok) throw new Error(result.error || 'Could not revoke peer');
 						status = await api.call('veci.app.wireguard', 'status', {});
 						draw();
