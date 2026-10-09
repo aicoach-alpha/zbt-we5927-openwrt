@@ -127,3 +127,23 @@ VeCI must not become the public stable default until all of these pass:
 - `sysupgrade -T` on the exact release image.
 
 No official/final router flash is performed while any Router App or firmware-update gate above remains incomplete. The existing RC1 remains the recovery baseline until a VeCI-enabled image passes every gate and the operator explicitly approves the final flash.
+
+
+## Firmware updater
+
+VeCI contains a native firmware updater; the WE5927 release source is supplied by `veci-update-we5927` so the generic core does not hardcode a router model or project repository.
+
+The native flow is deliberately two-phase:
+
+1. stage a firmware image, either by chunked browser upload or the configured GitHub release channel;
+2. verify size and SHA256, then require `sysupgrade -T` to pass;
+3. create a short-lived validation token bound to the exact file hash and running board;
+4. enable the destructive Install & reboot action only for that validated file.
+
+The WE5927 profile points to:
+
+`https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json`
+
+Automatic checking is enabled by default. Automatic download is opt-in. A downloaded image is staged and validated but is not flashed automatically while signed firmware release metadata is not yet provisioned.
+
+The release publisher creates the GitHub firmware release and exact matching Router Apps feed from the same build run, then updates the stable channel metadata. No final release workflow should be dispatched until all Router Apps and live regression gates have passed.
