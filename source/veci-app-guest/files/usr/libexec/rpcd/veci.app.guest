@@ -5,7 +5,7 @@ bool_json() {
 }
 
 clean_ssid() {
-	printf '%s' "$1" | tr -d '\r\n'
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9 _.-'
 }
 
 number_in_range() {
@@ -232,8 +232,8 @@ method_save() {
 	idle="$(printf '%s' "$input" | jsonfilter -e '@.idle_timeout' 2>/dev/null)"
 	session="$(printf '%s' "$input" | jsonfilter -e '@.session_timeout' 2>/dev/null)"
 
-	ssid="$(clean_ssid "$ssid")"
-	[ -n "$ssid" ] && [ "${#ssid}" -le 32 ] || {
+	safe_ssid="$(clean_ssid "$ssid")"
+	[ -n "$ssid" ] && [ "$safe_ssid" = "$ssid" ] && [ "${#ssid}" -le 32 ] || {
 		printf '{ "ok": false, "error": "invalid_ssid" }\n'
 		return
 	}
