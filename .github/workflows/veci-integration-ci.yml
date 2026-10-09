@@ -98,6 +98,26 @@ jobs:
           grep -qx 'PKG_NAME:=veci' /tmp/openwrt/package/veci/Makefile
           grep -q '<base href="/veci/" />' /tmp/openwrt/package/veci/veci/index.html
 
+      - name: Verify published firmware never downgrades to unsigned mode
+        run: |
+          sh -ec '
+            . /tmp/openwrt/package/veci/files/rpcd-veci
+            cat() {
+              if [ "$1" = "/etc/veci-release-channel" ]; then
+                printf "published\\n"
+              else
+                command cat "$@"
+              fi
+            }
+            firmware_keys_present() { return 1; }
+            firmware_signature_required
+            if firmware_verify_signature /tmp/veci-test-nonexistent-image.bin; then
+              echo "Security regression: unsigned image was accepted" >&2
+              exit 1
+            fi
+            echo "FAIL_CLOSED_PUBLISHED_NO_KEY_PASS"
+          '
+
       - name: Validate app catalog JSON
         run: |
           for manifest in source/veci-app-catalog-we5927/files/usr/share/veci/apps/*.json; do
