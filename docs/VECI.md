@@ -75,14 +75,37 @@ The provider registers:
 ```text
 ubus object: veci.cellular
 methods:
-  status
-  reconnect
-  switchSim
+  status          # periodic lightweight status; NO IMEI/ICCID
+  identity        # explicit read of cached IMEI (authenticated)
+  identityLive    # explicit read-only AT+CGSN query (authenticated)
+  reconnect       # user-confirmed data operation
+  switchSim       # user-confirmed SIM operation
 ```
 
-`status` is sourced from `we5927-lte status-fast` and returns only the fields the VeCI cellular page needs. Device identifiers such as IMEI and ICCID are deliberately not forwarded into the generic GUI API.
+`status` is sourced from `we5927-lte status-fast` and returns only the normal cellular monitoring fields. **IMEI and ICCID are not present in periodic status payloads.** IMEI is available only after the authenticated user requests it through `identity` or `identityLive`; ICCID is not forwarded at all. The generic VeCI UI has no modem-specific AT parsing.
+
+`identity` reads the cached result previously obtained by the WE5927 LTE manager and includes cache age and stale metadata. `identityLive` requests **read-only** `AT+CGSN` through the manager's serialized, bounded AT transport. If the modem is disconnected, unresponsive, or the AT port is busy, the read fails closed; it must never restart the modem or fall back to a guessed identifier. Both paths validate the 15-digit response. IMEI is revealed temporarily on the Cellular page and automatically hidden after 60 seconds; VeCI must not persist it in browser storage, telemetry, or logs.
+
+A modem's vendor web management UI can report a different identity from the modem's AT command interface, including when a stored/vendor value is outdated. **Matching cached and live AT values only establishes agreement between those two interfaces; it does not prove what the operator sees, whether an identifier is registered, or the legality of its use.** Do not overwrite, synchronize, or program any identifier to make two displays match. Verify discrepancies with the device supplier and official registration channels.
 
 `reconnect` and `switchSim` are explicit write operations and run through the existing tested LTE manager rather than duplicating modem logic.
+
+### Read-only identity diagnostics (WE5927 shell)
+
+Use these only on a device you administer. **Do not paste full IMEI/ICCID or authentication credentials into issues or chat transcripts.**
+
+```sh
+for mode in status-fast status-full; do
+  printf '%s: ' "$mode"
+  /usr/sbin/we5927-lte "$mode" 2>/dev/null |
+    jsonfilter -e '@.imei' 2>/dev/null |
+    awk 'length($0)==15 && $0 ~ /^[0-9]+$/ {print "****" substr($0,12,4); next} {print "not available"}'
+done
+```
+
+`status-full` uses `ATI` first and falls back to `AT+CGSN` when needed. The optional `imei-read` command (included only in the new firmware source) uses `AT+CGSN` directly and returns structured JSON. Do not assume the command exists in older installed images.
+
+UAT acceptance requires an authenticated session, explicit reveal, masked screenshots, cache-age handling, busy/offline error handling, no modem writes, and a 60-second automatic hide. Live-device UAT is separate from non-live CI.
 
 ## Build order
 
