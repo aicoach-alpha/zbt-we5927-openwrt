@@ -9,5 +9,6 @@
 	"remove_packages": [
 		"veci-app-voucher"
 	],
-	"enabled": false
+	"enabled": true,
+	"module": "/veci-apps/voucher.js"
 }
