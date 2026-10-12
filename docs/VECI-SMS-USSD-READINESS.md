@@ -279,6 +279,20 @@ per-action UI consent only after mock integration and physical capability UAT.
 Keep current read-only messagingCapabilities as the only exposed RPC method
 until all of those gates pass.
 
+### Separate J8c/J9E image/feed pipeline evidence (not this draft)
+
+On 2026-10-12, GitHub Actions run 38201705426 for source commit
+4fd61c6fcc3c739830398e7b22601ee094c02a71 completed SUCCESS for
+both the build job and J9E paired firmware/feed integrity and trust job.
+Three nonexpired artifacts were confirmed in that run: the J8c maintenance
+candidate, the matched optional app feed, and the J9E paired audit.
+This validates the referenced CI-run result only; it is NOT an image build
+from this SMS/USSD draft branch and does NOT contain a deployable proof of
+the newly developed native messaging libraries, which remain intentionally
+excluded from firmware compilation. The paired audit success does not
+constitute successful physical router UAT, updater recovery, flash approval
+or production release authorization.
+
 **Release gate remains NO_GO**: source-only serial improvements are not proof of SMS/USSD support on a physical W907 modem, and the current live kernel/image has not been altered.
 
 ## UAT matrix, ALL NOT TESTED on physical router
