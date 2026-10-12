@@ -26,6 +26,7 @@ class Queue(ctypes.Structure):
         ("active_valid", ctypes.c_int),
         ("poisoned", ctypes.c_int),
         ("deadline_ms", ctypes.c_int64),
+        ("started_ms", ctypes.c_int64),
         ("acked", ctypes.c_int),
         ("ussd_received", ctypes.c_int),
         ("ussd_mode", ctypes.c_int),
@@ -245,6 +246,25 @@ class QueueTests(unittest.TestCase):
         self.submit(1)
         self.begin()
         self.assertEqual(self.submit(1), -errno.EEXIST)
+
+    def test_clock_regression_poisons_no_replay(self):
+        self.submit(1)
+        self.submit(2)
+        self.begin()
+        self.assertEqual(self.feed(OK, when=999), -errno.EPROTO)
+        self.assertEqual(self.q.count, 0)
+        self.assertEqual(self.begin()[0], -errno.EIO)
+
+    def test_bad_event_code_is_not_ignored(self):
+        self.submit()
+        self.begin()
+        self.assertEqual(self.feed(77), -errno.EPROTO)
+        self.assertTrue(self.q.poisoned)
+
+    def test_only_exact_approval_value_allowed(self):
+        self.assertEqual(self.submit(consent=2), -errno.EACCES)
+        self.assertEqual(self.submit(consent=-1), -errno.EACCES)
+        self.assertEqual(self.submit(consent=1), 0)
 
     def test_no_modem_io_no_network_or_logging(self):
         src = SOURCE.read_text()
