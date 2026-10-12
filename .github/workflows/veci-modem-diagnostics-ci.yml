@@ -18,6 +18,8 @@ on:
       - 'source/we5927-lte/src/veci-modem-identity.c'
       - 'source/we5927-lte/src/veci-modem-identity.h'
       - 'source/we5927-lte/src/veci-sms-pdu-decode.c'
+      - 'source/we5927-lte/src/veci-sms-inbox-index.c'
+      - 'source/we5927-lte/src/veci-sms-inbox-index.h'
       - 'source/we5927-lte/src/veci-ussd-decode.c'
       - 'source/we5927-lte/src/veci-sms-multipart.c'
       - 'source/we5927-lte/src/veci-sms-multipart.h'
@@ -31,6 +33,7 @@ on:
       - 'tests/test_veci_modem_identity.py'
       - 'tests/fuzz_veci_modem_transaction.c'
       - 'tests/test_veci_sms_pdu_decode.py'
+      - 'tests/test_veci_sms_inbox_index.py'
       - 'tests/test_veci_ussd_decode.py'
       - 'tests/test_veci_sms_multipart.py'
       - 'tests/fuzz_veci_sms_multipart.c'
@@ -83,6 +86,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_serial_pty_smoke.py' -v
       - name: Verify read-only modem identity policy using isolated fake sysfs and PTY
         run: python3 -m unittest discover -s tests -p 'test_veci_modem_identity.py' -v
+      - name: Verify explicit-only CMGL PDU inbox indexing without SMS text or sender disclosure
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_index.py' -v
       - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_pdu_decode.py' -v
       - name: Verify bounded async USSD UCS2/unsupported DCS parser (offline)
