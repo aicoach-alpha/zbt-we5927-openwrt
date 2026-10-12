@@ -256,6 +256,35 @@ class MultipartTests(unittest.TestCase):
                 1 if seq == 2 else 0)
         self.assertEqual(self.o.text.decode(), "Jalan pagi 🚴")
 
+    def test_eight_fragments_complete_at_limit(self):
+        for seq in range(8, 0, -1):
+            rc = self.add(f"{seq}", seq=seq, total=8)
+            self.assertEqual(rc, 1 if seq == 1 else 0)
+        self.assertEqual(self.o.text, b"12345678")
+        self.assertEqual(self.o.total_parts, 8)
+
+    def test_total_over_2048_never_exposes_partial_data(self):
+        for seq in range(1, 5):
+            self.assertEqual(self.add("A" * 512, seq=seq, total=5), 0)
+        rc = self.add("Z", seq=5, total=5)
+        self.assertEqual(rc, -errno.EOVERFLOW)
+        self.assertTrue(self.s.poisoned)
+        self.assertEqual(self.o.text, b"")
+        self.assertEqual(self.o.text_len, 0)
+        self.assertEqual(self.s.groups[0].chunks[0].raw, b"\x00" * 513)
+
+    def test_513_byte_fragment_fails_closed(self):
+        self.assertEqual(self.add("A" * 513), -errno.EINVAL)
+        self.assertEqual(self.s.groups[0].occupied, 0)
+        self.assertEqual(self.add("A" * 512), 0)
+
+    def test_invalid_output_request_cannot_expose_text(self):
+        self.add("ABC", seq=1)
+        self.assertEqual(self.add(b"\x01", seq=2), -errno.EINVAL)
+        self.assertEqual(self.o.text, b"")
+        self.assertEqual(self.o.text_len, 0)
+        self.assertFalse(self.s.poisoned)
+
     def test_no_io_or_external_dependencies(self):
         code = (SRC / "veci-sms-multipart.c").read_text()
         for token in ("ttyUSB", "AT+CMGS", "syslog(", "printf(",
