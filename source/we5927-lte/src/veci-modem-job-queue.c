@@ -13,45 +13,11 @@
  *
  * The fixed FIFO has maximum four pending jobs and NO automatic retries.
  */
+#include "veci-modem-job-queue.h"
 #include <errno.h>
 #include <limits.h>
-#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
-
-#define VECI_JOBS_MAX 4
-#define VECI_JOB_TIMEOUT_MIN_MS 100
-#define VECI_JOB_TIMEOUT_MAX_MS 30000
-
-enum veci_job_kind { VECI_JOB_SMS_LIST=1, VECI_JOB_SMS_READ=2,
-                     VECI_JOB_USSD=3 };
-enum veci_event_kind { VECI_OTHER=0, VECI_OK=1, VECI_ERROR=2,
-                       VECI_SMS_PDU=3, VECI_SMS_NOTICE=4,
-                       VECI_USSD=5, VECI_PROTOCOL_ERROR=6 };
-enum veci_job_result { VECI_WAITING=0, VECI_COMPLETE=1,
-                       VECI_INPUT_REQUIRED=2 };
-
-struct veci_job {
-    uint32_t id;
-    int kind;
-};
-
-struct veci_job_queue {
-    struct veci_job pending[VECI_JOBS_MAX];
-    struct veci_job active;
-    unsigned int head;
-    unsigned int count;
-    int active_valid;
-    int poisoned;
-    int64_t deadline_ms;
-    int64_t started_ms;
-    int acked;
-    int ussd_received;
-    int ussd_mode;
-    int expected_pdu;
-    unsigned int pdu_count;
-    int result;
-};
 
 void veci_jobs_init(struct veci_job_queue *q)
 {
