@@ -139,6 +139,51 @@ multisegment interleaving and modem charset settings are **NOT verified** on
 the W907-EC. Do not enable a decoder automatically in background polling, or
 make SMS contents available to ordinary read-only sessions.
 
+
+### Inactive multipart SMS assembler (two bounded groups)
+
+The source-only library source/we5927-lte/src/veci-sms-multipart.c and its
+public C header source/we5927-lte/src/veci-sms-multipart.h reconstruct decoded
+SMS-DELIVER fragments from trusted backend inputs; they **cannot receive SMS**.
+
+- Exactly **2 concurrent groups**, **8 parts/group**, **512 UTF-8 bytes/part**
+  and **2,048 UTF-8 bytes/result**. Heap-free static storage. No disk, network,
+  modem I/O, persistent copies or remote dependencies.
+- A nonzero per-SIM/ingress scope must be assigned by the **privileged caller**
+  based on authenticated physical modem/SIM context, not from user input,
+  phone number, a hash of an OTP or arbitrary web request. Scope isolation
+  prevents cross-SIM assembly. Sender, reference ID, 8/16-bit reference mode,
+  alphabet and declared part count must match.
+- Fragments can arrive out of order. Identical duplicates are idempotent;
+  conflicting duplicates or inconsistent metadata fail closed, erase pending
+  buffers and require explicit reset. **Never auto-replay or re-submit** after
+  failure. A completed group's metadata is kept as a temporary tombstone to
+  reject delayed duplicate fragments.
+- Each incomplete group expires after 600,000 monotonic milliseconds.
+  Incomplete expiry or backward-clock movement poisons and wipes the assembler;
+  completed tombstones are wiped when expired. No automatic restart.
+- Assembled output has a separate explicit clear operation. *A caller MUST call
+  it on every path*, must redact OTP in logs and must not expose raw contents
+  through ordinary read-only ACLs. This library alone does not implement ACL,
+  application user consent, storage privacy, SIM authentication or carrier
+  verification.
+- Must not infer that matching sender/reference indicates cryptographic
+  authenticity. If a sender reuses a reference close in time, fragments may
+  still collide; this only reduces the risk and **is not a formal guarantee**.
+
+Offline host tests use synthetic decoded GSM7/UCS2 PDUs, out-of-order segments,
+two SIM scopes, two senders, conflict/duplicate cases, overflow protection,
+expiration, zeroization, and 8-part upper bound. The independent native
+multipart ASAN/UBSAN harness runs 8,000 randomized malformed inserts and
+1,000 complete groups (9,000 scenarios), in addition to the existing 10,000
+SMS-PDU/USSD negative corpus.
+
+Before enabling any physical modem access, require verified W907-EC AT/URC
+demultiplexing and serial lock ownership, real-world UDH/charset and SIM-change
+UAT, RP/CSRF/ACL audit, user-visible SMS consent, owner-approved hardware
+activation, final edition image/ABI validation, and rollback plan. No UAT
+on a physical router has been performed by these changes.
+
 **Next integration safety gates (not implemented):** one process must hold
 /var/lock/we5927-at.lock continuously from command dispatch through the
 final asynchronous notification or deadline, including all SMS prompt/PDU
