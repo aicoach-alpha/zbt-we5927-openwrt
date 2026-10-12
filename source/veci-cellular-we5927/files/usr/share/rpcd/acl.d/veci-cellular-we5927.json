@@ -6,7 +6,8 @@
 				"veci.cellular": [
 					"status",
 					"identity",
-					"identityLive"
+					"identityLive",
+					"messagingCapabilities"
 				]
 			}
 		},
