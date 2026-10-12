@@ -18,56 +18,9 @@
  * NOTE: reference reuse and forged SMS sender identity are not authenticatable
  * from the GSM protocol alone. Requires device-level integration tests.
  */
+#include "veci-sms-multipart.h"
 #include <errno.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <string.h>
-#include <limits.h>
-
-#define VECI_MP_GROUPS 2u
-#define VECI_MP_PARTS 8u
-#define VECI_MP_PART_MAX 512u
-#define VECI_MP_TOTAL_MAX 2048u
-#define VECI_MP_TTL_MAX 600000
-#define VECI_MP_SENDER_MAX 24u
-
-struct veci_mp_part {
-    uint64_t scope_id;
-    const char *sender; /* verified sender string from SMS-PDU decoder */
-    unsigned int alphabet; /* 0 GSM7, 2 UCS2 */
-    unsigned int concat_ref;
-    unsigned int concat_total;
-    unsigned int concat_part;
-    unsigned int concat_is_16bit;
-    const char *text; /* UTF-8, verified SMS-PDU decoder output */
-    size_t text_len;
-};
-
-struct veci_mp_group {
-    uint64_t scope_id;
-    int64_t opened_ms;
-    unsigned int ref, total, alphabet, ref_16bit, received;
-    unsigned int occupied;
-    unsigned int completed;
-    char sender[VECI_MP_SENDER_MAX];
-    unsigned int mask;
-    uint16_t len[VECI_MP_PARTS];
-    char chunks[VECI_MP_PARTS][VECI_MP_PART_MAX + 1u];
-};
-
-struct veci_mp_state {
-    struct veci_mp_group groups[VECI_MP_GROUPS];
-    int64_t last_now_ms;
-    int clock_valid;
-    int poisoned;
-};
-
-struct veci_mp_result {
-    char text[VECI_MP_TOTAL_MAX + 1u];
-    size_t text_len;
-    uint64_t scope_id;
-    unsigned int total_parts;
-};
 
 static void wipe(void *ptr, size_t length)
 {
