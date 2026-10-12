@@ -188,6 +188,7 @@ case "$1" in
 			status) status ;;
 			identity) identity ;;
 			identityLive) identity_live ;;
+			messagingCapabilities) messaging_capabilities ;;
 			reconnect) reconnect ;;
 			switchSim) switch_sim ;;
 			*) emit_error "method_not_found" ;;
