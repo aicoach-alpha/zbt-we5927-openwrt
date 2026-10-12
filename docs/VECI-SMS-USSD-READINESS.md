@@ -117,6 +117,21 @@ on the modem or able to access the router device:
   fail closed; explicit clear removes decoded text from the caller buffer.
   Decoding a USSD response **does not** initiate a USSD session.
 
+
+### Sanitized input-fuzz gate (development-only)
+
+tests/fuzz_veci_sms_codec.c executes a deterministic corpus of 5,000
+negative SMS PDU inputs and 5,000 malformed/ambiguous USSD inputs under
+AddressSanitizer and UndefinedBehaviorSanitizer on the GitHub CI host.
+The initial sanitizer run detected an off-by-one in the test harness's
+random-input length generation; that harness was corrected. The subsequent
+full CI run passed 124/124 unit and integration cases plus the complete
+10,000-input sanitizer corpus, without any SMS or USSD being sent.
+
+This is deterministic negative fuzz, not an exhaustive formal proof or
+hardware protocol/OTA security certification. Any future changes to codec
+buffer bounds, charset variants, or on-device consumers require new tests.
+
 Both are tested by compiling native C on GitHub Actions runner and processing
 synthetic fixtures (tests/test_veci_sms_pdu_decode.py,
 tests/test_veci_ussd_decode.py). Real operator SMS/USSD syntax, DCS behavior,
