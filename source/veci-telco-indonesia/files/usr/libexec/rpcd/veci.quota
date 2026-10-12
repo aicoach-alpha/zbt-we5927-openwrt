@@ -10,6 +10,14 @@ case "$1" in
       status)
         printf '{ "schema": 1, "provider": "xl", "state": "not_connected", "total_bytes": null, "remaining_bytes": null, "used_bytes": null, "expires_at": null, "fetched_at": null, "source": null, "buckets": [] }\n'
         ;;
+      providers)
+        # Root-owned immutable build-time registry; no dynamic credentials.
+        if [ -r /usr/share/veci/telco/providers.json ]; then
+          cat /usr/share/veci/telco/providers.json
+        else
+          printf '{ "error": "provider_registry_unavailable" }\n'
+        fi
+        ;;
       *)
         printf '{ "error": "method_not_found" }\n'
         ;;
