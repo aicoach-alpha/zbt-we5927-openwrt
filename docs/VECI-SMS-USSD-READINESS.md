@@ -54,11 +54,18 @@ as SMS inbox/send or live USSD support.
   The helper marks expired state as failed, never automatically retries.
 - The parser does no modem I/O, no network I/O, no logging, no storage, no
   credential access and has no background process.
+- An additional inactive native library,
+  source/we5927-lte/src/veci-modem-session-lock.c, interoperates with the
+  existing /var/lock/we5927-at.lock via flock(2); it allows immediate busy
+  detection or at most a 2000 ms bounded wait, rejects symlink/hardlink lock
+  files and returns an owned descriptor for a future caller to hold for the
+  complete transaction. It does **not** expose a generic command executor,
+  fairness-guaranteed FIFO, user-facing RPC or live modem capability.
 
 **Next integration safety gates (not implemented):** one process must hold
 /var/lock/we5927-at.lock continuously from command dispatch through the
 final asynchronous notification or deadline, including all SMS prompt/PDU
-phases. A command-by-command flock is insufficient for interactive USSD and
+phases. The inactive lock primitive can support this, but is NOT integrated. A command-by-command flock is insufficient for interactive USSD and
 AT+CMGS transactions. The modem transport must route unsolicited events
 without treating them as the command terminal, disable logging of any raw
 message/PDU, enforce a small bounded operation queue, and never execute
