@@ -112,6 +112,8 @@ esac
         classdir = root/"class/tty"/ttyname
         classdir.mkdir(parents=True, exist_ok=True)
         link = classdir/"device"
+        if link.exists() or link.is_symlink():
+            link.unlink()
         link.symlink_to(os.path.relpath(ttydir, classdir))
         (devdir/"idVendor").write_text(vendor + "\n")
         (devdir/"idProduct").write_text(product + "\n")
