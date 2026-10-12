@@ -33,6 +33,14 @@ static int fmt(char *dst, size_t cap, const char *base,
     int n = snprintf(dst, cap, "%s/%s", base, suffix);
     return n < 0 || (size_t)n >= cap ? -ENAMETOOLONG : 0;
 }
+static int addpath(char *dst, size_t cap, const char *suffix)
+{
+    size_t len = strlen(dst), extra = strlen(suffix);
+    if (len >= cap || extra > cap - len - 2u) return -ENAMETOOLONG;
+    dst[len++] = '/';
+    memcpy(dst + len, suffix, extra + 1u);
+    return 0;
+}
 static int under(const char *root, const char *path)
 {
     size_t n = strlen(root);
@@ -166,9 +174,9 @@ int veci_modem_verify_identity(const char *trusted_sysfs_root,
     if (!realpath(trusted_sysfs_root, root)) return -errno;
     if (fmt(classpath, sizeof(classpath), root, "class/tty") != 0)
         return -ENAMETOOLONG;
-    if (fmt(classpath, sizeof(classpath), classpath, tty_name) != 0)
+    if (addpath(classpath, sizeof(classpath), tty_name) != 0)
         return -ENAMETOOLONG;
-    if (fmt(classpath, sizeof(classpath), classpath, "device") != 0)
+    if (addpath(classpath, sizeof(classpath), "device") != 0)
         return -ENAMETOOLONG;
     if (!realpath(classpath, resolved)) return -errno;
     rc = interface_path(root, resolved, tty_name, ifdir, sizeof(ifdir));
@@ -190,7 +198,6 @@ int veci_modem_verify_identity(const char *trusted_sysfs_root,
     if (attr(usbdev, "idProduct", buf, sizeof(buf)) ||
         hex4(buf, &pid) != 0 || pid != PID) return -ENODEV;
     /* Never trust just ttyUSB ordinal: tie its sysfs major/minor to fd. */
-    strcpy(classpath, root);
     if (fmt(classpath, sizeof(classpath), root, "class/tty") != 0)
         return -ENAMETOOLONG;
     if (fmt(classpath, sizeof(classpath), classpath, tty_name) != 0)
