@@ -32,7 +32,7 @@ class PtySmokeTests(unittest.TestCase):
         cls.so = str(Path(cls.tmp.name) / "libveci-serial-test.so")
         cmd = [
             "cc", "-std=c99", "-O2", "-Wall", "-Wextra", "-Werror",
-            "-D_GNU_SOURCE", "-DVECI_ENABLE_OFFLINE_PTY_HARNESS",
+            "-DVECI_ENABLE_OFFLINE_PTY_HARNESS",
             "-fPIC", "-shared",
             str(SRC / "veci-serial-pty-smoke.c"),
             str(SRC / "veci-modem-session-lock.c"),
