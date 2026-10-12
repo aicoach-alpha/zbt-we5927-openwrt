@@ -1,0 +1,58 @@
+name: VeCI Indonesia static quality
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/indonesia-edition
+    paths:
+      - 'source/veci-indonesia-quota/**'
+      - 'source/veci.commit'
+      - 'scripts/prepare-veci.sh'
+      - 'scripts/veci_xl_quota_normalize.py'
+      - 'tests/test_veci_xl_quota_normalize.py'
+      - 'tests/test_indonesia_edition.py'
+      - '.github/workflows/veci-editions.yml'
+      - '.github/workflows/veci-indonesia-ci.yml'
+      - 'docs/VECI-INDONESIA.md'
+permissions:
+  contents: read
+concurrency:
+  group: indonesia-static-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: XL quota normalizer unit tests
+        run: python3 -m unittest discover -s tests -p 'test_veci_xl_quota_normalize.py' -v
+      - name: Regional profile and read-only router quota tests
+        run: python3 -m unittest discover -s tests -p 'test_indonesia_edition.py' -v
+      - name: Stage pinned Indonesia UI and validate ECMAScript syntax
+        run: |
+          mkdir -p /tmp/veci-id-openwrt/package
+          VECI_EDITION=indonesia ./scripts/prepare-veci.sh /tmp/veci-id-openwrt
+          test -f /tmp/veci-id-openwrt/package/veci-indonesia-quota/Makefile
+          node --check /tmp/veci-id-openwrt/package/veci/veci/js/pages/home.js
+          python3 - <<'PY'
+          import json,pathlib
+          root=pathlib.Path('/tmp/veci-id-openwrt/package/veci-default-ui/files/etc/veci-release.json')
+          obj=json.loads(root.read_text())
+          assert obj['edition']=='indonesia'
+          assert obj['veci_commit']==pathlib.Path('source/veci.commit').read_text().strip()
+          core=pathlib.Path('/tmp/veci-id-openwrt/package/veci/veci/js/pages/home.js').read_text()
+          assert 'data-indonesia-quota' in core
+          assert "info.edition !== 'indonesia'" in core
+          print('INDONESIA_SOURCE_PIN_AND_UI_PASS')
+          PY
+      - name: General edition metadata remains distinct
+        run: |
+          mkdir -p /tmp/veci-general-openwrt/package
+          VECI_EDITION=general ./scripts/prepare-veci.sh /tmp/veci-general-openwrt
+          python3 - <<'PY'
+          import json,pathlib
+          p=pathlib.Path('/tmp/veci-general-openwrt/package/veci-default-ui/files/etc/veci-release.json')
+          assert json.loads(p.read_text())['edition']=='general'
+          print('GENERAL_EDITION_IDENTITY_PASS')
+          PY
