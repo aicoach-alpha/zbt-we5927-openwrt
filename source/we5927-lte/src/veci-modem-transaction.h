@@ -5,11 +5,10 @@
  */
 #ifndef VECI_MODEM_TRANSACTION_H
 #define VECI_MODEM_TRANSACTION_H
+#include "veci-at-framing.h"
+#include "veci-modem-job-queue.h"
 #include <stddef.h>
 #include <stdint.h>
-
-#define VECI_TXN_LINE 1024
-#define VECI_TXN_QUEUE 4
 enum veci_txn_state {
     VECI_TXN_IDLE = 0,
     VECI_TXN_ARMED = 1,
@@ -18,29 +17,11 @@ enum veci_txn_state {
     VECI_TXN_INTERACTIVE = 4,
     VECI_TXN_QUARANTINED = 5
 };
-struct veci_txn_frame {
-    char line[VECI_TXN_LINE];
-    size_t line_len, total;
-    int pdu_expected, failed;
-};
-struct veci_txn_job {
-    uint32_t id;
-    int kind;
-};
-struct veci_txn_queue {
-    struct veci_txn_job pending[VECI_TXN_QUEUE], active;
-    unsigned int head, count;
-    int active_valid, poisoned;
-    int64_t deadline_ms, started_ms;
-    int acked, ussd_received, ussd_mode, expected_pdu;
-    unsigned int pdu_count;
-    int result;
-};
 struct veci_modem_transaction {
-    struct veci_txn_frame frame;
-    struct veci_txn_queue queue;
+    struct veci_at_frame frame;
+    struct veci_job_queue queue;
     uint64_t epoch;
-    int lock_fd;       /* borrowed; never closed by coordinator */
+    int lock_fd; /* borrowed; never closed by coordinator */
     uint32_t job_id;
     int kind;
     int state;
