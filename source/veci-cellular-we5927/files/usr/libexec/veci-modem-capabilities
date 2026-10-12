@@ -26,7 +26,8 @@ find_at_port() {
         devpath="$(readlink -f "$entry/device" 2>/dev/null || :)"
         case "$devpath" in
             /sys/devices/*:1.4/*)
-                usbparent="${devpath%%:1.4/*}"
+                interface_dir="${devpath%/*}"
+                usbparent="${interface_dir%/*}"
                 [ -r "$usbparent/idVendor" ] || continue
                 [ -r "$usbparent/idProduct" ] || continue
                 vid="$(cat "$usbparent/idVendor" 2>/dev/null || :)"
