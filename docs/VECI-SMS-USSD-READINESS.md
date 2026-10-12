@@ -62,13 +62,45 @@ as SMS inbox/send or live USSD support.
   complete transaction. It does **not** expose a generic command executor,
   fairness-guaranteed FIFO, user-facing RPC or live modem capability.
 
+
+### Inactive bounded SMS/USSD queue and integration tests
+
+Development-only source: source/we5927-lte/src/veci-modem-job-queue.c.
+The FIFO holds **four pending opaque job IDs**, without SMS content, phone
+numbers, USSD codes or authentication data. A separate active job is allowed.
+The only implemented kinds are SMS list/read and USSD; **SMS send is NOT
+implemented**. Submission requires an exact approval flag (1) from a future
+privileged caller; that flag is not itself identity authentication or proof
+of a UI consent gesture. The caller still needs server-side ACL and CSRF
+validation and confirmation that the consent belongs to that specific action.
+
+A transaction begins only after an explicit dequeue operation; a caller
+must already hold the common modem lock and must retain it until completion,
+error/expiry or verified cancellation. Fake events from the native framing
+parser are classified without copying SMS or USSD contents into queue memory.
+SMS reading counts only +CMGR PDU records; inbox listing counts +CMGL
+responses and ignores unsolicited +CMT messages. A USSD AT OK is *not* the
+final response: the queue waits for an asynchronous +CUSD indication.
+Interactive +CUSD mode 1 retains the active session and requires further
+explicit user action.
+
+Any parser error, modem error, expired deadline, clock regression, unknown
+event, or cancellation poisons the queue and **discards all pending jobs**
+(no auto retry). Recovery requires explicit reset, without replay. No
+cross-process FIFO, persistent job queue or recovery watchdog is provided.
+
+Tests/test_veci_modem_job_queue.py compiles the native FIFO, and
+tests/test_veci_modem_pipeline.py compiles native framing together with
+the FIFO to exercise segmented PDU, interleaved unsolicited SMS, delayed
+USSD, text-mode rejection and timeout, without touching hardware.
+
 **Next integration safety gates (not implemented):** one process must hold
 /var/lock/we5927-at.lock continuously from command dispatch through the
 final asynchronous notification or deadline, including all SMS prompt/PDU
 phases. The inactive lock primitive can support this, but is NOT integrated. A command-by-command flock is insufficient for interactive USSD and
 AT+CMGS transactions. The modem transport must route unsolicited events
 without treating them as the command terminal, disable logging of any raw
-message/PDU, enforce a small bounded operation queue, and never execute
+message/PDU, enforce a verified caller-owned queue/transaction executor, and never execute
 SMS/USSD on page load. Add privileged ubus write ACLs and explicit
 per-action UI consent only after mock integration and physical capability UAT.
 Keep current read-only messagingCapabilities as the only exposed RPC method
