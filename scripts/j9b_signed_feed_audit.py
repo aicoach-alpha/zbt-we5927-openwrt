@@ -97,17 +97,25 @@ def audit(firmware,feed,apk,run_id,unsquashfs="/usr/bin/unsquashfs"):
             "--no-network","search","veci-app-guest"],20)
         simulations=[]
         for name in APPS:
-            simulations.append(invoke([apk,"--root",root,"--keys-dir","/etc/apk/keys",
+            simulations.append(invoke([apk,"--root",root,"--keys-dir",keydir,
                 "--repositories-file",str(repo_file),"--no-network",
                 "--simulate","add","--initdb","veci-app-"+name],75))
         result["solver"]=check_group(simulations)
         result["detail"]["solver_passed"]=sum(x["ok"] for x in simulations)
-        if result["solver"]!="PASS":
-            result["detail"]["solver_first_app_explicit_keys"]=invoke([
-                apk,"--root",root,"--keys-dir",keydir,
-                "--repositories-file",repo_file,"--no-network",
-                "--simulate","add","--initdb","veci-app-guest"],20)
         result["detail"]["solver_failure_examples"]=[x["message"] for x in simulations if not x["ok"]][:3]
+
+        # Offline fetch reads actual APK payloads by their SIGNED index entry.
+        # The verifier checks the indexed content digest; this is a safer
+        # authenticity test than standalone signature validation for OpenWrt.
+        out=Path(scratch)/"fetched"
+        out.mkdir()
+        names=["veci-app-"+x for x in APPS]+["kmod-wireguard","kmod-sched-cake"]
+        payload=[invoke([apk,"--keys-dir",keydir,"--repositories-file",
+                        str(repo_file),"--no-network","fetch",
+                        "--output",out,name],75) for name in names]
+        result["package_content"]=check_group(payload)
+        result["detail"]["content_verified"]=sum(x["ok"] for x in payload)
+        result["detail"]["content_failure_examples"]=[x["message"] for x in payload if not x["ok"]][:3]
         return result
 
 def main():
