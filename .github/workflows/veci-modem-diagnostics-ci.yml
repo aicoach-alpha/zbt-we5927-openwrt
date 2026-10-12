@@ -9,11 +9,13 @@ on:
       - 'source/we5927-lte/src/veci-at-framing.c'
       - 'source/we5927-lte/src/veci-modem-session-lock.c'
       - 'source/we5927-lte/src/veci-modem-job-queue.c'
+      - 'source/we5927-lte/src/veci-sms-pdu-decode.c'
       - 'tests/test_we5927_at_transport.py'
       - 'tests/test_veci_at_framing.py'
       - 'tests/test_veci_modem_session_lock.py'
       - 'tests/test_veci_modem_job_queue.py'
       - 'tests/test_veci_modem_pipeline.py'
+      - 'tests/test_veci_sms_pdu_decode.py'
       - 'tests/test_veci_modem_sms_ussd.py'
       - '.github/workflows/veci-modem-diagnostics-ci.yml'
       - 'docs/VECI-SMS-USSD-READINESS.md'
@@ -43,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_modem_job_queue.py' -v
       - name: Cross-check fragmented AT responses against SMS/USSD FIFO state machine
         run: python3 -m unittest discover -s tests -p 'test_veci_modem_pipeline.py' -v
+      - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_pdu_decode.py' -v
       - name: Validate existing LTE manager parses before AT integration
         run: sh -n source/we5927-lte/files/usr/sbin/we5927-lte
       - name: Verify both build editions stage the audited LTE manager
