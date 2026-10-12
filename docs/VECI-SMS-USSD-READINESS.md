@@ -229,6 +229,44 @@ coordinator cases**, all without accessing a modem. Each adversarial suite
 runs with AddressSanitizer and UndefinedBehaviorSanitizer. Successful CI is
 not a passing physical SMS/USSD UAT, nor an approved firmware image release.
 
+
+### Host-only serial transport smoke, still NOT deployable
+
+The source-only file source/we5927-lte/src/veci-serial-pty-smoke.c is
+**hard-disabled by its compiler guard** unless an offline host test
+deliberately defines VECI_ENABLE_OFFLINE_PTY_HARNESS. It is not included by
+the OpenWrt package Makefile; CI also verifies this exclusion.
+
+On an isolated mock pseudo-terminal (PTY), it exercises the complete native
+flow: acquire the SAME shared flock implementation, check the externally
+configured TTY, reject pre-existing unread input, open a consent-gated job,
+transmit one tightly constrained synthetic SMS read/list command, poll/write
+with a single monotonic deadline, parse fragmented modem-style replies, mark
+terminal completion/error, and release the lock only after the terminal
+response or failure. Commands are narrowly limited to fixed SMS list
+AT+CMGL=4 or indexed SMS read AT+CMGR=1..255. SMS sending, deletion,
+interactive USSD and arbitrary AT are not permitted even in this harness.
+Its public result reports only a record count and status; all raw SMS bytes
+remain transient, and command/RX buffers use non-optimizable explicit wipe.
+These read operations are still sensitive and would require real user consent
+before any live implementation.
+
+The host test tests/test_veci_serial_pty_smoke.py verifies simulated SMS
+responses and unsolicited notices, lock contention/held-lock lifetime,
+fragmentation, modem errors, timeout without replay, denial of unapproved
+operations, compile-off by default, and refusal to start when an old +CUSD
+or OK is already buffered. There are now **194 offline unit/integration
+tests** and **24,000 ASAN/UBSAN deterministic test scenarios** in CI.
+
+Limitations: successful host PTY tests **do not prove** a physical W907-EC
+is connected, or that a specific unsolicited notification belongs to one
+request. The test path accepts a caller-supplied isolated lock filename solely
+for mock testing; a production implementation MUST hardcode the shared
+modem lock, verify modem USB interface 1.4 and trusted identity, hold a
+device-wide serial lease, define strict UART quiescence and resynchronization,
+redact OTP in *all* layers, enforce per-action ACL/CSRF/consent, and perform
+on-device audit before any real SMS/USSD transaction is enabled.
+
 **Next integration safety gates (not implemented):** one process must hold
 /var/lock/we5927-at.lock continuously from command dispatch through the
 final asynchronous notification or deadline, including all SMS prompt/PDU
