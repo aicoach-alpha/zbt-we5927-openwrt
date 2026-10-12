@@ -66,7 +66,8 @@ cleanup_expired() {
 }
 
 method_status() {
-	cleanup_expired
+	# Read-only. Expiry cleanup belongs to the background cleaner or
+	# explicit cleanupExpired write method, never a status poll.
 	now="$(date +%s)"
 	guest_ready=0
 	ensure_guest_ready && guest_ready=1
@@ -79,8 +80,12 @@ method_status() {
 		code="$(uci -q get veci_voucher.$section.code 2>/dev/null || true)"
 		expires="$(uci -q get veci_voucher.$section.expires 2>/dev/null || printf '0')"
 		created="$(uci -q get veci_voucher.$section.created 2>/dev/null || printf '0')"
-		remaining=0
-		if [ "$expires" -gt "$now" ] 2>/dev/null; then remaining=$((expires - now)); fi
+		case "$expires:$created" in
+			*[!0-9:]*|:*) continue ;;
+		esac
+		# Do not expose expired vouchers while the cleaner is pending.
+		[ "$expires" -gt "$now" ] 2>/dev/null || continue
+		remaining=$((expires - now))
 		json_add_object
 		json_add_string code "$code"
 		json_add_int created "$created"
