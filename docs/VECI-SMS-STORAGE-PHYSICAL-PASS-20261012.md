@@ -36,8 +36,8 @@ included in returned data. No USSD session was executed.
   (`messagingCapabilities`) remain **LIVE/PASS**.
 - Explicit helper CLI count check from `/tmp` is now
   **PHYSICAL-UAT PASS**, not merely CI PASS.
-- Persistent `messagingStorage` RPC and ACL are **NOT LIVE** yet.
-- The separate v2 overlay installer has a pinned payload commit,
+- Persistent `messagingStorage` RPC and ACL are **LIVE/PASS** following the owner-executed v2 hotfix.
+- The installed v2 overlay installer has a pinned payload commit,
   SHA256 validation, legacy RPC schema/status checks, persistent v1
   backup in `/root/veci-storage-hotfix-rollback` and rollback on
   failed registration/health. The previous capability-v1 backup
@@ -48,9 +48,40 @@ included in returned data. No USSD session was executed.
 - Inbox contents, SMS send, interactive USSD, XL quota, firmware
   upgrade and recovery/power-loss UAT remain **NOT LIVE / NOT TESTED**.
 
-Installation of v2 requires an explicit operator invocation on the
-known working Windows-office WE5927 SSH session. It may briefly
-restart rpcd; it does not reboot, flash or issue a modem command.
-Record `V2_LIVE_RPC_PASS`, `V2_STATUS_PASS` and then a separate
-explicit `ubus call veci.cellular messagingStorage` response to
-promote the persistent read-only RPC to LIVE/PASS.
+## Operator-observed v2 production rollout — PASS
+
+The owner executed `scripts/veci-live-storage-hotfix-v2.sh` from immutable
+GitHub commit `070d271776e5696d48e484273708ee2adb459a76` on the actual
+WE5927 via Windows-office SSH. The 7,598-byte installer returned:
+
+```
+V2_LIVE_RPC_PASS: messagingStorage registered
+V2_STATUS_PASS: LTE status healthy
+NO_AT_COMMAND_SENT_BY_INSTALLER
+V2_ROLLBACK_BACKUP=/root/veci-storage-hotfix-rollback
+```
+
+`ubus -v list veci.cellular` displayed five methods:
+`status`, `messagingCapabilities`, `messagingStorage`, `reconnect`,
+`switchSim` with the unchanged `sim:String` argument. Subsequent *explicit*
+`ubus call veci.cellular messagingStorage` returned:
+
+```
+{"ok":true,"state":"queried","source":"read_only_at_cpms",
+ "memory":"ME","used":5,"total":255}
+```
+
+The owner also explicitly rechecked `messagingCapabilities` and got
+`ok:true`, `state:probed`, with SMS mode/storage/notifications and USSD
+all reporting `supported`. Overlay remained ~1.7 MiB free (2.1 MiB total,
+364 KiB used / 17%). No firmware flash/reboot or LTE/SIM/network change.
+
+**PASS scope:** persistent read-only SMS *storage counts* and read-only
+capability diagnostic methods. **NOT PASS:** inbox reading, SMS sending,
+USSD network session, live operator balance/XL quota, full firmware
+upgrade or recovery tests. Preserve BOTH distinct rollback directories:
+`/root/veci-capability-hotfix-rollback` (v1 original)
+and `/root/veci-storage-hotfix-rollback` (working v1 backup).
+
+These are owner-provided device observations, not direct remote execution
+by this assistant.
