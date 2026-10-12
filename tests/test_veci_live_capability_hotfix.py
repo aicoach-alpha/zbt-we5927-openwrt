@@ -11,11 +11,12 @@ HOTFIX = ROOT / "scripts/veci-live-capability-hotfix.sh"
 RPC = ROOT / "scripts/veci-live-minimal/veci.cellular"
 ACL = ROOT / "scripts/veci-live-minimal/veci-cellular-we5927.json"
 HELPER = ROOT / "source/veci-cellular-we5927/files/usr/libexec/veci-modem-capabilities"
+PINNED_HELPER = ROOT / "scripts/veci-live-minimal/veci-modem-capabilities"
 
 
 class PartialReleaseContract(unittest.TestCase):
     def test_script_syntax(self):
-        for p in (HOTFIX, RPC, HELPER):
+        for p in (HOTFIX, RPC, HELPER, PINNED_HELPER):
             r = subprocess.run(["sh", "-n", str(p)], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, f"{p}: {r.stderr}")
 
@@ -23,7 +24,7 @@ class PartialReleaseContract(unittest.TestCase):
         script = HOTFIX.read_text()
         files = (
             (RPC, "RPC_SHA"),
-            (HELPER, "HELPER_SHA"),
+            (PINNED_HELPER, "HELPER_SHA"),
             (ACL, "ACL_SHA"),
         )
         for p, symbol in files:
@@ -33,6 +34,8 @@ class PartialReleaseContract(unittest.TestCase):
             self.assertEqual(actual, match.group(1), str(p))
         self.assertRegex(script, r"(?m)^SOURCE_SHA=[0-9a-f]{40}$")
         self.assertNotIn("SOURCE_SHA=dev", script)
+        self.assertIn("probe) probe_capabilities", PINNED_HELPER.read_text())
+        self.assertNotIn("AT+CPMS?' 1500", PINNED_HELPER.read_text())
         self.assertIn("check_sha \"$work/rpc\" \"$RPC_SHA\"", script)
         self.assertIn("check_sha \"$work/helper\" \"$HELPER_SHA\"", script)
         self.assertIn("check_sha \"$work/acl\" \"$ACL_SHA\"", script)
