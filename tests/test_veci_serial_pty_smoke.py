@@ -35,6 +35,7 @@ class PtySmokeTests(unittest.TestCase):
             "-DVECI_ENABLE_OFFLINE_PTY_HARNESS",
             "-fPIC", "-shared",
             str(SRC / "veci-serial-pty-smoke.c"),
+            str(SRC / "veci-modem-identity.c"),
             str(SRC / "veci-modem-session-lock.c"),
             str(SRC / "veci-modem-transaction.c"),
             str(SRC / "veci-at-framing.c"),
@@ -51,6 +52,11 @@ class PtySmokeTests(unittest.TestCase):
             ctypes.POINTER(Result),
         ]
         cls.lib.veci_serial_sms_smoke_fd.restype = ctypes.c_int
+        cls.lib.veci_serial_sms_smoke_verified_fd.argtypes = [
+            ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p,
+            ctypes.c_int, ctypes.c_uint, ctypes.c_int, ctypes.c_int,
+            ctypes.POINTER(Result)]
+        cls.lib.veci_serial_sms_smoke_verified_fd.restype = ctypes.c_int
 
     @classmethod
     def tearDownClass(cls):
@@ -99,6 +105,76 @@ class PtySmokeTests(unittest.TestCase):
         t = threading.Thread(target=worker, daemon=True)
         self.threads.append(t)
         t.start()
+
+    def identity_fixture(self, name="ttyUSB2", inter="1-1:1.4",
+                         vendor="05c6", product="902e", driver="option1",
+                         use_real_fd=True):
+        root = Path(self.tmp_local.name) / "sysroot"
+        serial = root / "devices/usb1/1-1" / inter / name
+        serial.mkdir(parents=True, exist_ok=True)
+        classdir = root / "class/tty" / name
+        classdir.mkdir(parents=True, exist_ok=True)
+        (classdir / "device").symlink_to(os.path.relpath(serial, classdir))
+        d = os.fstat(self.slave).st_rdev
+        device = f"{os.major(d)}:{os.minor(d)}" if use_real_fd else "188:2"
+        (classdir / "dev").write_text(device)
+        (root / "devices/usb1/1-1" / "idVendor").write_text(vendor)
+        (root / "devices/usb1/1-1" / "idProduct").write_text(product)
+        driverdir = root / "bus/usb-serial/drivers" / driver
+        driverdir.mkdir(parents=True, exist_ok=True)
+        (serial.parent / "driver").symlink_to(
+            os.path.relpath(driverdir, serial.parent))
+        return root
+
+    def verified_execute(self, root, name="ttyUSB2", kind=2, index=1,
+                         approved=1):
+        value = Result()
+        rc = self.lib.veci_serial_sms_smoke_verified_fd(
+            self.slave, str(root).encode(), name.encode(), self.lock_path,
+            kind, index, approved, 500, ctypes.byref(value))
+        self.assertEqual(rc, value.status)
+        return rc, value.records
+
+    def test_verified_identity_then_mock_sms_read(self):
+        root = self.identity_fixture()
+        self.spawn("AT+CMGR=1\r", ["+CMGR: 0,,2\r\n000011\r\nOK\r\n"])
+        self.assertEqual(self.verified_execute(root), (0, 1))
+
+    def test_verified_identity_then_mock_sms_list(self):
+        root = self.identity_fixture()
+        self.spawn("AT+CMGL=4\r", ["OK\r\n"])
+        self.assertEqual(self.verified_execute(root, kind=1, index=0), (0, 0))
+
+    def test_verified_transport_rejects_ttyusb3_before_send(self):
+        root = self.identity_fixture(name="ttyUSB3")
+        self.assertNotEqual(self.verified_execute(root, name="ttyUSB3")[0], 0)
+        self.assertEqual(select.select([self.master], [], [], 0.02)[0], [])
+
+    def test_verified_transport_rejects_non_at_interface_before_send(self):
+        root = self.identity_fixture(inter="1-1:1.5")
+        self.assertNotEqual(self.verified_execute(root)[0], 0)
+        self.assertEqual(select.select([self.master], [], [], 0.02)[0], [])
+
+    def test_verified_transport_rejects_wrong_usb_ids_before_send(self):
+        root = self.identity_fixture(vendor="12d1")
+        self.assertNotEqual(self.verified_execute(root)[0], 0)
+        self.assertEqual(select.select([self.master], [], [], 0.02)[0], [])
+
+    def test_verified_transport_rejects_bad_driver_before_send(self):
+        root = self.identity_fixture(driver="rndis_host")
+        self.assertNotEqual(self.verified_execute(root)[0], 0)
+        self.assertEqual(select.select([self.master], [], [], 0.02)[0], [])
+
+    def test_verified_transport_rejects_fd_mismatch_before_send(self):
+        root = self.identity_fixture(use_real_fd=False)
+        self.assertNotEqual(self.verified_execute(root)[0], 0)
+        self.assertEqual(select.select([self.master], [], [], 0.02)[0], [])
+
+    def test_verified_transport_rejects_unapproved_before_sysfs(self):
+        root = Path(self.tmp_local.name) / "missing"
+        self.assertEqual(self.verified_execute(root, approved=0),
+                         (-errno.EACCES, 0))
+        self.assertEqual(select.select([self.master], [], [], 0.02)[0], [])
 
     def test_sms_read_record_offline(self):
         self.spawn("AT+CMGR=1\r", ['+CMGR: 0,,2\r\n', '000011\r\n', 'OK\r\n'])
