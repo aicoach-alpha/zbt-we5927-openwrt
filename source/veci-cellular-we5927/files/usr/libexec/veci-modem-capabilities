@@ -90,10 +90,10 @@ storage_parse() {
             if ($0 == "") next
             if ($0 == "AT+CPMS?") { if (seen || ok) bad=1; next }
             if ($0 == "OK") { if (ok || !seen) bad=1; ok=1; next }
-            if ($0 ~ /^\\+CPMS:[[:space:]]*/) {
+            if ($0 ~ /^\+CPMS:[[:space:]]*/) {
                 if (seen || ok) { bad=1; next }
                 gsub(/[[:space:]]/, "", $0)
-                sub(/^\\+CPMS:/, "", $0)
+                sub(/^\+CPMS:/, "", $0)
                 n=split($0, values, ",")
                 if (n != 9) { bad=1; next }
                 for (i=1; i<=9; i+=3) {
@@ -115,7 +115,7 @@ storage_parse() {
         }
         END {
             if (!bad && seen && ok) {
-                printf "%s %d %d\\n",memory,used,total
+                printf "%s %d %d\n",memory,used,total
                 exit 0
             }
             exit 1
@@ -128,7 +128,7 @@ storage_error() {
         modem_busy|modem_port_unavailable|at_tool_unavailable|query_failed|invalid_response) reason="$1" ;;
         *) reason=unavailable ;;
     esac
-    printf '{ "ok": false, "state": "unavailable", "reason": "%s" }\\n' "$reason"
+    printf '{ "ok": false, "state": "unavailable", "reason": "%s" }\n' "$reason"
 }
 storage_query() {
     [ -x /usr/sbin/we5927-at ] || { storage_error at_tool_unavailable; return; }
@@ -138,12 +138,12 @@ storage_query() {
         flock -n -x 9 || { storage_error modem_busy; exit 0; }
         raw="$(/usr/sbin/we5927-at "$at_port" 'AT+CPMS?' 1500 2>/dev/null)" ||
             { storage_error query_failed; exit 0; }
-        compact="$(printf '%s\\n' "$raw" | storage_parse)" ||
+        compact="$(printf '%s\n' "$raw" | storage_parse)" ||
             { storage_error invalid_response; exit 0; }
         # compact is emitted by a strict awk parser: "SM 0 30", no secrets.
         set -- $compact
         [ "$#" -eq 3 ] || { storage_error invalid_response; exit 0; }
-        printf '{ "ok": true, "state": "queried", "source": "read_only_at_cpms", "memory": "%s", "used": %s, "total": %s }\\n' "$1" "$2" "$3"
+        printf '{ "ok": true, "state": "queried", "source": "read_only_at_cpms", "memory": "%s", "used": %s, "total": %s }\n' "$1" "$2" "$3"
     ) 9>/var/lock/we5927-at.lock
 }
 
