@@ -90,7 +90,7 @@ storage_parse() {
             if ($0 == "") next
             if ($0 == "AT+CPMS?") { if (seen || ok) bad=1; next }
             if ($0 == "OK") { if (ok || !seen) bad=1; ok=1; next }
-            if ($0 ~ /^\+CPMS:[[:space:]]*/) {
+            if ($0 ~ /^[[:space:]]*\+CPMS:[[:space:]]*/) {
                 if (seen || ok) { bad=1; next }
                 gsub(/[[:space:]]/, "", $0)
                 sub(/^\+CPMS:/, "", $0)
