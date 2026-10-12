@@ -8,8 +8,12 @@ on:
       - 'source/we5927-lte/src/we5927-at.c'
       - 'source/we5927-lte/Makefile'
       - 'source/we5927-lte/src/veci-at-framing.c'
+      - 'source/we5927-lte/src/veci-at-framing.h'
       - 'source/we5927-lte/src/veci-modem-session-lock.c'
       - 'source/we5927-lte/src/veci-modem-job-queue.c'
+      - 'source/we5927-lte/src/veci-modem-job-queue.h'
+      - 'source/we5927-lte/src/veci-modem-transaction.c'
+      - 'source/we5927-lte/src/veci-modem-transaction.h'
       - 'source/we5927-lte/src/veci-sms-pdu-decode.c'
       - 'source/we5927-lte/src/veci-ussd-decode.c'
       - 'source/we5927-lte/src/veci-sms-multipart.c'
@@ -19,6 +23,7 @@ on:
       - 'tests/test_veci_modem_session_lock.py'
       - 'tests/test_veci_modem_job_queue.py'
       - 'tests/test_veci_modem_pipeline.py'
+      - 'tests/test_veci_modem_transaction.py'
       - 'tests/test_veci_sms_pdu_decode.py'
       - 'tests/test_veci_ussd_decode.py'
       - 'tests/test_veci_sms_multipart.py'
@@ -53,6 +58,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_modem_job_queue.py' -v
       - name: Cross-check fragmented AT responses against SMS/USSD FIFO state machine
         run: python3 -m unittest discover -s tests -p 'test_veci_modem_pipeline.py' -v
+      - name: Compile and test AT session coordinator, epochs, stale URCs, held descriptor (offline)
+        run: python3 -m unittest discover -s tests -p 'test_veci_modem_transaction.py' -v
       - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_pdu_decode.py' -v
       - name: Verify bounded async USSD UCS2/unsupported DCS parser (offline)
@@ -86,7 +93,8 @@ jobs:
           mk=Path('source/we5927-lte/Makefile').read_text()
           assert '$(CP) ./src/we5927-at.c $(PKG_BUILD_DIR)/' in mk
           for s in ('veci-at-framing.c','veci-modem-job-queue.c','veci-modem-session-lock.c',
-                    'veci-sms-pdu-decode.c','veci-sms-multipart.c','veci-ussd-decode.c'):
+                    'veci-sms-pdu-decode.c','veci-sms-multipart.c','veci-ussd-decode.c',
+                    'veci-modem-transaction.c'):
               assert s not in mk, f'Unauthorized modem library in firmware build: {s}'
           print('INERT_BUILD_GUARD_PASS: optional native SMS/USSD sources not linked into firmware')
           PY
