@@ -227,7 +227,7 @@ class FramingTests(unittest.TestCase):
         for token in ("open(", "write(", "printf(", "syslog(", "AT+CMGS",
                       "AT+CUSD=1", "/dev/ttyUSB", "curl ", "wget "):
             self.assertNotIn(token, src)
-        self.assertIn("VECI_FRAME_PDU_MAX 512", src)
+        self.assertIn("VECI_FRAME_PDU_MAX 512", (SOURCE.parent / "veci-at-framing.h").read_text())
 
 
 if __name__ == "__main__":
