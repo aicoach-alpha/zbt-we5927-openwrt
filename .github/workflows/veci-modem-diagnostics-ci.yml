@@ -6,7 +6,9 @@ on:
       - 'source/veci-cellular-we5927/**'
       - 'source/we5927-lte/files/usr/sbin/we5927-lte'
       - 'source/we5927-lte/src/we5927-at.c'
+      - 'source/we5927-lte/src/veci-at-framing.c'
       - 'tests/test_we5927_at_transport.py'
+      - 'tests/test_veci_at_framing.py'
       - 'tests/test_veci_modem_sms_ussd.py'
       - '.github/workflows/veci-modem-diagnostics-ci.yml'
       - 'docs/VECI-SMS-USSD-READINESS.md'
@@ -28,6 +30,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_modem_sms_ussd.py' -v
       - name: Compile and exercise native AT serial transport against fake pseudo-terminal
         run: python3 -m unittest discover -s tests -p 'test_we5927_at_transport.py' -v
+      - name: Compile and test inert PDU-mode SMS and deferred USSD parser
+        run: python3 -m unittest discover -s tests -p 'test_veci_at_framing.py' -v
       - name: Validate existing LTE manager parses before AT integration
         run: sh -n source/we5927-lte/files/usr/sbin/we5927-lte
       - name: Verify both build editions stage the audited LTE manager
