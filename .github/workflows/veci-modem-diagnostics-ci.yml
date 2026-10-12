@@ -36,6 +36,7 @@ on:
       - 'tests/fuzz_veci_sms_multipart.c'
       - 'tests/fuzz_veci_sms_codec.c'
       - 'tests/test_veci_modem_sms_ussd.py'
+      - 'tests/test_veci_sms_storage_readonly.py'
       - '.github/workflows/veci-modem-diagnostics-ci.yml'
       - 'docs/VECI-SMS-USSD-READINESS.md'
       - 'scripts/veci-live-capability-hotfix.sh'
@@ -57,6 +58,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Offline AT parser, mocked serial replies, lock and ACL tests
         run: python3 -m unittest discover -s tests -p 'test_veci_modem_sms_ussd.py' -v
+      - name: Verify read-only SMS storage counter, mocked modem, corruption and concurrent lock
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_storage_readonly.py' -v
       - name: "Audit minimal reversible overlay hotfix: pinned SHA256, ACL and legacy RPC ABI"
         run: python3 -m unittest discover -s tests -p 'test_veci_live_capability_hotfix.py' -v
       - name: Compile and exercise native AT serial transport against fake pseudo-terminal
