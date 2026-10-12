@@ -38,6 +38,8 @@ on:
       - 'tests/test_veci_sms_inbox_index.py'
       - 'tests/test_veci_ussd_decode.py'
       - 'tests/test_veci_xl_ussd_consent.py'
+      - 'tests/test_veci_message_readiness.py'
+      - 'scripts/veci-messaging-readiness-ondevice.sh'
       - 'tests/test_veci_sms_multipart.py'
       - 'tests/fuzz_veci_sms_multipart.c'
       - 'tests/fuzz_veci_sms_codec.c'
@@ -93,6 +95,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_index.py' -v
       - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_pdu_decode.py' -v
+      - name: Verify W907 physical SMS read-only mode/charset preflight parser
+        run: python3 -m unittest discover -s tests -p 'test_veci_message_readiness.py' -v
       - name: Verify XL USSD *808# opt-in and per-menu generation-bound consent guard
         run: python3 -m unittest discover -s tests -p 'test_veci_xl_ussd_consent.py' -v
       - name: Verify bounded async USSD UCS2/unsupported DCS parser (offline)
