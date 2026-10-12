@@ -46,7 +46,7 @@ int main(void)
         char ussd[1100];
         struct veci_sms_deliver sms;
         struct veci_ussd_reply reply;
-        size_t j, len = (size_t)(next_random() % 515u);
+        size_t j, len = (size_t)(next_random() % sizeof(pdu));
         int rc;
 
         /* Vary length, bad hex, malformed TPDU and random embedded NUL. */
