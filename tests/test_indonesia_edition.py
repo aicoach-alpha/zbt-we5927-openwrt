@@ -11,6 +11,15 @@ class TestIndonesia(unittest.TestCase):
         for file in [P,I,R/"scripts/prepare-veci.sh"]:
             p=subprocess.run(["sh","-n",str(file)],capture_output=True,text=True)
             self.assertEqual(p.returncode,0,p.stderr)
+    def test_optional_host_sync_shell_syntax(self):
+        script=R/"scripts/sync_xl_quota_host.sh"
+        p=subprocess.run(["bash","-n",str(script)],capture_output=True,text=True)
+        self.assertEqual(p.returncode,0,p.stderr)
+        text=script.read_text()
+        self.assertIn("StrictHostKeyChecking=yes",text)
+        self.assertIn("BatchMode=yes",text)
+        self.assertIn("veci_xl_quota_normalize.py",text)
+        self.assertNotIn("sshpass",text)
     def test_readonly_acl(self):
         a=json.loads(A.read_text())["veci-indonesia-quota"]
         self.assertEqual(a["read"]["ubus"]["veci.indonesia"],["status"])
