@@ -78,14 +78,14 @@ static int command_for(int kind, unsigned int index,
  * PTY FD must be noncanonical, raw and configured by the trusted caller.
  * Result contains only count/status, never raw bytes or decoded OTP.
  */
-int veci_serial_sms_smoke_fd(int tty_fd, const char *isolated_test_lock,
+static int veci_serial_sms_smoke_locked_fd(int tty_fd, int owned_lock_fd,
                              int kind, unsigned int index, int approved,
                              int timeout_ms,
                              struct veci_serial_smoke_result *out)
 {
     struct veci_modem_transaction tx;
     struct termios tio;
-    int lock_fd=-1, old_flags=-1, rc=-EINVAL, k, remaining;
+    int old_flags=-1, rc=-EINVAL, k, remaining;
     int64_t deadline;
     uint32_t id=0;
     char command[32];
@@ -95,7 +95,8 @@ int veci_serial_sms_smoke_fd(int tty_fd, const char *isolated_test_lock,
     if (!out) return -EINVAL;
     memset(out, 0, sizeof(*out));
     out->status = -EINVAL;
-    if (approved != 1 || !isolated_test_lock || !*isolated_test_lock ||
+    if (approved != 1 || owned_lock_fd < 0 ||
+        fcntl(owned_lock_fd, F_GETFD) < 0 ||
         tty_fd < 0 || timeout_ms < 100 || timeout_ms > 30000) {
         rc = approved != 1 ? -EACCES : -EINVAL;
         goto done;
@@ -109,8 +110,6 @@ int veci_serial_sms_smoke_fd(int tty_fd, const char *isolated_test_lock,
     }
     old_flags = fcntl(tty_fd, F_GETFL);
     if (old_flags < 0) { rc = -EBADF; goto done; }
-    lock_fd = veci_at_session_lock_path(isolated_test_lock, 0);
-    if (lock_fd < 0) { rc = lock_fd; goto done; }
     if (fcntl(tty_fd, F_SETFL, old_flags | O_NONBLOCK) != 0) {
         rc = -errno; goto done;
     }
@@ -130,7 +129,7 @@ int veci_serial_sms_smoke_fd(int tty_fd, const char *isolated_test_lock,
     veci_txn_init(&tx);
     rc = veci_txn_submit(&tx, 1u, kind, approved);
     if (rc) goto done;
-    rc = veci_txn_arm(&tx, epoch, lock_fd, deadline, timeout_ms, &id, &k);
+    rc = veci_txn_arm(&tx, epoch, owned_lock_fd, deadline, timeout_ms, &id, &k);
     if (rc) goto done;
     if (id != 1u || k != kind) { rc = -EPROTO; goto done; }
     rc = veci_txn_issued(&tx, epoch, id);
@@ -194,18 +193,48 @@ done:
     secure_wipe(command, sizeof(command));
     if (old_flags >= 0)
         (void)fcntl(tty_fd, F_SETFL, old_flags);
-    if (lock_fd >= 0)
-        veci_at_session_unlock(lock_fd);
     out->status = rc;
     if (rc != 0) out->records = 0;
     return rc;
 }
 
 
+/* Legacy simulated PTY helper: owns one lock acquisition throughout the
+ * entire transaction. Caller supplies a path only in offline tests.
+ * Real firmware MUST use the fixed internal lock path and verify opened
+ * modem FD identity under this same lock before any command.
+ */
+int veci_serial_sms_smoke_fd(int tty_fd, const char *isolated_test_lock,
+                             int kind, unsigned int index, int approved,
+                             int timeout_ms,
+                             struct veci_serial_smoke_result *out)
+{
+    int lock_fd, rc;
+    if (!out) return -EINVAL;
+    out->records = 0;
+    out->status = -EINVAL;
+    if (approved != 1) {
+        out->status = -EACCES;
+        return -EACCES;
+    }
+    if (!isolated_test_lock || !*isolated_test_lock) return -EINVAL;
+    lock_fd = veci_at_session_lock_path(isolated_test_lock, 0);
+    if (lock_fd < 0) {
+        out->status = lock_fd;
+        return lock_fd;
+    }
+    rc = veci_serial_sms_smoke_locked_fd(
+        tty_fd, lock_fd, kind, index, approved, timeout_ms, out);
+    veci_at_session_unlock(lock_fd);
+    return rc;
+}
+
+
 /*
- * Offline-gated entrypoint that PROVES identity was validated BEFORE mock
- * command dispatch. In real firmware, root must be constant "/sys" and
- * physical device/USB lifecycle requires independent hardware UAT.
+ * Offline-gated entrypoint that verifies identity while holding the same
+ * lock used for command dispatch. In real firmware, trusted root MUST be
+ * constant "/sys"; physical USB disconnect and SIM-change lifecycle still
+ * require independent device UAT.
  * This is NOT a production RPC; no fallback to an unverified tty allowed.
  */
 int veci_serial_sms_smoke_verified_fd(
@@ -223,13 +252,27 @@ int veci_serial_sms_smoke_verified_fd(
         out->status = -EACCES;
         return -EACCES;
     }
-    rc = veci_modem_verify_identity(trusted_mock_sysfs, tty_name, tty_fd,
-                                    &observed);
-    memset(&observed, 0, sizeof(observed));
-    if (rc != 0) {
+    /* The lock MUST already be held when physical identity is attested.
+     * Otherwise USB/TTY topology could change between verification and
+     * subsequent lock admission (TOCTOU). Never unlock until all framing
+     * and terminal processing has completed, including failures.
+     */
+    rc = veci_at_session_lock_path(isolated_test_lock, 0);
+    if (rc < 0) {
         out->status = rc;
         return rc;
     }
-    return veci_serial_sms_smoke_fd(tty_fd, isolated_test_lock, kind, index,
-                                    approved, timeout_ms, out);
+    {
+        int lock_fd = rc;
+        rc = veci_modem_verify_identity(trusted_mock_sysfs, tty_name, tty_fd,
+                                        &observed);
+        memset(&observed, 0, sizeof(observed));
+        if (rc == 0) {
+            rc = veci_serial_sms_smoke_locked_fd(
+                tty_fd, lock_fd, kind, index, approved, timeout_ms, out);
+        }
+        veci_at_session_unlock(lock_fd);
+    }
+    out->status = rc;
+    return rc;
 }
