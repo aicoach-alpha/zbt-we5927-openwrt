@@ -19,11 +19,16 @@ void veci_sms_index_clear(struct veci_sms_index_session *s)
 {
     if (s) wipe(s, sizeof(*s));
 }
-int veci_sms_index_init(struct veci_sms_index_session *s, int approved)
+int veci_sms_index_init(struct veci_sms_index_session *s, int approved,
+                        int unread_to_read_effect_acknowledged)
 {
     if (!s) return -EINVAL;
     veci_sms_index_clear(s);
-    if (approved != 1) return -EACCES;
+    /* SMS listing via AT+CMGL can mark unread messages as read.
+     * It is not a side-effect-free operation. Refuse without both flags.
+     */
+    if (approved != 1 || unread_to_read_effect_acknowledged != 1)
+        return -EACCES;
     s->approved = 1;
     veci_frame_init(&s->frame);
     return 0;
@@ -132,7 +137,14 @@ int veci_sms_index_feed(struct veci_sms_index_session *s,
     int rc;
     if (!s || (!bytes && n)) return -EINVAL;
     if (!s->approved) return -EACCES;
-    if (s->failed || s->completed) return -EPROTO;
+    if (s->failed) return -EPROTO;
+    if (s->completed) {
+        /* Never retain previously approved metadata if late bytes arrive
+         * after a caller already reported success. No partial replay.
+         */
+        if (n) invalidate(s);
+        return -EPROTO;
+    }
     if (s->stage == 2) {
         /* A CRLF terminal may arrive split at arbitrary transport reads.
          * Ignore ONLY CR/LF after OK, not a second command or response.
@@ -142,6 +154,7 @@ int veci_sms_index_feed(struct veci_sms_index_session *s,
         for (i = 0; i < n; ++i) {
             if (bytes[i] != '\r' && bytes[i] != '\n') {
                 invalidate(s);
+                wipe(&s->frame, sizeof(s->frame));
                 return -EPROTO;
             }
         }
@@ -152,6 +165,10 @@ int veci_sms_index_feed(struct veci_sms_index_session *s,
         wipe(s->frame.line, sizeof(s->frame.line));
     if (rc != 0 || s->failed) {
         invalidate(s);
+        /* PDU input may contain personal SMS/OTP bytes. Wipe even if
+         * framing failed midway through a partial sensitive PDU line.
+         */
+        wipe(&s->frame, sizeof(s->frame));
         return -EPROTO;
     }
     return 0;
