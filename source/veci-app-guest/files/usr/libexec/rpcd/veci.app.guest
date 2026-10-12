@@ -73,6 +73,66 @@ EOF
 	uci commit veci_guest
 }
 
+# All activation changes are transactional against these router-owned UCI
+# files. Snapshots reside in tmpfs; restoration is best-effort but failure
+# must be reported, never represented as an enabled portal.
+portal_snapshot_begin() {
+	GUEST_ROLLBACK_REASON='activation_failed'
+	GUEST_ROLLBACK_DIR="$(mktemp -d /tmp/veci-guest-snapshot.XXXXXX 2>/dev/null)" || {
+		GUEST_ROLLBACK_REASON='snapshot_failed'
+		return 1
+	}
+	chmod 700 "$GUEST_ROLLBACK_DIR" || return 1
+	for name in network dhcp firewall wireless uhttpd uspot veci_guest; do
+		if [ -f "/etc/config/$name" ]; then
+			cp -p "/etc/config/$name" "$GUEST_ROLLBACK_DIR/$name" || {
+				rm -rf "$GUEST_ROLLBACK_DIR"
+				GUEST_ROLLBACK_DIR=''
+				GUEST_ROLLBACK_REASON='snapshot_failed'
+				return 1
+			}
+		else
+			: > "$GUEST_ROLLBACK_DIR/$name.absent" || return 1
+		fi
+	done
+}
+
+portal_snapshot_discard() {
+	[ -n "$GUEST_ROLLBACK_DIR" ] && rm -rf "$GUEST_ROLLBACK_DIR"
+	GUEST_ROLLBACK_DIR=''
+}
+
+portal_snapshot_restore() {
+	# Close radio before attempting config restoration.
+	if uci -q get wireless.veci_guest >/dev/null 2>&1; then
+		uci -q set wireless.veci_guest.disabled='1' || true
+		uci commit wireless || true
+		wifi reload >/dev/null 2>&1 || true
+	fi
+	rc=0
+	for name in network dhcp firewall wireless uhttpd uspot veci_guest; do
+		if [ -f "$GUEST_ROLLBACK_DIR/$name.absent" ]; then
+			rm -f "/etc/config/$name" || rc=1
+		elif [ -f "$GUEST_ROLLBACK_DIR/$name" ]; then
+			cp -p "$GUEST_ROLLBACK_DIR/$name" "/etc/config/$name" || rc=1
+		else
+			rc=1
+		fi
+	done
+	# Restore listeners and dataplane from the original UCI snapshot.
+	for service in network dnsmasq firewall uhttpd uspot; do
+		service_restart "$service" || rc=1
+	done
+	wifi reload >/dev/null 2>&1 || rc=1
+	portal_snapshot_discard
+	if [ "$rc" -eq 0 ]; then
+		GUEST_ROLLBACK_REASON='activation_failed_rolled_back'
+		return 0
+	fi
+	GUEST_ROLLBACK_REASON='rollback_incomplete'
+	return 1
+}
+
 provision_base() {
 	lan_ip="$(uci -q get network.lan.ipaddr 2>/dev/null || true)"
 	[ -n "$lan_ip" ] || {
@@ -174,6 +234,7 @@ add_list uhttpd.veci_guest.ucode_prefix='/hotspot=/usr/share/uspot/handler.uc'
 add_list uhttpd.veci_guest.ucode_prefix='/cpd=/usr/share/uspot/handler-cpd.uc'
 set uhttpd.veci_guest.error_page='/cpd'
 EOF
+	[ "$?" -eq 0 ] || return 1
 
 	uci -q delete uhttpd.main.listen_http
 	uci add_list uhttpd.main.listen_http="$lan_ip:80"
@@ -181,15 +242,13 @@ EOF
 	ssid="$(uci -q get veci_guest.main.ssid 2>/dev/null || printf 'VeCI-Guest')"
 	uci set wireless.veci_guest.ssid="$ssid"
 
-	uci commit network
-	uci commit dhcp
-	uci commit firewall
-	uci commit wireless
-	uci commit uhttpd
+	for config in network dhcp firewall wireless uhttpd; do
+		uci commit "$config" || return 1
+	done
 	return 0
 }
 
-enable_portal() {
+enable_portal_unchecked() {
 	provision_base || return 1
 	idle="$(uci -q get veci_guest.main.idle_timeout 2>/dev/null || printf '600')"
 	session="$(uci -q get veci_guest.main.session_timeout 2>/dev/null || printf '3600')"
@@ -216,6 +275,31 @@ EOF
 	uci commit wireless || return 1
 	wifi reload >/dev/null 2>&1 || return 1
 	return 0
+}
+
+provision_portal() {
+	portal_snapshot_begin || return 1
+	if provision_base &&
+		service_restart network &&
+		service_restart dnsmasq &&
+		service_restart firewall &&
+		service_restart uhttpd &&
+		wifi reload >/dev/null 2>&1; then
+		portal_snapshot_discard
+		return 0
+	fi
+	portal_snapshot_restore || return 1
+	return 1
+}
+
+enable_portal() {
+	portal_snapshot_begin || return 1
+	if enable_portal_unchecked; then
+		portal_snapshot_discard
+		return 0
+	fi
+	portal_snapshot_restore || return 1
+	return 1
 }
 
 disable_portal() {
@@ -282,17 +366,18 @@ method_action() {
 	action="$(printf '%s' "$input" | jsonfilter -e '@.action' 2>/dev/null)"
 	case "$action" in
 		provision)
-			if provision_base; then
-				service_restart network || true
-				service_restart dnsmasq || true
-				service_restart firewall || true
-				service_restart uhttpd || true
-				wifi reload >/dev/null 2>&1 || true
+			if provision_portal; then
 				printf '{ "ok": true }\n'
+			else
+				printf '{ "ok": false, "error": "%s" }\n' "$GUEST_ROLLBACK_REASON"
 			fi
 			;;
 		enable)
-			if enable_portal; then printf '{ "ok": true }\n'; fi
+			if enable_portal; then
+				printf '{ "ok": true }\n'
+			else
+				printf '{ "ok": false, "error": "%s" }\n' "$GUEST_ROLLBACK_REASON"
+			fi
 			;;
 		disable)
 			if disable_portal; then printf '{ "ok": true }\n'; fi
