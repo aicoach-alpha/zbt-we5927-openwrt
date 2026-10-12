@@ -31,8 +31,13 @@ struct veci_sms_index_session {
 };
 
 /* approved=1 is a necessary input from trusted backend, NOT an ACL check.
- * Returns -EACCES unless 1. All previous state is wiped on init. */
-int veci_sms_index_init(struct veci_sms_index_session *s, int approved);
+ * 3GPP TS 27.005: CMGL can change received unread -> received read.
+ * A SEPARATE foreground acknowledgement of this side effect is mandatory.
+ * Both flags must be 1. Neither flag substitutes for real auth/CSRF/ACL.
+ * All previous state is wiped on init.
+ */
+int veci_sms_index_init(struct veci_sms_index_session *s, int approved,
+                        int unread_to_read_effect_acknowledged);
 /* Caller must supply bytes for ONE exact AT+CMGL=4 query while holding
  * shared full-session lock. No transport and no auto-retry in this library.
  */
