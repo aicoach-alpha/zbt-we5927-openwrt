@@ -1,6 +1,7 @@
 import json
 import pathlib
 import subprocess
+import tempfile
 import unittest
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
@@ -68,6 +69,34 @@ class TelcoContract(unittest.TestCase):
         self.assertNotIn("https://",backend)
         # Initial skeleton neither pretends to authenticate nor reports fake quota.
         self.assertIn('"state": "not_connected"',backend)
+    def test_edition_build_selector_isolated(self):
+        script=ROOT/"scripts/select-veci-edition.sh"
+        with tempfile.TemporaryDirectory() as t:
+            tree=pathlib.Path(t)
+            config=tree/".config"
+            config.write_text("CONFIG_PACKAGE_veci=y\\n")
+            general=subprocess.run(["sh",str(script),"general",str(config)],capture_output=True,text=True)
+            self.assertEqual(general.returncode,0,general.stderr)
+            self.assertIn("# CONFIG_PACKAGE_veci-telco-indonesia is not set",config.read_text())
+            self.assertNotIn("CONFIG_PACKAGE_veci-telco-indonesia=y",config.read_text())
+            # Indonesia must not silently succeed if package staging was skipped.
+            missing=subprocess.run(["sh",str(script),"indonesia",str(config)],capture_output=True,text=True)
+            self.assertNotEqual(missing.returncode,0)
+            pkg=tree/"package/veci-telco-indonesia"
+            pkg.mkdir(parents=True)
+            (pkg/"Makefile").write_text("fake staging fixture")
+            indonesia=subprocess.run(["sh",str(script),"indonesia",str(config)],capture_output=True,text=True)
+            self.assertEqual(indonesia.returncode,0,indonesia.stderr)
+            self.assertEqual(config.read_text().count("CONFIG_PACKAGE_veci-telco-indonesia=y"),1)
+            cannot_general=subprocess.run(["sh",str(script),"general",str(config)],capture_output=True,text=True)
+            self.assertNotEqual(cannot_general.returncode,0)
+            invalid=subprocess.run(["sh",str(script),"unknown",str(config)],capture_output=True,text=True)
+            self.assertNotEqual(invalid.returncode,0)
+    def test_preparation_does_not_install_edition_implicitly(self):
+        script=(ROOT/"scripts/prepare-veci.sh").read_text()
+        self.assertIn('VECI_EDITION="${VECI_EDITION:-general}"',script)
+        self.assertIn('if [ "$VECI_EDITION" = "indonesia" ]',script)
+        self.assertIn('"edition": "$VECI_EDITION"',script)
     def test_general_firmware_stays_unmodified(self):
         wf=(ROOT/".github/workflows/j8c-app-feed.yml").read_text()
         self.assertNotIn("set_module PACKAGE_veci-telco-indonesia",wf)
