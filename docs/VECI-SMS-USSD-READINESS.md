@@ -32,6 +32,41 @@ Development has hardened `source/we5927-lte/src/we5927-at.c` without enabling me
 
 **Critical protocol distinction:** a generic one-shot AT transaction is still **not** sufficient for SMS inbox/send or interactive USSD. Text-mode SMS content may itself contain a line `OK`, and network-initiated USSD `+CUSD` responses may arrive asynchronously *after* command acknowledgement. Before enabling those operations, implement a session-aware parser (prefer SMS PDU for framing), unsolicited-response handling, strict message privacy/OTP consent and a separate privileged ubus write ACL. Never expose raw modem transcripts to the ordinary dashboard. Physical UAT must verify exact USB interface, APDU capability, message character set/encoding, operator-side USSD availability and race-free coordination with status polling.
 
+
+## Inert PDU-mode SMS / deferred USSD framing (follow-up development)
+
+The development branch includes a NEW **host-tested, inactive** parser,
+source/we5927-lte/src/veci-at-framing.c, gated by
+tests/test_veci_at_framing.py. This is not built into any existing router
+image or exposed through ubus. A passing test here must **not** be presented
+as SMS inbox/send or live USSD support.
+
+- Incremental AT-line parser with 1024-byte line / 8192-byte response bounds,
+  explicit EOF handling and failure-closed malformed frames.
+- SMS PDU-mode +CMGL, +CMGR, +CMT, +CDS recognize one matching hex PDU,
+  validate SMSC octet length and the declared TPDU octet length. Text mode is
+  intentionally rejected because SMS body text such as "OK" is ambiguous.
+- +CMTI is only a notice; it never exposes, retrieves or stores an SMS.
+- +CUSD mode is classified as an **asynchronous** indication. A preceding
+  bare AT OK is only acknowledgement, not a finished USSD result.
+  Interactive mode 1 requires later explicit user input; it never autoresponds.
+- Session expiry must be driven by a future caller using a monotonic deadline.
+  The helper marks expired state as failed, never automatically retries.
+- The parser does no modem I/O, no network I/O, no logging, no storage, no
+  credential access and has no background process.
+
+**Next integration safety gates (not implemented):** one process must hold
+/var/lock/we5927-at.lock continuously from command dispatch through the
+final asynchronous notification or deadline, including all SMS prompt/PDU
+phases. A command-by-command flock is insufficient for interactive USSD and
+AT+CMGS transactions. The modem transport must route unsolicited events
+without treating them as the command terminal, disable logging of any raw
+message/PDU, enforce a small bounded operation queue, and never execute
+SMS/USSD on page load. Add privileged ubus write ACLs and explicit
+per-action UI consent only after mock integration and physical capability UAT.
+Keep current read-only messagingCapabilities as the only exposed RPC method
+until all of those gates pass.
+
 **Release gate remains NO_GO**: source-only serial improvements are not proof of SMS/USSD support on a physical W907 modem, and the current live kernel/image has not been altered.
 
 ## UAT matrix, ALL NOT TESTED on physical router
