@@ -157,11 +157,22 @@ int veci_txn_feed(struct veci_modem_transaction *tx,
     struct veci_event_ctx ctx;
     int rc = check_owner(tx, epoch, id);
     if (rc != 0) return rc;
-    if (tx->state != VECI_TXN_INFLIGHT) return -EPERM;
     if (!bytes && size) return -EINVAL;
-    if (!size) return 0;
+    if (tx->state != VECI_TXN_INFLIGHT &&
+        tx->state != VECI_TXN_COMPLETE) return -EPERM;
     rc = veci_txn_tick(tx, now_ms);
     if (rc < 0) return rc;
+    if (tx->state == VECI_TXN_COMPLETE) {
+        size_t i;
+        /* CRLF can straddle serial reads after terminal OK. Empty line
+         * delimiters are harmless; *any* other trailing byte is ambiguous.
+         * Do not silently treat a late URC as belonging to the next job. */
+        for (i = 0; i < size; ++i)
+            if (bytes[i] != '\r' && bytes[i] != '\n')
+                return reject(tx, -EPROTO);
+        return VECI_COMPLETE;
+    }
+    if (!size) return 0;
     ctx.tx = tx;
     ctx.now_ms = now_ms;
     rc = veci_frame_feed(&tx->frame, bytes, size, on_event, &ctx);
