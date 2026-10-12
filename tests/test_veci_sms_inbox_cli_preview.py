@@ -142,6 +142,7 @@ class InboxPreviewOffline(unittest.TestCase):
         self.assertIn("902e", text)
         self.assertIn("1.4/ttyUSB2", text)
         self.assertIn("flock -n -x 9", text)
+        self.assertLess(text.index("flock -n -x 9"), text.index('port="$(readlink -f'))
         self.assertIn("'AT+CMGF?'", text)
         self.assertIn("'AT+CMGL=4'", text)
         for forbidden in ("AT+CMGS=", "AT+CUSD=", "AT+CMGD=", 
