@@ -36,6 +36,12 @@ struct veci_serial_smoke_result {
     int status;                 /* 0 success or negative errno */
 };
 
+static void secure_wipe(void *p, size_t n)
+{
+    volatile unsigned char *v = (volatile unsigned char *)p;
+    while (n--) *v++ = 0;
+}
+
 static int64_t now_ms(void)
 {
     struct timespec t;
@@ -183,8 +189,8 @@ done:
     /* Command and serial RX bytes are never logged or exposed.
      * Most failures occurred with transport ambiguity; do not retry.
      */
-    memset(buffer, 0, sizeof(buffer));
-    memset(command, 0, sizeof(command));
+    secure_wipe(buffer, sizeof(buffer));
+    secure_wipe(command, sizeof(command));
     if (old_flags >= 0)
         (void)fcntl(tty_fd, F_SETFL, old_flags);
     if (lock_fd >= 0)
