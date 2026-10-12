@@ -94,6 +94,36 @@ tests/test_veci_modem_pipeline.py compiles native framing together with
 the FIFO to exercise segmented PDU, interleaved unsolicited SMS, delayed
 USSD, text-mode rejection and timeout, without touching hardware.
 
+
+### Inert SMS PDU payload and USSD payload decoders
+
+The development branch now contains two additional **source-only** components.
+Neither is linked into a firmware package, published through ubus, installed
+on the modem or able to access the router device:
+
+- source/we5927-lte/src/veci-sms-pdu-decode.c decodes **SMS-DELIVER** PDU
+  payloads, sender digits and SMSC-validated octets; default GSM-7 alphabet
+  including basic escapes, UCS2/UTF-16BE including valid surrogate pairs, and
+  8-bit / 16-bit concatenation UDH metadata. It does not reassemble messages,
+  decode SMS-SUBMIT, send messages, save contact names, or automatically read
+  OTP. Reject compressed, unknown/8-bit DCS, malformed sender/UDH, bad Unicode,
+  oversized input, and unknown GSM escapes. It zeroes temporary byte
+  buffers and exposes an explicit wipe of the result after use.
+- source/we5927-lte/src/veci-ussd-decode.c accepts structured +CUSD URCs,
+  interprets mode 0–5, and decodes **only** the recognized UCS2 encodings
+  DCS 72 and DCS 8. Other DCS variants are returned as unsupported with an
+  empty text field: **no guessed plaintext, no fabricated quota or OTP**.
+  Malformed notification, invalid Unicode, injection and oversized payload
+  fail closed; explicit clear removes decoded text from the caller buffer.
+  Decoding a USSD response **does not** initiate a USSD session.
+
+Both are tested by compiling native C on GitHub Actions runner and processing
+synthetic fixtures (tests/test_veci_sms_pdu_decode.py,
+tests/test_veci_ussd_decode.py). Real operator SMS/USSD syntax, DCS behavior,
+multisegment interleaving and modem charset settings are **NOT verified** on
+the W907-EC. Do not enable a decoder automatically in background polling, or
+make SMS contents available to ordinary read-only sessions.
+
 **Next integration safety gates (not implemented):** one process must hold
 /var/lock/we5927-at.lock continuously from command dispatch through the
 final asynchronous notification or deadline, including all SMS prompt/PDU
