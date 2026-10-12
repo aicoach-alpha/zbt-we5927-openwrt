@@ -27,14 +27,8 @@ fail() {
     fail board_mismatch
 [ -x /usr/sbin/we5927-at ] || fail transport_missing
 command -v flock >/dev/null 2>&1 || fail transport_missing
-[ -c /dev/ttyUSB2 ] || fail unverified_modem
-port="$(readlink -f /sys/class/tty/ttyUSB2/device 2>/dev/null || :)"
-case "$port" in /sys/devices/*:1.4/ttyUSB2) ;; *) fail unverified_modem ;; esac
-parent="$(dirname "$(dirname "$port")")"
-[ "$(cat "$parent/idVendor" 2>/dev/null || :)" = 05c6 ] ||
-    fail unverified_modem
-[ "$(cat "$parent/idProduct" 2>/dev/null || :)" = 902e ] ||
-    fail unverified_modem
+# Confirm physical identity only AFTER the shared lock is held.
+# This still does NOT replace production opened-FD attestation.
 
 # Strict parser: reject unsolicited lines, nonhex PDUs, duplicates,
 # truncation, invalid TPDU lengths, more than 16 entries and post-OK data.
@@ -123,6 +117,14 @@ parse_mode() {
 # This CLI can change unread flags: only run on deliberate user command.
 (
     flock -n -x 9 || fail modem_busy
+    [ -c /dev/ttyUSB2 ] || fail unverified_modem
+    port="$(readlink -f /sys/class/tty/ttyUSB2/device 2>/dev/null || :)"
+    case "$port" in /sys/devices/*:1.4/ttyUSB2) ;; *) fail unverified_modem ;; esac
+    parent="$(dirname "$(dirname "$port")")"
+    [ "$(cat "$parent/idVendor" 2>/dev/null || :)" = 05c6 ] ||
+        fail unverified_modem
+    [ "$(cat "$parent/idProduct" 2>/dev/null || :)" = 902e ] ||
+        fail unverified_modem
     raw="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF?' 1500 2>/dev/null)" ||
         fail response_unavailable
     mode="$(printf '%s\n' "$raw" | parse_mode)"
