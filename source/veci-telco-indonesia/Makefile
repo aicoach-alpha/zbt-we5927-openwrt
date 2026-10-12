@@ -24,6 +24,8 @@ endef
 define Package/veci-telco-indonesia/install
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
 	$(INSTALL_BIN) ./files/usr/libexec/rpcd/veci.quota $(1)/usr/libexec/rpcd/veci.quota
+	$(INSTALL_DIR) $(1)/usr/libexec
+	$(INSTALL_BIN) ./files/usr/libexec/veci-quota-cache $(1)/usr/libexec/veci-quota-cache
 	$(INSTALL_DIR) $(1)/usr/share/veci/telco
 	$(INSTALL_DATA) ./files/usr/share/veci/telco/providers.json $(1)/usr/share/veci/telco/providers.json
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
