@@ -43,6 +43,8 @@ on:
       - 'tests/test_veci_sms_inbox_cli_preview.py'
       - 'tests/test_veci_sms_storage_ui_hotfix.py'
       - 'tests/test_veci_sms_storage_ui_built_v11.py'
+      - 'tests/test_veci_sms_ui_exact_live_20261012.py'
+      - 'scripts/veci-sms-ui-live-captured-20261012/**'
       - 'scripts/veci-sms-storage-ui-built-hotfix-v11.sh'
       - 'scripts/veci-sms-storage-ui-built-v1/**'
       - 'scripts/veci-sms-storage-ui-hotfix-v1.sh'
@@ -104,6 +106,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_index.py' -v
       - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_pdu_decode.py' -v
+      - name: Prove physical WE5927 Cellular exact-upload hash and surgical SMS storage delta
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_ui_exact_live_20261012.py' -v
       - name: Verify minified VeCI SMS-count overlay Terser asset hashes and rollback
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_storage_ui_built_v11.py' -v
       - name: Verify USB LTE-independent reversible UI-only SMS storage metadata overlay
