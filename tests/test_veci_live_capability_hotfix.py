@@ -86,6 +86,14 @@ class PartialReleaseContract(unittest.TestCase):
         self.assertNotIn("AT+CUSD=1", s)
         self.assertNotIn("uci set", s)
 
+    def test_existing_and_updated_status_health_are_rollback_gates(self):
+        s = HOTFIX.read_text()
+        self.assertIn('baseline="$(ubus call veci.cellular status', s)
+        self.assertIn('current_status="$(ubus call veci.cellular status', s)
+        self.assertIn('LTE status response invalid after patch', s)
+        self.assertLess(s.index('current_status="$(ubus call'),
+                        s.index('success=1'))
+
     def test_download_source_file_paths_are_pinned(self):
         s = HOTFIX.read_text()
         self.assertIn("fetch scripts/veci-live-minimal/veci.cellular", s)
