@@ -1,6 +1,14 @@
 #!/bin/sh
 set -eu
 
+# Edition is selected explicitly at build time; never from any remote
+# service and never silently changes an existing General image.
+VECI_EDITION="${VECI_EDITION:-general}"
+case "$VECI_EDITION" in
+	general|indonesia) ;;
+	*) echo "error: unsupported VeCI edition: $VECI_EDITION" >&2; exit 2 ;;
+esac
+
 OPENWRT_ROOT="${1:-}"
 [ -n "$OPENWRT_ROOT" ] || {
 	echo "usage: $0 /path/to/openwrt" >&2
@@ -54,6 +62,15 @@ for package in veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci
 	cp -a "$SELF_DIR/source/$package" "$OPENWRT_ROOT/package/$package"
 done
 
+# One source tree, two clearly separated build profiles. The optional
+# carrier package has no effect on General firmware staging.
+if [ "$VECI_EDITION" = "indonesia" ]; then
+	rm -rf "$OPENWRT_ROOT/package/veci-telco-indonesia"
+	cp -a "$SELF_DIR/source/veci-telco-indonesia" "$OPENWRT_ROOT/package/veci-telco-indonesia"
+else
+	rm -rf "$OPENWRT_ROOT/package/veci-telco-indonesia"
+fi
+
 BUILD_ID="$(git -C "$SELF_DIR" rev-parse HEAD)"
 if git -C "$OPENWRT_ROOT" rev-parse HEAD >/dev/null 2>&1; then
 	OPENWRT_PIN="$(git -C "$OPENWRT_ROOT" rev-parse HEAD)"
@@ -70,6 +87,7 @@ mkdir -p "$OPENWRT_ROOT/package/veci-default-ui/files/etc"
 cat > "$OPENWRT_ROOT/package/veci-default-ui/files/etc/veci-release.json" <<EOF
 {
 	"schema": 1,
+	"edition": "$VECI_EDITION",
 	"build_id": "$BUILD_ID",
 	"veci_commit": "$PIN",
 	"openwrt_commit": "$OPENWRT_PIN"
@@ -82,7 +100,7 @@ else
 	printf 'development\n' > "$OPENWRT_ROOT/package/veci-default-ui/files/etc/veci-release-channel"
 fi
 
-echo "Prepared VeCI $PIN"
+echo "Prepared VeCI $PIN (edition: $VECI_EDITION)"
 echo "  core:      $DEST"
 echo "  default:   $OPENWRT_ROOT/package/veci-default-ui"
 echo "  cellular:  $OPENWRT_ROOT/package/veci-cellular-we5927"
