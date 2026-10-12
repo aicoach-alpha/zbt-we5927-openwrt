@@ -145,6 +145,52 @@ class PtySmokeTests(unittest.TestCase):
         self.spawn("AT+CMGL=4\r", ["OK\r\n"])
         self.assertEqual(self.verified_execute(root, kind=1, index=0), (0, 0))
 
+    def test_verified_identity_check_only_after_lock_is_owned(self):
+        # Deliberately absent fake sysfs MUST not be inspected before lock
+        # admission: a contended lock takes precedence over invalid USB
+        # identity, proving full-session lock ownership begins first.
+        lock = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            root = Path(self.tmp_local.name) / "missing-sysfs"
+            self.assertEqual(self.verified_execute(root), (-errno.EBUSY, 0))
+            self.assertEqual(select.select([self.master], [], [], 0.02)[0], [])
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+            os.close(lock)
+
+    def test_verified_identity_lock_remains_across_mock_sms_response(self):
+        root = self.identity_fixture()
+        sent = threading.Event()
+        release = threading.Event()
+        received = []
+        def modem():
+            payload = b""
+            while not payload.endswith(b"\\r"):
+                payload += os.read(self.master, 100)
+            self.assertEqual(payload, b"AT+CMGR=1\\r")
+            sent.set()
+            self.assertTrue(release.wait(1.0))
+            os.write(self.master, b"+CMGR: 0,,2\\r\\n000011\\r\\nOK\\r\\n")
+        t = threading.Thread(target=modem, daemon=True)
+        self.threads.append(t)
+        t.start()
+        def invoke():
+            received.append(self.verified_execute(root))
+        task = threading.Thread(target=invoke, daemon=True)
+        self.threads.append(task)
+        task.start()
+        self.assertTrue(sent.wait(1.0))
+        other = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            with self.assertRaises(BlockingIOError):
+                fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            os.close(other)
+            release.set()
+        task.join(timeout=2.0)
+        self.assertEqual(received, [(0, 1)])
+
     def test_verified_transport_rejects_ttyusb3_before_send(self):
         root = self.identity_fixture(name="ttyUSB3")
         self.assertNotEqual(self.verified_execute(root, name="ttyUSB3")[0], 0)
