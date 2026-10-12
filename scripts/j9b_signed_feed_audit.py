@@ -88,11 +88,13 @@ def audit(firmware,feed,apk,run_id,unsquashfs="/usr/bin/unsquashfs"):
         if result["signature"]!="PASS" or result["metadata"]!="PASS":
             result["detail"]["solver_note"]="Blocked by missing trusted signed indexes or invalid APKv3 metadata"
             return result
-        # All writes below are confined to the extracted disposable image tree.
-        shutil.copytree(feed,root/"j9b-feed")
-        repo_file=root/"etc/apk/j9b.list"
-        repo_file.parent.mkdir(parents=True,exist_ok=True)
-        repo_file.write_text("".join("file:///j9b-feed/"+n+"\n" for n in INDEXES))
+        # Host apk must see absolute local paths to the signed indexes;
+        # file:///j9b-feed points to the wrong filesystem with --root.
+        repo_file=Path(scratch)/"j9b-repositories.list"
+        repo_file.write_text("".join(str(feed/n)+"\n" for n in INDEXES))
+        result["detail"]["repository_probe"]=invoke([
+            apk,"--keys-dir",keydir,"--repositories-file",repo_file,
+            "--no-network","search","veci-app-guest"],20)
         simulations=[]
         for name in APPS:
             simulations.append(invoke([apk,"--root",root,"--keys-dir","/etc/apk/keys",
@@ -100,6 +102,11 @@ def audit(firmware,feed,apk,run_id,unsquashfs="/usr/bin/unsquashfs"):
                 "--simulate","add","--initdb","veci-app-"+name],75))
         result["solver"]=check_group(simulations)
         result["detail"]["solver_passed"]=sum(x["ok"] for x in simulations)
+        if result["solver"]!="PASS":
+            result["detail"]["solver_first_app_explicit_keys"]=invoke([
+                apk,"--root",root,"--keys-dir",keydir,
+                "--repositories-file",repo_file,"--no-network",
+                "--simulate","add","--initdb","veci-app-guest"],20)
         result["detail"]["solver_failure_examples"]=[x["message"] for x in simulations if not x["ok"]][:3]
         return result
 
