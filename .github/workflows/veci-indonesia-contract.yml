@@ -20,6 +20,33 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify read-only ubus provider and unavailable quota semantics
         run: python3 -m unittest discover -s tests -p 'test_veci_indonesia_contract.py' -v
+      - name: Stage General and Indonesia from same pinned source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          for edition in general indonesia; do
+            workspace="$RUNNER_TEMP/veci-edition-$edition"
+            mkdir -p "$workspace/package"
+            VECI_EDITION="$edition" ./scripts/prepare-veci.sh "$workspace"
+            printf 'CONFIG_PACKAGE_veci=y\\n' > "$workspace/.config"
+            sh scripts/select-veci-edition.sh "$edition" "$workspace/.config"
+            python3 - "$workspace" "$edition" <<'PY'
+          import json, pathlib, sys
+          root,edition=pathlib.Path(sys.argv[1]),sys.argv[2]
+          release=json.loads((root/'package/veci-default-ui/files/etc/veci-release.json').read_text())
+          assert release['edition']==edition
+          pkg=root/'package/veci-telco-indonesia'
+          cfg=(root/'.config').read_text()
+          if edition=='general':
+              assert not pkg.exists()
+              assert 'CONFIG_PACKAGE_veci-telco-indonesia=y' not in cfg
+          else:
+              assert (pkg/'Makefile').exists()
+              assert (pkg/'files/usr/libexec/rpcd/veci.quota').exists()
+              assert 'CONFIG_PACKAGE_veci-telco-indonesia=y' in cfg
+          print('Profile staged:',edition,'Pinned core:',release['veci_commit'][:12])
+          PY
+          done
       - name: Fail closed until authorized XL connector is implemented
         run: |
           test "$(sh source/veci-telco-indonesia/files/usr/libexec/rpcd/veci.quota call status | python3 -c 'import json,sys; x=json.load(sys.stdin); print(x["state"])')" = not_connected
