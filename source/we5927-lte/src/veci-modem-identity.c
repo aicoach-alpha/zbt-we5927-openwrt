@@ -200,7 +200,7 @@ int veci_modem_verify_identity(const char *trusted_sysfs_root,
     /* Never trust just ttyUSB ordinal: tie its sysfs major/minor to fd. */
     if (fmt(classpath, sizeof(classpath), root, "class/tty") != 0)
         return -ENAMETOOLONG;
-    if (fmt(classpath, sizeof(classpath), classpath, tty_name) != 0)
+    if (addpath(classpath, sizeof(classpath), tty_name) != 0)
         return -ENAMETOOLONG;
     if (attr(classpath, "dev", buf, sizeof(buf)) ||
         devpair(buf, &mj, &mn) != 0) return -ENODEV;
