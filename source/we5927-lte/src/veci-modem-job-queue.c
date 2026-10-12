@@ -44,6 +44,7 @@ struct veci_job_queue {
     int active_valid;
     int poisoned;
     int64_t deadline_ms;
+    int64_t started_ms;
     int acked;
     int ussd_received;
     int ussd_mode;
@@ -79,7 +80,7 @@ int veci_jobs_submit(struct veci_job_queue *q, uint32_t id,
 {
     unsigned int tail;
     if (!q || !id || !good_kind(kind)) return -EINVAL;
-    if (!approved) return -EACCES;
+    if (approved != 1) return -EACCES;
     if (q->poisoned) return -EIO;
     if (has_id(q, id)) return -EEXIST;
     if (q->count == VECI_JOBS_MAX) return -ENOSPC;
@@ -105,6 +106,7 @@ int veci_jobs_begin(struct veci_job_queue *q, int64_t now_ms,
     q->head = (q->head + 1) % VECI_JOBS_MAX;
     q->count--;
     q->active_valid = 1;
+    q->started_ms = now_ms;
     q->deadline_ms = now_ms + timeout_ms;
     q->acked = q->ussd_received = q->expected_pdu = 0;
     q->pdu_count = 0;
@@ -130,6 +132,7 @@ int veci_jobs_expire(struct veci_job_queue *q, int64_t now_ms)
     if (!q || now_ms < 0) return -EINVAL;
     if (q->poisoned) return -EIO;
     if (!q->active_valid) return -ENOENT;
+    if (now_ms < q->started_ms) return poison(q, -EPROTO);
     if (now_ms >= q->deadline_ms) return poison(q, -ETIMEDOUT);
     return VECI_WAITING;
 }
@@ -154,6 +157,8 @@ int veci_jobs_consume(struct veci_job_queue *q, uint32_t id,
     if (!q || !id || now_ms < 0) return -EINVAL;
     if (q->poisoned) return -EIO;
     if (!q->active_valid || q->active.id != id) return -ENOENT;
+    if (now_ms < q->started_ms || event < VECI_OTHER ||
+        event > VECI_PROTOCOL_ERROR) return poison(q, -EPROTO);
     if (now_ms >= q->deadline_ms) return poison(q, -ETIMEDOUT);
     if (q->result != VECI_WAITING) return -EALREADY;
     if (event == VECI_PROTOCOL_ERROR || event == VECI_ERROR)
