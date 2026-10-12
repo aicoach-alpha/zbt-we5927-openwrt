@@ -111,6 +111,19 @@ esac
         self.assertNotIn("sendSms",str(a))
         self.assertNotIn("ussdExecute",str(a))
 
+    def test_modem_manager_is_unique_valid_and_imei_path_retained(self):
+        src=LTE.read_text()
+        self.assertEqual(src.count('imei_read_json() {'),1)
+        self.assertEqual(src.count('status_fast_json() {'),1)
+        self.assertEqual(src.count('status_json() {'),1)
+        self.assertEqual(src.count('case "$1" in'),1)
+        self.assertIn('imei-read)',src)
+        self.assertIn('status-fast)',src)
+        self.assertIn('we5927-at.lock',src)
+        p=subprocess.run(['sh','-n',str(LTE)],capture_output=True,text=True)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertIn('for package in we5927-lte ',(ROOT/'scripts/prepare-veci.sh').read_text())
+
     def test_general_and_indonesia_package_share_one_diagnostic_helper(self):
         mk=(BASE/"Makefile").read_text()
         self.assertIn("veci-modem-capabilities",mk)
