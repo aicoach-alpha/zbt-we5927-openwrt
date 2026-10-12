@@ -8,7 +8,8 @@ case "$1" in
   call)
     case "$2" in
       status)
-        printf '{ "schema": 1, "provider": "xl", "state": "not_connected", "total_bytes": null, "remaining_bytes": null, "used_bytes": null, "expires_at": null, "fetched_at": null, "source": null, "buckets": [] }\n'
+        # Fixed local path only; ubus clients cannot pass an arbitrary file.
+        /usr/libexec/veci-quota-cache status /tmp/veci-telco/quota-xl.json
         ;;
       providers)
         # Root-owned immutable build-time registry; no dynamic credentials.
