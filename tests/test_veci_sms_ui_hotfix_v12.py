@@ -25,6 +25,7 @@ class SafeHotfix(unittest.TestCase):
         self.page=self.root/"www/js/pages/cellular.js"
         self.page.parent.mkdir(parents=True)
         self.backup=self.root/"backups/ui-v12"
+        self.backup.parent.mkdir(parents=True)
         self.board=self.root/"sysinfo/board_name"
         self.board.parent.mkdir(parents=True)
         self.board.write_text("zbtlink,zbt-we5927\n")
