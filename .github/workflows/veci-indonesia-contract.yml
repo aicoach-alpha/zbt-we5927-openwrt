@@ -5,6 +5,7 @@ on:
     paths:
       - 'source/veci-telco-indonesia/**'
       - 'tests/test_veci_indonesia_contract.py'
+      - 'tests/test_veci_quota_cache.py'
       - 'docs/VECI-INDONESIA-EDITION.md'
       - '.github/workflows/veci-indonesia-contract.yml'
 permissions:
