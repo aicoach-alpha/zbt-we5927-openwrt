@@ -108,6 +108,12 @@ apply() {
     }
     trap cleanup EXIT
 
+    # Baseline: existing status endpoint must already be healthy; no
+    # router mutation is acceptable if the old LTE RPC is failing.
+    baseline="$(ubus call veci.cellular status 2>/dev/null)" ||
+        die "existing LTE status RPC unavailable; refusing patch"
+    printf '%s\n' "$baseline" | grep -q '"enabled"' ||
+        die "existing LTE status lacks enabled field; refusing patch"
     fetch scripts/veci-live-minimal/veci.cellular "$work/rpc"
     fetch source/veci-cellular-we5927/files/usr/libexec/veci-modem-capabilities "$work/helper"
     fetch scripts/veci-live-minimal/veci-cellular-we5927.json "$work/acl"
@@ -172,6 +178,12 @@ apply() {
         printf '%s\n' "$methods" | grep -q "\"$method\":" ||
             die "registered RPC missing: $method"
     done
+    # Functional health: method registration alone does not prove status
+    # still works. A failed response must trigger file rollback.
+    current_status="$(ubus call veci.cellular status 2>/dev/null)" ||
+        die "LTE status RPC failed after patch"
+    printf '%s\n' "$current_status" | grep -q '"enabled"' ||
+        die "LTE status response invalid after patch"
     success=1
     echo "LIVE_RPC_REGISTRATION_PASS"
     echo "NO_AT_COMMAND_SENT_BY_INSTALLER"
