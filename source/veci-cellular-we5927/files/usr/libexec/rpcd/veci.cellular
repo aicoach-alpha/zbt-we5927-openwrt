@@ -181,7 +181,7 @@ switch_sim() {
 
 case "$1" in
 	list)
-		printf '{ "status": {}, "identity": {}, "identityLive": {}, "reconnect": {}, "switchSim": { "sim": "int" } }\n'
+		printf '{ "status": {}, "identity": {}, "identityLive": {}, "messagingCapabilities": {}, "reconnect": {}, "switchSim": { "sim": "int" } }\n'
 		;;
 	call)
 		case "$2" in
