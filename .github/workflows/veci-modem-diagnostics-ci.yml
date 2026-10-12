@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Offline AT parser, mocked serial replies, lock and ACL tests
         run: python3 -m unittest discover -s tests -p 'test_veci_modem_sms_ussd.py' -v
-      - name: Audit minimal reversible overlay hotfix: pinned SHA256, ACL and legacy RPC ABI
+      - name: "Audit minimal reversible overlay hotfix: pinned SHA256, ACL and legacy RPC ABI"
         run: python3 -m unittest discover -s tests -p 'test_veci_live_capability_hotfix.py' -v
       - name: Compile and exercise native AT serial transport against fake pseudo-terminal
         run: python3 -m unittest discover -s tests -p 'test_we5927_at_transport.py' -v
