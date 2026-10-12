@@ -17,6 +17,7 @@
 #endif
 #define _GNU_SOURCE
 #include "veci-modem-transaction.h"
+#include "veci-modem-identity.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -198,4 +199,37 @@ done:
     out->status = rc;
     if (rc != 0) out->records = 0;
     return rc;
+}
+
+
+/*
+ * Offline-gated entrypoint that PROVES identity was validated BEFORE mock
+ * command dispatch. In real firmware, root must be constant "/sys" and
+ * physical device/USB lifecycle requires independent hardware UAT.
+ * This is NOT a production RPC; no fallback to an unverified tty allowed.
+ */
+int veci_serial_sms_smoke_verified_fd(
+    int tty_fd, const char *trusted_mock_sysfs,
+    const char *tty_name, const char *isolated_test_lock,
+    int kind, unsigned int index, int approved, int timeout_ms,
+    struct veci_serial_smoke_result *out)
+{
+    struct veci_modem_identity observed;
+    int rc;
+    if (!out) return -EINVAL;
+    out->records = 0;
+    out->status = -EINVAL;
+    if (approved != 1) {
+        out->status = -EACCES;
+        return -EACCES;
+    }
+    rc = veci_modem_verify_identity(trusted_mock_sysfs, tty_name, tty_fd,
+                                    &observed);
+    memset(&observed, 0, sizeof(observed));
+    if (rc != 0) {
+        out->status = rc;
+        return rc;
+    }
+    return veci_serial_sms_smoke_fd(tty_fd, isolated_test_lock, kind, index,
+                                    approved, timeout_ms, out);
 }
