@@ -58,7 +58,7 @@ class InboxPreviewOffline(unittest.TestCase):
 
     def test_valid_smsc_offset(self):
         # SMSC length 2, two SMSC bytes, and two TPDU bytes.
-        output = parse_sms(entry(1,0,"0211220011") + "OK\r\n")
+        output = parse_sms("+CMGL: 1,0,,2\r\n0211220011\r\nOK\r\n")
         self.assertEqual(output.returncode, 0, output.stderr)
         self.assertEqual(json.loads(output.stdout)["messages"][0]["tpdu_octets"], 2)
 
@@ -96,7 +96,7 @@ class InboxPreviewOffline(unittest.TestCase):
             entry(1) + "ERROR\r\n",
             entry(1) + "+CMS ERROR: 321\r\n",
             "+CMGL: 1,0,,2\r\n",
-            "OK",
+            "O",
             entry(1) + "OK\r\n+CMTI: \"ME\",2\r\n",
         ):
             with self.subTest(prefix=wire[:25]):
