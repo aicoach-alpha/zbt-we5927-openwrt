@@ -266,10 +266,15 @@ int veci_mp_add(struct veci_mp_state *state,
     g->mask |= mask;
     g->received++;
     if (g->received != g->total) return 0;
+    /* Size-validate ALL segments before exposing any sensitive text. */
     for (i = 0; i < g->total; ++i) {
         if (!(g->mask & (1u << i)) ||
             g->len[i] > VECI_MP_TOTAL_MAX - len)
             return invalid(state, EOVERFLOW);
+        len += g->len[i];
+    }
+    len = 0;
+    for (i = 0; i < g->total; ++i) {
         memcpy(out->text + len, g->chunks[i], g->len[i]);
         len += g->len[i];
     }
