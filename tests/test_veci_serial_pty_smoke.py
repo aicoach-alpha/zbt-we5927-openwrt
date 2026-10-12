@@ -159,6 +159,19 @@ class PtySmokeTests(unittest.TestCase):
             self.assertEqual(self.execute(index=index), (-errno.EINVAL, 0))
         self.assertEqual(self.execute(kind=1, index=1), (-errno.EINVAL, 0))
 
+    def test_stale_urc_before_dispatch_prevents_command(self):
+        os.write(self.master, b'+CUSD: 0,"0041",72\r\n')
+        self.assertEqual(self.execute(), (-errno.EAGAIN, 0))
+        # RX queue must be preserved, never silently flushed.
+        self.assertEqual(os.read(self.slave, 64), b'+CUSD: 0,"0041",72\r\n')
+        r, _, _ = select.select([self.master], [], [], 0.02)
+        self.assertEqual(r, [])
+
+    def test_stale_response_ok_before_dispatch_prevents_command(self):
+        os.write(self.master, b"OK\r\n")
+        self.assertEqual(self.execute(kind=1, index=0), (-errno.EAGAIN, 0))
+        self.assertEqual(os.read(self.slave, 16), b"OK\r\n")
+
     def test_lock_contention_prevents_command(self):
         lock = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
         try:
