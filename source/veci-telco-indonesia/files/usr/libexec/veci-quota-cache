@@ -32,13 +32,13 @@ read_cache() {
         empty_status unavailable; return
     fi
     owner="$(id -u)"
-    dir_uid="$(stat -c %u "$parent" 2>/dev/null || :)"
-    file_uid="$(stat -c %u "$cache" 2>/dev/null || :)"
-    dir_mode="$(stat -c %a "$parent" 2>/dev/null || :)"
-    file_mode="$(stat -c %a "$cache" 2>/dev/null || :)"
-    bytes="$(stat -c %s "$cache" 2>/dev/null || :)"
-    if [ "$dir_uid" != "$owner" ] || [ "$file_uid" != "$owner" ] ||
-       [ "$dir_mode" != 700 ] || [ "$file_mode" != 600 ] ||
+    # The WE5927 BusyBox image deliberately excludes the stat applet.
+    # ls -ldn + awk and wc are already built into the pinned firmware.
+    dir_info="$(ls -ldn "$parent" 2>/dev/null | awk '{ print $1 " " $3 }')"
+    file_info="$(ls -ldn "$cache" 2>/dev/null | awk '{ print $1 " " $3 }')"
+    bytes="$(wc -c < "$cache" 2>/dev/null | tr -d '[:space:]')"
+    if [ "$dir_info" != "drwx------ $owner" ] ||
+       [ "$file_info" != "-rw------- $owner" ] ||
        ! canonical_number "$bytes" || [ "$bytes" -gt 4096 ]; then
         empty_status unavailable; return
     fi
