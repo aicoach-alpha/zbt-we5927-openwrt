@@ -17,10 +17,13 @@ def expiry_epoch(value):
         return n//1000 if n>100000000000 else n
     if isinstance(value,str):
         if value.isdigit():return expiry_epoch(int(value))
-        try:return int(datetime.fromisoformat(value.replace("Z","+00:00")).replace(
-            tzinfo=timezone.utc if datetime.fromisoformat(value.replace("Z","+00:00")).tzinfo is None else None
-        ).timestamp())
-        except ValueError:return 0
+        try:
+            parsed=datetime.fromisoformat(value.replace("Z","+00:00"))
+            if parsed.tzinfo is None:
+                parsed=parsed.replace(tzinfo=timezone.utc)
+            return int(parsed.timestamp())
+        except ValueError:
+            return 0
     return 0
 
 def normalize(raw):
