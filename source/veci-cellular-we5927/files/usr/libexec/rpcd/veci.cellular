@@ -146,6 +146,15 @@ identity_live() {
 	json_dump
 }
 
+messaging_capabilities() {
+	# Explicit on-demand AT test commands; no SMS body, USSD code or OTP.
+	[ -x /usr/libexec/veci-modem-capabilities ] || {
+		emit_error "capability_probe_unavailable"
+		return
+	}
+	/usr/libexec/veci-modem-capabilities probe
+}
+
 reconnect() {
 	[ -x "$LTE" ] || {
 		emit_error "lte_manager_missing"
