@@ -10,9 +10,7 @@ export LC_ALL
 
 fail() {
     case "$1" in
-        explicit_consent_required|board_mismatch|unverified_modem|
-        modem_busy|transport_missing|pdu_mode_required|response_unavailable|
-        invalid_response) reason="$1" ;;
+        explicit_consent_required|board_mismatch|unverified_modem|modem_busy|transport_missing|pdu_mode_required|response_unavailable|invalid_response) reason="$1" ;;
         *) reason=unavailable ;;
     esac
     printf '{"ok":false,"reason":"%s","messages":[]}\n' "$reason"
