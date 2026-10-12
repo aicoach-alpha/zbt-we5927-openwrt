@@ -1,0 +1,12 @@
+{
+  "veci-indonesia-quota": {
+    "description": "Read-only VeCI Indonesia quota overview; never expose subscriber secrets",
+    "read": {
+      "ubus": {
+        "veci.indonesia": [
+          "status"
+        ]
+      }
+    }
+  }
+}
