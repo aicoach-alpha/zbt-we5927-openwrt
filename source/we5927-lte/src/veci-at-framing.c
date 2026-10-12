@@ -190,6 +190,20 @@ int veci_frame_feed(struct veci_at_frame *f, const unsigned char *buf,
     return 0;
 }
 
+/* Called at end of a bounded transaction: a truncated PDU or pending line
+ * MUST fail instead of being interpreted as an empty SMS inbox.
+ */
+int veci_frame_finish(struct veci_at_frame *f,
+                      veci_frame_callback callback, void *ctx)
+{
+    if (!f || f->failed) return -1;
+    if (f->line_len || f->pdu_expected >= 0) {
+        emit_failure(f, callback, ctx);
+        return -1;
+    }
+    return 0;
+}
+
 /* A USSD request is not complete on its initial AT OK. +CUSD is an
  * asynchronous URC and may arrive either before or after that OK.
  * This state tracker has no retry, timeout, AT transmitter or persistence.
@@ -230,4 +244,14 @@ int veci_ussd_consume(struct veci_ussd_session *s, int event, int meta)
     if (s->mode == 0) return VECI_USSD_RESPONSE;
     if (s->mode == 1) return VECI_USSD_INTERACTIVE;
     return VECI_USSD_TERMINATED;
+}
+
+/* Caller must own a monotonic deadline and invoke this if a response has
+ * not completed in time. No automatic resend or USSD cancellation here.
+ */
+int veci_ussd_expire(struct veci_ussd_session *s)
+{
+    if (!s) return VECI_USSD_FAILED;
+    s->failed = 1;
+    return VECI_USSD_FAILED;
 }
