@@ -1,0 +1,10 @@
+{
+  "veci-quota": {
+    "description": "Read-only Indonesia telco quota status",
+    "read": {
+      "ubus": {
+        "veci.quota": ["status"]
+      }
+    }
+  }
+}
