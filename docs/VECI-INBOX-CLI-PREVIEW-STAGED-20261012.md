@@ -14,7 +14,7 @@ Date 2026-10-12, Asia/Jakarta. This is a technical CLI prototype for root SSH, N
 
 - File `scripts/veci-sms-inbox-index-preview.sh` (pure BusyBox POSIX shell and awk; staged, not deployed).
 - It requires root and two exact CLI flags: `--show-indices-only --ack-unread-may-be-marked-read`.
-- It confirms board identity, sysfs ttyUSB2 USB interface 1.4 and VID:PID 05c6:902e. It takes the shared nonblocking modem lock.
+- It confirms board identity, then takes the shared nonblocking modem lock **before** checking sysfs ttyUSB2 USB interface 1.4 and VID:PID 05c6:902e. This is NOT equivalent to a production-grade opened-FD device identity check.
 - Within that lock, it reads the already-active PDU mode with `AT+CMGF?` and, if PDU, requests a single `AT+CMGL=4` (up to 5 sec) with no automatic retry.
 - Its output is only count + message slot indices, numeric delivery status and TPDU length. The raw SMS PDU, sender, message contents, and OTP are never printed, stored persistently or sent to a server.
 - The strict parser rejects missing final OK, invalid lines, malformed PDU/TPDU lengths, unsolicited CUSD/CMTI, duplicate indices, more than 16 entries and post-OK content. It prints zero metadata on incomplete/invalid response.
