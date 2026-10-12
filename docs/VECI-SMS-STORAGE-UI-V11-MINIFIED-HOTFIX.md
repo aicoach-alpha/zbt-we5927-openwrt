@@ -84,3 +84,50 @@ physically observed, so installer PASS is not end-to-end dashboard PASS.
 Rollback only this UI hotfix with its `rollback` operation. Do NOT touch
 `/root/veci-capability-hotfix-rollback` or
 `/root/veci-storage-hotfix-rollback`.
+
+
+## Owner-observed v1.1 refusal — unrecognized installed asset
+
+On 12 October 2026, the owner ran the pinned 5,246-byte v1.1 script
+from firmware SHA `61130c9f033f32aaa706331c285dd0ed1920fc96` on the real
+WE5927 via office-laptop SSH. The read-only `status` call and protected
+`apply` confirmed:
+
+```text
+CURRENT_CELLULAR_SHA=0a4e78d5368806b31441612b8979ab7b2ac8f425890cfd89104f969accd8ee18
+EXPECTED_MINIFIED_SHA=a2c62cbf42909951b73127a4ee1bfef60cf7d8654ee274f41e997001444a7aa4
+CURRENT_CELLULAR_BYTES=6357
+HELPER_SHA=absent
+V11_BACKUP=none
+UI_V11_ERROR: installed_asset_not_verified_untouched
+```
+
+Overlay remains approx. 1.7 MiB available (364 KiB used of 2.1 MiB).
+No installation was performed. The v1.1 script correctly protected the
+unknown local Cellular asset and retained v1/v2 LIVE modem RPCs.
+
+### Independent historical asset investigation
+
+Compiled each historical `veci/js/pages/cellular.js` commit on all known
+VeCI branches with the exact official Terser build options and compared
+its SHA256 with the actual installed hash. **None of 12 compiled historical
+variants matches** `0a4e78d5...d8ee18`. Source: VeCI quality run
+https://github.com/aicoach-alpha/veci/actions/runs/38236031989.
+This may be a custom locally patched asset or another build/version; do NOT
+infer provenance without inspecting the installed file.
+
+**NO-GO** for any full-file Cellular replacement at this point.
+The next safe path is to acquire a read-only copy of the live
+`/www/veci/js/pages/cellular.js` from the *office Windows laptop* and
+analyze its anchors/functionality, then build a minimal, content-addressed
+patch or an isolated add-on with its own rollback. Do not SSH to
+192.168.1.1 from andre-nas (that is a different ZTE device).
+
+Read-only Windows PowerShell command from the office laptop:
+
+```powershell
+scp root@192.168.1.1:/www/veci/js/pages/cellular.js "$env:USERPROFILE\Downloads\veci-cellular-WE5927-live.js"
+```
+
+Review the file for secrets before sharing it in a project chat. No
+modem commands or firmware changes are needed for this collection.
