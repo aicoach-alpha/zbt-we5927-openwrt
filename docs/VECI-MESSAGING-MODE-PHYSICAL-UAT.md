@@ -1,4 +1,4 @@
-# WE5927 physical SMS mode + charset preflight — operator step
+# WE5927 physical SMS mode + charset preflight — actual device PASS
 
 Date: 2026-10-12. Source-only /tmp diagnostic. Never modifies firmware, LTE, SIM, AT mode or message state.
 
@@ -33,9 +33,27 @@ Expected shape only (do not fabricate real values):
 
 {"ok":true,"source":"read_only_at","sms_mode":"pdu|text|unknown","charset":"..."}
 
-The actual label comes only from device response. If it reports modem_busy,
-do not force/retry automatically. Script performs no persistent mutations.
+Operator executed the pinned 2,342-byte source-only script in /tmp via office-laptop SSH. Shell syntax was valid and the real physical modem returned:
 
+```json
+{"ok":true,"source":"read_only_at","sms_mode":"pdu","charset":"IRA"}
+```
+
+PHYSICAL DEVICE UAT PASS for read-only CMGF?/CSCS? only. Existing PDU mode means no CMGF or CSCS configuration change is needed. No SMS listing or USSD was executed.
+
+## 3GPP side-effect gate: SMS inbox is NOT a harmless read
+
+ETSI 3GPP TS 27.005 section 4.1 explicitly states that listing SMS
+through AT+CMGL changes received unread messages to received read.
+The modem also returns entire SMS PDUs, potentially including OTP.
+Normative source: https://www.etsi.org/deliver/etsi_ts/127000_127099/127005/18.00.00_60/ts_127005v180000p.pdf
+
+Future Inbox access MUST require a new explicit user acknowledgement of
+this possible state mutation, elevated authentication/CSRF, one-time
+consent and a pinned USB/tty full-session transport holding the LTE lock.
+Never poll or auto-list SMS, and never emit raw PDU to routine RPC/logs.
+AT+CMGL=? is a distinct test command, not a request to list SMS.
+Physical PDU/IRA readiness does not certify CMGL or USSD carrier access.
 ## Status/next gate
 
 303/303 offline unit tests PASS in GitHub Actions:
