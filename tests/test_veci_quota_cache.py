@@ -163,6 +163,7 @@ class CacheSafetyTests(unittest.TestCase):
         self.assertNotIn("curl ",content)
         self.assertNotIn("wget ",content)
         self.assertNotIn("https://",content)
+        self.assertNotIn("stat -c",content)
         self.assertNotIn("ACCESS_TOKEN",content)
         self.assertNotIn("--no-check-certificate",content)
         r=subprocess.run(["sh","-n",str(CACHE)],capture_output=True,text=True)
