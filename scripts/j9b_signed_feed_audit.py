@@ -56,7 +56,7 @@ def audit(firmware,feed,apk,run_id,unsquashfs="/usr/bin/unsquashfs"):
     with tempfile.TemporaryDirectory(prefix="j9b-ci-") as scratch:
         root=Path(scratch)/"root"
         extracted=invoke([unsquashfs,"-quiet","-o",str(squashfs_offset(image)),
-                          "-d",str(root),str(image)],150)
+                          "-d",str(root),str(image),"etc/apk","lib/apk"],150)
         result["detail"]["squashfs"]=extracted
         if not extracted["ok"]:
             result["keys"]="BLOCKED"
