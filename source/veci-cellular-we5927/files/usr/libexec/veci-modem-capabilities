@@ -14,26 +14,30 @@ unavailable() {
     printf '{ "ok": false, "state": "unavailable", "reason": "%s", "sms_mode": "not_tested", "sms_storage": "not_tested", "sms_notifications": "not_tested", "ussd": "not_tested" }\n' "$reason"
 }
 
-# Never probe the W907's non-AT 1.5 USB function; doing so can hang I/O.
-# Match the modem manager's USB interface 1.4, with one configured fallback.
+# Never probe W907 1.5 and NEVER fall back to a configured ttyUSB port.
+# These low-impact diagnostics require both interface 1.4 and USB 05c6:902e.
+# A future privileged SMS transport must additionally attest the opened FD.
 find_at_port() {
     for entry in /sys/class/tty/ttyUSB*; do
         [ -e "$entry/device" ] || continue
+        name="${entry##*/}"
+        [ "$name" != ttyUSB3 ] || continue
+        case "$name" in ttyUSB[0-9]|ttyUSB[0-9][0-9]) ;; *) continue ;; esac
         devpath="$(readlink -f "$entry/device" 2>/dev/null || :)"
         case "$devpath" in
-            */1-1:1.4/*)
-                port="/dev/$(basename "$entry")"
+            /sys/devices/*:1.4/*)
+                usbparent="${devpath%%:1.4/*}"
+                [ -r "$usbparent/idVendor" ] || continue
+                [ -r "$usbparent/idProduct" ] || continue
+                vid="$(cat "$usbparent/idVendor" 2>/dev/null || :)"
+                pid="$(cat "$usbparent/idProduct" 2>/dev/null || :)"
+                [ "$vid" = 05c6 ] || continue
+                [ "$pid" = 902e ] || continue
+                port="/dev/$name"
                 [ -c "$port" ] && { printf '%s\n' "$port"; return 0; }
                 ;;
         esac
     done
-    configured="$(uci -q get we5927_lte.main.at_port 2>/dev/null || :)"
-    case "$configured" in
-        /dev/ttyUSB3) return 1 ;;
-        /dev/ttyUSB[0-9]|/dev/ttyUSB[0-9][0-9])
-            [ -c "$configured" ] && { printf '%s\n' "$configured"; return 0; }
-            ;;
-    esac
     return 1
 }
 
