@@ -12,6 +12,7 @@ on:
       - 'source/we5927-lte/src/veci-sms-pdu-decode.c'
       - 'source/we5927-lte/src/veci-ussd-decode.c'
       - 'source/we5927-lte/src/veci-sms-multipart.c'
+      - 'source/we5927-lte/src/veci-sms-multipart.h'
       - 'tests/test_we5927_at_transport.py'
       - 'tests/test_veci_at_framing.py'
       - 'tests/test_veci_modem_session_lock.py'
@@ -20,6 +21,7 @@ on:
       - 'tests/test_veci_sms_pdu_decode.py'
       - 'tests/test_veci_ussd_decode.py'
       - 'tests/test_veci_sms_multipart.py'
+      - 'tests/fuzz_veci_sms_multipart.c'
       - 'tests/fuzz_veci_sms_codec.c'
       - 'tests/test_veci_modem_sms_ussd.py'
       - '.github/workflows/veci-modem-diagnostics-ci.yml'
@@ -66,6 +68,15 @@ jobs:
             source/we5927-lte/src/veci-ussd-decode.c \
             -o "$RUNNER_TEMP/fuzz-veci-sms-codec"
           ASAN_OPTIONS=detect_leaks=0 "$RUNNER_TEMP/fuzz-veci-sms-codec"
+      - name: Fuzz 8,000 malformed and 1,000 complete multipart groups under ASAN UBSAN
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I source/we5927-lte/src \
+            tests/fuzz_veci_sms_multipart.c source/we5927-lte/src/veci-sms-multipart.c \
+            -o "$RUNNER_TEMP/fuzz-veci-multipart"
+          ASAN_OPTIONS=detect_leaks=0 "$RUNNER_TEMP/fuzz-veci-multipart"
       - name: Validate existing LTE manager parses before AT integration
         run: sh -n source/we5927-lte/files/usr/sbin/we5927-lte
       - name: Verify both build editions stage the audited LTE manager
