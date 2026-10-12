@@ -3,7 +3,7 @@
 # Authenticated API adapter and cache are intentionally NOT enabled at this stage.
 case "$1" in
   list)
-    printf '{ "status": {} }\n'
+    printf '{ "status": {}, "providers": {} }\n'
     ;;
   call)
     case "$2" in
