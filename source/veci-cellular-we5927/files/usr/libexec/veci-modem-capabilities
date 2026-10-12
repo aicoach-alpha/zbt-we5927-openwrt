@@ -79,8 +79,77 @@ probe_capabilities() {
     ) 9>/var/lock/we5927-at.lock
 }
 
-[ "$#" -eq 1 ] || { echo 'usage: veci-modem-capabilities probe' >&2; exit 2; }
+# On-demand SMS *storage count* only. AT+CPMS? is a READ query.
+# NEVER read SMS PDUs, sender addresses, SMS body, PIN/OTP or USSD text.
+# Reject malformed, duplicated, extra, unsolicited or partial responses.
+storage_parse() {
+    awk '
+        /^[[:space:]]*$/ { next }
+        {
+            gsub(/\r/, "", $0)
+            if ($0 == "") next
+            if ($0 == "AT+CPMS?") { if (seen || ok) bad=1; next }
+            if ($0 == "OK") { if (ok || !seen) bad=1; ok=1; next }
+            if ($0 ~ /^\\+CPMS:[[:space:]]*/) {
+                if (seen || ok) { bad=1; next }
+                gsub(/[[:space:]]/, "", $0)
+                sub(/^\\+CPMS:/, "", $0)
+                n=split($0, values, ",")
+                if (n != 9) { bad=1; next }
+                for (i=1; i<=9; i+=3) {
+                    if (values[i] !~ /^"[A-Z][A-Z]"$/ ||
+                        values[i+1] !~ /^[0-9]+$/ ||
+                        values[i+2] !~ /^[0-9]+$/ ||
+                        values[i+1]+0 > values[i+2]+0 ||
+                        values[i+2]+0 > 65535) bad=1
+                }
+                if (bad) next
+                memory=values[1]
+                gsub(/"/, "", memory)
+                used=values[2]+0
+                total=values[3]+0
+                seen=1
+                next
+            }
+            bad=1
+        }
+        END {
+            if (!bad && seen && ok) {
+                printf "%s %d %d\\n",memory,used,total
+                exit 0
+            }
+            exit 1
+        }
+    '
+}
+
+storage_error() {
+    case "$1" in
+        modem_busy|modem_port_unavailable|at_tool_unavailable|query_failed|invalid_response) reason="$1" ;;
+        *) reason=unavailable ;;
+    esac
+    printf '{ "ok": false, "state": "unavailable", "reason": "%s" }\\n' "$reason"
+}
+storage_query() {
+    [ -x /usr/sbin/we5927-at ] || { storage_error at_tool_unavailable; return; }
+    command -v flock >/dev/null 2>&1 || { storage_error unavailable; return; }
+    at_port="$(find_at_port)" || { storage_error modem_port_unavailable; return; }
+    (
+        flock -n -x 9 || { storage_error modem_busy; exit 0; }
+        raw="$(/usr/sbin/we5927-at "$at_port" 'AT+CPMS?' 1500 2>/dev/null)" ||
+            { storage_error query_failed; exit 0; }
+        compact="$(printf '%s\\n' "$raw" | storage_parse)" ||
+            { storage_error invalid_response; exit 0; }
+        # compact is emitted by a strict awk parser: "SM 0 30", no secrets.
+        set -- $compact
+        [ "$#" -eq 3 ] || { storage_error invalid_response; exit 0; }
+        printf '{ "ok": true, "state": "queried", "source": "read_only_at_cpms", "memory": "%s", "used": %s, "total": %s }\\n' "$1" "$2" "$3"
+    ) 9>/var/lock/we5927-at.lock
+}
+
+[ "$#" -eq 1 ] || { echo 'usage: veci-modem-capabilities probe|storage' >&2; exit 2; }
 case "$1" in
     probe) probe_capabilities ;;
+    storage) storage_query ;;
     *) echo 'unsupported operation' >&2; exit 2 ;;
 esac
