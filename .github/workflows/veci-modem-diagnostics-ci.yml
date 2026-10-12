@@ -24,6 +24,7 @@ on:
       - 'tests/test_veci_modem_job_queue.py'
       - 'tests/test_veci_modem_pipeline.py'
       - 'tests/test_veci_modem_transaction.py'
+      - 'tests/fuzz_veci_modem_transaction.c'
       - 'tests/test_veci_sms_pdu_decode.py'
       - 'tests/test_veci_ussd_decode.py'
       - 'tests/test_veci_sms_multipart.py'
@@ -85,6 +86,18 @@ jobs:
             tests/fuzz_veci_sms_multipart.c source/we5927-lte/src/veci-sms-multipart.c \
             -o "$RUNNER_TEMP/fuzz-veci-multipart"
           ASAN_OPTIONS=detect_leaks=0 "$RUNNER_TEMP/fuzz-veci-multipart"
+      - name: Fuzz 5,000 fragmented AT mock sessions with ASAN and UBSAN
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I source/we5927-lte/src \
+            tests/fuzz_veci_modem_transaction.c \
+            source/we5927-lte/src/veci-modem-transaction.c \
+            source/we5927-lte/src/veci-modem-job-queue.c \
+            source/we5927-lte/src/veci-at-framing.c \
+            -o "$RUNNER_TEMP/fuzz-veci-modem-transaction"
+          ASAN_OPTIONS=detect_leaks=0 "$RUNNER_TEMP/fuzz-veci-modem-transaction"
       - name: Assert no inactive SMS/USSD C libraries are linked into router
         shell: bash
         run: |
