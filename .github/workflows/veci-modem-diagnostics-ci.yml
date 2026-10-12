@@ -6,6 +6,7 @@ on:
       - 'source/veci-cellular-we5927/**'
       - 'source/we5927-lte/files/usr/sbin/we5927-lte'
       - 'source/we5927-lte/src/we5927-at.c'
+      - 'source/we5927-lte/Makefile'
       - 'source/we5927-lte/src/veci-at-framing.c'
       - 'source/we5927-lte/src/veci-modem-session-lock.c'
       - 'source/we5927-lte/src/veci-modem-job-queue.c'
@@ -77,6 +78,18 @@ jobs:
             tests/fuzz_veci_sms_multipart.c source/we5927-lte/src/veci-sms-multipart.c \
             -o "$RUNNER_TEMP/fuzz-veci-multipart"
           ASAN_OPTIONS=detect_leaks=0 "$RUNNER_TEMP/fuzz-veci-multipart"
+      - name: Assert no inactive SMS/USSD C libraries are linked into router
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          mk=Path('source/we5927-lte/Makefile').read_text()
+          assert '$(CP) ./src/we5927-at.c $(PKG_BUILD_DIR)/' in mk
+          for s in ('veci-at-framing.c','veci-modem-job-queue.c','veci-modem-session-lock.c',
+                    'veci-sms-pdu-decode.c','veci-sms-multipart.c','veci-ussd-decode.c'):
+              assert s not in mk, f'Unauthorized modem library in firmware build: {s}'
+          print('INERT_BUILD_GUARD_PASS: optional native SMS/USSD sources not linked into firmware')
+          PY
       - name: Validate existing LTE manager parses before AT integration
         run: sh -n source/we5927-lte/files/usr/sbin/we5927-lte
       - name: Verify both build editions stage the audited LTE manager
