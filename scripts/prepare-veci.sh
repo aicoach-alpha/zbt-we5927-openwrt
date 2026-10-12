@@ -49,10 +49,16 @@ rm -rf "$DEST"
 mkdir -p "$DEST"
 cp -a "$TMP/tree/." "$DEST/"
 
-for package in veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci-app-guest veci-app-sqm veci-app-ddns veci-app-wireguard veci-app-voucher veci-update-we5927; do
+for package in veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci-app-guest veci-app-sqm veci-app-ddns veci-app-wireguard veci-app-voucher veci-update-we5927 veci-indonesia-quota; do
 	rm -rf "$OPENWRT_ROOT/package/$package"
 	cp -a "$SELF_DIR/source/$package" "$OPENWRT_ROOT/package/$package"
 done
+
+EDITION="${VECI_EDITION:-general}"
+case "$EDITION" in
+	general|indonesia) ;;
+	*) echo "error: invalid VeCI edition" >&2; exit 1 ;;
+esac
 
 BUILD_ID="$(git -C "$SELF_DIR" rev-parse HEAD)"
 if git -C "$OPENWRT_ROOT" rev-parse HEAD >/dev/null 2>&1; then
@@ -70,6 +76,7 @@ mkdir -p "$OPENWRT_ROOT/package/veci-default-ui/files/etc"
 cat > "$OPENWRT_ROOT/package/veci-default-ui/files/etc/veci-release.json" <<EOF
 {
 	"schema": 1,
+	"edition": "$EDITION",
 	"build_id": "$BUILD_ID",
 	"veci_commit": "$PIN",
 	"openwrt_commit": "$OPENWRT_PIN"
