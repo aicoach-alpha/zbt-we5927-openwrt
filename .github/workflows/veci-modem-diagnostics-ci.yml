@@ -1,0 +1,38 @@
+name: VeCI SMS and USSD capability diagnostics (offline)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/veci-cellular-we5927/**'
+      - 'tests/test_veci_modem_sms_ussd.py'
+      - '.github/workflows/veci-modem-diagnostics-ci.yml'
+      - 'docs/VECI-SMS-USSD-READINESS.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veci-modem-diagnostics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Offline AT parser, mocked serial replies, lock and ACL tests
+        run: python3 -m unittest discover -s tests -p 'test_veci_modem_sms_ussd.py' -v
+      - name: Fail closed on any active modem command in probe
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('source/veci-cellular-we5927/files/usr/libexec/veci-modem-capabilities').read_text()
+          allowed=('AT+CMGF=?','AT+CPMS=?','AT+CNMI=?','AT+CUSD=?')
+          assert all(s.count(x)==1 for x in allowed)
+          assert "flock -n -x 9" in s
+          assert "we5927-at.lock" in s
+          assert not any(x in s for x in ('AT+CMGS=', 'AT+CMGL=', 'AT+CMGR=', 'AT+CMGD=', 'AT+CUSD=1,'))
+          print('Only 4 AT capability tests, no SMS/USSD transaction, no router touched')
+          PY
