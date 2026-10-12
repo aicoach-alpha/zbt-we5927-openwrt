@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh consented XL quota every 3 hours
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=3h
+Persistent=false
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
