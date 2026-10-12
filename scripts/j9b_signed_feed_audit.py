@@ -65,6 +65,7 @@ def audit(firmware,feed,apk,run_id,unsquashfs="/usr/bin/unsquashfs"):
         keys=list(keydir.glob("*")) if keydir.is_dir() else []
         keys=[p for p in keys if p.is_file() and p.stat().st_size>0]
         result["detail"]["firmware_key_count"]=len(keys)
+        result["detail"]["firmware_key_extensions"] = sorted(set(x.suffix for x in keys))
         result["keys"]="PASS" if keys else "BLOCKED"
         metadata=[invoke([apk,"adbdump","--format","json",p],20) for p in selected]
         result["metadata"]=check_group(metadata)
@@ -75,6 +76,13 @@ def audit(firmware,feed,apk,run_id,unsquashfs="/usr/bin/unsquashfs"):
             result["detail"]["signatures_valid"]=sum(x["ok"] for x in signatures)
             result["detail"]["signature_tested"]=len(signatures)
             result["detail"]["signature_failure_examples"]=[x["message"] for x in signatures if not x["ok"]][:3]
+            # Independent verification with the EXACT SAME extracted public keys.
+            # This distinguishes CLI root-path resolution from a genuinely
+            # untrusted/unsigned APKv3 artifact without granting new trust.
+            direct=[invoke([apk,"--keys-dir",keydir,"verify",p],20) for p in selected]
+            result["detail"]["signature_explicit_keys"] = check_group(direct)
+            result["detail"]["explicit_keys_valid"] = sum(x["ok"] for x in direct)
+            result["detail"]["explicit_keys_failure_examples"] = [x["message"] for x in direct if not x["ok"]][:3]
         if result["signature"]!="PASS" or result["metadata"]!="PASS":
             result["detail"]["solver_note"]="Blocked by missing firmware trust key, signature, or APKv3 metadata validation"
             return result
