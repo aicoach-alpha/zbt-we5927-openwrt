@@ -279,6 +279,43 @@ per-action UI consent only after mock integration and physical capability UAT.
 Keep current read-only messagingCapabilities as the only exposed RPC method
 until all of those gates pass.
 
+
+### Read-only W907 modem identity policy (source-only)
+
+The new source/we5927-lte/src/veci-modem-identity.c and .h implement a
+**read-only** sysfs identity gate. The caller must own an already-open serial
+character FD and a trusted fixed sysfs root; the gate never opens any tty,
+sends AT, writes sysfs, guesses ports or queries a physical modem. In host
+tests, only an isolated synthetic sysfs root and PTY slave are provided.
+
+All properties must match before acceptance: ttyUSB name (explicitly
+rejecting ttyUSB3), canonical sysfs device resolution *within* the trusted
+root, USB interface **1.4** (never 1.5), expected Qualcomm vendor/product
+**05c6:902e**, serial driver option/option1, and the tty major:minor value
+matching the supplied *already-open* serial FD. Attribute reads reject
+symlinked files, non-regular files, malformed data and oversized values.
+Unexpected syspath topology or missing attributes fail closed; there is
+**no fallback** to an arbitrary configured port.
+
+The offline test harness exposes
+veci_serial_sms_smoke_verified_fd, which invokes this read-only identity
+gate **before** any mock AT command write. New PTY tests verify that no
+command is sent for wrong VID, wrong interface, ttyUSB3, driver mismatch,
+major/minor mismatch or absent authorization. The unrestricted mock-only
+function is NOT deployable and stays protected by the existing offline
+compiler guard. All messaging helpers remain excluded from the OpenWrt
+package Makefile.
+
+Test evidence: **225 host unit/integration cases PASS** (the earlier 194
+plus 23 standalone identity fixtures and 8 integrated PTY identity-gate
+scenarios), and the existing **24,000 ASAN/UBSAN simulated cases PASS**.
+This does **not** demonstrate the real W907-EC sysfs tree or a real hardware
+identity. Before live activation, validate sysfs topology on a designated
+test unit via a separate, authorized read-only UAT; hardcode the production
+sysfs root and fixed lock, and pin the FD to verified physical USB identity.
+Revalidate after hotplug, modem reset, SIM change and serial re-enumeration.
+On a mismatch, refuse and alert; never probe ttyUSB3 or a fallback port.
+
 ### Separate J8c/J9E image/feed pipeline evidence (not this draft)
 
 On 2026-10-12, GitHub Actions run 38201705426 for source commit
