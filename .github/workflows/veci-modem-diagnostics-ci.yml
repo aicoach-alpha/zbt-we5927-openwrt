@@ -21,6 +21,8 @@ on:
       - 'source/we5927-lte/src/veci-sms-inbox-index.c'
       - 'source/we5927-lte/src/veci-sms-inbox-index.h'
       - 'source/we5927-lte/src/veci-ussd-decode.c'
+      - 'source/we5927-lte/src/veci-xl-ussd-consent.c'
+      - 'source/we5927-lte/src/veci-xl-ussd-consent.h'
       - 'source/we5927-lte/src/veci-sms-multipart.c'
       - 'source/we5927-lte/src/veci-sms-multipart.h'
       - 'tests/test_we5927_at_transport.py'
@@ -35,6 +37,7 @@ on:
       - 'tests/test_veci_sms_pdu_decode.py'
       - 'tests/test_veci_sms_inbox_index.py'
       - 'tests/test_veci_ussd_decode.py'
+      - 'tests/test_veci_xl_ussd_consent.py'
       - 'tests/test_veci_sms_multipart.py'
       - 'tests/fuzz_veci_sms_multipart.c'
       - 'tests/fuzz_veci_sms_codec.c'
@@ -90,6 +93,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_index.py' -v
       - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_pdu_decode.py' -v
+      - name: Verify XL USSD *808# opt-in and per-menu generation-bound consent guard
+        run: python3 -m unittest discover -s tests -p 'test_veci_xl_ussd_consent.py' -v
       - name: Verify bounded async USSD UCS2/unsupported DCS parser (offline)
         run: python3 -m unittest discover -s tests -p 'test_veci_ussd_decode.py' -v
       - name: Verify bounded multipart reconstruction and native SMS-PDU integration (offline)
