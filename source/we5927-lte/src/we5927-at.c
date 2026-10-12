@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,10 +16,10 @@
 #define AT_RESPONSE_MAX 8192
 #define AT_LINE_MAX 1024
 
-static long ms_now(void) {
+static int64_t ms_now(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return -1;
-    return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
+    return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
 static int valid_command(const char *cmd) {
@@ -49,7 +50,7 @@ int main(int argc, char **argv) {
     struct termios tio;
     char tx[512], buf[512], line[AT_LINE_MAX];
     size_t total = 0, line_len = 0, sent, tx_len;
-    long deadline;
+    int64_t deadline;
 
     if (argc < 3 || argc > 4) {
         fprintf(stderr, "usage: %s /dev/ttyUSB1 'AT+CMD' [timeout_ms]\n", argv[0]);
