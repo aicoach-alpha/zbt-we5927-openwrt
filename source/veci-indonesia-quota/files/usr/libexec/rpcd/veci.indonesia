@@ -1,0 +1,51 @@
+#!/bin/sh
+# Read-only rpcd bridge; no operator API traffic, secrets, or modem writes.
+CACHE='/tmp/veci-indonesia-quota.json'
+disconnected() {
+	printf '{ "edition": "indonesia", "operator": "xl", "status": "disconnected" }\n'
+}
+valid_uint() {
+	case "$1" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$(printf '%s' "$1" | wc -c)" -le 14 ]
+}
+quota_status() {
+	[ -f "$CACHE" ] && [ ! -L "$CACHE" ] && [ -r "$CACHE" ] || { disconnected; return; }
+	[ "$(wc -c < "$CACHE" 2>/dev/null)" -le 2048 ] 2>/dev/null || { disconnected; return; }
+	. /usr/share/libubox/jshn.sh
+	json_load "$(cat "$CACHE")" 2>/dev/null || { disconnected; return; }
+	json_get_var provider operator
+	json_get_var total total_bytes
+	json_get_var remaining remaining_bytes
+	json_get_var expires expires_at
+	json_get_var updated updated_at
+	[ "$provider" = xl ] || { disconnected; return; }
+	for v in "$total" "$remaining" "$updated" "$expires"; do
+		valid_uint "$v" || { disconnected; return; }
+	done
+	[ "$total" -gt 0 ] 2>/dev/null && [ "$total" -le 10000000000000 ] 2>/dev/null &&
+		[ "$remaining" -le "$total" ] 2>/dev/null || { disconnected; return; }
+	now="$(date +%s 2>/dev/null)"
+	valid_uint "$now" && [ "$updated" -le "$now" ] 2>/dev/null &&
+		[ "$expires" -gt 0 ] 2>/dev/null || { disconnected; return; }
+	age=$((now - updated))
+	status=ready
+	[ "$age" -gt 21600 ] && status=stale
+	[ "$expires" -le "$now" ] && status=stale
+	json_init
+	json_add_string edition indonesia
+	json_add_string operator xl
+	json_add_string status "$status"
+	json_add_string total_bytes "$total"
+	json_add_string remaining_bytes "$remaining"
+	json_add_string updated_at "$updated"
+	json_add_string expires_at "$expires"
+	json_dump
+}
+case "$1" in
+	list) printf '{ "status": {} }\n' ;;
+	call)
+		case "$2" in
+			status) quota_status ;;
+			*) printf '{ "error": "unknown_method" }\n' ;;
+		esac ;;
+esac
