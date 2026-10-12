@@ -132,9 +132,20 @@ int veci_sms_index_feed(struct veci_sms_index_session *s,
     int rc;
     if (!s || (!bytes && n)) return -EINVAL;
     if (!s->approved) return -EACCES;
-    if (s->failed || s->completed || s->stage == 2) {
-        if (s->stage == 2 && n) invalidate(s);
-        return -EPROTO;
+    if (s->failed || s->completed) return -EPROTO;
+    if (s->stage == 2) {
+        /* A CRLF terminal may arrive split at arbitrary transport reads.
+         * Ignore ONLY CR/LF after OK, not a second command or response.
+         * No bytes are committed until finish() confirms the frame.
+         */
+        size_t i;
+        for (i = 0; i < n; ++i) {
+            if (bytes[i] != '\r' && bytes[i] != '\n') {
+                invalidate(s);
+                return -EPROTO;
+            }
+        }
+        return 0;
     }
     rc = veci_frame_feed(&s->frame, bytes, n, on_frame, s);
     if (!s->frame.line_len)
