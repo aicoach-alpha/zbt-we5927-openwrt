@@ -7,8 +7,10 @@ on:
       - 'source/we5927-lte/files/usr/sbin/we5927-lte'
       - 'source/we5927-lte/src/we5927-at.c'
       - 'source/we5927-lte/src/veci-at-framing.c'
+      - 'source/we5927-lte/src/veci-modem-session-lock.c'
       - 'tests/test_we5927_at_transport.py'
       - 'tests/test_veci_at_framing.py'
+      - 'tests/test_veci_modem_session_lock.py'
       - 'tests/test_veci_modem_sms_ussd.py'
       - '.github/workflows/veci-modem-diagnostics-ci.yml'
       - 'docs/VECI-SMS-USSD-READINESS.md'
@@ -32,6 +34,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_we5927_at_transport.py' -v
       - name: Compile and test inert PDU-mode SMS and deferred USSD parser
         run: python3 -m unittest discover -s tests -p 'test_veci_at_framing.py' -v
+      - name: Verify full-session native AT lock against flock and bounded contention
+        run: python3 -m unittest discover -s tests -p 'test_veci_modem_session_lock.py' -v
       - name: Validate existing LTE manager parses before AT integration
         run: sh -n source/we5927-lte/files/usr/sbin/we5927-lte
       - name: Verify both build editions stage the audited LTE manager
