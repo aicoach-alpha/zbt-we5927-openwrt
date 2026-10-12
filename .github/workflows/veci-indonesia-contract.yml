@@ -1,0 +1,26 @@
+name: VeCI Indonesia optional quota contract
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/**'
+      - 'tests/test_veci_indonesia_contract.py'
+      - 'docs/VECI-INDONESIA-EDITION.md'
+      - '.github/workflows/veci-indonesia-contract.yml'
+permissions:
+  contents: read
+concurrency:
+  group: veci-indonesia-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify read-only ubus provider and unavailable quota semantics
+        run: python3 -m unittest discover -s tests -p 'test_veci_indonesia_contract.py' -v
+      - name: Fail closed until authorized XL connector is implemented
+        run: |
+          test "$(sh source/veci-telco-indonesia/files/usr/libexec/rpcd/veci.quota call status | python3 -c 'import json,sys; x=json.load(sys.stdin); print(x["state"])')" = not_connected
+          echo 'Provider skeleton only; NO quota available; General build unchanged; no live router contacted.'
