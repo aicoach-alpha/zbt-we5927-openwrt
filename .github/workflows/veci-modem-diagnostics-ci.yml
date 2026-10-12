@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'source/veci-cellular-we5927/**'
+      - 'source/we5927-lte/files/usr/sbin/we5927-lte'
       - 'tests/test_veci_modem_sms_ussd.py'
       - '.github/workflows/veci-modem-diagnostics-ci.yml'
       - 'docs/VECI-SMS-USSD-READINESS.md'
