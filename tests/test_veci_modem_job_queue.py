@@ -268,7 +268,7 @@ class QueueTests(unittest.TestCase):
 
     def test_no_modem_io_no_network_or_logging(self):
         src = SOURCE.read_text()
-        self.assertIn("VECI_JOBS_MAX 4", src)
+        self.assertIn("VECI_JOBS_MAX 4", (SOURCE.parent / "veci-modem-job-queue.h").read_text())
         self.assertNotIn("/dev/ttyUSB", src)
         self.assertNotIn("AT+CMGS=", src)
         self.assertNotIn("AT+CUSD=1", src)
