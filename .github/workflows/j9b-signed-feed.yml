@@ -82,7 +82,10 @@ jobs:
           r=json.load(open('j9b-report.json'))
           assert r['release_decision']=='NO_GO'
           assert r['j9b']=='EXECUTED'
-          print('J9B audited. Release NO_GO:',r['keys'],r['signature'],r['solver'])
+          required=('keys','metadata','signature','package_content','solver')
+          for key in required:
+              assert r.get(key)=='PASS', f'{key} must PASS; got {r.get(key)}'
+          print('J9B OFFLINE PASS; final firmware release still NO_GO:',r['gates'] if 'gates' in r else required)
           PY
       - name: Archive J9B evidence
         if: always()
