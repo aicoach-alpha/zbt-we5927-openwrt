@@ -66,7 +66,7 @@ esac
         self.assertEqual(data["sms_notifications"],"rejected")
         self.assertEqual(data["ussd"],"unknown")
         self.assertNotIn("AT+",result.stdout)
-        self.assertNotIn("SM","".join(data.values()))
+        self.assertNotIn("+CPMS:",result.stdout)
 
     def test_busy_lock_never_waits_or_sends_a_command(self):
         fd=os.open(self.lock,os.O_CREAT|os.O_RDWR,0o600)
@@ -90,7 +90,7 @@ esac
         source=HELPER.read_text()
         cmd=re.findall(r'test_at\s+[\x27"]([^"\x27]+)[\x27"]',source)
         self.assertEqual(cmd,["AT+CMGF=?","AT+CPMS=?","AT+CNMI=?","AT+CUSD=?"])
-        self.assertNotRegex(source,r'AT\+(CMGS|CMGR|CMGL|CMGD|CUSD=1|CPMS=)')
+        self.assertNotRegex(source,r'AT\+(CMGS|CMGR|CMGL|CMGD|CUSD=1|CPMS=[^?])')
         self.assertIn("we5927-at.lock",source)
         self.assertIn("flock -n -x 9",source)
         self.assertIn("*/1-1:1.4/*",source)
