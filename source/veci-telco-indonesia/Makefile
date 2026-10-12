@@ -11,7 +11,7 @@ define Package/veci-telco-indonesia
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI Indonesia Edition optional telco quota UI backend
-  DEPENDS:=+veci
+  DEPENDS:=+veci +jsonfilter
 endef
 
 define Package/veci-telco-indonesia/description
