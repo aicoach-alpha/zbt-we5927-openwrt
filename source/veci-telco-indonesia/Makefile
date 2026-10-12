@@ -15,7 +15,7 @@ define Package/veci-telco-indonesia
 endef
 
 define Package/veci-telco-indonesia/description
-  Read-only telco quota integration contract. XL support requires a separately authenticated companion adapter; this package alone never guesses quota.
+  Standalone read-only operator registry and quota contract. Future authorized adapters execute locally and contact carriers directly; no developer-hosted companion. No live carrier login implemented yet.
 endef
 
 define Build/Compile
