@@ -184,6 +184,51 @@ UAT, RP/CSRF/ACL audit, user-visible SMS consent, owner-approved hardware
 activation, final edition image/ABI validation, and rollback plan. No UAT
 on a physical router has been performed by these changes.
 
+
+### Offline AT session coordinator — integration foundation, NOT live
+
+The source-only files source/we5927-lte/src/veci-modem-transaction.c and
+source/we5927-lte/src/veci-modem-transaction.h coordinate the existing native
+framer and consent-gated FIFO. The two existing native components now have
+canonical C headers veci-at-framing.h and veci-modem-job-queue.h, so structure
+layouts and callable types are shared, not guessed.
+
+A privileged caller must supply an already-open, independently held modem
+lock descriptor, a strictly advancing ingress epoch, the exact approved job,
+a monotonic start time, and a bounded deadline. The coordinator validates
+that the borrowed FD is **open** and checks logical epoch/job IDs, but DOES
+NOT verify that the FD holds the real shared flock or that bytes originated
+from the W907-EC modem. Those are separate transport/OS responsibilities.
+Source-only CI intentionally tests using a mock local descriptor; **never
+claim this demonstrates real modem locking**.
+
+State transitions are IDLE -> ARMED -> INFLIGHT ->
+COMPLETE/INTERACTIVE/QUARANTINED. Only a separately authorized transport may
+issue actual commands. An SMS command must not silently consume a late +CUSD
+response from an earlier USSD session, and a USSD session rejects unexpected
+CMGR/CMGL responses. Unfinished lines, malformed payloads, protocol errors,
+backward-clock events, timeout, closed borrowed FD, or unrecognized trailing
+response bytes lead to explicit failure/quarantine, with no auto retry and no
+queued job replay. Split CRLF delimiters across serial reads are tolerated
+without admitting other trailing data. An interactive USSD reply is NOT
+automatically answered, ended, or replayed.
+
+A quarantined session requires an explicit authorized reset AFTER the trusted
+transport actually resynchronizes the modem; the helper only clears in-memory
+state. Logical epoch tagging does NOT solve untagged/late URCs arriving
+physically on a UART. Such ambiguity requires conservative transport
+quarantine, verified modem reset/port drainage and hardware UAT. The API
+does not implement a serial transmitter, privilege proof, durable task queue,
+USB modem identity verification, filesystem, network, or live SIM operation.
+
+An inactive firmware package build guard checks that none of the new C
+helpers are linked into source/we5927-lte/Makefile. The latest offline
+test matrix runs **175 host unit/integration tests**, **10,000 adversarial
+PDU/USSD codec cases**, **9,000 multipart cases**, and **5,000 fragmented AT
+coordinator cases**, all without accessing a modem. Each adversarial suite
+runs with AddressSanitizer and UndefinedBehaviorSanitizer. Successful CI is
+not a passing physical SMS/USSD UAT, nor an approved firmware image release.
+
 **Next integration safety gates (not implemented):** one process must hold
 /var/lock/we5927-at.lock continuously from command dispatch through the
 final asynchronous notification or deadline, including all SMS prompt/PDU
