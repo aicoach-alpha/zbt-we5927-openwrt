@@ -121,6 +121,11 @@ method_create() {
 	[ "$(clean_text "$description")" = "$description" ] && [ "${#description}" -le 64 ] || { printf '{ "ok": false, "error": "invalid_description" }\n'; return; }
 	printf '%s' "$public_key" | grep -Eq '^[A-Za-z0-9+/]{43}=$' || { printf '{ "ok": false, "error": "invalid_public_key" }\n'; return; }
 	valid_cidr "$allowed_ip" || { printf '{ "ok": false, "error": "invalid_allowed_ip" }\n'; return; }
+	case "$allowed_ip" in
+		0.0.0.0/0|::/0)
+			printf '{ "ok": false, "error": "default_route_peers_require_expert_setup" }\n'
+			return ;;
+	esac
 	if [ -n "$endpoint_host" ]; then
 		[ "$(clean_token "$endpoint_host")" = "$endpoint_host" ] && [ "${#endpoint_host}" -le 253 ] || { printf '{ "ok": false, "error": "invalid_endpoint" }\n'; return; }
 	fi
@@ -134,7 +139,9 @@ method_create() {
 	uci -q set "network.$section.description=$description"
 	uci -q set "network.$section.public_key=$public_key"
 	uci -q add_list "network.$section.allowed_ips=$allowed_ip"
-	uci -q set "network.$section.route_allowed_ips=1"
+	# Peer entries must not inject routes into the router's WAN/LAN table.
+	# Routing is an explicit advanced network policy, never an app side effect.
+	uci -q set "network.$section.route_allowed_ips=0"
 	uci -q set "network.$section.persistent_keepalive=$keepalive"
 	if [ -n "$endpoint_host" ]; then uci -q set "network.$section.endpoint_host=$endpoint_host"; fi
 	if [ -n "$endpoint_port" ]; then uci -q set "network.$section.endpoint_port=$endpoint_port"; fi
