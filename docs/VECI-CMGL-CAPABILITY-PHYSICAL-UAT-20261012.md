@@ -57,7 +57,19 @@ No SMS text, OTP, number or raw PDU is ever emitted.
 
 ## Status
 
-Pending physical execution of the AT+CMGL=? test by router owner.
+**OPERATOR-OBSERVED PHYSICAL UAT: PASS — 2026-10-12.**
+The owner ran the exact source-pinned script from commit
+`479ed78c797962a26395f5184809f57b56a41e01` on the WE5927
+through office-laptop SSH. The 2,013-byte file was downloaded; shell
+syntax validation succeeded; physical read-only command returned:
+
+```json
+{"ok":true,"source":"read_only_at_test","cmgl_test":"accepted","sms_messages_accessed":false}
+```
+
+This proves the modem accepted the 3GPP CMGL TEST command only.
+It **does not** prove SMS listing has been run, any inbox contents were
+retrieved, or that the modem would preserve unread flags on actual list.
 No authorization to read the actual SMS inbox or conduct a USSD session.
 No third hotfix, no new RPC method, no flash or reboot is needed for this test.
 After this test, privileged UI consent and whole-session transport must
