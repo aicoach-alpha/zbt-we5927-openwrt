@@ -54,6 +54,11 @@ class FramingTests(unittest.TestCase):
             CALLBACK, ctypes.c_void_p,
         ]
         cls.lib.veci_frame_feed.restype = ctypes.c_int
+        cls.lib.veci_frame_finish.argtypes = [
+            ctypes.POINTER(Frame), CALLBACK, ctypes.c_void_p]
+        cls.lib.veci_frame_finish.restype = ctypes.c_int
+        cls.lib.veci_ussd_expire.argtypes = [ctypes.POINTER(Session)]
+        cls.lib.veci_ussd_expire.restype = ctypes.c_int
         cls.lib.veci_ussd_init.argtypes = [ctypes.POINTER(Session)]
         cls.lib.veci_ussd_consume.argtypes = [
             ctypes.POINTER(Session), ctypes.c_int, ctypes.c_int]
@@ -189,6 +194,33 @@ class FramingTests(unittest.TestCase):
         self.events.clear()
         self.assertEqual(self.feed("OK\r\n"), 0)
         self.assertEqual(self.events[-1][0], OK)
+
+    def test_truncated_sms_pdu_fails_at_end_of_transaction(self):
+        self.assertEqual(self.feed("+CMGL: 0,0,,2\r\n"), 0)
+        self.assertEqual(self.lib.veci_frame_finish(
+            ctypes.byref(self.frame), self.callback, None), -1)
+        self.assertEqual(self.events[-1][0], PROTOCOL_ERROR)
+
+    def test_partial_terminal_line_fails_at_end_of_transaction(self):
+        self.assertEqual(self.feed("O"), 0)
+        self.assertEqual(self.lib.veci_frame_finish(
+            ctypes.byref(self.frame), self.callback, None), -1)
+        self.assertFalse(any(e[0] == OK for e in self.events))
+
+    def test_complete_response_can_finish(self):
+        self.assertEqual(self.feed("OK\r\n"), 0)
+        self.assertEqual(self.lib.veci_frame_finish(
+            ctypes.byref(self.frame), self.callback, None), 0)
+
+    def test_pending_ussd_can_be_expired_without_resend(self):
+        s = Session()
+        self.lib.veci_ussd_init(ctypes.byref(s))
+        self.assertEqual(self.lib.veci_ussd_consume(
+            ctypes.byref(s), OK, 0), WAITING)
+        self.assertEqual(self.lib.veci_ussd_expire(
+            ctypes.byref(s)), FAILED)
+        self.assertEqual(self.lib.veci_ussd_consume(
+            ctypes.byref(s), USSD, 0), FAILED)
 
     def test_no_modem_io_or_sensitive_logging_in_parser(self):
         src = SOURCE.read_text()
