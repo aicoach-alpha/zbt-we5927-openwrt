@@ -36,7 +36,7 @@ class InboxIndexTests(unittest.TestCase):
         if r.returncode:
             raise AssertionError(r.stderr)
         cls.lib = ctypes.CDLL(str(output))
-        cls.lib.veci_sms_index_init.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        cls.lib.veci_sms_index_init.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
         cls.lib.veci_sms_index_init.restype = ctypes.c_int
         cls.lib.veci_sms_index_feed.argtypes = [
             ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t]
@@ -56,7 +56,7 @@ class InboxIndexTests(unittest.TestCase):
 
     def setUp(self):
         self.session = ctypes.create_string_buffer(16384)
-        self.assertEqual(self.lib.veci_sms_index_init(self.session, 1), 0)
+        self.assertEqual(self.lib.veci_sms_index_init(self.session, 1, 1), 0)
 
     def feed(self, stream, fragments=0):
         if isinstance(stream, str):
@@ -94,11 +94,34 @@ class InboxIndexTests(unittest.TestCase):
 
     def test_exact_approval_required_before_processing(self):
         for flag in (0, 2, -1):
-            self.assertLess(self.lib.veci_sms_index_init(self.session, flag), 0)
+            self.assertLess(self.lib.veci_sms_index_init(self.session, flag, 1), 0)
             self.assertLess(self.feed(cmgl(1) + "OK\r\n"), 0)
             self.assertIsNone(self.items())
-        self.assertEqual(self.lib.veci_sms_index_init(self.session, 1), 0)
+        self.assertEqual(self.lib.veci_sms_index_init(self.session, 1, 1), 0)
 
+    def test_explicit_acknowledgement_of_read_state_mutation_required(self):
+        # CMGL can mark unread messages as read: user must acknowledge.
+        for ack in (0, -1, 2):
+            with self.subTest(ack=ack):
+                self.assertLess(self.lib.veci_sms_index_init(self.session, 1, ack), 0)
+                self.assertLess(self.feed(cmgl(1) + 'OK\r\n'), 0)
+                self.assertIsNone(self.items())
+        self.assertEqual(self.lib.veci_sms_index_init(self.session, 1, 1), 0)
+
+    def test_partial_secret_pdu_wiped_on_incomplete_protocol_error(self):
+        secret = b'004F5450534543524554'
+        self.assertEqual(self.feed(b'+CMGL: 1,0,,10\r\n' + secret[:12]), 0)
+        self.assertIn(secret[:12], self.session.raw)
+        self.assertLess(self.feed(b'GG\r\n'), 0)
+        self.assertNotIn(secret[:12], self.session.raw)
+        self.assertIsNone(self.items())
+
+    def test_late_input_after_finish_invalidates_previous_metadata(self):
+        self.assertEqual(self.feed(cmgl(5) + 'OK\r\n'), 0)
+        self.assertEqual(self.lib.veci_sms_index_finish(self.session), 0)
+        self.assertEqual(self.items(), [(5, 0, 2)])
+        self.assertLess(self.feed(b'NEXT'), 0)
+        self.assertIsNone(self.items())
     def test_empty_inbox_only_after_real_terminal_ok(self):
         self.assertEqual(self.feed("OK\r\n"), 0)
         self.assertIsNone(self.items())
@@ -108,7 +131,7 @@ class InboxIndexTests(unittest.TestCase):
     def test_two_headers_pdus_and_fragmentation(self):
         for piece in (1, 2, 5, 23):
             with self.subTest(fragment=piece):
-                self.lib.veci_sms_index_init(self.session, 1)
+                self.lib.veci_sms_index_init(self.session, 1, 1)
                 wire = "AT+CMGL=4\r\n" + cmgl(1, 0) + cmgl(3, 1) + "OK\r\n"
                 self.assertEqual(self.feed(wire, piece), 0)
                 self.assertEqual(self.lib.veci_sms_index_finish(self.session), 0)
@@ -154,7 +177,7 @@ class InboxIndexTests(unittest.TestCase):
                      "+CMGL: 1,0,,2,1", "+CMGL: 1,0,,2X",
                      "+CMGL: 1,0,\"X\",2"):
             with self.subTest(item=item):
-                self.lib.veci_sms_index_init(self.session, 1)
+                self.lib.veci_sms_index_init(self.session, 1, 1)
                 self.assertLess(self.feed(item+"\r\n"), 0)
                 self.assertIsNone(self.items())
 
@@ -163,7 +186,7 @@ class InboxIndexTests(unittest.TestCase):
                      "+CMGL: 1,0,,4\r\n000011\r\nOK\r\n",
                      "+CMGL: 1,0,,2\r\nFF0011\r\nOK\r\n"):
             with self.subTest(wire=wire[:20]):
-                self.lib.veci_sms_index_init(self.session, 1)
+                self.lib.veci_sms_index_init(self.session, 1, 1)
                 self.assertLess(self.feed(wire), 0)
                 self.assertIsNone(self.items())
 
@@ -173,13 +196,13 @@ class InboxIndexTests(unittest.TestCase):
                      '+CMT: ,2\r\n000011\r\nOK\r\n',
                      '+CMS ERROR: 500\r\n'):
             with self.subTest(wire=wire[:12]):
-                self.lib.veci_sms_index_init(self.session, 1)
+                self.lib.veci_sms_index_init(self.session, 1, 1)
                 self.assertLess(self.feed(wire), 0)
                 self.assertIsNone(self.items())
 
     def test_truncated_mid_header_and_pdu(self):
         for wire in ("+CMGL: 1,0,,2\r\n", "OK", "+CMGL: 1,0,,2\r\n0000"):
-            self.lib.veci_sms_index_init(self.session, 1)
+            self.lib.veci_sms_index_init(self.session, 1, 1)
             self.assertEqual(self.feed(wire), 0)
             self.assertLess(self.lib.veci_sms_index_finish(self.session), 0)
             self.assertIsNone(self.items())
@@ -187,7 +210,7 @@ class InboxIndexTests(unittest.TestCase):
     def test_post_terminal_data_rejected(self):
         self.assertLess(self.feed(cmgl(1) + "OK\r\nLATE\r\n"), 0)
         self.assertIsNone(self.items())
-        self.lib.veci_sms_index_init(self.session, 1)
+        self.lib.veci_sms_index_init(self.session, 1, 1)
         self.assertEqual(self.feed("OK\r\n"), 0)
         self.assertLess(self.feed(cmgl(1)), 0)
         self.assertIsNone(self.items())
@@ -196,7 +219,7 @@ class InboxIndexTests(unittest.TestCase):
         self.assertEqual(self.feed("".join(cmgl(i) for i in range(16))+"OK\r\n"), 0)
         self.assertEqual(self.lib.veci_sms_index_finish(self.session), 0)
         self.assertEqual(len(self.items()),16)
-        self.lib.veci_sms_index_init(self.session,1)
+        self.lib.veci_sms_index_init(self.session,1,1)
         self.assertLess(self.feed("".join(cmgl(i) for i in range(17))+"OK\r\n"), 0)
         self.assertIsNone(self.items())
 
