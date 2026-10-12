@@ -107,6 +107,15 @@ int veci_serial_sms_smoke_fd(int tty_fd, const char *isolated_test_lock,
     if (fcntl(tty_fd, F_SETFL, old_flags | O_NONBLOCK) != 0) {
         rc = -errno; goto done;
     }
+    {
+        struct pollfd pending = { .fd=tty_fd, .events=POLLIN };
+        int pr = poll(&pending, 1, 0);
+        /* Fail closed rather than flushing stale responses or consuming
+         * a leftover USSD URC as the response to a fresh SMS command.
+         * This check alone cannot prevent an URC arriving later. */
+        if (pr < 0) { rc = -errno; goto done; }
+        if (pr > 0) { rc = -EAGAIN; goto done; }
+    }
     deadline = now_ms();
     if (deadline < 0 || deadline > INT64_MAX - timeout_ms) {
         rc = -EIO; goto done;
