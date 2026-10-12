@@ -93,8 +93,63 @@ esac
         self.assertNotRegex(source,r'AT\+(CMGS|CMGR|CMGL|CMGD|CUSD=1|CPMS=[^?])')
         self.assertIn("we5927-at.lock",source)
         self.assertIn("flock -n -x 9",source)
-        self.assertIn("*/1-1:1.4/*",source)
-        self.assertIn("/dev/ttyUSB3) return 1",source)
+        self.assertIn("/sys/devices/*:1.4/*",source)
+        self.assertIn('[ "$name" != ttyUSB3 ]',source)
+        self.assertIn('[ "$vid" = 05c6 ]',source)
+        self.assertIn('[ "$pid" = 902e ]',source)
+        self.assertNotIn("cfg at_port",source)
+        self.assertNotIn("uci -q get we5927_lte.main.at_port",source)
+
+    def _identity_script(self, interface="1-1:1.4", vendor="05c6",
+                         product="902e", ttyname="ttyUSB2", fallback=False):
+        # Replace fixed /sys and /dev roots only inside this standalone
+        # extracted function, NEVER invoke the real router filesystem.
+        root = self.dir/"synthetic-sys"
+        devdir = root/"devices/usb1/1-1"
+        iface = devdir/interface
+        ttydir = iface/ttyname
+        ttydir.mkdir(parents=True, exist_ok=True)
+        classdir = root/"class/tty"/ttyname
+        classdir.mkdir(parents=True, exist_ok=True)
+        link = classdir/"device"
+        link.symlink_to(os.path.relpath(ttydir, classdir))
+        (devdir/"idVendor").write_text(vendor + "\n")
+        (devdir/"idProduct").write_text(product + "\n")
+        code = function("find_at_port")
+        code = code.replace("/sys/class/tty/ttyUSB*", str(root/"class/tty/ttyUSB*"))
+        code = code.replace("/sys/devices/*:1.4/*",
+                            str(root/"devices/*:1.4/*"))
+        code = code.replace('port="/dev/$name"', 'port="/dev/null"')
+        return "set -eu\n" + code + "\nfind_at_port\n"
+
+    def test_verified_interface_14_with_matching_usb_id(self):
+        result=self.run_shell(self._identity_script())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "/dev/null")
+
+    def test_wrong_interface_15_never_falls_back(self):
+        result=self.run_shell(self._identity_script(interface="1-1:1.5"))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+
+    def test_ttyusb3_is_forbidden_even_if_interface_14(self):
+        result=self.run_shell(self._identity_script(ttyname="ttyUSB3"))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+
+    def test_wrong_vendor_product_rejected_before_port(self):
+        for kwargs in ({"vendor":"12d1"}, {"product":"902f"}):
+            with self.subTest(kwargs=kwargs):
+                result=self.run_shell(self._identity_script(**kwargs))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, "")
+
+    def test_no_legacy_config_fallback_when_usb_not_discovered(self):
+        code = function("find_at_port")
+        self.assertNotIn("configured", code)
+        self.assertNotIn("uci ", code)
+        self.assertNotIn("preferred", code)
+        self.assertIn("return 1", code)
 
     def test_unrecognized_rpc_methods_cannot_send_sms(self):
         rpc=RPC.read_text()
