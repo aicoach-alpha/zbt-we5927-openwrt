@@ -18,6 +18,7 @@ on:
       - 'tests/test_veci_modem_pipeline.py'
       - 'tests/test_veci_sms_pdu_decode.py'
       - 'tests/test_veci_ussd_decode.py'
+      - 'tests/fuzz_veci_sms_codec.c'
       - 'tests/test_veci_modem_sms_ussd.py'
       - '.github/workflows/veci-modem-diagnostics-ci.yml'
       - 'docs/VECI-SMS-USSD-READINESS.md'
@@ -51,6 +52,16 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_pdu_decode.py' -v
       - name: Verify bounded async USSD UCS2/unsupported DCS parser (offline)
         run: python3 -m unittest discover -s tests -p 'test_veci_ussd_decode.py' -v
+      - name: Fuzz 10,000 malformed SMS/USSD payloads under ASAN and UBSAN
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer \
+            tests/fuzz_veci_sms_codec.c \
+            source/we5927-lte/src/veci-sms-pdu-decode.c \
+            source/we5927-lte/src/veci-ussd-decode.c \
+            -o "$RUNNER_TEMP/fuzz-veci-sms-codec"
+          ASAN_OPTIONS=detect_leaks=0 "$RUNNER_TEMP/fuzz-veci-sms-codec"
       - name: Validate existing LTE manager parses before AT integration
         run: sh -n source/we5927-lte/files/usr/sbin/we5927-lte
       - name: Verify both build editions stage the audited LTE manager
