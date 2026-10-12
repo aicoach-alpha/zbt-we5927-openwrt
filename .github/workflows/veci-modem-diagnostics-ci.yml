@@ -42,6 +42,9 @@ on:
       - 'scripts/veci-live-capability-hotfix.sh'
       - 'scripts/veci-live-minimal/**'
       - 'tests/test_veci_live_capability_hotfix.py'
+      - 'scripts/veci-live-storage-v2/**'
+      - 'scripts/veci-live-storage-hotfix-v2.sh'
+      - 'tests/test_veci_live_storage_hotfix_v2.py'
 
 permissions:
   contents: read
@@ -62,6 +65,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_storage_readonly.py' -v
       - name: "Audit minimal reversible overlay hotfix: pinned SHA256, ACL and legacy RPC ABI"
         run: python3 -m unittest discover -s tests -p 'test_veci_live_capability_hotfix.py' -v
+      - name: Verify reversible v2 SMS storage overlay package and retained v1 rollback
+        run: python3 -m unittest discover -s tests -p 'test_veci_live_storage_hotfix_v2.py' -v
       - name: Compile and exercise native AT serial transport against fake pseudo-terminal
         run: python3 -m unittest discover -s tests -p 'test_we5927_at_transport.py' -v
       - name: Compile and test inert PDU-mode SMS and deferred USSD parser
