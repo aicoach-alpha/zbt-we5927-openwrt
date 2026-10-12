@@ -166,12 +166,12 @@ class PtySmokeTests(unittest.TestCase):
         received = []
         def modem():
             payload = b""
-            while not payload.endswith(b"\\r"):
+            while not payload.endswith(b"\r"):
                 payload += os.read(self.master, 100)
-            self.assertEqual(payload, b"AT+CMGR=1\\r")
+            self.assertEqual(payload, b"AT+CMGR=1\r")
             sent.set()
             self.assertTrue(release.wait(1.0))
-            os.write(self.master, b"+CMGR: 0,,2\\r\\n000011\\r\\nOK\\r\\n")
+            os.write(self.master, b"+CMGR: 0,,2\r\n000011\r\nOK\r\n")
         t = threading.Thread(target=modem, daemon=True)
         self.threads.append(t)
         t.start()
