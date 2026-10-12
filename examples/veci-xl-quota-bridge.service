@@ -1,0 +1,16 @@
+[Unit]
+Description=VeCI Indonesia XL quota sync to authorized test router
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=veciquota
+Group=veciquota
+EnvironmentFile=/etc/veci-indonesia/bridge.env
+ExecStart=/opt/veci-indonesia/scripts/sync_xl_quota_host.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+TimeoutStartSec=110
