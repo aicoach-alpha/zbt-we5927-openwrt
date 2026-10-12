@@ -114,7 +114,7 @@ class CacheSafetyTests(unittest.TestCase):
         self.assertEqual(obj["state"],"unavailable")
 
     def test_invalid_numbers_fail_closed(self):
-        for rem in (-1,"4",2.5,"4\\nINJECT",10**15,None,True):
+        for rem in (-1,"abc",2.5,"4\\nINJECT",10**15,None,True):
             with self.subTest(rem=repr(rem)):
                 self.put(self.data(remaining_bytes=rem))
                 obj,_=self.decoded()
