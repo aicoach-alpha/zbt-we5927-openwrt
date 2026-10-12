@@ -53,6 +53,21 @@ class TelcoContract(unittest.TestCase):
         self.assertIn("providers.json",pkg)
         self.assertNotIn("python3",pkg.lower())
         self.assertNotIn("nodejs",pkg.lower())
+    def test_standalone_public_edition_contract(self):
+        spec=(ROOT/"docs/VECI-INDONESIA-EDITION.md").read_text()
+        pkg=(BASE/"Makefile").read_text()
+        self.assertIn("Standalone mode — mandatory release gate",spec)
+        self.assertIn("No central VeCI backend",spec)
+        self.assertIn("Direct-to-carrier egress only",spec)
+        self.assertIn("No always-on provider processes",spec)
+        self.assertIn("no developer-hosted companion",pkg)
+        self.assertNotIn("requires a separately authenticated companion adapter",pkg.lower())
+        backend=PROVIDER.read_text()
+        self.assertNotIn("curl ",backend)
+        self.assertNotIn("wget ",backend)
+        self.assertNotIn("https://",backend)
+        # Initial skeleton neither pretends to authenticate nor reports fake quota.
+        self.assertIn('"state": "not_connected"',backend)
     def test_general_firmware_stays_unmodified(self):
         wf=(ROOT/".github/workflows/j8c-app-feed.yml").read_text()
         self.assertNotIn("set_module PACKAGE_veci-telco-indonesia",wf)
