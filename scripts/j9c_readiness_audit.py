@@ -21,17 +21,51 @@ def findings(src):
     apply=method(src["core"],"method_firmware_apply")
     validate=method(src["core"],"method_firmware_validate")
     action=method(src["core"],"method_app_action")
+    if "portal_snapshot_begin || return 1" in guest and "portal_snapshot_restore" in guest:
+        guest_safety="MITIGATED_STATIC"
+    elif "provision_base || return 1" in guest and "wifi reload" in guest:
+        guest_safety="BLOCKED"
+    else:
+        guest_safety="REVIEW_REQUIRED"
+    if "cleanup_expired" in voucher and not voucher.lstrip().startswith("#"):
+        voucher_safety="BLOCKED"
+    elif "cleanup_expired" in voucher and not "cleanupExpired) method_cleanup" in src["voucher"]:
+        voucher_safety="BLOCKED"
+    elif "cleanupExpired) method_cleanup" in src["voucher"] and "[ \"$expires\" -gt \"$now\" ]" in voucher:
+        voucher_safety="MITIGATED_STATIC"
+    else:
+        voucher_safety="REVIEW_REQUIRED"
+    if "route_allowed_ips=1" in wg:
+        route_safety="BLOCKED"
+    elif "route_allowed_ips=0" in wg and "0.0.0.0/0|::/0" in wg:
+        route_safety="MITIGATED_STATIC"
+    else:
+        route_safety="REVIEW_REQUIRED"
+    if ('firmware_validation_fresh "$validation_issued"' in apply and
+        'firmware_validation_fresh "$issued"' in validate and
+        "firmware_validation_max_age=600" in src["core"]):
+        token_safety="MITIGATED_STATIC"
+    elif ("validation_token" in apply and not re.search(
+        r"validation_(created|expires)|token_(issued|expires)|max_age",apply+validate)):
+        token_safety="BLOCKED"
+    else:
+        token_safety="REVIEW_REQUIRED"
+    if all(x in action for x in ("app_cleanup_provider_missing",
+                                 "app_cleanup_unavailable",
+                                 'cleanup_ok" = "true"')):
+        cleanup_safety="MITIGATED_STATIC"
+    elif 'if [ -n "$cleanup" ]; then' in action:
+        cleanup_safety="BLOCKED"
+    else:
+        cleanup_safety="REVIEW_REQUIRED"
     return {
-       "guest_partial_activation_rollback":"BLOCKED" if
-          "provision_base || return 1" in guest and "wifi reload" in guest
-          and "disable_portal" not in guest else "REVIEW_REQUIRED",
-       "voucher_read_side_effect":"BLOCKED" if "cleanup_expired" in voucher else "REVIEW_REQUIRED",
-       "wireguard_peer_auto_routes":"BLOCKED" if "route_allowed_ips=1" in wg else "REVIEW_REQUIRED",
-       "updater_token_expiry":"BLOCKED" if "validation_token" in apply
-          and not re.search(r"validation_(created|expires)|token_(issued|expires)|max_age",apply+validate)
-          else "REVIEW_REQUIRED",
-       "app_cleanup_empty_response":"BLOCKED" if 'if [ -n "$cleanup" ]; then' in action else "REVIEW_REQUIRED"
+        "guest_partial_activation_rollback":guest_safety,
+        "voucher_read_side_effect":voucher_safety,
+        "wireguard_peer_auto_routes":route_safety,
+        "updater_token_expiry":token_safety,
+        "app_cleanup_empty_response":cleanup_safety
     }
+
 def audit(root,core):
     p={a:root/("source/veci-app-"+a+"/files/usr/libexec/rpcd/veci.app."+a) for a in APPS}
     p["updater"]=root/"source/veci-update-we5927/files/usr/sbin/veci-update-agent"
