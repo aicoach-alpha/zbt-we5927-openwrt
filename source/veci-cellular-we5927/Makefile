@@ -22,6 +22,8 @@ endef
 define Package/veci-cellular-we5927/install
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
 	$(INSTALL_BIN) ./files/usr/libexec/rpcd/veci.cellular $(1)/usr/libexec/rpcd/veci.cellular
+	$(INSTALL_DIR) $(1)/usr/libexec
+	$(INSTALL_BIN) ./files/usr/libexec/veci-modem-capabilities $(1)/usr/libexec/veci-modem-capabilities
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/veci-cellular-we5927.json $(1)/usr/share/rpcd/acl.d/veci-cellular-we5927.json
 endef
