@@ -29,10 +29,6 @@ class CapturedExactOverlay(unittest.TestCase):
         handler_start = code.index("\t\t// The existing v2 endpoint reads AT+CPMS? only.")
         handler_end = code.index("\t\tconst reconnect = root.querySelector('#cellular-reconnect');", handler_start)
         code = code[:handler_start] + code[handler_end:]
-        # Both insertions follow blank lines in original. The panel/handler
-        # each added their own extra blank line. Remove precisely those.
-        code = code.replace('\n\n\t\t\t<div class="notice-card">', '\n\t\t\t<div class="notice-card">', 1)
-        code = code.replace("\n\n\t\tconst reconnect = root.querySelector", "\n\t\tconst reconnect = root.querySelector", 1)
         self.assertEqual(hashlib.sha256(code.encode()).hexdigest(), ORIGINAL)
 
     def test_no_modem_or_sms_body_access(self):
