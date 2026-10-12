@@ -19,6 +19,21 @@ VeCI General and VeCI Indonesia share one modem communication interface. The WE5
 
 The existing OpenWrt board patch stages a bootstrap `package/we5927-lte`. The canonical maintained LTE source lives in `source/we5927-lte`, and it previously contained a broken, duplicated shell block. The malformed portion was repaired in the development tree (one unique function per operation, complete read-only IMEI helper, one dispatcher). The build staging script `scripts/prepare-veci.sh` now **replaces** the patch's LTE package with the syntax-checked canonical source. CI compares the staged files in both General and Indonesia profiles. Both builds must use the same corrected modem manager and read-only SMS/USSD helper.
 
+
+## Native serial transport hardening for eventual SMS/USSD
+
+Development has hardened `source/we5927-lte/src/we5927-at.c` without enabling message transactions. It now:
+
+- Recognizes complete terminal `OK`, `ERROR`, `NO CARRIER`, `+CMS ERROR` and `+CME ERROR` **across arbitrarily fragmented serial reads**, rather than searching each read fragment separately.
+- Enforces an 8 KiB maximum response and 1024-byte maximum logical line, bounds the timeout to 100–30,000 ms, handles short UART writes, and rejects AT commands containing embedded control characters or line breaks.
+- Uses 64-bit monotonic milliseconds for reliable timeouts even after many weeks of uptime on 32-bit MIPS.
+- Reuses the original shared nonblocking AT lock from the LTE manager; it introduces no daemon, Python/Node runtime, or remote endpoint.
+- Adds `tests/test_we5927_at_transport.py`: 11 native host-C/PTTY regressions covering split OK/error, incomplete OK, false terminal substring, long responses, timeout, invalid commands, legacy LTE status and simulated carrier errors. CI now executes these beside nine mocked diagnostics tests.
+
+**Critical protocol distinction:** a generic one-shot AT transaction is still **not** sufficient for SMS inbox/send or interactive USSD. Text-mode SMS content may itself contain a line `OK`, and network-initiated USSD `+CUSD` responses may arrive asynchronously *after* command acknowledgement. Before enabling those operations, implement a session-aware parser (prefer SMS PDU for framing), unsolicited-response handling, strict message privacy/OTP consent and a separate privileged ubus write ACL. Never expose raw modem transcripts to the ordinary dashboard. Physical UAT must verify exact USB interface, APDU capability, message character set/encoding, operator-side USSD availability and race-free coordination with status polling.
+
+**Release gate remains NO_GO**: source-only serial improvements are not proof of SMS/USSD support on a physical W907 modem, and the current live kernel/image has not been altered.
+
 ## UAT matrix, ALL NOT TESTED on physical router
 
 1. Before any AT request, verify wired recovery access, backup, SIM presence and correct USB interface mapping using read-only sysfs commands.
