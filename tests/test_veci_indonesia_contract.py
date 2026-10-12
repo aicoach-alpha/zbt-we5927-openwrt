@@ -74,7 +74,7 @@ class TelcoContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             tree=pathlib.Path(t)
             config=tree/".config"
-            config.write_text("CONFIG_PACKAGE_veci=y\\n")
+            config.write_text("CONFIG_PACKAGE_veci=y\n")
             general=subprocess.run(["sh",str(script),"general",str(config)],capture_output=True,text=True)
             self.assertEqual(general.returncode,0,general.stderr)
             self.assertIn("# CONFIG_PACKAGE_veci-telco-indonesia is not set",config.read_text())
