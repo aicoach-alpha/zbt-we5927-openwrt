@@ -57,7 +57,10 @@ rm -rf "$DEST"
 mkdir -p "$DEST"
 cp -a "$TMP/tree/." "$DEST/"
 
-for package in veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci-app-guest veci-app-sqm veci-app-ddns veci-app-wireguard veci-app-voucher veci-update-we5927; do
+# The OpenWrt board patch provides a bootstrap we5927-lte package, but the
+# audited package in source/we5927-lte MUST replace it on both editions.
+# Otherwise a stale modem manager could be embedded in a green build.
+for package in we5927-lte veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci-app-guest veci-app-sqm veci-app-ddns veci-app-wireguard veci-app-voucher veci-update-we5927; do
 	rm -rf "$OPENWRT_ROOT/package/$package"
 	cp -a "$SELF_DIR/source/$package" "$OPENWRT_ROOT/package/$package"
 done
