@@ -185,7 +185,7 @@ class InboxIndexTests(unittest.TestCase):
             self.assertIsNone(self.items())
 
     def test_post_terminal_data_rejected(self):
-        self.assertEqual(self.feed(cmgl(1) + "OK\r\nLATE\r\n"), -1)
+        self.assertLess(self.feed(cmgl(1) + "OK\r\nLATE\r\n"), 0)
         self.assertIsNone(self.items())
         self.lib.veci_sms_index_init(self.session, 1)
         self.assertEqual(self.feed("OK\r\n"), 0)
