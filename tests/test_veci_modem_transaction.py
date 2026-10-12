@@ -173,25 +173,25 @@ class SessionTests(unittest.TestCase):
         self.begin(LIST)
         self.assertEqual(self.feed("O"), 0)
         self.assertEqual(self.feed("K\r"), 1)
-        self.assertEqual(self.feed("\n"), COMPLETE)
+        self.assertEqual(self.feed("\n"), 1)
         self.assertEqual(self.finish(), 0)
         self.assertEqual(self.tx.state, IDLE)
 
     def test_split_crlf_after_terminal_is_valid(self):
         self.begin(LIST)
-        self.assertEqual(self.feed("OK\r"), COMPLETE)
-        self.assertEqual(self.feed("\n\r\n"), COMPLETE)
+        self.assertEqual(self.feed("OK\r"), 1)
+        self.assertEqual(self.feed("\n\r\n"), 1)
         self.assertEqual(self.finish(), 0)
 
     def test_unexpected_trailing_bytes_in_later_read_poison_session(self):
         self.begin(LIST)
-        self.assertEqual(self.feed("OK\r\n"), COMPLETE)
+        self.assertEqual(self.feed("OK\r\n"), 1)
         self.assertEqual(self.feed("+CUSD:"), -errno.EPROTO)
         self.assertEqual(self.tx.state, QUARANTINED)
 
     def test_split_crlf_after_terminal_expires_if_delayed_too_long(self):
         self.begin(LIST)
-        self.assertEqual(self.feed("OK\r"), COMPLETE)
+        self.assertEqual(self.feed("OK\r"), 1)
         self.assertEqual(self.feed("\n", now=3000), -errno.ETIMEDOUT)
         self.assertEqual(self.tx.state, QUARANTINED)
 
