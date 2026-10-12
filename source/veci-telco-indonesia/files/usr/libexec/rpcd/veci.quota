@@ -1,0 +1,18 @@
+#!/bin/sh
+# Explicit read-only contract. No credentials, fake data or implicit network calls.
+# Authenticated API adapter and cache are intentionally NOT enabled at this stage.
+case "$1" in
+  list)
+    printf '{ "status": {} }\n'
+    ;;
+  call)
+    case "$2" in
+      status)
+        printf '{ "schema": 1, "provider": "xl", "state": "not_connected", "total_bytes": null, "remaining_bytes": null, "used_bytes": null, "expires_at": null, "fetched_at": null, "source": null, "buckets": [] }\n'
+        ;;
+      *)
+        printf '{ "error": "method_not_found" }\n'
+        ;;
+    esac
+    ;;
+esac
