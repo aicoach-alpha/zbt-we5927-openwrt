@@ -1,0 +1,36 @@
+#!/bin/sh
+# Root-only local import of data retrieved via a separately authenticated XL bridge.
+# NEVER expose as unauthenticated ubus/HTTP write; store no OTP, MSISDN or API key.
+CACHE='/tmp/veci-indonesia-quota.json'
+umask 077
+[ "$(id -u)" = 0 ] || { echo root_required >&2; exit 1; }
+payload="$(head -c 2049)"
+[ "$(printf '%s' "$payload" | wc -c)" -le 2048 ] || { echo too_large >&2; exit 1; }
+. /usr/share/libubox/jshn.sh
+json_load "$payload" 2>/dev/null || { echo invalid_json >&2; exit 1; }
+json_get_var provider operator
+json_get_var total total_bytes
+json_get_var remaining remaining_bytes
+json_get_var expires expires_at
+[ "$provider" = xl ] || { echo unsupported_operator >&2; exit 1; }
+valid_uint() {
+	case "$1" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$(printf '%s' "$1" | wc -c)" -le 14 ]
+}
+for v in "$total" "$remaining" "$expires"; do
+	valid_uint "$v" || { echo invalid_number >&2; exit 1; }
+done
+[ "$total" -gt 0 ] 2>/dev/null && [ "$total" -le 10000000000000 ] 2>/dev/null &&
+	[ "$remaining" -le "$total" ] 2>/dev/null || { echo invalid_quota >&2; exit 1; }
+now="$(date +%s)"
+valid_uint "$now" && [ "$expires" -gt 0 ] 2>/dev/null || { echo invalid_clock_or_expiry >&2; exit 1; }
+json_init
+json_add_string operator xl
+json_add_string total_bytes "$total"
+json_add_string remaining_bytes "$remaining"
+json_add_string expires_at "$expires"
+json_add_string updated_at "$now"
+temp="$(mktemp /tmp/veci-indonesia-quota.XXXXXX)" || exit 1
+trap 'rm -f "$temp"' EXIT HUP INT TERM
+json_dump > "$temp" && chmod 600 "$temp" && mv -f "$temp" "$CACHE" || exit 1
+printf 'quota_cached\n'
