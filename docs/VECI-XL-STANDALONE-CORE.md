@@ -24,6 +24,12 @@ The next local producer should:
 5. Keep a single shared transport/client, retry scheduler and cache normalizer on device. Do not spawn one daemon per operator.
 6. Benchmark memory and flash under MIPS `mipsel_24kc` and real `jsonfilter`/BusyBox. The CI tests use an Ubuntu-only fake `jsonfilter` to verify shell safety; they do not substitute for native MIPS compatibility testing.
 
+## Transport audit — important security blocker
+
+The existing OpenWrt image has `uclient-fetch` and CA/TLS support, but its upstream source (OpenWrt `uclient-fetch.c`) defaults to enabling proxy environment interpretation and automatically follows HTTP redirects (up to 10). Merely allowlisting the FIRST carrier URL is therefore **not sufficient** to ensure a subscriber token can never leave an operator-owned hostname. A direct-to-carrier request component MUST set explicit no-proxy policy and reject any off-allowlist redirect **before** forwarding Authorization/cookie/body fields. Require a host-aware client without automatic cross-origin redirects, or a vetted native libuclient API integration. Disable auto-follow for sensitive carrier requests. Test 302/307, mixed-case hosts, IP literals, encoded @ characters, scheme downgrade, DNS/network errors and TLS hostname mismatch before any OTP is enabled.
+
+No live MyXL request is implemented at this stage. The local cache is safe to inspect offline, but successful cache tests do **not** prove direct network authentication or TLS integrity.
+
 ## Audits and CI
 
 - `tests/test_veci_indonesia_contract.py`: 9 unit tests, including General/Indonesia source isolation.
