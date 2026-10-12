@@ -96,7 +96,7 @@ def audit(firmware,feed,apk,run_id,unsquashfs="/usr/bin/unsquashfs"):
         simulations=[]
         for name in APPS:
             simulations.append(invoke([apk,"--root",root,"--keys-dir","/etc/apk/keys",
-                "--repositories-file",str(repo_file),"--network=false",
+                "--repositories-file",str(repo_file),"--no-network",
                 "--simulate","add","--initdb","veci-app-"+name],75))
         result["solver"]=check_group(simulations)
         result["detail"]["solver_passed"]=sum(x["ok"] for x in simulations)
