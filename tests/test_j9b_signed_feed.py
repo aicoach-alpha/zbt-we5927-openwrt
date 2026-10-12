@@ -33,5 +33,5 @@ class J9BTests(unittest.TestCase):
         source=script.read_text()
         self.assertNotIn('"--allow-untrusted"',source)
         self.assertIn('"--simulate"',source)
-        self.assertIn('"--network=false"',source)
+        self.assertIn('"--no-network"',source)
         self.assertIn('"release_decision":"NO_GO"',source)
