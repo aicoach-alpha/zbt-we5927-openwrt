@@ -9,6 +9,7 @@ BASE=ROOT/"source/veci-telco-indonesia"
 PROVIDER=BASE/"files/usr/libexec/rpcd/veci.quota"
 ACL=BASE/"files/usr/share/rpcd/acl.d/veci-quota.json"
 REGISTRY=BASE/"files/usr/share/veci/telco/providers.json"
+CACHE_HELPER=BASE/"files/usr/libexec/veci-quota-cache"
 
 class TelcoContract(unittest.TestCase):
     def test_shell_syntax(self):
@@ -20,13 +21,18 @@ class TelcoContract(unittest.TestCase):
         self.assertEqual(acl["read"]["ubus"]["veci.quota"],["status","providers"])
         self.assertNotIn("write",acl)
     def test_no_unauthenticated_fake_quota(self):
-        d=json.loads(subprocess.check_output(["sh",str(PROVIDER),"call","status"],text=True))
+        with tempfile.TemporaryDirectory() as root:
+            # No cache file -> no quota. Provider always uses its fixed local path.
+            d=json.loads(subprocess.check_output([
+                "sh",str(CACHE_HELPER),"status",str(pathlib.Path(root)/"not-created.json")
+            ],text=True))
         self.assertEqual(d["provider"],"xl")
         self.assertEqual(d["state"],"not_connected")
         self.assertIsNone(d["remaining_bytes"])
         self.assertIsNone(d["total_bytes"])
         self.assertIsNone(d["used_bytes"])
         self.assertEqual(d["buckets"],[])
+        self.assertIn("/usr/libexec/veci-quota-cache status /tmp/veci-telco/quota-xl.json",PROVIDER.read_text())
     def test_single_registry_has_major_brands(self):
         reg=json.loads(REGISTRY.read_text())
         self.assertEqual(reg["edition"],"indonesia")
@@ -54,6 +60,7 @@ class TelcoContract(unittest.TestCase):
         self.assertIn("providers.json",pkg)
         self.assertNotIn("python3",pkg.lower())
         self.assertNotIn("nodejs",pkg.lower())
+        self.assertIn("veci-quota-cache",pkg)
     def test_standalone_public_edition_contract(self):
         spec=(ROOT/"docs/VECI-INDONESIA-EDITION.md").read_text()
         pkg=(BASE/"Makefile").read_text()
@@ -68,7 +75,7 @@ class TelcoContract(unittest.TestCase):
         self.assertNotIn("wget ",backend)
         self.assertNotIn("https://",backend)
         # Initial skeleton neither pretends to authenticate nor reports fake quota.
-        self.assertIn('"state": "not_connected"',backend)
+        self.assertIn("veci-quota-cache status",backend)
     def test_edition_build_selector_isolated(self):
         script=ROOT/"scripts/select-veci-edition.sh"
         with tempfile.TemporaryDirectory() as t:
