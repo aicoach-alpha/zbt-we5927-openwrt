@@ -2,6 +2,11 @@ name: VeCI General and Indonesia edition candidates
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feat/indonesia-edition
+    paths:
+      - '.github/workflows/veci-editions.yml'
 
 permissions:
   contents: read
@@ -155,10 +160,10 @@ jobs:
           if [ "$VECI_EDITION" = indonesia ]; then
             require_config PACKAGE_veci-indonesia-quota y
           else
-            require_config PACKAGE_veci-indonesia-quota n 2>/dev/null && {
-              echo "Incorrect General package selection" >&2; exit 1;
-            } || true
-            grep -qx '# CONFIG_PACKAGE_veci-indonesia-quota is not set' .config
+            grep -qx '# CONFIG_PACKAGE_veci-indonesia-quota is not set' .config || {
+              echo "General edition unexpectedly contains Indonesia-only quota package" >&2
+              exit 1
+            }
           fi
 
       - name: Build firmware and exact-ABI optional packages
