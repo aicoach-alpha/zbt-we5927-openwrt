@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Offline AT parser, mocked serial replies, lock and ACL tests
         run: python3 -m unittest discover -s tests -p 'test_veci_modem_sms_ussd.py' -v
+      - name: Validate existing LTE manager parses before AT integration
+        run: sh -n source/we5927-lte/files/usr/sbin/we5927-lte
       - name: Fail closed on any active modem command in probe
         shell: bash
         run: |
