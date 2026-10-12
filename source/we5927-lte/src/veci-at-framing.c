@@ -8,35 +8,11 @@
  * Payload pointers passed to callbacks are temporary, never logged here.
  * License: GPL-2.0-only
  */
+#include "veci-at-framing.h"
 #include <ctype.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define VECI_FRAME_LINE_MAX 1024
-#define VECI_FRAME_STREAM_MAX 8192
-#define VECI_FRAME_PDU_MAX 512
-
-enum veci_frame_event {
-    VECI_FRAME_OTHER = 0,
-    VECI_FRAME_OK = 1,
-    VECI_FRAME_ERROR = 2,
-    VECI_FRAME_SMS_PDU = 3,
-    VECI_FRAME_SMS_NOTICE = 4,
-    VECI_FRAME_USSD = 5,
-    VECI_FRAME_PROTOCOL_ERROR = 6
-};
-
-struct veci_at_frame {
-    char line[VECI_FRAME_LINE_MAX];
-    size_t line_len;
-    size_t total;
-    int pdu_expected;        /* -1 when no SMS PDU header is pending */
-    int failed;
-};
-
-typedef void (*veci_frame_callback)(int event, const char *value, int metadata, void *ctx);
 
 void veci_frame_init(struct veci_at_frame *f)
 {
@@ -208,20 +184,6 @@ int veci_frame_finish(struct veci_at_frame *f,
  * asynchronous URC and may arrive either before or after that OK.
  * This state tracker has no retry, timeout, AT transmitter or persistence.
  */
-enum veci_ussd_state {
-    VECI_USSD_WAITING = 0,
-    VECI_USSD_RESPONSE = 1,
-    VECI_USSD_INTERACTIVE = 2,
-    VECI_USSD_TERMINATED = 3,
-    VECI_USSD_FAILED = 4
-};
-struct veci_ussd_session {
-    int acked;
-    int seen_urc;
-    int mode;
-    int failed;
-};
-
 void veci_ussd_init(struct veci_ussd_session *s)
 {
     memset(s, 0, sizeof(*s));
