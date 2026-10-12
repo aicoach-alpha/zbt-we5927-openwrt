@@ -52,6 +52,16 @@ These values are SCHEMA EXAMPLES, not the user's actual quota. Byte totals MUST 
 
 The example importer accepts real quota only after an approved host-to-router connection has been configured. It deliberately cannot log in to XL by itself. On reboot the memory cache clears and UI shows `Belum terhubung` until it is refreshed.
 
+## Optional host sync after MyXL authentication (NOT enabled yet)
+
+After the owner explicitly authorizes a separate, recoverable TEST router and configures their XL session on a trusted Linux host, `scripts/sync_xl_quota_host.sh` can pull BITS-XL `json quota` responses, normalize the numbers and send only that minimal JSON through SSH to `/usr/sbin/veci-quota-import`. It never flashes, reboots, or edits modem identity.
+
+The service templates `examples/veci-xl-quota-bridge.service` and `examples/veci-xl-quota-bridge.timer` target a dedicated least-privilege `veciquota` Linux account, with the BITS-XL login and SSH identities provisioned under that account. Configure an explicit trusted SSH target in `/etc/veci-indonesia/bridge.env` as `VECI_ROUTER_SSH=approved-test-router-host-alias`; SSH host keys must be verified ahead of time, with batch authentication and no new host-key acceptance at runtime. Use an authorized forced-command SSH key for the import only when possible. The `/opt/veci-indonesia` path in the provided systemd unit is a **template**, not an existing installation.
+
+The timer requests quota roughly every three hours, and after a reboot the router cache is intentionally empty until the first successful sync. Rate limits, API changes and authentication expiry must surface as `Belum terhubung` / `Data lama`. Do not disclose the raw MyXL response, SMS OTP, account tokens, phone number or private SSH key in logs or public issue reports.
+
+Deployment on the current live WE5927 is **not authorized**. First finish the candidate firmware build, rerun J9/J9B, and complete controlled test-router UAT. The helper does not itself solve MyXL authentication and has not made a live operator API call.
+
 ## Security and future operator architecture
 
 Use per-operator adapters which all return the same normalized quota model, with separate credential stores and TLS rules on the external host. Put only read-only summaries into the VeCI dashboard. In future offer per-operator package breakdown, unlimited/FUP flags and appropriate subquota classification (national, local, application) rather than deceptively combining them.
