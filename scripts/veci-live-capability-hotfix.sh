@@ -8,16 +8,15 @@ umask 077
 LC_ALL=C
 export LC_ALL
 
-SOURCE_SHA=cffdde8df49ef46170deb5bb93bb636cdc4f0343
+SOURCE_SHA=216355e88f30276bec5783fdde0f399200365263
 BASE=https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt
-PREFIX=source/veci-cellular-we5927/files
 RPC=/usr/libexec/rpcd/veci.cellular
 HELPER=/usr/libexec/veci-modem-capabilities
 ACL=/usr/share/rpcd/acl.d/veci-cellular-we5927.json
 BACKUP=/root/veci-capability-hotfix-rollback
-RPC_SHA=3b662a293101dd695e91c99d947ba716bb3cac90f2742dd8c48021761a0c2788
+RPC_SHA=2fde4bb0200f1319a2d63688e5be1422b68b5c3efa7f2dca117cf7f8c0eafada
 HELPER_SHA=d0191d99ccfdab5554baf3f2084ce81e1735550e51e64a219ffeb4e3abbdb85c
-ACL_SHA=b8c526130dff8cc9840d31145b38ce9dc17bf1412d5cd714cb33d16fe3a6001b
+ACL_SHA=b39a09cd65e264e46373f3e4fd674021a9a6a04622f1c5b6108b981ca3d382c1
 
 die() { echo "HOTFIX_ERROR: $*" >&2; exit 1; }
 check_sha() {
@@ -26,7 +25,7 @@ check_sha() {
     [ "$got" = "$2" ]
 }
 fetch() {
-    wget -q -O "$2" "$BASE/$SOURCE_SHA/$PREFIX/$1" ||
+    wget -q -O "$2" "$BASE/$SOURCE_SHA/$1" ||
         die "HTTPS download failed: $1"
 }
 board() {
@@ -109,9 +108,9 @@ apply() {
     }
     trap cleanup EXIT
 
-    fetch usr/libexec/rpcd/veci.cellular "$work/rpc"
-    fetch usr/libexec/veci-modem-capabilities "$work/helper"
-    fetch usr/share/rpcd/acl.d/veci-cellular-we5927.json "$work/acl"
+    fetch scripts/veci-live-minimal/veci.cellular "$work/rpc"
+    fetch source/veci-cellular-we5927/files/usr/libexec/veci-modem-capabilities "$work/helper"
+    fetch scripts/veci-live-minimal/veci-cellular-we5927.json "$work/acl"
     check_sha "$work/rpc" "$RPC_SHA" || die "RPC SHA256 mismatch"
     check_sha "$work/helper" "$HELPER_SHA" || die "helper SHA256 mismatch"
     check_sha "$work/acl" "$ACL_SHA" || die "ACL SHA256 mismatch"
@@ -121,6 +120,16 @@ apply() {
         grep -q "\"$method\":" "$work/rpc" ||
             die "RPC method missing: $method"
     done
+    grep -Fq '"sim": "String"' "$work/rpc" ||
+        die "legacy SIM method schema changed"
+    if grep -q '"identityLive":' "$work/rpc" ||
+       grep -q '"identity":' "$work/rpc"; then
+        die "minimal hotfix unexpectedly exposes IMEI methods"
+    fi
+    if grep -q '"identityLive"' "$work/acl" ||
+       grep -q '"identity"' "$work/acl"; then
+        die "minimal hotfix ACL unexpectedly exposes IMEI methods"
+    fi
     grep -Fq 'AT+CMGF=?' "$work/helper" ||
         die "capability-only AT command allowlist missing"
     grep -Fq 'AT+CUSD=?' "$work/helper" ||
