@@ -1,0 +1,107 @@
+#!/bin/sh
+# Operator-only delete ONE exact previously listed PDU from selected memory.
+set -eu
+umask 077
+LC_ALL=C;export LC_ALL
+fail(){ printf '{"ok":false,"reason":"delete_unavailable"}\n'; exit 1; }
+[ "$#" -eq 2 ] || fail
+slot="$1"; memory="$2"
+case "$slot" in ''|*[!0-9]*)fail;;esac
+[ "$(printf %s "$slot"|wc -c)" -le 5 ] && [ "$slot" -le 65535 ] || fail
+case "$memory" in SM|ME);;*)fail;;esac
+[ "$(id -u)" -eq 0 ] || fail
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail
+[ -x /usr/sbin/we5927-at ] && command -v flock >/dev/null 2>&1 || fail
+expected="$(head -c 513)" || fail
+n="$(printf %s "$expected"|wc -c)" || fail
+[ "$n" -ge 4 ] && [ "$n" -le 512 ] && [ "$((n%2))" -eq 0 ] || fail
+case "$expected" in *[!0-9A-F]*)fail;;esac
+storage_from_cpms(){
+ awk '
+ {gsub(/\r/,"",$0);if($0=="")next}
+ $0=="AT+CPMS?"&&!seen{next}
+ /^\+CPMS:[ ]*"/&&!seen{
+  line=$0;sub(/^\+CPMS:[ ]*"/,"",line)
+  split(line,a,"\"")
+  if(a[1]!="SM"&&a[1]!="ME"&&a[1]!="MT")bad=1
+  else mem=a[1]
+  seen=1;next
+ }
+ $0=="OK"&&seen&&!done{done=1;next}
+ {bad=1}
+ END{if(done&&!bad&&mem!="")print mem;else exit 1}
+ '
+}
+is_pdu_mode(){
+ awk '
+ {gsub(/\r/,"",$0);if($0=="")next}
+ $0=="AT+CMGF?"&&!seen{next}
+ /^\+CMGF:[ ]*0[ ]*$/&&!seen{seen=1;next}
+ $0=="OK"&&seen&&!done{done=1;next}
+ {bad=1}
+ END{exit !(done&&!bad)}
+ '
+}
+single_pdu(){
+ awk -v index="$slot" '
+ function dec(v,limit){return v~/^[0-9]+$/&&length(v)<=5&&v+0<=limit}
+ function hdr(v,a,n){
+  sub(/^\+CMGR:[ ]*/,"",v);gsub(/ /,"",v);n=split(v,a,",")
+  if(n!=3||!dec(a[1],4)||a[2]!=""||!dec(a[3],240)||a[3]+0<1)return 0
+  tpdu=a[3]+0;return 1
+ }
+ function valid(v,x,s,hi,lo){
+  x=toupper(v)
+  if(length(x)<4||length(x)>512||length(x)%2||x~/[^0-9A-F]/)return 0
+  hi=index("0123456789ABCDEF",substr(x,1,1))-1
+  lo=index("0123456789ABCDEF",substr(x,2,1))-1
+  if(hi<0||lo<0)return 0
+  s=hi*16+lo
+  return length(x)/2-1-s==tpdu
+ }
+ {gsub(/\r/,"",$0);if($0=="")next
+  if(length($0)>1024||bad||done){bad=1;next}
+  if(!stage&&!echoed&&$0=="AT+CMGR=" index){echoed=1;next}
+  if(stage==0&&$0~/^\+CMGR:/&&hdr($0)){stage=1;next}
+  if(stage==1&&valid($0)){pdu=toupper($0);stage=2;next}
+  if(stage==2&&$0=="OK"){done=1;next}
+  bad=1
+ }
+ END{if(bad||!done||stage!=2)exit 1;print pdu}
+ '
+}
+delete_ok(){
+ awk -v index="$slot" '
+ {gsub(/\r/,"",$0);if($0=="")next
+  if($0==("AT+CMGD=" index ",0")&&!echoed){echoed=1;next}
+  if($0=="OK"&&!done){done=1;next}
+  bad=1
+ }
+ END{exit !(done&&!bad)}
+ '
+}
+(
+ flock -n -x 9 || fail
+ [ -c /dev/ttyUSB2 ] || fail
+ dev="$(readlink -f /sys/class/tty/ttyUSB2/device 2>/dev/null || :)"
+ case "$dev" in /sys/devices/*:1.4/ttyUSB2);;*)fail;;esac
+ parent="$(dirname "$(dirname "$dev")")"
+ [ "$(cat "$parent/idVendor" 2>/dev/null || :)" = 05c6 ] || fail
+ [ "$(cat "$parent/idProduct" 2>/dev/null || :)" = 902e ] || fail
+ res="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CPMS?' 2000 2>/dev/null)" || fail
+ active="$(printf '%s\n' "$res" | storage_from_cpms)" || fail
+ unset res
+ [ "$active" = "$memory" ] || fail
+ res="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF?' 1500 2>/dev/null)" || fail
+ printf '%s\n' "$res" | is_pdu_mode || fail
+ unset res
+ res="$(/usr/sbin/we5927-at /dev/ttyUSB2 "AT+CMGR=$slot" 3500 2>/dev/null)" || fail
+ current="$(printf '%s\n' "$res" | single_pdu)" || fail
+ unset res
+ [ "$current" = "$expected" ] || fail
+ unset current expected
+ res="$(/usr/sbin/we5927-at /dev/ttyUSB2 "AT+CMGD=$slot,0" 4000 2>/dev/null)" || fail
+ printf '%s\n' "$res" | delete_ok || fail
+ unset res
+ printf '{"ok":true,"deleted":%s,"storage":"%s"}\n' "$slot" "$memory"
+) 9>/var/lock/we5927-at.lock
