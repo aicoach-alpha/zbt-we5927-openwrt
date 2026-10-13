@@ -93,6 +93,23 @@ class StoreTest(unittest.TestCase):
                 self.assertEqual(self.consume(**wrong), -errno.EACCES)
                 self.assertEqual(self.consume(), -errno.EACCES)
 
+    def test_expired_record_requires_new_explicit_consent(self):
+        self.assertEqual(self.arm(ttl=10), 0)
+        self.assertEqual(self.arm(now=1009, nonce=WRONG), -errno.EBUSY)
+        self.assertEqual(self.arm(now=1010, nonce=WRONG, consent=0), -errno.EACCES)
+        self.assertEqual(self.arm(now=1010, nonce=WRONG), 0)
+        self.assertEqual(self.consume(), -errno.EACCES)
+        self.assertEqual(self.consume(nonce=WRONG), -errno.EACCES)
+
+    def test_corrupted_record_cannot_be_replaced_after_expiry(self):
+        self.assertEqual(self.arm(ttl=10), 0)
+        with open(Path(self.tmp.name) / "pending", "ab") as f:
+            f.write(b"bad-data")
+        self.assertEqual(self.arm(now=4000, nonce=WRONG), -errno.EBUSY)
+        self.assertNotEqual(self.consume(), 0)
+        self.assertEqual(self.arm(now=4000, nonce=WRONG), 0)
+        self.assertEqual(self.consume(nonce=WRONG, now=4001), 0)
+
     def test_expiry_and_clock_rollback_burn(self):
         for moment in (999, 3000):
             with self.subTest(moment=moment):

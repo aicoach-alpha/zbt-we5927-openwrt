@@ -66,3 +66,5 @@ and least-privileged negative ACL test have been established.
 UAT: host-only tests for tampering, competing processes, symlink,
 non-tmpfs rejection, expiry and one-use behavior; firmware inert-build CI.
 No actual WE5927 modem command, router deployment, reboot or flash.
+
+Expired pending capability is reclaimed ONLY on a newly validated, fresh `store_arm` consent request under the same flock; active tokens cannot be overwritten. Malformed/corrupt records do not permit automatic replacement. This prevents expired tokens from permanently blocking future approved reads without allowing silent re-arm.

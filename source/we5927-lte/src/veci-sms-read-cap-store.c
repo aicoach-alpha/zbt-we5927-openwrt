@@ -86,6 +86,29 @@ static int full_read(int fd, void *buf, size_t n)
     return got == 0 ? 0 : -EIO;
 }
 
+/* Explicit NEW consent can replace an EXPIRED record; not an implicit retry.
+ * A corrupt or nonregular record cannot silently authorize a new read.
+ */
+static int remove_expired_locked(int dirfd, uint64_t now)
+{
+    struct veci_store_record old = {0};
+    int fd = openat(dirfd, VECI_STORE_NAME, O_RDONLY | O_NOFOLLOW |
+                    O_CLOEXEC | O_NONBLOCK);
+    int ret = -EBUSY;
+    if (fd < 0) return ret;
+    if (file_ok(fd) == 0 && full_read(fd, &old, sizeof(old)) == 0 &&
+        old.tag == VECI_STORE_TAG && old.revision == VECI_STORE_REV &&
+        old.cap.state == VECI_SMS_CAP_READY && old.cap.armed_ms &&
+        old.cap.expires_ms > old.cap.armed_ms &&
+        old.cap.expires_ms - old.cap.armed_ms <= VECI_SMS_CAP_MAX_TTL_MS &&
+        now >= old.cap.expires_ms &&
+        unlinkat(dirfd, VECI_STORE_NAME, 0) == 0)
+        ret = 0;
+    (void)close(fd);
+    erase(&old, sizeof(old));
+    return ret;
+}
+
 int veci_sms_store_arm(int dirfd,
                        const unsigned char session[VECI_SMS_SESSION_BYTES],
                        const unsigned char token[VECI_SMS_CAP_BYTES],
@@ -107,6 +130,13 @@ int veci_sms_store_arm(int dirfd,
     fd = openat(dirfd, VECI_STORE_NAME,
                 O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC |
                 O_NONBLOCK, 0600);
+    if (fd < 0 && errno == EEXIST) {
+        ret = remove_expired_locked(dirfd, now);
+        if (ret) goto unlock;
+        fd = openat(dirfd, VECI_STORE_NAME,
+                    O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC |
+                    O_NONBLOCK, 0600);
+    }
     if (fd < 0) { ret = errno == EEXIST ? -EBUSY : -EIO; goto unlock; }
     created = 1;
     ret = file_ok(fd);
