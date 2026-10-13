@@ -1,0 +1,57 @@
+name: VeCI MiFi SMS v1.5 release gate
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/veci-sms-mifi-v15-staged/**'
+      - '.github/workflows/veci-sms-mifi-v15.yml'
+      - 'scripts/veci-sms-mifi-v15-install.sh'
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backend, page, ACL and rollback script syntax
+        shell: bash
+        run: |
+          set -eu
+          sh -n scripts/veci-sms-mifi-v15-staged/rpcd-veci.sms
+          sh -n scripts/veci-sms-mifi-v15-staged/veci-sms-mifi-inbox
+          if [ -f scripts/veci-sms-mifi-v15-install.sh ]; then
+            sh -n scripts/veci-sms-mifi-v15-install.sh
+          fi
+          node --check scripts/veci-sms-mifi-v15-staged/cellular.js
+          python3 -m json.tool scripts/veci-sms-mifi-v15-staged/acl.json >/dev/null
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          d=Path('scripts/veci-sms-mifi-v15-staged')
+          rpc=(d/'rpcd-veci.sms').read_text()
+          worker=(d/'veci-sms-mifi-inbox').read_text()
+          ui=(d/'cellular.js').read_text()
+          acl=json.loads((d/'acl.json').read_text())
+          assert acl['veci-sms-inbox-we5927']['read']['ubus']=={}
+          assert acl['veci-sms-inbox-we5927']['write']['ubus']['veci.sms']==[
+              'listIndex','getConfig','setEnabled','listMessages']
+          assert 'sms_state || { deny sms_disabled; return; }' in rpc
+          assert 'sms_state || { unset result; deny sms_disabled; exit 0; }' in rpc
+          assert 'smsState.textContent' in ui and 'clearSms()' in ui
+          assert "api.call('veci.sms', 'listMessages'" in ui
+          assert "api.call('veci.sms', 'setEnabled'" in ui
+          assert "api.call('veci.sms.private'" not in ui
+          assert 'on_demand_cmgl_pdu' in worker
+          assert "flock -n -x 9" in worker
+          assert 'pdu[count]=toupper($0)' in worker
+          print('VECI_MIFI_SMS_V15_MINIMAL_RELEASE_GATE_PASS')
+          PY
+      - name: Immutable deployment asset SHA256
+        run: |
+          echo VECI_MIFI_SMS_V15_SHA_BEGIN
+          sha256sum scripts/veci-sms-mifi-v15-staged/rpcd-veci.sms \
+                    scripts/veci-sms-mifi-v15-staged/veci-sms-mifi-inbox \
+                    scripts/veci-sms-mifi-v15-staged/cellular.js \
+                    scripts/veci-sms-mifi-v15-staged/acl.json
+          echo VECI_MIFI_SMS_V15_SHA_END
