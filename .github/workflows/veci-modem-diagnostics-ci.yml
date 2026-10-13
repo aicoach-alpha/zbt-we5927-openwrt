@@ -50,6 +50,8 @@ on:
       - 'tests/test_veci_sms_inbox_installer_v13.py'
       - 'tests/test_veci_sms_inbox_installer_v131.py'
       - 'tests/test_veci_sms_rpcd_preflight_readonly.py'
+      - 'tests/test_veci_sms_acl_session_audit.py'
+      - 'scripts/veci-sms-acl-session-audit-20261013.sh'
       - 'scripts/veci-sms-rpcd-readonly-preflight-20261013.sh'
       - 'scripts/veci-sms-inbox-admin-ui-v131-install.sh'
       - 'scripts/veci-sms-inbox-admin-ui-v13-install.sh'
@@ -124,6 +126,8 @@ jobs:
           sha256sum source/veci-sms-inbox-we5927/files/usr/libexec/rpcd/veci.sms
           sha256sum source/veci-sms-inbox-we5927/files/usr/libexec/veci-sms-inbox-index
           sha256sum source/veci-sms-inbox-we5927/files/usr/share/rpcd/acl.d/veci-sms-inbox-we5927.json
+      - name: Verify read-only SMS Inbox ACL grants and anonymous session audit with no credentials
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_acl_session_audit.py' -v
       - name: Verify on-device rpcd list-signature preflight never calls the modem or restarts services
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_rpcd_preflight_readonly.py' -v
       - name: Simulate v1.3.1 bounded rpcd readiness, delayed registration and verified rollback
