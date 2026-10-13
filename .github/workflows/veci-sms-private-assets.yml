@@ -9,6 +9,7 @@ on:
       - 'scripts/veci-sms-private-ui-staged-20261013/cellular.js'
       - '.github/workflows/veci-sms-private-assets.yml'
       - 'scripts/veci-sms-private-v14-live-install-20261013.sh'
+      - 'scripts/veci-sms-private-v14-typefix-20261013.sh'
 permissions:
   contents: read
 jobs:
@@ -20,6 +21,7 @@ jobs:
       - name: Production overlay asset sanity and immutable SHA256
         run: |
           sh -n scripts/veci-sms-private-v14-live-install-20261013.sh
+          sh -n scripts/veci-sms-private-v14-typefix-20261013.sh
           sh -n source/veci-sms-private-we5927/files/usr/libexec/veci-sms-private-read
           node --check scripts/veci-sms-private-ui-staged-20261013/cellular.js
           printf 'PRIVATE_SMS_ASSET_SHA256_BEGIN\n'
