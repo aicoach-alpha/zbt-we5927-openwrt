@@ -1,0 +1,52 @@
+name: VeCI SMS private ucode native syntax (no router)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/we5927-lte/src/veci-sms-private-consent.uc'
+      - 'source/we5927-lte/src/veci-sms-auth-ubus-preflight.uc'
+      - 'source/we5927-lte/src/veci-sms-private-acl.json'
+      - 'tests/test_veci_sms_private_consent.py'
+      - '.github/workflows/veci-sms-private-native-ucode.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veci-sms-ucode-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-ucode-syntax:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout VeCI source
+        uses: actions/checkout@v4
+      - name: Checkout OpenWrt-pinned native ucode source
+        uses: actions/checkout@v4
+        with:
+          repository: jow-/ucode
+          ref: b885dd0fe1e974551fb1233ca5f3aa74d80b74d9
+          path: native-ucode-source
+          persist-credentials: false
+      - name: Install native compilation dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends cmake pkg-config libjson-c-dev libmd-dev
+      - name: Build native ucode interpreter without ubus
+        run: |
+          cmake -S native-ucode-source -B native-ucode-build \
+            -DUBUS_SUPPORT=OFF -DUCI_SUPPORT=OFF -DULOOP_SUPPORT=OFF -DFS_SUPPORT=ON
+          cmake --build native-ucode-build --parallel 2
+      - name: Native compile-only private RPC scripts - never execute on router
+        run: |
+          LD_LIBRARY_PATH="$PWD/native-ucode-build" native-ucode-build/ucode -c -o /tmp/veci-sms-private.ucb \
+            source/we5927-lte/src/veci-sms-private-consent.uc
+          LD_LIBRARY_PATH="$PWD/native-ucode-build" native-ucode-build/ucode -c -o /tmp/veci-sms-audit.ucb \
+            source/we5927-lte/src/veci-sms-auth-ubus-preflight.uc
+          test -s /tmp/veci-sms-private.ucb
+          test -s /tmp/veci-sms-audit.ucb
+          echo 'VECI_PRIVATE_NATIVE_UCODE_SYNTAX_PASS'
+      - name: Negative ACL + source-only protection
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_private_consent.py' -v
