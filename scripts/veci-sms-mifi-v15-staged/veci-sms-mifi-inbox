@@ -100,6 +100,26 @@ parse_list() {
       }
     '
 }
+parse_storage() {
+    # memory1 is the currently-selected store for AT+CMGL and CMGD.
+    # Never claim a SIM/ME source when modem returns combined MT/unknown.
+    awk '
+    { gsub(/\r/, "", $0); if ($0=="") next }
+    $0=="AT+CPMS?" && !seen { next }
+    /^\+CPMS:[ ]*"/ && !seen {
+      line=$0
+      sub(/^\+CPMS:[ ]*"/,"",line)
+      split(line,a,"\"")
+      if (a[1]!="SM" && a[1]!="ME" && a[1]!="MT") bad=1
+      else memory=a[1]
+      seen=1
+      next
+    }
+    $0=="OK" && seen && !ok {ok=1;next}
+    {bad=1}
+    END{if(bad||!ok||!seen)exit 1;print memory}
+    '
+}
 parse_mode() {
     awk '
       {gsub(/\r/,"",$0);if($0=="")next}
@@ -123,6 +143,8 @@ parse_mode() {
         fail unverified_modem
     [ "$(cat "$parent/idProduct" 2>/dev/null || :)" = 902e ] ||
         fail unverified_modem
+    selected="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CPMS?' 2000 2>/dev/null)" || fail response_unavailable
+    selected="$(printf '%s\n' "$selected" | parse_storage)" || fail invalid_response
     raw="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF?' 1500 2>/dev/null)" ||
         fail response_unavailable
     mode="$(printf '%s\n' "$raw" | parse_mode)"
@@ -134,5 +156,7 @@ parse_mode() {
     parsed="$(printf '%s\n' "$raw" | parse_list)" ||
         fail invalid_response
     unset raw
-    printf '%s\n' "$parsed"
+    # Only validated two-letter memory code included in the JSON.
+    case "$selected" in SM|ME|MT) ;; *) fail invalid_response ;; esac
+    printf '%s\n' "$parsed" | sed "s/\"source\":\"on_demand_cmgl_pdu\",/\"source\":\"on_demand_cmgl_pdu\",\"storage\":\"$selected\",/"
 ) 9>/var/lock/we5927-at.lock
