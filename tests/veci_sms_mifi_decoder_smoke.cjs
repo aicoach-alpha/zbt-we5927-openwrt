@@ -20,4 +20,15 @@ assert.strictEqual(decode(numeric).text,'HELLO');
 assert.strictEqual(decode(ucs2).text,'HI');
 assert.throws(()=>decode(numeric.slice(0,-4)),/size|truncated/);
 assert(!src.includes("console.log(item.pdu)"));
+// 13 October 2026, 13:27:00 at +07:00, after TP-PID and TP-DCS.
+const hexScts='62013131720082';
+const timed=numeric.slice(0,24)+hexScts+numeric.slice(38);
+const stamp=decode(timed);
+assert.strictEqual(stamp.text,'HELLO');
+assert.strictEqual(stamp.received.networkTime,'2026-10-13 13:27:00');
+assert.strictEqual(stamp.received.timezoneMinutes,420);
+assert.strictEqual(new Date(stamp.received.unixMs).toISOString(),'2026-10-13T06:27:00.000Z');
+const malformed=numeric.slice(0,24)+'62023131720082'+numeric.slice(38);
+assert.strictEqual(decode(malformed).received,null);
+
 console.log('VECI_MIFI_SMS_OPERATOR_ALPHA_DCS_SMOKE_PASS');
