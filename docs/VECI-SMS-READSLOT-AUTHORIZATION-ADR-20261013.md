@@ -41,3 +41,28 @@ Date: 2026-10-13. Status: **DEVELOPMENT DECISION / NOT LIVE**.
 ## Release decision
 
 **GO** for source-only security and modem-PTY development. **NO GO** for production activation of SMS body/sender/OTP read until verified user principal/session propagation across rpcd security boundary and cross-request token persistence are implemented. Current v1.3.1 production metadata UI remains LIVE/PASS with no changes. This is a real release blocker, not something that more unit tests alone can resolve.
+
+## 2026-10-13 follow-up: cross-process single-use tmpfs store (SOURCE-ONLY)
+
+The isolated C library `veci-sms-read-cap-store.[ch]` stages one pending
+capability in a caller-created private 0700 tmpfs directory. Each independent
+rpcd process opens the directory itself. An exclusive nonblocking `flock`
+on the directory serializes create/consume; `openat` uses
+`O_CREAT|O_EXCL|O_NOFOLLOW` for create and `O_NOFOLLOW` for consume.
+Owner, mode, tmpfs filesystem and file type are validated. The entire
+record is removed before validating the session/nonce/slot/generation/TTL:
+failed attempts burn the token. No auto retry or SMS body is persisted.
+Only one armed request per device; a failed/unconsumed one does not silently
+re-arm. RAM-backed file storage is not a permanent daemon or flash write.
+
+**Security limitation NOT FIXED by this stage:** No caller with verified
+session provenance exists yet; the store deliberately does NOT trust or
+derive a browser principal. The existing exec-plugin `rpcd` cannot infer
+the session from method args. Frontend consent flags are not proof of
+authorization. This source must NOT be linked into deployed firmware or
+a new private ubus RPC until a trusted per-request authentication boundary
+and least-privileged negative ACL test have been established.
+
+UAT: host-only tests for tampering, competing processes, symlink,
+non-tmpfs rejection, expiry and one-use behavior; firmware inert-build CI.
+No actual WE5927 modem command, router deployment, reboot or flash.

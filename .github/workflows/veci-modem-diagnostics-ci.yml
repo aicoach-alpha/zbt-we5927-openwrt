@@ -22,6 +22,9 @@ on:
       - 'source/we5927-lte/src/veci-sms-read-capability.c'
       - 'source/we5927-lte/src/veci-sms-read-capability.h'
       - 'tests/test_veci_sms_read_capability.py'
+      - 'source/we5927-lte/src/veci-sms-read-cap-store.c'
+      - 'source/we5927-lte/src/veci-sms-read-cap-store.h'
+      - 'tests/test_veci_sms_read_cap_store.py'
       - 'source/we5927-lte/src/veci-telco-quota-otp-policy.c'
       - 'source/we5927-lte/src/veci-telco-quota-otp-policy.h'
       - 'tests/test_veci_telco_quota_otp_policy.py'
@@ -140,6 +143,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_telco_quota_otp_policy.py' -v
       - name: Verify server-trusted one-use SMS capability binding, TTL, consumed-before-I/O and zeroization
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_capability.py' -v
+      - name: Validate locked one-use SMS capability across separate rpcd processes (offline only)
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_cap_store.py' -v
       - name: Verify one-shot SMS read-slot authorization, CSRF, consent, replay and modem generation guard (source only)
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_slot_policy.py' -v
       - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
