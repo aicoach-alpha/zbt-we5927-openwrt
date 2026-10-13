@@ -49,10 +49,16 @@ function decodePrivatePdu(hex) {
   const udhi=!!(fo&64), digits=one(),toa=one();
   if(!(toa&128) || digits<1 || digits>20)throw Error("Sender");
   const alpha=(toa&112)===80;
-  const addrBytes=alpha?Math.ceil(digits*7/8):Math.ceil(digits/2);
+  // TS 23.040 alphanumeric OA length counts USEFUL SEMI-OCTETS,
+  // not characters or septets. A 10-character sender uses 18 nibbles.
+  const addrBytes=Math.ceil(digits/2);
   if(p+addrBytes>bytes.length)throw Error("Sender truncated");
   let sender="";
-  if(alpha){sender=unpack7(bytes.slice(p,p+addrBytes),digits);}
+  if(alpha){
+    const septetCount=Math.floor(digits*4/7);
+    if(!septetCount || septetCount>11)throw Error("Alpha sender length");
+    sender=unpack7(bytes.slice(p,p+addrBytes),septetCount);
+  }
   else {
     if((toa&112)===16)sender="+";
     for(let i=0;i<digits;i++){let v=(i&1)?bytes[p+(i>>1)]>>4:bytes[p+(i>>1)]&15;if(v>9)throw Error("Sender digit");sender+=String(v);}
@@ -61,8 +67,22 @@ function decodePrivatePdu(hex) {
   p+=addrBytes;
   if(p+10>bytes.length)throw Error("Header truncated");
   one();const dcs=one();
-  if((dcs&192)!==0 || (dcs&32)!==0)throw Error("Unsupported encoding");
-  const alphabet=(dcs>>2)&3;
+  // 23.038 DCS: general coding, message-waiting indication and
+  // 1111xxxx message classes (commonly used for operator SMS).
+  let alphabet;
+  if((dcs&192)===0){
+    if(dcs&32)throw Error("Compressed SMS");
+    alphabet=(dcs>>2)&3;
+  }else if((dcs&240)===240){
+    alphabet=(dcs&4)?1:0;
+  }else if((dcs&240)===224){
+    alphabet=2;
+  }else if((dcs&240)===192 || (dcs&240)===208){
+    alphabet=0;
+  }else{
+    throw Error("Unsupported DCS");
+  }
+  if(alphabet===1)throw Error("Binary SMS");
   if(alphabet!==0 && alphabet!==2)throw Error("Unsupported alphabet");
   p+=7; const udl=one(), data=bytes.slice(p);
   let header=0;
@@ -299,9 +319,12 @@ export default {
 						const decoded = decodePrivatePdu(item.pdu);
 						label.textContent = 'From: ' + decoded.sender + ' · slot ' + item.index;
 						body.textContent = decoded.text;
-					} catch {
+					} catch (error) {
+						// Local decoder-only error, never log/return raw PDU
+						// or any decoded sender/body in diagnostics.
+						const why = String(error?.message || '').replace(/[^A-Za-z0-9 _-]/g, '').slice(0, 42);
 						label.textContent = 'SMS slot ' + item.index;
-						body.textContent = 'Message encoding not supported.';
+						body.textContent = 'Unable to decode SMS' + (why ? ' (' + why + ')' : '') + '.';
 					}
 					card.append(label, body);
 					frag.appendChild(card);
