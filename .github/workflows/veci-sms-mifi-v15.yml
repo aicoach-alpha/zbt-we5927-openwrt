@@ -55,6 +55,11 @@ jobs:
           assert 'pdu[count]=toupper($0)' in worker
           assert "'AT+CPMS?'" in worker
           assert 'delete_message()' in rpc
+          # v1.5.3 adds storage before count; exact old v1.5.2 pattern
+          # silently rejected ALL valid full-SMS lists after upgrade.
+          assert all(('"storage":"'+v+'","count":') in rpc for v in ('SM','ME','MT'))
+          assert '\\"storage\\":\\"SM\\"' not in rpc  # no literal backslash JSON
+
           delete=Path('scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one').read_text()
           assert 'AT+CMGD=$slot,0' in delete
           assert '[ "$current" = "$expected" ] || fail' in delete
