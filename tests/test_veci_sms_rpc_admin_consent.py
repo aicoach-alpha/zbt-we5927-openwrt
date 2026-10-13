@@ -44,6 +44,10 @@ class SmsRpcConsent(unittest.TestCase):
         self.test_script=self.root/"veci.sms"
         text=RPC.read_text().replace("WORKER=/usr/libexec/veci-sms-inbox-index",
                                      "WORKER="+str(self.dummy))
+        text=text.replace("RATE_FILE=/tmp/veci-sms-inbox-last-attempt",
+                          "RATE_FILE="+str(self.root/"last-attempt"))
+        text=text.replace("RATE_LOCK=/var/lock/veci-sms-inbox-rpc.lock",
+                          "RATE_LOCK="+str(self.root/"rate.lock"))
         self.test_script.write_text(text)
         self.env={**os.environ, "PATH":str(self.bin)+":"+os.environ["PATH"]}
 
@@ -99,6 +103,23 @@ class SmsRpcConsent(unittest.TestCase):
         p=self.call({"scope":"metadata_only","ack_unread_status":"I_ACCEPT_UNREAD_TO_READ"},"AT+CMGS")
         self.assertFalse(json.loads(p.stdout)["ok"])
         self.assertFalse(self.count.exists())
+
+    def test_repeated_listing_rejected_before_second_worker_invocation(self):
+        payload={"scope":"metadata_only","ack_unread_status":"I_ACCEPT_UNREAD_TO_READ"}
+        first=self.call(payload)
+        self.assertTrue(json.loads(first.stdout)["ok"],first.stderr)
+        second=self.call(payload)
+        self.assertFalse(json.loads(second.stdout)["ok"])
+        self.assertEqual(json.loads(second.stdout)["reason"],"retry_later")
+        self.assertEqual(self.count.read_text(),"x")
+
+    def test_attempt_even_if_helper_fails_still_throttles(self):
+        self.dummy.write_text("#!/bin/sh\nexit 2\n")
+        payload={"scope":"metadata_only","ack_unread_status":"I_ACCEPT_UNREAD_TO_READ"}
+        first=self.call(payload)
+        self.assertEqual(json.loads(first.stdout)["reason"],"index_unavailable")
+        second=self.call(payload)
+        self.assertEqual(json.loads(second.stdout)["reason"],"retry_later")
 
     def test_worker_secret_output_rejected_as_whole(self):
         self.dummy.write_text("#!/bin/sh\nprintf '%s\\n' 'OTPSECRET' \n")
