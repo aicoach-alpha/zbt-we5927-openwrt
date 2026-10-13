@@ -1,6 +1,6 @@
 /*
  * OFFLINE TEST HARNESS ONLY: one verified-FD +CMGR read using a synthetic PTY.
- * Never compile into firmware, open /dev/ttyUSB or expose a production RPC.
+ * Never compile into firmware, open a physical modem port or expose a production RPC.
  * Caller supplies trusted already-open noncanonical PTY and a TEST lock path.
  * Security inputs must be proven by privileged caller in any future runtime.
  */
