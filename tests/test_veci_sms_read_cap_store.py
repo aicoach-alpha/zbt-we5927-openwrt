@@ -137,7 +137,7 @@ class StoreTest(unittest.TestCase):
         os.symlink("/etc/passwd", Path(self.tmp.name) / "pending")
         self.assertEqual(self.arm(), -errno.EBUSY)
         self.assertEqual(self.consume(), -errno.EACCES)
-        self.assertFalse((Path(self.tmp.name) / "pending").exists())
+        self.assertTrue((Path(self.tmp.name) / "pending").is_symlink())  # Never follow/delete attacker link
         self.assertTrue(Path("/etc/passwd").exists())
 
     def test_parallel_consumers_only_one_success(self):
