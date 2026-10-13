@@ -60,7 +60,7 @@ apply() {
   [ ! -e "$ACL" ] && [ ! -L "$ACL" ] || fail existing_acl_do_not_overwrite
   [ ! -e "$BACKUP" ] || fail backup_already_exists
   [ -x /etc/init.d/rpcd ] || fail rpcd_service_missing
-  for cmd in wget sha256sum grep awk cmp; do
+  for cmd in wget sha256sum grep awk cmp ubus; do
     command -v "$cmd" >/dev/null 2>&1 || fail missing_dependency
   done
   space="$(df -k /overlay | awk 'NR==2 {print $4}')"
@@ -114,6 +114,8 @@ apply() {
   [ "$(sha "$ACL")" = "$ACL_SHA" ] || fail final_integrity_mismatch
   # Refresh only rpcd registration; LTE and uhttpd services stay untouched.
   /etc/init.d/rpcd restart >/dev/null 2>&1 || fail rpcd_restart_failed
+  ubus list veci.sms 2>/dev/null | grep -qx 'veci.sms' ||
+    fail rpc_registration_not_visible
   done_ok=1
   echo "VECI_INBOX_V13_ASSETS_PASS"
   echo "MODEM_SMS_NOT_ACCESSED_BY_INSTALLER"
