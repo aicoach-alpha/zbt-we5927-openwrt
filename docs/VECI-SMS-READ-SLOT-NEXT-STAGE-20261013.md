@@ -27,3 +27,12 @@ Date 2026-10-13. Physical device already has metadata-only Inbox v1.3.1 LIVE/PAS
 - SMS send/delete and XL USSD interaction: **NOT IMPLEMENTED/LIVE**.
 
 Evidence: `docs/VECI-SMS-INBOX-INDEX-V13-UAT-20261013.md` and PR #4.
+
+
+## Hardware ACL audit 2026-10-13 and source-only readSlot progress
+
+Hardware owner ran `veci-sms-acl-session-audit-20261013.sh` and reported one configured rpcd login section with `write '*'`, **anonymous `veci.sms.listIndex` DENIED**, no other restricted login section, and `NON_ADMIN_SESSION_TEST=not_performed`. This validates current device configuration only; it must not be generalized to future distinct or restricted user accounts. No router changes or SMS read happened during the audit. See `docs/VECI-SMS-ACL-SESSION-AUDIT-20261013.md`.
+
+New pure C source-only `source/we5927-lte/src/veci-sms-read-slot-policy.[ch]` defines a single-slot, single-attempt guard requiring exactly verified ACL, CSRF, fresh consent for *that* slot, serial lock held, and opened file-descriptor identity verified by its future **trusted caller**. It binds operation to a nonzero trusted session identity, one-time request nonce, and modem generation; exact slot 0..65535. The guard transitions IDLE→ARMED→ISSUED→COMPLETED and rejects wrong slot, session, token, epoch, unvalidated result or attempts to retry, with quarantining and volatile wiping. **Security limit:** it does not implement authentication, true CSRF, session-bound nonce generation, modem transport or read/return text. Those must be proven in the real privileged caller; passing boolean flags supplied by a browser would NOT be secure.
+
+Host CI **405/405 offline PASS** https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38339018912, including 11 new native guard tests and INERT_BUILD_GUARD_PASS. Native read-slot code has no AT command or serial/network/filesystem IO and is not linked or installed in router firmware. SMS content/OTP view, send/delete and XL USSD remain **NOT LIVE**. No physical deployment is authorized by these unit tests alone.
