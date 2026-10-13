@@ -77,10 +77,12 @@ apply() {
     ubus -S list 2>/dev/null | grep -qx 'veci.sms' || fail no_sms_metadata_rpc
     ubus -S list 2>/dev/null | grep -qx 'veci.sms.private' && fail private_rpc_already_present
     # Never activate private RPC when uhttpd authentication is disabled.
-    if uci -q show uhttpd 2>/dev/null | grep -Eq '\.no_ubusauth=(1|yes|true)([[:space:]]|$)'; then
+    if uci -q show uhttpd 2>/dev/null | awk -F= '$1 ~ /\.no_ubusauth$/ {v=$2; gsub(/[^[:alnum:]]/,"",v); if(v=="1"||v=="yes"||v=="true")bad=1} END{exit !bad}'; then
         fail uhttpd_unauthenticated
     fi
-    for pid in $(pidof uhttpd 2>/dev/null || :); do
+    pids="$(pidof uhttpd 2>/dev/null || :)"
+    [ -n "$pids" ] || fail uhttpd_process_missing
+    for pid in $pids; do
         [ -r "/proc/$pid/cmdline" ] || fail uhttpd_runtime_unknown
         if tr '\000' '\n' < "/proc/$pid/cmdline" | grep -qx -- '-a'; then
             fail uhttpd_unauthenticated
