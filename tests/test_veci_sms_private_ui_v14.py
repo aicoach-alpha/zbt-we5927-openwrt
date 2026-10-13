@@ -24,6 +24,8 @@ class StageV14(unittest.TestCase):
     def test_private_data_in_textcontent_only_and_not_cached(self):
         c=UI.read_text()
         self.assertIn("message.textContent =",c)
+        self.assertIn("decodePrivatePdu(result.pdu)",c)
+        self.assertIn("TextDecoder('utf-16be'",c)
         self.assertIn("message.textContent = ''",c)
         self.assertIn("privateOutput.replaceChildren(message)",c)
         self.assertIn("setTimeout(() => {",c)
