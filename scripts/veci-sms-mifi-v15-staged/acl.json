@@ -10,7 +10,8 @@
           "listIndex",
           "getConfig",
           "setEnabled",
-          "listMessages"
+          "listMessages",
+          "deleteMessage"
         ]
       }
     }

@@ -71,6 +71,40 @@ list_messages() {
   ) 8>"$RATE_LOCK"
 }
 
+
+SMS_DELETE=/usr/libexec/veci-sms-delete-one
+
+delete_message(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required; return; }
+  sms_state || { deny sms_disabled; return; }
+  [ -x "$SMS_DELETE" ] || { deny worker_unavailable; return; }
+  command -v jsonfilter >/dev/null 2>&1 || { deny invalid_request; return; }
+  input="$(head -c 1025)" || { deny invalid_request; return; }
+  [ "$(printf %s "$input" | wc -c)" -le 1024 ] || { deny invalid_request; return; }
+  idx="$(jsonfilter -s "$input" -e '@.index' 2>/dev/null || :)"
+  store="$(jsonfilter -s "$input" -e '@.storage' 2>/dev/null || :)"
+  pdu="$(jsonfilter -s "$input" -e '@.expectedPdu' 2>/dev/null || :)"
+  unset input
+  case "$idx" in ''|*[!0-9]*) deny invalid_request;return;;esac
+  [ "$(printf %s "$idx"|wc -c)" -le 5 ] && [ "$idx" -le 65535 ] ||
+      { deny invalid_request;return; }
+  case "$store" in SM|ME);;*) deny invalid_request;return;;esac
+  n="$(printf %s "$pdu"|wc -c)"
+  [ "$n" -ge 4 ] && [ "$n" -le 512 ] && [ "$((n%2))" -eq 0 ] ||
+      { deny invalid_request;return; }
+  case "$pdu" in *[!0-9A-F]*) deny invalid_request;return;;esac
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    sms_state || { deny sms_disabled;exit 0; }
+    result="$(printf %s "$pdu" | "$SMS_DELETE" "$idx" "$store" 2>/dev/null)" ||
+      { deny index_unavailable;exit 0; }
+    sms_state || { deny sms_disabled;exit 0; }
+    expected="{\"ok\":true,\"deleted\":$idx,\"storage\":\"$store\"}"
+    [ "$result" = "$expected" ] || { deny index_unavailable;exit 0; }
+    printf '%s\n' "$expected"
+  ) 8>"$RATE_LOCK"
+}
+
 deny() {
   case "$1" in
     admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy|sms_disabled)
@@ -133,7 +167,7 @@ list_index() {
 [ "$#" -ge 1 ] || exit 2
 case "$1" in
   list)
-    printf '{"listIndex":{"scope":"str","ack_unread_status":"str"},"getConfig":{},"setEnabled":{"state":"str"},"listMessages":{}}\n'
+    printf '{"listIndex":{"scope":"str","ack_unread_status":"str"},"getConfig":{},"setEnabled":{"state":"str"},"listMessages":{},"deleteMessage":{"index":"int","storage":"str","expectedPdu":"str"}}\n'
     ;;
   call)
     [ "$#" -ge 2 ] || { deny invalid_request; exit 0; }
@@ -142,6 +176,7 @@ case "$1" in
       getConfig) config ;;
       setEnabled) toggle ;;
       listMessages) list_messages ;;
+      deleteMessage) delete_message ;;
       *) deny invalid_request ;;
     esac
     ;;
