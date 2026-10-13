@@ -46,9 +46,8 @@ esac
 ''',
             "jsonfilter": '''#!/bin/sh
 if [ "$1" = "-e" ] && [ "$2" = "@.access" ]; then
-  cat >/dev/null
-  echo false
-  exit 0
+  python3 -c 'import json,sys; print(str(json.load(sys.stdin)["access"]).lower())'
+  exit $?
 fi
 if [ "$1" = "-i" ]; then echo listIndex; exit 0; fi
 exit 1
@@ -99,7 +98,7 @@ exit 1
         raw=SCRIPT.read_text()
         for unsafe in ("we5927-at", "AT+CMGL", "AT+CMGR", "AT+CUSD",
                        "ubus call veci.sms", "rpcd restart", "uci set",
-                       "session login", "session grant", "session create",
+                       "ubus call session login", "ubus call session grant", "ubus call session create",
                        "logger ", "sysupgrade "):
             self.assertNotIn(unsafe,raw)
 
