@@ -21,6 +21,10 @@ def load_library(path):
         ctypes.c_int, ptr, ptr, ctypes.c_uint, ctypes.c_uint64,
         ctypes.c_uint64, ctypes.c_uint, ctypes.c_int, ctypes.c_int, ctypes.c_int]
     lib.veci_sms_store_arm.restype = ctypes.c_int
+    lib.veci_sms_store_arm_generated.argtypes = [
+        ctypes.c_int, ptr, ctypes.c_uint, ctypes.c_uint64, ctypes.c_uint64,
+        ctypes.c_uint, ctypes.c_int, ctypes.c_int, ctypes.c_int, ptr]
+    lib.veci_sms_store_arm_generated.restype = ctypes.c_int
     lib.veci_sms_store_consume.argtypes = [
         ctypes.c_int, ptr, ptr, ctypes.c_uint, ctypes.c_uint64, ctypes.c_uint64]
     lib.veci_sms_store_consume.restype = ctypes.c_int
@@ -74,6 +78,61 @@ class StoreTest(unittest.TestCase):
             kw.get("fd", self.fd), kw.get("session", A), kw.get("nonce", B),
             kw.get("slot", 4), kw.get("generation", 39),
             kw.get("now", 1001))
+
+
+    def gen(self, **kw):
+        out=(ctypes.c_ubyte*16)(*([0xEE]*16))
+        rc=self.lib.veci_sms_store_arm_generated(
+            kw.get("fd",self.fd),kw.get("session",A),
+            kw.get("slot",4),kw.get("generation",39),
+            kw.get("now",1000),kw.get("ttl",2000),
+            kw.get("acl",1),kw.get("csrf",1),kw.get("consent",1),out)
+        return rc,out
+
+    def test_kernel_generated_nonce_roundtrip(self):
+        rc,token=self.gen()
+        self.assertEqual(rc,0)
+        self.assertNotEqual(bytes(token),bytes(16))
+        self.assertNotEqual(bytes(token),bytes([0xEE]*16))
+        self.assertEqual(self.consume(nonce=token),0)
+        self.assertEqual(self.consume(nonce=token),-errno.EACCES)
+
+    def test_new_nonce_on_new_explicit_consent(self):
+        rc,a=self.gen()
+        self.assertEqual(rc,0)
+        self.assertEqual(self.consume(nonce=a),0)
+        rc,b=self.gen(now=2000)
+        self.assertEqual(rc,0)
+        self.assertNotEqual(bytes(a),bytes(b))
+        self.assertEqual(self.consume(nonce=b,now=2001),0)
+
+    def test_nonce_never_exported_if_acl_csrf_consent_invalid(self):
+        for gate in ("acl","csrf","consent"):
+            with self.subTest(gate=gate):
+                rc,output=self.gen(**{gate:0})
+                self.assertEqual(rc,-errno.EACCES)
+                self.assertEqual(bytes(output),bytes(16))
+                self.assertEqual(os.listdir(self.tmp.name),[])
+
+    def test_busy_store_hides_new_random_candidate(self):
+        rc,first=self.gen()
+        self.assertEqual(rc,0)
+        rc,blocked=self.gen(now=1001)
+        self.assertEqual(rc,-errno.EBUSY)
+        self.assertEqual(bytes(blocked),bytes(16))
+        self.assertEqual(self.consume(nonce=first),0)
+
+    def test_invalid_slot_does_not_return_nonce(self):
+        rc,token=self.gen(slot=65536)
+        self.assertEqual(rc,-errno.EACCES)
+        self.assertEqual(bytes(token),bytes(16))
+        self.assertEqual(os.listdir(self.tmp.name),[])
+
+    def test_generated_nonce_mismatched_session_consumes(self):
+        rc,token=self.gen()
+        self.assertEqual(rc,0)
+        self.assertEqual(self.consume(nonce=token,session=WRONG),-errno.EACCES)
+        self.assertEqual(self.consume(nonce=token),-errno.EACCES)
 
     def test_happy_path_distinct_open_descriptors_and_replay(self):
         self.assertEqual(self.arm(), 0)

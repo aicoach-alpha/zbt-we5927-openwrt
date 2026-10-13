@@ -76,3 +76,32 @@ See [VECI-SMS-UCODE-SESSION-BOUNDARY-20261013.md](VECI-SMS-UCODE-SESSION-BOUNDAR
 ## Physical auth preflight correction — 13 October
 
 Observed office WE5927 ucode and rpcd ucode present, no private SMS read RPC, but previous check looked at wrong uhttpd config key `ubus_noauth` and wrong module path. Actual OpenWrt init option is `no_ubusauth` (runs uhttpd `-a` when enabled) and actual module is `/usr/lib/uhttpd_ubus.so`. Prior assumption that uhttpd auth was confirmed is **retracted**. A corrected source-only audit checks effective UCI and process args without exporting credentials. Still NO_GO for production readSlot until negative ACL test and trusted cross-request principal binding are proven.
+
+## 2026-10-13 physical effective uhttpd auth preflight and CSPRNG hardening
+
+The owner ran the corrected, read-only c50ae0e script on the physical
+**office** WE5927. Observed: `UHTTPD_NO_UBUSAUTH_UCI=not_enabled`,
+`UHTTPD_NO_UBUSAUTH_RUNTIME=not_enabled`, ubus CORS not enabled,
+`UHTTPD_UBUS_MODULE_FILE=present`, `UHTTPD_UBUS_MODULE_LOADED=present`,
+`UCODE_BINARY=present`, `RPCD_UCODE_PLUGIN=present`,
+`VECI_PRIVATE_SMS_API=not_registered`, and
+`AUTH_BACKEND_GATE=backend_ready_session_binding_unverified`.
+No SMS modem command or credentials/session values were exported.
+This is a **backend readiness PASS** only, NOT browser session binding UAT.
+
+The source-only private capability store now has an optional
+`veci_sms_store_arm_generated()` entry point: a trusted privileged caller
+must have already proved ACL, CSRF and fresh per-slot consent; the routine
+creates a 128-bit nonce from Linux `getrandom(GRND_NONBLOCK)` and refuses
+unseeded/kernel failures without weak entropy fallback. The generated nonce
+is output only when the root-owned private tmpfs state was armed
+successfully; all failure paths clear the output and wipe the candidate.
+Tests check replay, mismatched session, denied gates, busy store and
+new-approval nonce rotation. This API is **NOT** linked into firmware,
+not a complete authentication path and has no modem I/O. User-submitted
+approval booleans cannot substitute for the privileged caller's proofs.
+
+**Blocking next gate:** prove fresh admin and least-privileged browser
+session behavior across the HTTP-to-rpcd-ucode boundary, and verify the
+caller context cannot be spoofed by non-privileged peers. Preserve
+NO_GO for `AT+CMGR` or public SMS text/sender/OTP reads.

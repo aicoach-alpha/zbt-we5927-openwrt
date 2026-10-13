@@ -21,6 +21,20 @@ int veci_sms_store_arm(int private_dirfd,
                        int authenticated_acl, int csrf_verified,
                        int fresh_per_slot_consent);
 
+/*
+ * Preferred future server-side entry point: generate 128-bit capability from
+ * the Linux kernel CSPRNG. Never accept a nonce supplied by the browser.
+ * On failure nonce_out is cleared, including when the store is busy.
+ * AUTH / CSRF / per-slot consent flags MUST be derived by a trusted caller.
+ */
+int veci_sms_store_arm_generated(
+    int private_dirfd,
+    const unsigned char trusted_session[VECI_SMS_SESSION_BYTES],
+    unsigned int slot, uint64_t modem_generation,
+    uint64_t now_monotonic_ms, unsigned int ttl_ms,
+    int authenticated_acl, int csrf_verified, int fresh_per_slot_consent,
+    unsigned char nonce_out[VECI_SMS_CAP_BYTES]);
+
 int veci_sms_store_consume(int private_dirfd,
                            const unsigned char trusted_session[VECI_SMS_SESSION_BYTES],
                            const unsigned char nonce[VECI_SMS_CAP_BYTES],
