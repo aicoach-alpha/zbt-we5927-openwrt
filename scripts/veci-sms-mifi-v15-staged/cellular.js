@@ -284,6 +284,18 @@ export default {
 						<button class="button button-secondary" id="cellular-sms-open" type="button">Open Inbox</button>
 						<button class="button button-secondary" id="cellular-sms-clear" type="button">Clear screen</button>
 					</div>
+					<div class="cellular-actions" style="margin:12px 0;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+						<label for="cellular-sms-search" style="flex:1;min-width:180px">Search Inbox
+							<input id="cellular-sms-search" type="search" placeholder="Sender or message text" autocomplete="off" disabled style="display:block;width:100%;margin-top:4px"/>
+						</label>
+						<label for="cellular-sms-filter">Status
+							<select id="cellular-sms-filter" disabled style="display:block;margin-top:4px">
+								<option value="all">All messages</option>
+								<option value="unread">Unread</option>
+								<option value="read">Read</option>
+							</select>
+						</label>
+					</div>
 					<div id="cellular-sms-messages" role="status" aria-live="polite">Click Open Inbox to load messages.</div>
 				</div>
 			</section>
@@ -319,10 +331,32 @@ export default {
 		const smsOpen = root.querySelector('#cellular-sms-open');
 		const smsClear = root.querySelector('#cellular-sms-clear');
 		const smsOutput = root.querySelector('#cellular-sms-messages');
+		const smsSearch = root.querySelector('#cellular-sms-search');
+		const smsFilter = root.querySelector('#cellular-sms-filter');
+		let smsSearchItems = [];
+		function filterSms() {
+			const query = smsSearch.value.trim().toLocaleLowerCase();
+			const mode = smsFilter.value;
+			let visible = 0;
+			for (const item of smsSearchItems) {
+				const match = (!query || item.search.includes(query)) &&
+					(mode === 'all' || item.readState === mode);
+				item.card.hidden = !match;
+				if (match) visible++;
+			}
+			smsOutput.setAttribute('aria-label', visible+' of '+smsSearchItems.length+' SMS messages shown');
+		}
+		smsSearch.addEventListener('input', filterSms);
+		smsFilter.addEventListener('change', filterSms);
 		let smsEnabled = false;
 		let smsGeneration = 0;
 		function clearSms() {
 			smsGeneration += 1;
+			smsSearchItems = [];
+			smsSearch.value = '';
+			smsFilter.value = 'all';
+			smsSearch.disabled = true;
+			smsFilter.disabled = true;
 			smsOutput.replaceChildren();
 			smsOutput.textContent = 'No SMS loaded.';
 		}
@@ -401,12 +435,17 @@ export default {
 				const rows=mergeSmsParts(decodedRows);
 				rows.sort((a,b)=>(b.decoded?.received?.unixMs??-1)-(a.decoded?.received?.unixMs??-1));
 				const statusName={0:'Unread',1:'Read',2:'Unsent',3:'Sent',4:'All'};
+				const indexed = [];
 				for(const item of rows) {
 					const card=document.createElement('article');
-					card.className='detail-list';
+					card.className='sms-message-card';
+					card.style.cssText='border:1px solid #dce6ef;border-radius:12px;padding:14px 16px;margin:12px 0;background:#fff;overflow-wrap:anywhere;';
 					const label=document.createElement('strong');
+					label.style.cssText='display:block;font-size:14px;margin-bottom:6px;';
 					const date=document.createElement('small');
+					date.style.cssText='display:block;opacity:.78;margin-bottom:10px;';
 					const body=document.createElement('p');
+					body.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 12px;line-height:1.55;';
 					const slotList=item.indices||[item.index];
 					if(item.decoded){
 						label.textContent='From: '+item.decoded.sender;
@@ -450,11 +489,37 @@ export default {
 								if(turn===smsGeneration)toast('Could not confirm SMS deletion. Reopen Inbox to refresh.','warning');
 							}finally{setBusy(deleteBtn,false);}
 						});
+						deleteBtn.style.cssText='width:auto;min-width:110px;';
 						card.append(deleteBtn);
 					}
+					// Native clipboard only on explicit click. Never transmit
+					// or persist private SMS text beyond the rendered page.
+					if(item.decoded){
+						const copyBtn=document.createElement('button');
+						copyBtn.type='button';
+						copyBtn.className='button button-secondary';
+						copyBtn.textContent='Copy message';
+						copyBtn.style.cssText='width:auto;min-width:110px;margin-right:8px;';
+						copyBtn.addEventListener('click',async()=>{
+							if(!smsEnabled || turn!==smsGeneration)return;
+							try{
+								if(!navigator.clipboard?.writeText)throw Error('Clipboard unavailable');
+								await navigator.clipboard.writeText(item.decoded.text);
+								toast('SMS text copied.','success');
+							}catch{toast('Browser clipboard unavailable.','warning');}
+						});
+						card.append(copyBtn);
+					}
+					indexed.push({card,search:(item.decoded?.sender||'') .toLocaleLowerCase()+
+						' '+(item.decoded?.text||'').toLocaleLowerCase(),
+						readState:item.status===0?'unread':item.status===1?'read':'other'});
 					frag.appendChild(card);
 				}
 				smsOutput.replaceChildren(frag);
+				smsSearchItems = indexed;
+				smsSearch.disabled = false;
+				smsFilter.disabled = false;
+				filterSms();
 			} catch {
 				if (smsEnabled && turn === smsGeneration) {
 					smsOutput.textContent = 'Unable to load SMS Inbox.';
