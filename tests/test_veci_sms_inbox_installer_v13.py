@@ -51,6 +51,9 @@ class OptionalInstaller(unittest.TestCase):
         )
         wget.write_text(script)
         wget.chmod(0o700)
+        ubus=self.bin/"ubus"
+        ubus.write_text("#!/bin/sh\n[ \"$1\" = list ] && [ \"$2\" = veci.sms ] || exit 11\necho veci.sms\n")
+        ubus.chmod(0o700)
         self.env={**os.environ,"PATH":str(self.bin)+":"+os.environ["PATH"]}
         src=INSTALLER.read_text()
         substitutions={
@@ -117,6 +120,19 @@ class OptionalInstaller(unittest.TestCase):
         p=self.exec("rollback")
         self.assertEqual(p.returncode,0,p.stderr)
         self.assertIn("VECI_INBOX_V13_ROLLBACK_PASS",p.stdout)
+        self.assertEqual(self.base.read_bytes(),V12.read_bytes())
+        self.assertFalse(self.rpc.exists())
+        self.assertFalse(self.worker.exists())
+        self.assertFalse(self.acl.exists())
+        self.assertEqual((self.root/"restarts").read_text().count("restart"),2)
+
+    def test_registration_failure_automatically_restores_v12(self):
+        ubus=self.bin/"ubus"
+        ubus.write_text("#!/bin/sh\nexit 1\n")
+        p=self.exec("apply")
+        self.assertNotEqual(p.returncode,0)
+        self.assertIn("rpc_registration_not_visible",p.stderr)
+        self.assertIn("INBOX_V13_AUTOMATIC_ROLLBACK_STARTED",p.stderr)
         self.assertEqual(self.base.read_bytes(),V12.read_bytes())
         self.assertFalse(self.rpc.exists())
         self.assertFalse(self.worker.exists())
