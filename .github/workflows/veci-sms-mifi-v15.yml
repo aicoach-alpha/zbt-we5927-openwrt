@@ -12,6 +12,7 @@ on:
       - 'scripts/veci-sms-mifi-v1531-inbox-hotfix.sh'
       - 'scripts/veci-sms-mifi-v154-ui-install.sh'
       - 'tests/veci_sms_mifi_decoder_smoke.cjs'
+      - 'tests/test_veci_sms_delete_awk_smoke.py'
 permissions:
   contents: read
 jobs:
@@ -69,6 +70,8 @@ jobs:
           assert 'SMS feature ON' not in delete or 'flock -n -x 9' in delete
           print('VECI_MIFI_SMS_V15_MINIMAL_RELEASE_GATE_PASS')
           PY
+      - name: SMS Delete guarded AT response parser / no hardware
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delete_awk_smoke.py' -v
       - name: Operator sender and DCS PDU smoke
         run: node tests/veci_sms_mifi_decoder_smoke.cjs
       - name: Immutable deployment asset SHA256
