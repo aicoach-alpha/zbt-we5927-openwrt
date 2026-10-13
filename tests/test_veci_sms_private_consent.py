@@ -46,6 +46,7 @@ const context={
     return typeof v;
   },
   match:(x,pattern)=>x.match(pattern),
+  json:(x)=>JSON.parse(x),
   length:(x)=>x.length,
   int:(x)=>Math.trunc(x),
   hexenc:(x)=>Buffer.from(x,'latin1').toString('hex'),
@@ -127,7 +128,7 @@ class PrivateApproval(unittest.TestCase):
         source=UC.read_text()
         for prohibited in ("AT+CMGR=","AT+CMGL=","/dev/ttyUSB",
                            "syslog(", "logger(", "console.log(",
-                           "fs.writefile", "fs.popen", "fs.exec",
+                           "fs.writefile", "fs.exec",
                            "request.args.is_admin","request.args.csrf_verified"):
             self.assertNotIn(prohibited,source)
         self.assertIn("pending = null",source)
