@@ -24,6 +24,41 @@ function normalizeOperator(value) {
 /* Decode only after explicitly authenticated, single-use private readSlot.
  * No persistence, no logging. Supports GSM7 & UCS2 SMS-DELIVER.
  */
+
+function formatSmsDate(received) {
+  if (!received || !Number.isFinite(received.unixMs))return 'Time unavailable';
+  const d=new Date(received.unixMs);
+  if (!Number.isFinite(d.getTime()))return 'Time unavailable';
+  return d.toLocaleString('id-ID', {day:'2-digit',month:'short',year:'numeric',
+    hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function mergeSmsParts(rows) {
+  const groups=new Map(),display=[];
+  for (const row of rows) {
+    const m=row.decoded, c=m?.concat;
+    // Do not merge unrelated messages with same reused reference: bind
+    // alphanumeric sender, total count and a 48h window of SCTS.
+    if(!c || !m.received || c.total<=1){display.push(row);continue;}
+    const key=[m.sender,c.ref,c.total].join('|');
+    const candidates=groups.get(key)||[];
+    let group=candidates.find(g=>Math.abs(g.epoch-m.received.unixMs)<=48*3600000 &&
+      !g.parts.has(c.part));
+    if(!group){group={epoch:m.received.unixMs,parts:new Map(),total:c.total};candidates.push(group);groups.set(key,candidates);display.push({group,decoded:m});}
+    group.parts.set(c.part,row);
+  }
+  return display.map(item=>{
+    if(!item.group)return item;
+    const group=item.group;
+    if(group.parts.size!==group.total)return {decoded:{...item.decoded,
+      text:item.decoded.text+' (multipart incomplete)',concat:item.decoded.concat},
+      index:item.group.parts.get(item.decoded.concat.part)?.index??null,status:0,partial:true};
+    const ordered=[...group.parts].sort((a,b)=>a[0]-b[0]).map(v=>v[1]);
+    return {...ordered[0],decoded:{...ordered[0].decoded,
+      text:ordered.map(r=>r.decoded.text).join(''),
+      concat:null,multipartCount:ordered.length},indices:ordered.map(r=>r.index)};
+  });
+}
+
 function decodePrivatePdu(hex) {
   if(typeof hex!=="string" || !/^(?:[0-9A-Fa-f]{2}){4,256}$/.test(hex))throw Error("PDU");
   const bytes=Uint8Array.from(hex.match(/../g),b=>parseInt(b,16));
@@ -84,9 +119,49 @@ function decodePrivatePdu(hex) {
   }
   if(alphabet===1)throw Error("Binary SMS");
   if(alphabet!==0 && alphabet!==2)throw Error("Unsupported alphabet");
-  p+=7; const udl=one(), data=bytes.slice(p);
-  let header=0;
-  if(udhi){if(!data.length)throw Error("UDH");header=data[0]+1;if(header<3 || header>data.length)throw Error("UDH invalid");}
+  // TP-Service-Centre-Time-Stamp: 7 swapped semi-octets; last holds
+  // signed UTC offset in quarter-hours. Keep original network time zone.
+  const scts=bytes.slice(p,p+7);
+  p+=7;
+  const decodeBcd=(v)=>{const lo=v&15,hi=(v>>4)&15;if(lo>9||hi>9)throw Error("SCTS BCD");return lo*10+hi;};
+  let received=null;
+  try {
+    const yy=decodeBcd(scts[0]);
+    const year=yy<90?2000+yy:1900+yy;
+    const month=decodeBcd(scts[1]),day=decodeBcd(scts[2]);
+    const hour=decodeBcd(scts[3]),minute=decodeBcd(scts[4]),second=decodeBcd(scts[5]);
+    const sign=(scts[6]&8)?-1:1;
+    const quarters=(scts[6]&7)*10+(scts[6]>>4);
+    if(month<1||month>12||day<1||day>31||hour>23||minute>59||second>59||quarters>79)
+      throw Error("SCTS range");
+    const local=Date.UTC(year,month-1,day,hour,minute,second);
+    const candidate=new Date(local);
+    if(candidate.getUTCFullYear()!==year||candidate.getUTCMonth()+1!==month||
+       candidate.getUTCDate()!==day)throw Error("SCTS date");
+    const timezoneMinutes=sign*quarters*15;
+    received={unixMs:local-timezoneMinutes*60000,timezoneMinutes,
+      networkTime:`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')} ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:${String(second).padStart(2,'0')}`};
+  } catch { /* Broken SCTS never hides otherwise valid message text. */ }
+  const udl=one(),data=bytes.slice(p);
+  let header=0,concat=null;
+  if(udhi){
+    if(!data.length)throw Error("UDH");
+    header=data[0]+1;
+    if(header<3||header>data.length)throw Error("UDH invalid");
+    // Concatenation IE: 8-bit 00/03 and 16-bit 08/04.
+    for(let i=1;i<header;){
+      if(i+2>header)throw Error("UDH IE");
+      const ie=data[i++],size=data[i++];
+      if(i+size>header)throw Error("UDH IE length");
+      if((ie===0&&size===3)||(ie===8&&size===4)){
+        const ref=ie===0?data[i]:(data[i]<<8)|data[i+1];
+        const total=data[i+size-2],part=data[i+size-1];
+        if(!total||total>32||part<1||part>total)throw Error("UDH multipart");
+        concat={ref,total,part};
+      }
+      i+=size;
+    }
+  }
   let text="";
   if(alphabet===0){
     if(udl>160 || data.length!==Math.ceil(udl*7/8))throw Error("GSM7 size");
@@ -108,7 +183,7 @@ function decodePrivatePdu(hex) {
     }
   }
   if(!sender || sender.length>80 || text.length>4096)throw Error("Message size");
-  return {sender,text};
+  return {sender,text,received,concat};
 }
 
 export default {
@@ -304,29 +379,39 @@ export default {
 				const head = document.createElement('p');
 				head.textContent = 'Stored SMS: ' + result.count;
 				frag.appendChild(head);
-				const seen = new Set();
-				for (const item of messages) {
-					if (!item || !Number.isSafeInteger(item.index) || item.index < 0 ||
-						item.index > 65535 || seen.has(item.index) ||
-						typeof item.pdu !== 'string' || item.pdu.length > 512)
+				const seen = new Set(), decodedRows=[];
+				for(const item of messages) {
+					if(!item || !Number.isSafeInteger(item.index) || item.index<0 ||
+						item.index>65535 || seen.has(item.index) ||
+						typeof item.pdu!=='string' || item.pdu.length>512)
 						throw Error('Invalid SMS record');
 					seen.add(item.index);
-					const card = document.createElement('div');
-					card.className = 'detail-list';
-					const label = document.createElement('strong');
-					const body = document.createElement('p');
-					try {
-						const decoded = decodePrivatePdu(item.pdu);
-						label.textContent = 'From: ' + decoded.sender + ' · slot ' + item.index;
-						body.textContent = decoded.text;
-					} catch (error) {
-						// Local decoder-only error, never log/return raw PDU
-						// or any decoded sender/body in diagnostics.
-						const why = String(error?.message || '').replace(/[^A-Za-z0-9 _-]/g, '').slice(0, 42);
-						label.textContent = 'SMS slot ' + item.index;
-						body.textContent = 'Unable to decode SMS' + (why ? ' (' + why + ')' : '') + '.';
+					let decoded=null,reason='';
+					try { decoded=decodePrivatePdu(item.pdu); }
+					catch(error){reason=String(error?.message||'Unknown').replace(/[^A-Za-z0-9 _-]/g,'').slice(0,42);}
+					decodedRows.push({index:item.index,status:item.status,decoded,reason});
+				}
+				const rows=mergeSmsParts(decodedRows);
+				rows.sort((a,b)=>(b.decoded?.received?.unixMs??-1)-(a.decoded?.received?.unixMs??-1));
+				const statusName={0:'Unread',1:'Read',2:'Unsent',3:'Sent',4:'All'};
+				for(const item of rows) {
+					const card=document.createElement('article');
+					card.className='detail-list';
+					const label=document.createElement('strong');
+					const date=document.createElement('small');
+					const body=document.createElement('p');
+					const slotList=item.indices||[item.index];
+					if(item.decoded){
+						label.textContent='From: '+item.decoded.sender;
+						date.textContent=formatSmsDate(item.decoded.received)+' · '+(statusName[item.status]||'Stored')+
+						  ' · slot '+slotList.join(', ');
+						body.textContent=item.decoded.text;
+					}else{
+						label.textContent='SMS slot '+item.index;
+						date.textContent='Message metadata';
+						body.textContent='Unable to decode SMS'+(item.reason?' ('+item.reason+')':'')+'.';
 					}
-					card.append(label, body);
+					card.append(label,date,body);
 					frag.appendChild(card);
 				}
 				smsOutput.replaceChildren(frag);
