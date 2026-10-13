@@ -165,7 +165,7 @@ apply() {
         fi
     done
     work="$(mktemp -d /tmp/sms-mifi-v15.XXXXXX)" || fail staging_failed
-    touched=0; success=0
+    touched=0; success=0; backup_created=0
     cleanup() {
         code=$?
         trap - EXIT
@@ -176,6 +176,10 @@ apply() {
             else
                 echo 'SMS_MIFI_V15_AUTO_ROLLBACK=manual_recovery_required' >&2
             fi
+        fi
+        if [ "$backup_created" = 1 ] && [ "$touched" != 1 ] &&
+           [ -d "$BACK" ] && [ ! -L "$BACK" ]; then
+            rm -rf "$BACK"
         fi
         rm -rf "$work"
         exit "$code"
@@ -198,6 +202,7 @@ apply() {
     [ "$(legacy_sha)" = "$baseline" ] || fail concurrent_change
     check_old || fail concurrent_change
     mkdir "$BACK" || fail backup_creation
+    backup_created=1
     cp -p "$UI" "$BACK/ui" || fail backup_ui
     cp -p "$RPC" "$BACK/rpc" || fail backup_rpc
     cp -p "$META" "$BACK/meta" || fail backup_metadata
