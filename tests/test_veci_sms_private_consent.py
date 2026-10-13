@@ -12,7 +12,8 @@ HARNESS=r"""
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const source=fs.readFileSync(process.argv[1],'utf8');
 let instant=900000, authorized=true, entropy=true, accessCalls=[];
-let randomCounter=7;
+let randomCounter=7, workerCalls=0;
+const fixturePdu='00040B912143658709F100000000000000000005C82293F904';
 const ubus={
   defer:(o,m,a,cb)=>{
     accessCalls.push({o,m,a});
@@ -29,6 +30,13 @@ const context={
       if(!entropy)return null;
       const bytes=Buffer.alloc(16,++randomCounter);
       return bytes.toString('latin1');
+    },popen:(argv,mode)=>{
+      workerCalls++;
+      assert.strictEqual(argv[0],'/usr/libexec/veci-sms-private-read');
+      assert.strictEqual(mode,'r');
+      const slot=Number(argv[1]);
+      let n=0;
+      return {read:(len)=>{n++; return n===1?JSON.stringify({ok:true,index:slot,pdu:fixturePdu}):''},close:()=>0};
     }};
     throw Error('unexpected import '+name);
   },
@@ -67,7 +75,7 @@ assert.strictEqual(first.ok,true);
 assert.strictEqual(first.token.length,32);
 assert.strictEqual(accessCalls.at(-1).a.function,'readSlot');
 assert.strictEqual(arm().reason,'approval_pending');
-assert.strictEqual(read(first.token).reason,'physical_read_disabled');
+assert.strictEqual(read(first.token).pdu,fixturePdu);
 assert.strictEqual(read(first.token).reason,'approval_missing_or_expired');
 let next=arm();
 assert.notStrictEqual(next.token,first.token);
@@ -104,6 +112,7 @@ assert.strictEqual(read('a'.repeat(32)).reason,'approval_missing_or_expired');
 entropy=false;
 assert.strictEqual(arm().reason,'unavailable');
 assert.strictEqual(read('a'.repeat(32)).reason,'approval_missing_or_expired');
+assert.strictEqual(workerCalls,1);
 console.log('VECI_SINGLE_VM_CONSENT_PASS');
 """
 
@@ -124,7 +133,8 @@ class PrivateApproval(unittest.TestCase):
         self.assertIn("pending = null",source)
         self.assertIn("clock(true)",source)
         self.assertIn("fs.readfile('/dev/urandom', 16)",source)
-        self.assertIn("physical_read_disabled",source)
+        self.assertIn("fs.popen(['/usr/libexec/veci-sms-private-read'",source)
+        self.assertIn("req.reply({ok:true, index:req.args.slot, pdu:result.pdu}",source)
         fw=(ROOT/"source/we5927-lte/Makefile").read_text()
         self.assertNotIn("veci-sms-private-consent",fw)
         self.assertNotIn("veci-sms-private-acl",fw)

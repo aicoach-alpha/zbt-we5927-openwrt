@@ -3,7 +3,7 @@
 /*
  * VeCI private SMS capability endpoint - STAGED SOURCE ONLY / NOT DEPLOYED.
  * This object owns two-step consent entirely in the existing rpcd ucode VM.
- * Real SMS reading is deliberately DISABLED, even on successful consume.
+ * Live worker is invoked only after authenticated, one-use consent.
  * No serial command, no SMS contents or sender, no additional daemon.
  *
  * HTTP /ubus authenticates SID and appends ubus_rpc_session to the request;
@@ -142,14 +142,41 @@ function read_request(req) {
             req.reply(denied(), 0);
             return;
         }
-        /* Release candidate MUST replace this fail-closed stub with
-         * held-lock, verified-modem one-CMGR worker after physical UAT.
-         * No SMS, sender, PDU or OTP is ever read here.
+        /* Explicit one-shot modem request AFTER successful readSlot ACL,
+         * consumed token and exact SID+slot match. No arbitrary command;
+         * sanitized decimal slot only. No shell or background job.
          */
-        req.reply({
-            ok:false, reason:'physical_read_disabled',
-            approval_consumed:true
-        }, 0);
+        let proc = fs.popen(['/usr/libexec/veci-sms-private-read',
+                              '' + req.args.slot], 'r');
+        if (!proc) {
+            req.reply({ok:false, reason:'sms_unavailable'}, 0);
+            return;
+        }
+        let raw = proc.read(1400);
+        let overflow = proc.read(1);
+        let status = proc.close();
+        if (status != 0 || type(raw) != 'string' ||
+            length(raw) > 1400 || (overflow != null && length(overflow)) > 0) {
+            req.reply({ok:false, reason:'sms_unavailable'}, 0);
+            return;
+        }
+        let result;
+        try { result = json(raw); } catch (e) { result = null; }
+        raw = null;
+        if (!result || result.ok != true ||
+            result.index != req.args.slot ||
+            type(result.pdu) != 'string' ||
+            length(result.pdu) < 4 || length(result.pdu) > 512 ||
+            length(result.pdu) % 2 != 0 ||
+            match(result.pdu, /^[0-9A-F]+$/) == null) {
+            req.reply({ok:false, reason:'sms_unavailable'}, 0);
+            return;
+        }
+        /* Private RPC ONLY. No PDU in metadata, logs, generic dumps or
+         * persistent storage. Frontend decodes in ephemeral foreground.
+         */
+        req.reply({ok:true, index:req.args.slot, pdu:result.pdu}, 0);
+
     });
 }
 
