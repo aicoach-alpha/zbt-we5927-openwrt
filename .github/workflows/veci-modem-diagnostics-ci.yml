@@ -48,6 +48,8 @@ on:
       - 'source/veci-sms-inbox-we5927/**'
       - 'tests/test_veci_sms_rpc_admin_consent.py'
       - 'tests/test_veci_sms_inbox_installer_v13.py'
+      - 'tests/test_veci_sms_inbox_installer_v131.py'
+      - 'scripts/veci-sms-inbox-admin-ui-v131-install.sh'
       - 'scripts/veci-sms-inbox-admin-ui-v13-install.sh'
       - 'tests/test_veci_sms_inbox_ui_stage.py'
       - 'scripts/veci-sms-inbox-ui-staged-20261013/**'
@@ -120,6 +122,8 @@ jobs:
           sha256sum source/veci-sms-inbox-we5927/files/usr/libexec/rpcd/veci.sms
           sha256sum source/veci-sms-inbox-we5927/files/usr/libexec/veci-sms-inbox-index
           sha256sum source/veci-sms-inbox-we5927/files/usr/share/rpcd/acl.d/veci-sms-inbox-we5927.json
+      - name: Simulate v1.3.1 bounded rpcd readiness, delayed registration and verified rollback
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_installer_v131.py' -v
       - name: Simulate safe v1.3 exact-live UI and independent rpcd package install/rollback
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_installer_v13.py' -v
       - name: Verify isolated admin-write SMS inbox RPC, explicit consent and rate limit
