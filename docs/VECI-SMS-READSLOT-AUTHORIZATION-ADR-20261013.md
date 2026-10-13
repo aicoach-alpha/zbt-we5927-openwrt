@@ -72,3 +72,7 @@ Expired pending capability is reclaimed ONLY on a newly validated, fresh `store_
 ## Additional ucode boundary research
 
 See [VECI-SMS-UCODE-SESSION-BOUNDARY-20261013.md](VECI-SMS-UCODE-SESSION-BOUNDARY-20261013.md). An upstream `rpcd` ucode plugin can inspect the **ubusd Unix peer** (`request.info.acl.user`), and OpenWrt `uhttpd` adds `ubus_rpc_session` to a forwarded /ubus call after its ACL check. A source-only, no-modem ucode audit prototype now checks the tuple with an additional `session.access` lookup. Native root ubus calls can provide their own SID, so this is not yet a trusted per-browser identity bridge, and physical proof with restricted HTTP sessions is still required before any readSlot release.
+
+## Physical auth preflight correction — 13 October
+
+Observed office WE5927 ucode and rpcd ucode present, no private SMS read RPC, but previous check looked at wrong uhttpd config key `ubus_noauth` and wrong module path. Actual OpenWrt init option is `no_ubusauth` (runs uhttpd `-a` when enabled) and actual module is `/usr/lib/uhttpd_ubus.so`. Prior assumption that uhttpd auth was confirmed is **retracted**. A corrected source-only audit checks effective UCI and process args without exporting credentials. Still NO_GO for production readSlot until negative ACL test and trusted cross-request principal binding are proven.
