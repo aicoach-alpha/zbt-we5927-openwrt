@@ -5,10 +5,12 @@ set -eu
 umask 077
 LC_ALL=C; export LC_ALL
 WORKER=/usr/libexec/veci-sms-inbox-index
+RATE_FILE=/tmp/veci-sms-inbox-last-attempt
+RATE_LOCK=/var/lock/veci-sms-inbox-rpc.lock
 
 deny() {
   case "$1" in
-    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable)
+    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy)
       reason="$1" ;;
     *) reason=index_unavailable ;;
   esac
@@ -32,7 +34,26 @@ list_index() {
   fi
   unset scope ack
   [ -x "$WORKER" ] || { deny worker_unavailable; return; }
-  result="$("$WORKER" --show-indices-only --ack-unread-may-be-marked-read 2>/dev/null)" ||
+  command -v flock >/dev/null 2>&1 || { deny index_unavailable; return; }
+  # Per-device rate control prevents accidental repeated state-changing lists.
+  # Reserve attempt BEFORE AT I/O, including if modem later times out.
+  (
+    flock -n -x 8 || { deny request_busy; exit 0; }
+    now="$(date +%s)" || { deny index_unavailable; exit 0; }
+    case "$now" in ''|*[!0-9]*) deny index_unavailable; exit 0 ;; esac
+    last="$(cat "$RATE_FILE" 2>/dev/null || :)"
+    case "$last" in
+      ''|*[!0-9]*) ;;
+      *)
+        if [ "$now" -lt "$last" ] || [ "$((now - last))" -lt 60 ]; then
+          deny retry_later
+          exit 0
+        fi
+        ;;
+    esac
+    printf '%s\n' "$now" > "$RATE_FILE" ||
+      { deny index_unavailable; exit 0; }
+    result="$("$WORKER" --show-indices-only --ack-unread-may-be-marked-read 2>/dev/null)" ||
     { deny index_unavailable; return; }
   [ "$(printf %s "$result" | wc -c)" -le 1600 ] ||
     { deny index_unavailable; return; }
@@ -43,6 +64,7 @@ list_index() {
     return
   fi
   printf '%s\n' "$result"
+  ) 8>"$RATE_LOCK"
 }
 [ "$#" -ge 1 ] || exit 2
 case "$1" in
