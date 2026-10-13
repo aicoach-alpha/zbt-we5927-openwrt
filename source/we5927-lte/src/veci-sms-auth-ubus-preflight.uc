@@ -19,8 +19,8 @@ function denied() {
 }
 
 function valid_sid(s) {
-    return typeof s == 'string' &&
-        /^[0-9a-f]{32}$/.test(s) &&
+    return type(s) == 'string' &&
+        match(s, /^[0-9a-f]{32}$/) != null &&
         s != '00000000000000000000000000000000';
 }
 
@@ -37,7 +37,7 @@ return {
                     info.method != 'probe' ||
                     !info.object || info.object.name != 'veci.sms.auth.audit' ||
                     !valid_sid(args.ubus_rpc_session) ||
-                    !Number.isInteger(args.slot) ||
+                    type(args.slot) != 'integer' ||
                     args.slot < 0 || args.slot > 65535 ||
                     args.scope != 'authorization_preflight_only')
                     return denied();
@@ -54,8 +54,9 @@ return {
                     function: 'readSlot'
                 }, function(code, response) {
                     request.reply({
-                        ok: code === 0 && response != null &&
-                            response.access === true,
+                        ok: code == 0 && response != null &&
+                            type(response.access) == 'boolean' &&
+                            response.access == true,
                         diagnostic_only: true
                     }, 0);
                 });
