@@ -62,8 +62,13 @@ list_messages() {
     [ "$(printf '%s' "$result" | wc -c)" -le 10000 ] ||
         { unset result; deny index_unavailable; exit 0; }
     # Worker owns strict PDU validation. Never print unparsed AT response.
+    # v1.5.3 worker inserts a verified storage label after source.
+    # Check the full prefix for one of the three explicit memory codes,
+    # not the v1.5.2 prefix which discarded valid results.
     case "$result" in
-      '{"ok":true,"source":"on_demand_cmgl_pdu","count":'*)
+      '{"ok":true,"source":"on_demand_cmgl_pdu","storage":"SM","count":'*|\
+      '{"ok":true,"source":"on_demand_cmgl_pdu","storage":"ME","count":'*|\
+      '{"ok":true,"source":"on_demand_cmgl_pdu","storage":"MT","count":'*)
         printf '%s\n' "$result" ;;
       *) deny index_unavailable ;;
     esac
