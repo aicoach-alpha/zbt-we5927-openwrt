@@ -36,7 +36,7 @@ toggle() {
   [ ! -L "$STATE_FILE" ] && [ -f "$STATE_FILE" ] ||
       { deny index_unavailable; return; }
   # State is on persistent flash only upon an explicit user switch.
-  temp="$STATE_FILE.new.$"
+  temp="$STATE_FILE.new.$$"
   (umask 077; printf '%s\n' "$next" > "$temp") ||
       { deny index_unavailable; return; }
   chmod 600 "$temp" || { rm -f "$temp"; deny index_unavailable; return; }
