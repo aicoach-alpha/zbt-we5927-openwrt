@@ -316,12 +316,11 @@ export default {
                     slot, token: approval.token
                 }, { timeout: 6000 });
                 if (result?.ok !== true || result.index !== slot ||
-                    typeof result.text !== 'string' || result.text.length > 4096 ||
-                    typeof result.sender !== 'string' || result.sender.length > 80)
+                    typeof result.pdu !== 'string' || !/^(?:[0-9A-F]{2}){4,256}$/.test(result.pdu))
                     throw new Error('SMS read unavailable');
-
+                const decoded = decodePrivatePdu(result.pdu);
                 const message = document.createElement('pre');
-                message.textContent = 'Slot ' + slot + ' · sender ' + result.sender + '\n' + result.text;
+                message.textContent = 'Slot ' + slot + ' · sender ' + decoded.sender + '\n' + decoded.text;
                 privateOutput.replaceChildren(message);
                 // Private text is visible only for a short time, including
                 // when the user forgets to navigate away.
