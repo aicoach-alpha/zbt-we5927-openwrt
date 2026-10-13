@@ -43,7 +43,7 @@ is_pdu_mode(){
  '
 }
 single_pdu(){
- awk -v index="$slot" '
+ awk -v slot_id="$slot" '
  function dec(v,limit){return v~/^[0-9]+$/&&length(v)<=5&&v+0<=limit}
  function hdr(v,a,n){
   sub(/^\+CMGR:[ ]*/,"",v);gsub(/ /,"",v);n=split(v,a,",")
@@ -61,7 +61,7 @@ single_pdu(){
  }
  {gsub(/\r/,"",$0);if($0=="")next
   if(length($0)>1024||bad||done){bad=1;next}
-  if(!stage&&!echoed&&$0=="AT+CMGR=" index){echoed=1;next}
+  if(!stage&&!echoed&&$0=="AT+CMGR=" slot_id){echoed=1;next}
   if(stage==0&&$0~/^\+CMGR:/&&hdr($0)){stage=1;next}
   if(stage==1&&valid($0)){pdu=toupper($0);stage=2;next}
   if(stage==2&&$0=="OK"){done=1;next}
@@ -71,9 +71,9 @@ single_pdu(){
  '
 }
 delete_ok(){
- awk -v index="$slot" '
+ awk -v slot_id="$slot" '
  {gsub(/\r/,"",$0);if($0=="")next
-  if($0==("AT+CMGD=" index ",0")&&!echoed){echoed=1;next}
+  if($0==("AT+CMGD=" slot_id ",0")&&!echoed){echoed=1;next}
   if($0=="OK"&&!done){done=1;next}
   bad=1
  }
