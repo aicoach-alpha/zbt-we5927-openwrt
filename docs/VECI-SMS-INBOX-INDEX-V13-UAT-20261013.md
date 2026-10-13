@@ -46,7 +46,7 @@ Payload commit: `cecfe43e99a1bf9b4c7c9c1158432acd44099de5`.
 - Offline tests **375/375 PASS**, including 9 RPC tests, 8 UI tests, 7 installer tests, native framing/identity tests and previous LIVE v1/v2/v1.2 regressions.
 - https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38334825882
 - `INERT_BUILD_GUARD_PASS`: native SMS/USSD extensions not linked into firmware.
-- No physical v1.3 deployment or browser/UAT has occurred as of this document creation.
+- Historical initial staging status: no physical v1.3 deployment at creation time. **Superseded by v1.3.1 physical LIVE/PASS acceptance below.**
 
 ## Operator procedure: office laptop SSH to actual WE5927
 
@@ -71,3 +71,23 @@ Rollback, if required: `sh /tmp/veci-sms-inbox-v13.sh rollback`.
 - Firmware flashing, new daemon or network connectivity changes.
 - Production-level opened-file-descriptor modem identity check is not yet in the real root CLI (sysfs+path checks occur under lock). Hardware identity and USB hotplug behavior must be UAT'd separately before general distribution.
 - UI/ACL and browser role behavior not yet verified on physical hardware. Do not claim full Inbox LIVE until user reports physical UAT.
+
+
+## Physical WE5927 v1.3.1 acceptance — 2026-10-13
+
+**LIVE/PASS for metadata-only Inbox** (confirmed with operator-owned physical SSH transcript and two dashboard screenshots). Owner first ran the read-only rpcd preflight. Returned `RPCD_PLUGIN_LIST_CONTRACT_PASS`, `SOURCE_SHA_VERIFIED=true`, `NO_MODEM_COMMANDS_SENT=true`, UI v1.2 SHA `2deb013e6ccf433b9c3abc3d7f02aafb33739dd1b5b5f222d4de501865314d40`, `veci.cellular=registered`, `veci.sms=absent`, old failed v1.3 backup valid. Owner then downloaded pinned 8,467-byte v1.3.1 installer from `cfc8007963060d8392387b3952463bf6e5f345aa`, ran status and apply, obtained **`VECI_INBOX_V131_ASSETS_PASS`** and **`MODEM_SMS_NOT_ACCESSED_BY_INSTALLER`**. Output verified all four pinned SHA256 values:
+
+```
+Cellular 5f34ca2320a77f0f91d1bda524e84f18c79af1d589ddeb2bf9392c2cd30af6ca
+RPC      24102a1919856de11a2eb207c57e56b78f85612a50bf71628ff1959edf856a2e
+Worker   ff11a42144181de131f1e595db163bd6f8ce7b3dd718a9e63cdf594e4fe2d7ec
+ACL      8bfe87008b20d8060f07e6ee7058cea1873bc7f39c99a5c58ea22c76b2fd1fa4
+```
+
+Independent rollback backup `/root/veci-sms-inbox-v131-rollback` is present; retain the older failed v1.3 backup and original v1/v2/v1.2 backups. Overlay went from **380 KiB used / 18%** to **392 KiB used / 19%** (about 12 KiB additional). About 1.7 MiB remained free.
+
+The first screenshot confirms Cellular UI and opt-in warning checkbox are rendered with no list requested, `Data link active`, `Internet: Reachable`, LTE and registered packet service. The second screenshot, following a **deliberate user-authorized UI listing**, confirms **`Listed 5 SMS slot(s)`** with indices 0..4, status 0 and TPDU sizes 163,48,153,163,52 bytes. These match earlier physical CLI evidence. **A real `AT+CMGL=4` occurred at the user's request, and it may change unread flags to read.** Do not re-run merely to verify the UI. No sender, body or OTP was shown.
+
+**Authorization caveat:** The dedicated `veci.sms.listIndex` method is declared under an rpcd `write` ACL. This is **not intrinsically proof of an `admin` role**—actual access is determined by the current session's granted ACLs. The backend runs as root under rpcd, so checking `id -u` does not identify the browser user. Physical browser success proves the currently logged-in session is allowed; **negative authorization from a non-admin session remains unverified**. Before broader use, audit `/etc/config/rpcd` login ACL grants, test a least-privilege session cannot call `veci.sms.listIndex`, and ensure no wildcard permission leaks. Never send login secrets or session tokens in reports.
+
+**Feature status:** SMS storage and manually consented **metadata Inbox are LIVE/PASS**. Read SMS content/sender/OTP, SMS send/delete, and live XL USSD are **NOT LIVE**. Do not infer that `status:0` proves SMS remain unread after listing, nor that reconnect/SIM switching actions were exercised (the buttons remain visibly present).
