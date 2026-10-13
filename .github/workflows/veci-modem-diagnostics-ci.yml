@@ -27,6 +27,8 @@ on:
       - 'tests/test_veci_sms_read_cap_store.py'
       - 'source/we5927-lte/src/veci-sms-auth-ubus-preflight.uc'
       - 'tests/test_veci_sms_auth_ubus_preflight.py'
+      - 'scripts/veci-sms-auth-backend-preflight-20261013.sh'
+      - 'tests/test_veci_sms_auth_backend_readonly.py'
       - 'source/we5927-lte/src/veci-telco-quota-otp-policy.c'
       - 'source/we5927-lte/src/veci-telco-quota-otp-policy.h'
       - 'tests/test_veci_telco_quota_otp_policy.py'
@@ -149,6 +151,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_cap_store.py' -v
       - name: Validate source-only rpcd ucode request context against mock ACL sessions
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_auth_ubus_preflight.py' -v
+      - name: Validate no-install read-only ucode/uhttpd backend readiness probe
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_auth_backend_readonly.py' -v
       - name: Verify one-shot SMS read-slot authorization, CSRF, consent, replay and modem generation guard (source only)
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_slot_policy.py' -v
       - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
