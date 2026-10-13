@@ -112,6 +112,12 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_index.py' -v
       - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_pdu_decode.py' -v
+      - name: Print SHA256 for exact live v1.2 UI, staged v1.3 UI and optional RPC assets
+        run: |
+          sha256sum scripts/veci-sms-inbox-ui-staged-20261013/cellular.js
+          sha256sum source/veci-sms-inbox-we5927/files/usr/libexec/rpcd/veci.sms
+          sha256sum source/veci-sms-inbox-we5927/files/usr/libexec/veci-sms-inbox-index
+          sha256sum source/veci-sms-inbox-we5927/files/usr/share/rpcd/acl.d/veci-sms-inbox-we5927.json
       - name: Verify isolated admin-write SMS inbox RPC, explicit consent and rate limit
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_rpc_admin_consent.py' -v
       - name: Verify exact-v1.2 SMS inbox UI delta, two-step confirmation and no auto CMGL
