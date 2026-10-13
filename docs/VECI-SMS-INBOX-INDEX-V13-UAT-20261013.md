@@ -53,12 +53,12 @@ Payload commit: `cecfe43e99a1bf9b4c7c9c1158432acd44099de5`.
 ```sh
 cd /tmp
 wget -O veci-sms-inbox-v13.sh \
-  https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/RELEASE_SHA/scripts/veci-sms-inbox-admin-ui-v13-install.sh
+  https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/9832b7d7267a0ff6720ee6268d06b5295a84ef79/scripts/veci-sms-inbox-admin-ui-v13-install.sh
 sh -n veci-sms-inbox-v13.sh && sh veci-sms-inbox-v13.sh status
 sh veci-sms-inbox-v13.sh apply
 ```
 
-RELEASE_SHA placeholder is replaced by the exact immutable GitHub commit containing the final script, after CI PASS. Do not run an unpinned URL.
+9832b7d7267a0ff6720ee6268d06b5295a84ef79 placeholder is replaced by the exact immutable GitHub commit containing the final script, after CI PASS. Do not run an unpinned URL.
 
 After `VECI_INBOX_V13_ASSETS_PASS`, refresh/login VeCI and click Cellular. Use `SMS Inbox — metadata only` checkbox and second modal ONLY if acknowledging the risk: received unread SMS can be marked read. The operation cannot be undone. Never use this action merely to test whether the UI exists.
 
