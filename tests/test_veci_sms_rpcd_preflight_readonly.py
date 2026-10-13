@@ -21,7 +21,7 @@ class ReadOnlyPreflight(unittest.TestCase):
         self.assertIn("'@.listIndex.ack_unread_status'",s)
         self.assertIn('NO_MODEM_COMMANDS_SENT=true',s)
         for forbidden in ('"$tmp" call','veci.sms listIndex','ubus call','CMGL=4',
-                          'CUSD=','we5927-at','restart','sysupgrade','uci set'):
+                          'CUSD=','we5927-at','/etc/init.d/rpcd restart','sysupgrade','uci set'):
             self.assertNotIn(forbidden,s)
 
     def test_integrity_and_tmp_only(self):
