@@ -1,0 +1,15 @@
+{
+  "veci-sms-inbox-we5927": {
+    "description": "Explicit SMS metadata listing. CMGL may mark unread messages read; administrator write privilege only.",
+    "read": {
+      "ubus": {}
+    },
+    "write": {
+      "ubus": {
+        "veci.sms": [
+          "listIndex"
+        ]
+      }
+    }
+  }
+}
