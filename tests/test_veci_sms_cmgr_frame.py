@@ -194,10 +194,14 @@ class CMGRFrame(unittest.TestCase):
                 self.assertNotEqual(self.feed(self.msg()+suffix),0)
 
     def test_malformed_binary_and_wrong_status_rejected(self):
-        cases=(self.msg().replace(b",,25",b",,99"),
+        good_pdu, length = fixture("OTP 1234")
+        wrong_len = self.msg().replace(
+            f",,{length}\\r\\n".encode(), b",,240\\r\\n", 1)
+        bad_hex = self.msg().replace(good_pdu.encode(), b"Z" + good_pdu[1:].encode(), 1)
+        cases=(wrong_len,
                self.msg(status=8),
-               self.msg().replace(b"004",b"00Q",1),
-               b'AT+CMGL=4\r\n' + self.msg(echo=False))
+               bad_hex,
+               b'AT+CMGL=4\\r\\n' + self.msg(echo=False))
         for payload in cases:
             self.lib.veci_sms_cmgr_clear(ctypes.byref(self.rx))
             self.assertEqual(self.lib.veci_sms_cmgr_init(ctypes.byref(self.rx),
