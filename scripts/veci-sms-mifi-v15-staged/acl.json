@@ -1,0 +1,18 @@
+{
+  "veci-sms-inbox-we5927": {
+    "description": "VeCI full SMS inbox + persistent on/off switch; authenticated admin WRITE ACL only.",
+    "read": {
+      "ubus": {}
+    },
+    "write": {
+      "ubus": {
+        "veci.sms": [
+          "listIndex",
+          "getConfig",
+          "setEnabled",
+          "listMessages"
+        ]
+      }
+    }
+  }
+}
