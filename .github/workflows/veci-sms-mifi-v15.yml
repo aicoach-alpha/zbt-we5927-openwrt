@@ -6,6 +6,8 @@ on:
       - 'scripts/veci-sms-mifi-v15-staged/**'
       - '.github/workflows/veci-sms-mifi-v15.yml'
       - 'scripts/veci-sms-mifi-v15-install.sh'
+      - 'scripts/veci-sms-mifi-v15-decoder-hotfix.sh'
+      - 'tests/veci_sms_mifi_decoder_smoke.cjs'
 permissions:
   contents: read
 jobs:
@@ -47,6 +49,8 @@ jobs:
           assert 'pdu[count]=toupper($0)' in worker
           print('VECI_MIFI_SMS_V15_MINIMAL_RELEASE_GATE_PASS')
           PY
+      - name: Operator sender and DCS PDU smoke
+        run: node tests/veci_sms_mifi_decoder_smoke.cjs
       - name: Immutable deployment asset SHA256
         run: |
           echo VECI_MIFI_SMS_V15_SHA_BEGIN
