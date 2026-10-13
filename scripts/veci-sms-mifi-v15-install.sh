@@ -4,7 +4,7 @@
 set -eu
 umask 077
 LC_ALL=C; export LC_ALL
-PIN=64c5b19359b061bb104bace9f8b1842f04aaf761
+PIN=f057a7853f25bb7aea81ab2131f452b5b3de2a98
 URL=https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt
 SRC=scripts/veci-sms-mifi-v15-staged
 UI=/www/veci/js/pages/cellular.js
@@ -24,7 +24,7 @@ OLD_META_ACL=8bfe87008b20d8060f07e6ee7058cea1873bc7f39c99a5c58ea22c76b2fd1fa4
 OLD_PRIVATE=33fdeeaeaf991733e461825c6439ba76eff404c89a24f3435250e764f89e2b72
 OLD_PRIVATE_UC=b5d8a10c04c305e9e5b493e299342f66858eb7468b831f9c7c50702eb2b48e2c
 OLD_PRIVATE_ACL=891e2643f44262adcaf6a3bc9d76865c58003967784c3015bb2feffc8fde7f29
-NEW_RPC=3beda4d853ef6e34847088e3303973b6acce9945696eb1fb1ba49d1187513567
+NEW_RPC=fca9c3d16537d2ab2bcba6ecff973913a3d56261940d20f0e19d1396df301a82
 NEW_MIFI=99aa086fba307b4a6070345eea73f8acb9268c5ba51d3776f7290b6baed52186
 NEW_UI=5ecd42fbb1b0e94db30a3590b9cba9e2fd4b8d6f2175c16ce97a755a2fff63dd
 NEW_ACL=c41849a66f4f3f53ca84def2db3b58486c40899bac51896258f1a5c6296327d0
@@ -34,21 +34,36 @@ board() {
     [ "$(id -u)" = 0 ] || fail root_required
     [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail wrong_router
 }
+# A current v1.4 may have had an independent hotfix. Refuse symlinks and
+# unfamiliar modules, but preserve actual bytes rather than obsolete hashes.
 check_old() {
-    [ "$(sha "$UI")" = "$OLD_UI" ] &&
-    [ "$(sha "$RPC")" = "$OLD_RPC" ] &&
-    [ "$(sha "$META")" = "$OLD_META" ] &&
-    [ "$(sha "$META_ACL")" = "$OLD_META_ACL" ] &&
-    [ "$(sha "$PRIVATE")" = "$OLD_PRIVATE" ] &&
-    [ "$(sha "$PRIVATE_UC")" = "$OLD_PRIVATE_UC" ] &&
-    [ "$(sha "$PRIVATE_ACL")" = "$OLD_PRIVATE_ACL" ]
+    for f in "$UI" "$RPC" "$META" "$META_ACL" "$PRIVATE" "$PRIVATE_UC" "$PRIVATE_ACL"; do
+        [ -f "$f" ] && [ ! -L "$f" ] && [ -s "$f" ] || return 1
+    done
+    grep -Fq 'cellular-sms-private-panel' "$UI" &&
+    grep -Fq "api.call('veci.sms.private', 'readSlot'" "$UI" &&
+    grep -Fq 'listIndex' "$RPC" &&
+    grep -Fq 'AT+CMGL=4' "$META" &&
+    grep -Fq '"veci.sms"' "$META_ACL" &&
+    grep -Fq 'veci.sms.private' "$PRIVATE_UC" &&
+    grep -Fq '"veci.sms.private"' "$PRIVATE_ACL" &&
+    sh -n "$RPC" &&
+    sh -n "$META" &&
+    sh -n "$PRIVATE"
+}
+legacy_sha() {
+    # Only hashes, no message content, secrets, session IDs or modem I/O.
+    for f in "$UI" "$RPC" "$META" "$META_ACL" "$PRIVATE" "$PRIVATE_UC" "$PRIVATE_ACL"; do
+        sha "$f" || return 1
+    done
 }
 check_new() {
     [ "$(sha "$UI")" = "$NEW_UI" ] &&
     [ "$(sha "$RPC")" = "$NEW_RPC" ] &&
     [ "$(sha "$MIFI")" = "$NEW_MIFI" ] &&
     [ "$(sha "$META_ACL")" = "$NEW_ACL" ] &&
-    [ "$(sha "$META")" = "$OLD_META" ] &&
+    [ -f "$BACK/meta" ] &&
+    [ "$(sha "$META")" = "$(sha "$BACK/meta")" ] &&
     [ ! -e "$PRIVATE" ] && [ ! -e "$PRIVATE_UC" ] &&
     [ ! -e "$PRIVATE_ACL" ]
 }
@@ -96,12 +111,11 @@ atomic_copy() {
     mv -f "$tmp" "$to" || return 1
 }
 restore() {
-    [ "$(sha "$BACK/ui")" = "$OLD_UI" ] || return 1
-    [ "$(sha "$BACK/rpc")" = "$OLD_RPC" ] || return 1
-    [ "$(sha "$BACK/meta-acl")" = "$OLD_META_ACL" ] || return 1
-    [ "$(sha "$BACK/private")" = "$OLD_PRIVATE" ] || return 1
-    [ "$(sha "$BACK/private-uc")" = "$OLD_PRIVATE_UC" ] || return 1
-    [ "$(sha "$BACK/private-acl")" = "$OLD_PRIVATE_ACL" ] || return 1
+    [ -f "$BACK/SHA256SUMS" ] || return 1
+    (cd "$BACK" && sha256sum -c SHA256SUMS >/dev/null 2>&1) || return 1
+    # Metadata worker is not modified by the installer; avoid undoing a
+    # concurrent change silently.
+    [ "$(sha "$META")" = "$(sha "$BACK/meta")" ] || return 1
     atomic_copy "$BACK/ui" "$UI" 644 || return 1
     atomic_copy "$BACK/rpc" "$RPC" 755 || return 1
     atomic_copy "$BACK/meta-acl" "$META_ACL" 644 || return 1
@@ -109,7 +123,8 @@ restore() {
     atomic_copy "$BACK/private-uc" "$PRIVATE_UC" 644 || return 1
     atomic_copy "$BACK/private-acl" "$PRIVATE_ACL" 644 || return 1
     rm -f "$MIFI" "$FLAG" || return 1
-    check_old
+    [ "$(sha "$UI")" = "$(sha "$BACK/ui")" ] &&
+    [ "$(sha "$RPC")" = "$(sha "$BACK/rpc")" ]
 }
 apply() {
     board
@@ -117,7 +132,15 @@ apply() {
         command -v "$tool" >/dev/null 2>&1 || fail missing_tools
     done
     [ -x /etc/init.d/rpcd ] || fail rpcd_missing
-    check_old || fail expected_live_v14_files_mismatch
+    check_old || {
+        echo 'SMS_MIFI_V15_BASELINE=unrecognized_v14_files' >&2
+        # Diagnostics contain only file fingerprints, never SMS contents.
+        for pair in "ui:$UI" "rpc:$RPC" "metadata:$META" "acl:$META_ACL" "worker:$PRIVATE" "ucode:$PRIVATE_UC" "private_acl:$PRIVATE_ACL"; do
+            name="${pair%%:*}"; file="${pair#*:}"
+            printf 'SMS_BASELINE_%s=%s\n' "$name" "$(sha "$file" || echo absent)" >&2
+        done
+        fail unrecognized_live_v14_files
+    }
     [ ! -e "$MIFI" ] && [ ! -L "$MIFI" ] || fail mifi_worker_exists
     [ ! -e "$FLAG" ] && [ ! -L "$FLAG" ] || fail existing_setting_not_overwritten
     [ ! -e "$BACK" ] || fail backup_already_exists
@@ -126,6 +149,7 @@ apply() {
     free="$(df -k /overlay | awk 'NR==2{print $4}')"
     case "$free" in ''|*[!0-9]*) fail unknown_overlay_space ;; esac
     [ "$free" -ge 200 ] || fail insufficient_space
+    baseline="$(legacy_sha)" || fail baseline_unavailable
     # The already-live uhttpd must keep ubus ACL authentication enabled.
     uci -q show uhttpd >/dev/null 2>&1 || fail uhttpd_status_unavailable
     if uci -q show uhttpd | awk -F= '$1 ~ /\.no_ubusauth$/ {
@@ -169,16 +193,20 @@ apply() {
     sh -n "$work/rpc" && sh -n "$work/mifi" || fail syntax_error
     grep -Fq '"listMessages"' "$work/acl" || fail acl_contract
     grep -Fq 'getConfig' "$work/rpc" || fail rpc_contract
-    # Backup original exact content, including old private v1.4, before edits.
+    # No assumptions about older hotfix SHAs: ensure no one touched the
+    # device files while the four new assets were being downloaded.
+    [ "$(legacy_sha)" = "$baseline" ] || fail concurrent_change
     check_old || fail concurrent_change
     mkdir "$BACK" || fail backup_creation
     cp -p "$UI" "$BACK/ui" || fail backup_ui
     cp -p "$RPC" "$BACK/rpc" || fail backup_rpc
+    cp -p "$META" "$BACK/meta" || fail backup_metadata
     cp -p "$META_ACL" "$BACK/meta-acl" || fail backup_acl
     cp -p "$PRIVATE" "$BACK/private" || fail backup_private
     cp -p "$PRIVATE_UC" "$BACK/private-uc" || fail backup_private_uc
     cp -p "$PRIVATE_ACL" "$BACK/private-acl" || fail backup_private_acl
-    [ "$(sha "$BACK/private-uc")" = "$OLD_PRIVATE_UC" ] || fail backup_integrity
+    (cd "$BACK" && sha256sum ui rpc meta meta-acl private private-uc private-acl > SHA256SUMS) || fail backup_manifest
+    (cd "$BACK" && sha256sum -c SHA256SUMS >/dev/null 2>&1) || fail backup_integrity
     touched=1
     atomic_copy "$work/mifi" "$MIFI" 700 || fail worker_install
     atomic_copy "$work/rpc" "$RPC" 755 || fail rpc_install
@@ -202,7 +230,7 @@ apply() {
 }
 rollback() {
     board
-    [ -f "$BACK/ui" ] || fail backup_missing
+    [ -f "$BACK/ui" ] && [ -f "$BACK/SHA256SUMS" ] || fail backup_missing
     check_new || fail unexpected_live_files
     restore || fail rollback_files
     /etc/init.d/rpcd restart >/dev/null 2>&1 || fail rpcd_restart
