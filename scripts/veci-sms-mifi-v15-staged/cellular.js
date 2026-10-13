@@ -502,11 +502,52 @@ export default {
 						copyBtn.style.cssText='width:auto;min-width:110px;margin-right:8px;';
 						copyBtn.addEventListener('click',async()=>{
 							if(!smsEnabled || turn!==smsGeneration)return;
+							// HTTP://192.168.x.x is not a secure context, so most
+							// browsers intentionally hide navigator.clipboard.
+							// execCommand must be called synchronously during
+							// the user gesture to retain clipboard permission.
+							const legacyCopy=()=>{
+								const field=document.createElement('textarea');
+								const oldFocus=document.activeElement;
+								field.value=item.decoded.text;
+								field.readOnly=true;
+								field.setAttribute('aria-hidden','true');
+								field.style.cssText='position:fixed;left:-10000px;top:0;opacity:0;';
+								document.body.appendChild(field);
+								let ok=false;
+								try{
+									field.focus();
+									field.select();
+									ok=document.execCommand('copy')===true;
+								}catch{}
+								field.value='';
+								field.remove();
+								try{oldFocus?.focus({preventScroll:true});}catch{}
+								return ok;
+							};
+							let copied=false;
+							if(!window.isSecureContext || !navigator.clipboard?.writeText){
+								copied=legacyCopy();
+							}else{
+								try{
+									await navigator.clipboard.writeText(item.decoded.text);
+									copied=true;
+								}catch{
+									// In secure contexts permission might be
+									// rejected; do not report false success.
+								}
+							}
+							if(copied){toast('SMS text copied.','success');return;}
+							// A browser may block programmatic copying entirely.
+							// Select visible text and let Ctrl+C work instead.
 							try{
-								if(!navigator.clipboard?.writeText)throw Error('Clipboard unavailable');
-								await navigator.clipboard.writeText(item.decoded.text);
-								toast('SMS text copied.','success');
-							}catch{toast('Browser clipboard unavailable.','warning');}
+								const selection=window.getSelection();
+								const range=document.createRange();
+								range.selectNodeContents(body);
+								selection.removeAllRanges();
+								selection.addRange(range);
+								toast('Select text ready — press Ctrl+C to copy.','warning');
+							}catch{toast('Copy unavailable; select message text manually.','warning');}
 						});
 						card.append(copyBtn);
 					}
