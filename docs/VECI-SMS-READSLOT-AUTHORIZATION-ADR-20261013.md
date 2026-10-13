@@ -68,3 +68,7 @@ non-tmpfs rejection, expiry and one-use behavior; firmware inert-build CI.
 No actual WE5927 modem command, router deployment, reboot or flash.
 
 Expired pending capability is reclaimed ONLY on a newly validated, fresh `store_arm` consent request under the same flock; active tokens cannot be overwritten. Malformed/corrupt records do not permit automatic replacement. This prevents expired tokens from permanently blocking future approved reads without allowing silent re-arm.
+
+## Additional ucode boundary research
+
+See [VECI-SMS-UCODE-SESSION-BOUNDARY-20261013.md](VECI-SMS-UCODE-SESSION-BOUNDARY-20261013.md). An upstream `rpcd` ucode plugin can inspect the **ubusd Unix peer** (`request.info.acl.user`), and OpenWrt `uhttpd` adds `ubus_rpc_session` to a forwarded /ubus call after its ACL check. A source-only, no-modem ucode audit prototype now checks the tuple with an additional `session.access` lookup. Native root ubus calls can provide their own SID, so this is not yet a trusted per-browser identity bridge, and physical proof with restricted HTTP sessions is still required before any readSlot release.
