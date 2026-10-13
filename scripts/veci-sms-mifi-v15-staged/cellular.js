@@ -46,16 +46,20 @@ function mergeSmsParts(rows) {
     if(!group){group={epoch:m.received.unixMs,parts:new Map(),total:c.total};candidates.push(group);groups.set(key,candidates);display.push({group,decoded:m});}
     group.parts.set(c.part,row);
   }
-  return display.map(item=>{
-    if(!item.group)return item;
+  return display.flatMap(item=>{
+    if(!item.group)return [item];
     const group=item.group;
-    if(group.parts.size!==group.total)return {decoded:{...item.decoded,
-      text:item.decoded.text+' (multipart incomplete)',concat:item.decoded.concat},
-      index:item.group.parts.get(item.decoded.concat.part)?.index??null,status:0,partial:true};
+    if(group.parts.size!==group.total){
+      // Display every available segment individually, never silently
+      // hide the other parts when a multipart SMS is incomplete.
+      return [...group.parts].sort((a,b)=>a[0]-b[0]).map(v=>({
+        ...v[1],decoded:{...v[1].decoded,text:v[1].decoded.text+
+          ' (part '+v[0]+'/'+group.total+')'}}));
+    }
     const ordered=[...group.parts].sort((a,b)=>a[0]-b[0]).map(v=>v[1]);
-    return {...ordered[0],decoded:{...ordered[0].decoded,
-      text:ordered.map(r=>r.decoded.text).join(''),
-      concat:null,multipartCount:ordered.length},indices:ordered.map(r=>r.index)};
+    return [{...ordered[0],decoded:{...ordered[0].decoded,
+      text:ordered.map(r=>r.decoded.text).join(''),concat:null,
+      multipartCount:ordered.length},indices:ordered.map(r=>r.index)}];
   });
 }
 
