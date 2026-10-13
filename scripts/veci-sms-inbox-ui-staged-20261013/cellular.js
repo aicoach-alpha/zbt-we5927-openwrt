@@ -110,7 +110,7 @@ export default {
 				<div class="cellular-actions">
 					<button class="button button-secondary" id="cellular-sms-count-check" type="button">Check stored SMS count</button>
 				</div>
-				<p>SMS Inbox is not enabled yet. Listing actual messages can mark unread SMS as read. This button reads storage totals only, never message contents or OTP.</p>
+				<p>This button checks storage totals only, never SMS content or OTP. SMS Inbox listing, if separately enabled, requires explicit administrator consent in the panel below.</p>
 			</section>
 
 			<section class="panel" aria-labelledby="cellular-sms-index-title">
