@@ -42,7 +42,8 @@ const context={
   },
   type:(v)=>{
     if(Array.isArray(v))return 'array';
-    if(Number.isInteger(v))return 'integer';
+    if(Number.isInteger(v))return 'int';
+    if(typeof v==='boolean')return 'bool';
     return typeof v;
   },
   match:(x,pattern)=>x.match(pattern),

@@ -37,7 +37,7 @@ return {
                     info.method != 'probe' ||
                     !info.object || info.object.name != 'veci.sms.auth.audit' ||
                     !valid_sid(args.ubus_rpc_session) ||
-                    type(args.slot) != 'integer' ||
+                    type(args.slot) != 'int' ||
                     args.slot < 0 || args.slot > 65535 ||
                     args.scope != 'authorization_preflight_only')
                     return denied();
@@ -55,7 +55,7 @@ return {
                 }, function(code, response) {
                     request.reply({
                         ok: code == 0 && response != null &&
-                            type(response.access) == 'boolean' &&
+                            type(response.access) == 'bool' &&
                             response.access == true,
                         diagnostic_only: true
                     }, 0);

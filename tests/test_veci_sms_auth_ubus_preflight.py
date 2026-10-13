@@ -21,7 +21,7 @@ const api=vm.runInNewContext('(function(){'+src+'})()', {
         assert.strictEqual(name,'ubus');
         return {connect:()=>fakeUbus};
     },
-    type:(v)=>Number.isInteger(v)?'integer':(typeof v==='string'?'string':typeof v),
+    type:(v)=>Number.isInteger(v)?'int':(typeof v==='boolean'?'bool':typeof v),
     match:(v,re)=>v.match(re),
 });
 const valid='a'.repeat(32);
@@ -103,7 +103,7 @@ class UbusAuthPreflightTest(unittest.TestCase):
         self.assertIn("direct local ubus call can supply a claimed SID",s)
         self.assertNotIn("Number.isInteger",s)
         self.assertNotIn("typeof ",s)
-        self.assertIn("type(args.slot) != 'integer'",s)
+        self.assertIn("type(args.slot) != 'int'",s)
         self.assertNotIn("is_admin",s)
         self.assertNotIn("csrf_verified",s)
         self.assertNotIn("request.args.approved",s)

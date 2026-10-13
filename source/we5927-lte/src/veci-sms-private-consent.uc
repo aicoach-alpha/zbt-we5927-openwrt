@@ -25,12 +25,12 @@ function sid_ok(sid) {
         sid != '00000000000000000000000000000000';
 }
 function slot_ok(slot) {
-    return type(slot) == 'integer' && slot >= 0 && slot <= 65535;
+    return type(slot) == 'int' && slot >= 0 && slot <= 65535;
 }
 function now_ms() {
     let stamp = clock(true);
     if (!stamp || type(stamp) != 'array' ||
-        type(stamp[0]) != 'integer' || type(stamp[1]) != 'integer' ||
+        type(stamp[0]) != 'int' || type(stamp[1]) != 'int' ||
         stamp[0] < 0 || stamp[1] < 0 || stamp[1] >= 1000000000)
         return null;
     return stamp[0] * 1000 + int(stamp[1] / 1000000);
@@ -55,7 +55,7 @@ function checked_access(req, cb) {
         function: 'readSlot'
     }, function(status, result) {
         let authorized = status == 0 && result != null &&
-            type(result.access) == 'boolean' && result.access == true;
+            type(result.access) == 'bool' && result.access == true;
         cb(authorized);
     });
 }
