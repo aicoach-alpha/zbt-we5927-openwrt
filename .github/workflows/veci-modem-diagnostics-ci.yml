@@ -19,6 +19,9 @@ on:
       - 'source/we5927-lte/src/veci-modem-identity.h'
       - 'source/we5927-lte/src/veci-sms-pdu-decode.c'
       - 'source/we5927-lte/src/veci-sms-read-slot-policy.c'
+      - 'source/we5927-lte/src/veci-sms-read-capability.c'
+      - 'source/we5927-lte/src/veci-sms-read-capability.h'
+      - 'tests/test_veci_sms_read_capability.py'
       - 'source/we5927-lte/src/veci-sms-cmgr-frame.c'
       - 'source/we5927-lte/src/veci-serial-cmgr-pty-guard.c'
       - 'tests/test_veci_serial_cmgr_pty_guard.py'
@@ -130,6 +133,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_serial_cmgr_pty_guard.py' -v
       - name: Verify strict SMS CMGR response and delayed private PDU decode with host-only fixtures
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_cmgr_frame.py' -v
+      - name: Verify server-trusted one-use SMS capability binding, TTL, consumed-before-I/O and zeroization
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_capability.py' -v
       - name: Verify one-shot SMS read-slot authorization, CSRF, consent, replay and modem generation guard (source only)
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_slot_policy.py' -v
       - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
