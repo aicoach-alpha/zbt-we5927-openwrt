@@ -4,7 +4,7 @@
 set -eu
 umask 077
 LC_ALL=C; export LC_ALL
-PIN=bb31e3c4dbfe765d73bcba4ba209d158503585f4
+PIN=0c42956b9894868108b1d0e79e1b36cc87713732
 REPO=https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt
 BASE=/www/veci/js/pages/cellular.js
 WORKER=/usr/libexec/veci-sms-private-read
@@ -12,7 +12,7 @@ UC=/usr/share/rpcd/ucode/veci-sms-private-consent.uc
 ACL=/usr/share/rpcd/acl.d/veci-sms-private-owner.json
 BACK=/root/veci-sms-private-v14-rollback
 PRIOR_SHA=5f34ca2320a77f0f91d1bda524e84f18c79af1d589ddeb2bf9392c2cd30af6ca
-NEW_UI_SHA=c9257cfd530b1f626039d0fe52d05b5da884a3d1ac3d66c695583e5aed6cf945
+NEW_UI_SHA=76c8354c4db32188851f1c4af93555ba3d4ddbba29e1e256e259cbbeb58902dc
 WORKER_SHA=33fdeeaeaf991733e461825c6439ba76eff404c89a24f3435250e764f89e2b72
 UC_SHA=4510fde262d70a98f5f4e570c406a878df33ea497f538cd40cbab20725a5160e
 ACL_SHA=891e2643f44262adcaf6a3bc9d76865c58003967784c3015bb2feffc8fde7f29
