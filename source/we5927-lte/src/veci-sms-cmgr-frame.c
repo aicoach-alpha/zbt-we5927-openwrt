@@ -50,9 +50,11 @@ static int cmgr_header(const char *line, unsigned int *status,
     p += 6;
     while (*p == ' ') p++;
     if (decimal(&p, 4u, status)) return -1;
-    if (*p++ != ',') return -1;
+    if (*p != ',') return -1;
+    ++p;
     while (*p == ' ') p++;
-    if (*p++ != ',') return -1;
+    if (*p != ',') return -1;
+    ++p;
     while (*p == ' ') p++;
     if (decimal(&p, 240u, length) || !*length || *p) return -1;
     return 0;
@@ -127,10 +129,14 @@ int veci_sms_cmgr_feed(struct veci_sms_cmgr_frame *s,
     int rc;
     if (!s || (!bytes && size)) return -EINVAL;
     if (!s->nonce) return -EACCES;
-    if (s->failed || s->completed) return -EPROTO;
+    if (s->failed) return -EPROTO;
+    if (s->completed) return reject(s);
     if (s->stage == 3u) {
+        if (size > VECI_FRAME_STREAM_MAX - s->framing.total)
+            return reject(s);
         for (size_t i = 0; i < size; ++i)
             if (bytes[i] != '\r' && bytes[i] != '\n') return reject(s);
+        s->framing.total += size;
         return 0;
     }
     rc = veci_frame_feed(&s->framing, bytes, size, on_line, s);
