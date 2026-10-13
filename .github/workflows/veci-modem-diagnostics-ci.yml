@@ -31,6 +31,9 @@ on:
       - 'tests/test_veci_sms_auth_backend_readonly.py'
       - 'scripts/veci-sms-auth-effective-preflight-20261013.sh'
       - 'tests/test_veci_sms_auth_effective_readonly.py'
+      - 'source/we5927-lte/src/veci-sms-private-consent.uc'
+      - 'source/we5927-lte/src/veci-sms-private-acl.json'
+      - 'tests/test_veci_sms_private_consent.py'
       - 'source/we5927-lte/src/veci-telco-quota-otp-policy.c'
       - 'source/we5927-lte/src/veci-telco-quota-otp-policy.h'
       - 'tests/test_veci_telco_quota_otp_policy.py'
@@ -157,6 +160,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_auth_backend_readonly.py' -v
       - name: Verify corrected UCI no_ubusauth and effective runtime flags without secrets
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_auth_effective_readonly.py' -v
+      - name: Validate one-process SMS private consent, restricted ACL, replay prevention (no modem)
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_private_consent.py' -v
       - name: Verify one-shot SMS read-slot authorization, CSRF, consent, replay and modem generation guard (source only)
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_slot_policy.py' -v
       - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)

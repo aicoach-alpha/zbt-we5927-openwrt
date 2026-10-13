@@ -1,0 +1,13 @@
+{
+  "veci-sms-private-owner": {
+    "description": "Explicit single SMS private approval and read - privileged WRITE grant only. SOURCE-ONLY, NOT DEPLOYED.",
+    "read": {
+      "ubus": {}
+    },
+    "write": {
+      "ubus": {
+        "veci.sms.private": ["armRead", "readSlot"]
+      }
+    }
+  }
+}
