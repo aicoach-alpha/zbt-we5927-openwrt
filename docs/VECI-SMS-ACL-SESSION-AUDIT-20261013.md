@@ -44,3 +44,25 @@ Check `SMS_RPC=registered`, `ACL_LISTINDEX_WRITE_DECLARED=true`, and `ANONYMOUS_
 ## Pending authorization gate before single-message content feature
 
 After read-only report, confirm a real least-privileged user session denied using a separate account and a `session access` query. **Do not send any live session token or password in a chat.** Do not create test logins or modify `/etc/config/rpcd` automatically. An administrative user must review effective account grants first. Only then implement a separate `readSlot` ACL and per-message consent with opened-FD modem identity attestation.
+
+
+## Physical UAT 2026-10-13 — permission inventory confirmed
+
+Owner executed the SHA-pinned 3,413-byte read-only diagnostic on physical WE5927; `sh -n` passed. Exact anonymized output:
+
+```text
+SMS_RPC=registered
+ACL_LISTINDEX_WRITE_DECLARED=true
+LOGIN_0_WRITE_GRANT_CLASS=wildcard
+LOGIN_COUNT=1
+WILDCARD_WRITE_LOGIN_COUNT=1
+EXPLICIT_SMS_WRITE_LOGIN_COUNT=0
+RESTRICTED_LOGIN_COUNT=0
+NEEDS_REVIEW_LOGIN_COUNT=0
+ANONYMOUS_SMS_LIST_ACCESS=denied
+NO_SMS_MODEM_COMMAND_SENT=true
+NO_CREDENTIALS_OR_SESSION_TOKENS_EXPORTED=true
+NON_ADMIN_SESSION_TEST=not_performed
+```
+
+**Interpretation:** one configured `rpcd` login section has `write '*'` (normal full-control class); unauthenticated all-zero session is denied to `veci.sms.listIndex`. This does NOT prove there is only one individual user of the router, nor prove every possible authenticated non-admin session is denied; there was no restricted login section to exercise. DO NOT create a test account just for this audit, and do not remove existing wildcard without knowing which login uses it. The current router's SMS metadata UI v1.3.1 stays LIVE/PASS. No message was read in the ACL audit. New SMS-content features remain blocked from deployment pending separate dedicated user-consent and privacy architecture.
