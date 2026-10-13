@@ -21,7 +21,8 @@ const api=vm.runInNewContext('(function(){'+src+'})()', {
         assert.strictEqual(name,'ubus');
         return {connect:()=>fakeUbus};
     },
-    Number, /* ucode's Number.isInteger supported by host-equivalent mock */
+    type:(v)=>Number.isInteger(v)?'integer':(typeof v==='string'?'string':typeof v),
+    match:(v,re)=>v.match(re),
 });
 const valid='a'.repeat(32);
 function run(args,info) {
@@ -100,6 +101,9 @@ class UbusAuthPreflightTest(unittest.TestCase):
         s=SCRIPT.read_text()
         self.assertIn("NOT the browser account name",s)
         self.assertIn("direct local ubus call can supply a claimed SID",s)
+        self.assertNotIn("Number.isInteger",s)
+        self.assertNotIn("typeof ",s)
+        self.assertIn("type(args.slot) != 'integer'",s)
         self.assertNotIn("is_admin",s)
         self.assertNotIn("csrf_verified",s)
         self.assertNotIn("request.args.approved",s)
