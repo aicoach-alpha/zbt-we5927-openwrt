@@ -59,7 +59,8 @@ function mergeSmsParts(rows) {
     const ordered=[...group.parts].sort((a,b)=>a[0]-b[0]).map(v=>v[1]);
     return [{...ordered[0],decoded:{...ordered[0].decoded,
       text:ordered.map(r=>r.decoded.text).join(''),concat:null,
-      multipartCount:ordered.length},indices:ordered.map(r=>r.index)}];
+      multipartCount:ordered.length},indices:ordered.map(r=>r.index),
+      segments:ordered.map(r=>({index:r.index,pdu:r.pdu}))}];
   });
 }
 
@@ -393,8 +394,10 @@ export default {
 					let decoded=null,reason='';
 					try { decoded=decodePrivatePdu(item.pdu); }
 					catch(error){reason=String(error?.message||'Unknown').replace(/[^A-Za-z0-9 _-]/g,'').slice(0,42);}
-					decodedRows.push({index:item.index,status:item.status,decoded,reason});
+					decodedRows.push({index:item.index,status:item.status,decoded,reason,pdu:item.pdu});
 				}
+				const storage=['SM','ME','MT'].includes(result.storage)?result.storage:'unknown';
+				head.textContent+=' · Storage: '+(storage==='SM'?'SIM card':storage==='ME'?'Modem':storage==='MT'?'Combined':'Unknown');
 				const rows=mergeSmsParts(decodedRows);
 				rows.sort((a,b)=>(b.decoded?.received?.unixMs??-1)-(a.decoded?.received?.unixMs??-1));
 				const statusName={0:'Unread',1:'Read',2:'Unsent',3:'Sent',4:'All'};
@@ -416,6 +419,39 @@ export default {
 						body.textContent='Unable to decode SMS'+(item.reason?' ('+item.reason+')':'')+'.';
 					}
 					card.append(label,date,body);
+					if((storage==='SM'||storage==='ME')&&item.decoded){
+						const deleteBtn=document.createElement('button');
+						deleteBtn.type='button';
+						deleteBtn.className='button button-secondary';
+						deleteBtn.textContent='Delete SMS';
+						deleteBtn.addEventListener('click',async()=>{
+							if(!smsEnabled || turn!==smsGeneration)return;
+							const segments=(item.segments||[{index:item.index,pdu:item.pdu}])
+							  .slice().sort((a,b)=>b.index-a.index);
+							const labelStore=storage==='SM'?'SIM card':'modem';
+							const confirmed=await confirm({
+								title:'Permanently delete SMS?',
+								message:'Delete this SMS from '+labelStore+' ('+segments.length+
+								  ' stored segment(s))? This cannot be undone.',
+								confirmLabel:'Delete permanently'
+							});
+							if(!confirmed||!smsEnabled||turn!==smsGeneration)return;
+							setBusy(deleteBtn,true,'Deleting…');
+							try{
+								for(const part of segments){
+									const response=await api.call('veci.sms','deleteMessage',{
+										index:part.index,storage,expectedPdu:part.pdu
+									},{timeout:12000});
+									if(response?.ok!==true||response.deleted!==part.index||
+										response.storage!==storage)throw Error('Delete not confirmed');
+								}
+								if(turn===smsGeneration){card.remove();toast('SMS deleted permanently.','success');}
+							}catch{
+								if(turn===smsGeneration)toast('Could not confirm SMS deletion. Reopen Inbox to refresh.','warning');
+							}finally{setBusy(deleteBtn,false);}
+						});
+						card.append(deleteBtn);
+					}
 					frag.appendChild(card);
 				}
 				smsOutput.replaceChildren(frag);
