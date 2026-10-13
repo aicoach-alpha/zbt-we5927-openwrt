@@ -182,7 +182,7 @@ class OnlyQuotaOtp(unittest.TestCase):
             self.assertNotIn(forbidden,code)
         mk=(ROOT/"source/we5927-lte/Makefile").read_text()
         self.assertNotIn("veci-telco-quota-otp-policy",mk)
-        self.assertIn("Bare +CMTI",HEADER.read_text()) if False else None
+        self.assertIn("+CMTI contains memory+index, not sender",HEADER.read_text())
         self.assertIn("SMS sender text alone is SPOOFABLE",HEADER.read_text())
 
 if __name__=="__main__":
