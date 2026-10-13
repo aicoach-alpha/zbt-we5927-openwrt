@@ -7,6 +7,8 @@ on:
       - '.github/workflows/veci-sms-mifi-v15.yml'
       - 'scripts/veci-sms-mifi-v15-install.sh'
       - 'scripts/veci-sms-mifi-v15-decoder-hotfix.sh'
+      - 'scripts/veci-sms-mifi-v153-staged/**'
+      - 'scripts/veci-sms-mifi-v153-delete-install.sh'
       - 'tests/veci_sms_mifi_decoder_smoke.cjs'
 permissions:
   contents: read
@@ -22,6 +24,10 @@ jobs:
           set -eu
           sh -n scripts/veci-sms-mifi-v15-staged/rpcd-veci.sms
           sh -n scripts/veci-sms-mifi-v15-staged/veci-sms-mifi-inbox
+          sh -n scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one
+          if [ -f scripts/veci-sms-mifi-v153-delete-install.sh ]; then
+            sh -n scripts/veci-sms-mifi-v153-delete-install.sh
+          fi
           if [ -f scripts/veci-sms-mifi-v15-install.sh ]; then
             sh -n scripts/veci-sms-mifi-v15-install.sh
           fi
@@ -37,7 +43,7 @@ jobs:
           acl=json.loads((d/'acl.json').read_text())
           assert acl['veci-sms-inbox-we5927']['read']['ubus']=={}
           assert acl['veci-sms-inbox-we5927']['write']['ubus']['veci.sms']==[
-              'listIndex','getConfig','setEnabled','listMessages']
+              'listIndex','getConfig','setEnabled','listMessages','deleteMessage']
           assert 'sms_state || { deny sms_disabled; return; }' in rpc
           assert 'sms_state || { unset result; deny sms_disabled; exit 0; }' in rpc
           assert 'smsState.textContent' in ui and 'clearSms()' in ui
@@ -47,6 +53,12 @@ jobs:
           assert 'on_demand_cmgl_pdu' in worker
           assert "flock -n -x 9" in worker
           assert 'pdu[count]=toupper($0)' in worker
+          assert "'AT+CPMS?'" in worker
+          assert 'delete_message()' in rpc
+          delete=Path('scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one').read_text()
+          assert 'AT+CMGD=$slot,0' in delete
+          assert '[ "$current" = "$expected" ] || fail' in delete
+          assert 'SMS feature ON' not in delete or 'flock -n -x 9' in delete
           print('VECI_MIFI_SMS_V15_MINIMAL_RELEASE_GATE_PASS')
           PY
       - name: Operator sender and DCS PDU smoke
@@ -57,5 +69,6 @@ jobs:
           sha256sum scripts/veci-sms-mifi-v15-staged/rpcd-veci.sms \
                     scripts/veci-sms-mifi-v15-staged/veci-sms-mifi-inbox \
                     scripts/veci-sms-mifi-v15-staged/cellular.js \
-                    scripts/veci-sms-mifi-v15-staged/acl.json
+                    scripts/veci-sms-mifi-v15-staged/acl.json \
+                    scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one
           echo VECI_MIFI_SMS_V15_SHA_END
