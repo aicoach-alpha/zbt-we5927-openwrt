@@ -1,0 +1,29 @@
+name: VeCI SMS private release asset fingerprints
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/we5927-lte/src/veci-sms-private-consent.uc'
+      - 'source/we5927-lte/src/veci-sms-private-acl.json'
+      - 'source/veci-sms-private-we5927/files/usr/libexec/veci-sms-private-read'
+      - 'scripts/veci-sms-private-ui-staged-20261013/cellular.js'
+      - '.github/workflows/veci-sms-private-assets.yml'
+permissions:
+  contents: read
+jobs:
+  fingerprint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Production overlay asset sanity and immutable SHA256
+        run: |
+          sh -n source/veci-sms-private-we5927/files/usr/libexec/veci-sms-private-read
+          node --check scripts/veci-sms-private-ui-staged-20261013/cellular.js
+          printf 'PRIVATE_SMS_ASSET_SHA256_BEGIN\n'
+          sha256sum \
+            source/we5927-lte/src/veci-sms-private-consent.uc \
+            source/we5927-lte/src/veci-sms-private-acl.json \
+            source/veci-sms-private-we5927/files/usr/libexec/veci-sms-private-read \
+            scripts/veci-sms-private-ui-staged-20261013/cellular.js
+          printf 'PRIVATE_SMS_ASSET_SHA256_END\n'
