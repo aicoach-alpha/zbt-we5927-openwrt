@@ -57,8 +57,8 @@ pdu_to(){
 }
 atomic(){
  tmp="$STORE.new.$$"
- cat > "$tmp" || {rm -f "$tmp";fail;}
- chmod 600 "$tmp" && mv -f "$tmp" "$STORE" || {rm -f "$tmp";fail;}
+ cat > "$tmp" || { rm -f "$tmp"; fail; }
+ chmod 600 "$tmp" && mv -f "$tmp" "$STORE" || { rm -f "$tmp"; fail; }
 }
 check || fail
 [ "$#" -ge 1 ] || fail
