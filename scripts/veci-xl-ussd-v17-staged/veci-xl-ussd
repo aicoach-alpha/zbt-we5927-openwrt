@@ -72,6 +72,7 @@ EOF
  result="$("$BIN" /dev/ttyUSB2 "$value" 2>/dev/null)" || fail ussd_unavailable
  [ "$(printf %s "$result"|wc -c)" -le 1300 ] || fail invalid_response
  case "$result" in '{"ok":true,"source":"operator_ussd","mode":'*',"dcs":'*',"text_supported":'*',"interactive":'*',"text":'*'}') ;; *)fail invalid_response;;esac
+ [ ! -x /usr/libexec/veci-xl-quota-cache ] || printf '%s\n' "$result" | /usr/libexec/veci-xl-quota-cache --record >/dev/null 2>&1 || :
  interactive="$(jsonfilter -s "$result" -e '@.interactive' 2>/dev/null || :)"
  case "$interactive" in
   true|1)
