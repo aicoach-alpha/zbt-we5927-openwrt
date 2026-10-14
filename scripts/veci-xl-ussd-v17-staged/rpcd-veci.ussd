@@ -8,10 +8,13 @@ fail(){ printf '{"ok":false,"reason":"%s"}\n' "$1";exit 0; }
 [ -x "$RUN" ] || fail unavailable
 case "$1" in
  list)
-  printf '{"start":{},"reply":{"session":"str","choice":"str","approval":"str"},"cancel":{"session":"str"}}\n';;
+  printf '{"start":{},"reply":{"session":"str","choice":"str","approval":"str"},"cancel":{"session":"str"},"quotaStatus":{}}\n';;
  call)
   case "$2" in
    start) "$RUN" --start || fail ussd_unavailable;;
+   quotaStatus)
+    [ -x /usr/libexec/veci-xl-quota-cache ] || fail quota_unavailable
+    /usr/libexec/veci-xl-quota-cache --status || fail quota_unavailable;;
    reply|cancel)
     command -v jsonfilter >/dev/null 2>&1 || fail unavailable
     payload="$(head -c 257)" || fail invalid_request
