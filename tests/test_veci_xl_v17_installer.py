@@ -9,7 +9,7 @@ import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=ROOT/"scripts/veci-xl-v17-ussd-quota-install.sh"
-FILES=("veci-xl-ussd-once","veci-xl-ussd","veci.ussd","veci-xl-ussd.json","cellular.js")
+FILES=("veci-xl-ussd-once","veci-xl-ussd","veci-xl-quota-cache","veci.ussd","veci-xl-ussd.json","cellular.js")
 
 class XLInstaller(unittest.TestCase):
     def setUp(self):
@@ -28,7 +28,7 @@ class XLInstaller(unittest.TestCase):
             self.expected[name]=self.digest(body/name)
         (body/"SHA256SUMS").write_text("".join(
            self.expected[n]+"  "+n+"\n" for n in FILES))
-        (body/"RELEASE_INFO").write_text("VERSION=v1.7.0-xl-ussd\n")
+        (body/"RELEASE_INFO").write_text("VERSION=v1.7.1-xl-ussd\n")
         self.tar=self.d/"bundle.tar.gz"
         with tarfile.open(self.tar,"w:gz") as z:
             z.add(body,arcname="veci-xl-v17")
@@ -53,6 +53,7 @@ exit 0
            "UI=/www/veci/js/pages/cellular.js":"UI="+str(self.ui),
            "CMGS=/usr/libexec/veci-sms-cmgs":"CMGS="+str(self.cmgs),
            "WRAPPER=/usr/libexec/veci-xl-ussd":"WRAPPER="+str(self.paths["veci-xl-ussd"]),
+           "CACHE=/usr/libexec/veci-xl-quota-cache":"CACHE="+str(self.paths["veci-xl-quota-cache"]),
            "NATIVE=/usr/libexec/veci-xl-ussd-once":"NATIVE="+str(self.paths["veci-xl-ussd-once"]),
            "RPC=/usr/libexec/rpcd/veci.ussd":"RPC="+str(self.paths["veci.ussd"]),
            "ACL=/usr/share/rpcd/acl.d/veci-xl-ussd.json":"ACL="+str(self.paths["veci-xl-ussd.json"]),
@@ -61,14 +62,14 @@ exit 0
               "OLD_UI="+self.digest(self.ui),
            "OLD_CMGS=ccb6f066f0be2fa0fbb5131a98f90ded88e28ae0442a57d0d73b1949b07016fb":
               "OLD_CMGS="+self.digest(self.cmgs),
-           "PIN=d000420c1956c491843ea04700bc298fbded2f5ac2edb87fa1da7abbf3c5ca9a":
+           "PIN=f59f566c964f5dee70ce246c37a78e0a9eca01a16d1c530588adc6aebd23900c":
               "PIN="+self.digest(self.tar),
            "[ \"$(id -u)\" = 0 ]":"[ 0 = 0 ]",
            "\"$(cat /tmp/sysinfo/board_name 2>/dev/null || :)\"":"\"zbtlink,zbt-we5927\"",
            "\"$(uname -r)\"":"\"6.12.94\"",
            "/etc/init.d/rpcd restart":str(b/"restart-rpcd"),
            "df -k /overlay":"df -k /",
-           "URL=https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/veci-xl-v17-47f92db74148/veci-xl-v17.tar.gz":
+           "URL=https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/veci-xl-v17-fbf0fc346a1b/veci-xl-v17.tar.gz":
               "URL=fixture:test",
         }
         for old,new in replacements.items():
