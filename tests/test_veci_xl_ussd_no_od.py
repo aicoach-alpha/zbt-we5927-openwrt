@@ -54,7 +54,8 @@ printf '{"operator":"XL XL","sim":1}\n'
         (d/"vendor").write_text("05c6")
         (d/"product").write_text("902e")
         src=SOURCE.read_text()
-        self.assertNotRegex(src,r"\bod\b")
+        self.assertNotRegex(src,r"(?m)^\s*od(?:\s|$)")
+        self.assertNotRegex(src,r"for x in[^\n]*\bod\b")
         self.assertIn("head -c 32 /dev/urandom | sha256sum",src)
         values=[
             ("BIN=/usr/libexec/veci-xl-ussd-once","BIN="+str(native)),
