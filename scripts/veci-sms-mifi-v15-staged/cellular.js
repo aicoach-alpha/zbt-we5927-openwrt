@@ -114,6 +114,43 @@ function decodeSentPdu(hex) {
   return {to,text};
 }
 
+
+function decodeSentPdu(hex) {
+  if(typeof hex!=='string'|| !/^(?:[0-9A-F]{2}){11,192}$/.test(hex))throw Error('Invalid sent record');
+  const b=Uint8Array.from(hex.match(/../g),x=>parseInt(x,16));
+  if(b[0]!==0 || b[1]!==1 || b[2]!==0)throw Error('Unsupported sent PDU');
+  const count=b[3],toa=b[4];
+  if(count<3||count>15||(toa!==0x81&&toa!==0x91))throw Error('Invalid sent recipient');
+  const alen=Math.ceil(count/2), at=5+alen;
+  if(at+3>b.length || b[at]!==0)throw Error('Invalid sent header');
+  let recipient=toa===0x91?'+':'';
+  for(let i=0;i<count;i++){
+    const val=i%2?(b[5+(i>>1)]>>4):(b[5+(i>>1)]&15);
+    if(val>9)throw Error('Invalid recipient');
+    recipient+=String(val);
+  }
+  const dcs=b[at+1],udl=b[at+2],ud=b.slice(at+3);
+  let message='';
+  if(dcs===0){
+    if(udl>160||ud.length!==Math.ceil(udl*7/8))throw Error('Invalid GSM7');
+    const table=[64,163,36,165,232,233,249,236,242,199,10,216,248,13,197,229,916,95,934,915,923,937,928,936,931,920,926,0,198,230,223,201,32,33,34,35,164,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,161,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,196,214,209,220,167,191,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,228,246,241,252,224];
+    const extensions={10:12,20:94,40:123,41:125,47:92,60:91,61:126,62:93,64:124,101:8364};
+    let escape=false;
+    for(let i=0;i<udl;i++){
+      const bit=i*7,byte=bit>>3,shift=bit&7;
+      const val=((ud[byte]>>shift)|((ud[byte+1]||0)<<(8-shift)))&127;
+      if(escape){if(extensions[val]===undefined)throw Error('Invalid extension');message+=String.fromCodePoint(extensions[val]);escape=false;}
+      else if(val===27)escape=true;
+      else {if(!table[val])throw Error('Invalid character');message+=String.fromCodePoint(table[val]);}
+    }
+    if(escape)throw Error('Invalid GSM escape');
+  }else if(dcs===8){
+    if(udl!==ud.length||udl<2||udl>140||udl%2)throw Error('Invalid Unicode');
+    for(let i=0;i<udl;i+=2)message+=String.fromCharCode((ud[i]<<8)|ud[i+1]);
+  }else throw Error('Unsupported encoding');
+  return {recipient,message};
+}
+
 function formatSmsDate(received) {
   if (!received || !Number.isFinite(received.unixMs))return 'Time unavailable';
   const d=new Date(received.unixMs);
@@ -374,6 +411,7 @@ export default {
 						<button class="button button-secondary" id="cellular-sms-clear" type="button">Clear screen</button>
 						<button class="button button-secondary" id="cellular-sms-compose-open" type="button">Compose SMS</button>
 						<button class="button button-secondary" id="cellular-sms-sent-open" type="button">Sent Messages</button>
+						<button class="button button-secondary" id="cellular-sms-sent-open" type="button">Sent Messages</button>
 					</div>
 					<form id="cellular-sms-compose" hidden style="border:1px solid #dce6ef;padding:14px 16px;border-radius:12px;margin:12px 0">
 						<strong>Compose SMS</strong>
@@ -401,6 +439,11 @@ export default {
 								<option value="read">Read</option>
 							</select>
 						</label>
+					</div>
+					<div id="cellular-sms-sent-panel" hidden style="border:1px solid #dce6ef;border-radius:12px;padding:14px;margin:12px 0">
+						<strong>Sent Messages</strong>
+						<p id="cellular-sms-sent-status">Only messages accepted by the modem are recorded. Delivery to the recipient is not guaranteed.</p>
+						<div id="cellular-sms-sent-list"></div>
 					</div>
 					<div id="cellular-sms-messages" role="status" aria-live="polite">Click Open Inbox to load messages.</div>
 					<div id="cellular-sms-sent-panel" hidden style="margin-top:16px;border-top:1px solid #dce6ef;padding-top:14px">
@@ -460,6 +503,43 @@ export default {
 		const smsSendStatus = root.querySelector('#cellular-sms-send-status');
 		const smsSend = root.querySelector('#cellular-sms-send');
 		const smsComposeClose = root.querySelector('#cellular-sms-compose-close');
+		const smsSentOpen = root.querySelector('#cellular-sms-sent-open');
+		const smsSentPanel = root.querySelector('#cellular-sms-sent-panel');
+		const smsSentStatus = root.querySelector('#cellular-sms-sent-status');
+		const smsSentList = root.querySelector('#cellular-sms-sent-list');
+		const renderSent = async ()=>{
+			if(!smsEnabled)return;
+			const generation=smsGeneration;
+			smsSentPanel.hidden=false;
+			smsSentStatus.textContent='Loading sent messages…';
+			smsSentList.replaceChildren();
+			try{
+				const response=await api.call('veci.sms','getSent',{}, {timeout:5000});
+				if(generation!==smsGeneration||!smsEnabled)return;
+				if(response?.ok!==true||response.source!=='local_sent'||!Array.isArray(response.messages)||
+					response.messages.length>30||response.count!==response.messages.length)
+					throw Error('Invalid sent history');
+				smsSentStatus.textContent=response.messages.length?
+					response.messages.length+' messages accepted by modem (delivery not confirmed).':'No sent history yet.';
+				for(const item of response.messages){
+					if(!Number.isSafeInteger(item.at)||item.at<0||item.status!=='accepted_by_modem')throw Error('Invalid history entry');
+					const {recipient,message}=decodeSentPdu(item.pdu);
+					const card=document.createElement('article');
+					card.style.cssText='border:1px solid #dce6ef;border-radius:10px;padding:12px;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere;';
+					const title=document.createElement('strong');
+					title.textContent='To: '+recipient;
+					const when=document.createElement('small');
+					when.style.cssText='display:block;margin:6px 0;opacity:.7';
+					when.textContent=new Date(item.at*1000).toLocaleString('id-ID')+' · Accepted by modem';
+					const body=document.createElement('p');
+					body.textContent=message;
+					card.append(title,when,body);smsSentList.append(card);
+				}
+			}catch{
+				if(generation===smsGeneration)smsSentStatus.textContent='Unable to load Sent Messages.';
+			}
+		};
+		smsSentOpen.addEventListener('click',renderSent);
 		const smsSearch = root.querySelector('#cellular-sms-search');
 		const smsFilter = root.querySelector('#cellular-sms-filter');
 		let smsSearchItems = [];
@@ -498,6 +578,8 @@ export default {
 			smsState.textContent = enabled ? 'SMS enabled' : 'SMS disabled — no messages can be read';
 			if (!enabled) {
 				clearSms();
+				smsSentPanel.hidden=true;
+				smsSentList.replaceChildren();
 				smsCompose.hidden=true;
 				smsText.value='';
 				smsTo.value='';
@@ -603,6 +685,8 @@ export default {
 					smsText.value='';
 					smsLength.textContent='One SMS maximum · 160 GSM7 or 70 Unicode characters';
 					toast('SMS accepted by modem.','success');
+					if(r.history_saved===false)toast('Sent, but history could not be saved.','warning');
+					if(!smsSentPanel.hidden)renderSent();
 				}else if(r?.reason==='network_rejected'){
 					smsSendStatus.textContent='SMS rejected by modem/network; not accepted.';
 				}else if(r?.reason==='send_rate_limited'){
