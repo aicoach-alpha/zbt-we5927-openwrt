@@ -53,6 +53,7 @@ cp "$FIXTURE_BUNDLE" "$2"
         self.assertNotIn("/etc/init.d/rpcd restart",src)
         for old,new in [
            ("STAGE=/root/veci-v161-stage","STAGE="+str(d/"stage")),
+           ("FLAG=/etc/veci-sms-feature","FLAG="+str(d/"feature")),
            ("/tmp/sysinfo/board_name",str(d/"board")),
            ('[ "$(id -u)" = 0 ]','[ 0 = 0 ]'),
            ('$(uname -r)','$(printf 6.12.94)'),
