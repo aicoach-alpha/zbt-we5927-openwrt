@@ -1,0 +1,46 @@
+name: VeCI XL *808 USSD and quota vertical slice
+on:
+  push:
+    paths:
+      - 'source/we5927-lte/src/veci-xl-ussd-once.c'
+      - 'scripts/veci-xl-ussd-v17-staged/**'
+      - 'tests/test_veci_xl_ussd_pty.py'
+      - '.github/workflows/veci-xl-ussd-v17.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  xl-ussd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise native actual AT command and late +CUSD on simulated modem
+        run: python3 -m unittest discover -s tests -p 'test_veci_xl_ussd_pty.py' -v
+      - name: Verify private scripts and passive/UI quota parser contract
+        run: |
+          set -eu
+          sh -n scripts/veci-xl-ussd-v17-staged/veci-xl-ussd
+          sh -n scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd
+          node --check --input-type=module < scripts/veci-xl-ussd-v17-staged/cellular.js
+          python3 - <<'PY'
+          import json,pathlib
+          base=pathlib.Path("scripts/veci-xl-ussd-v17-staged")
+          acl=json.loads((base/"veci-ussd-acl.json").read_text())["veci-xl-ussd"]
+          assert not acl.get("read")
+          assert acl["write"]["ubus"]["veci.ussd"] == ["start","reply","cancel"]
+          text=(base/"veci-xl-ussd").read_text()
+          assert "flock -n -x 9" in text
+          assert "AT+CMGL" not in text and "AT+CMGR" not in text
+          assert "'*808#'" in text
+          assert "/dev/ttyUSB2" in text
+          ui=(base/"cellular.js").read_text()
+          assert "parseXlUssdQuota" in ui and "I_APPROVE_THIS_USSD_CHOICE" in ui
+          assert "api.call('veci.ussd','start'" in ui
+          assert "api.call('veci.ussd','reply'" in ui
+          assert "api.call('veci.ussd','cancel'" in ui
+          assert "window.localStorage" not in ui
+          assert "localStorage.setItem" not in ui
+          assert "Some Sent records could not be saved." in ui
+          PY
+          echo VECI_XL_USSD_AND_QUOTA_SOURCE_PASS
