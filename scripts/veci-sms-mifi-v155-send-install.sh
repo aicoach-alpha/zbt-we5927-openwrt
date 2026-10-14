@@ -6,7 +6,7 @@ umask 077
 LC_ALL=C;export LC_ALL
 PIN=72a4f77d68ad38b13c7cd89779efb009f531cc62
 RAW=https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt
-RELEASE=https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/veci-sms-cmgs-efa147467eae/veci-sms-cmgs-mipsel
+RELEASE=https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/veci-sms-cmgs-e21b3b1bd9ec/veci-sms-cmgs-mipsel
 UI=/www/veci/js/pages/cellular.js
 RPC=/usr/libexec/rpcd/veci.sms
 ACL=/usr/share/rpcd/acl.d/veci-sms-inbox-we5927.json
