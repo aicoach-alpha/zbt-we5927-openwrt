@@ -84,7 +84,13 @@ apply(){
  if deployed;then echo 'VECI_XL_USSD_ALREADY_INSTALLED_PASS';status;return;fi
  baseline || fail v160_ui_or_sms_transport_changed
  new_absent || fail existing_ussd_component
- [ ! -e "$BACK" ] && [ ! -L "$BACK" ] || fail preexisting_backup
+ # A prior automatic rollback intentionally keeps a verified backup.
+ # Reuse only its exact original UI and the same pinned release manifest.
+ reuse_backup=0
+ if [ -e "$BACK" ] || [ -L "$BACK" ];then
+   old_backup || fail preexisting_backup_invalid
+   reuse_backup=1
+ fi
  for cmd in wget tar sha256sum awk mktemp flock;do command -v "$cmd" >/dev/null 2>&1 || fail dependency_missing;done
  free="$(df -k /overlay|awk 'NR==2{print $4}')"
  case "$free" in ''|*[!0-9]*)fail disk_unknown;;esac
@@ -111,10 +117,17 @@ apply(){
  (cd "$payload" && sha256sum -c SHA256SUMS >/dev/null 2>&1) || fail payload_corrupt
  grep -Fxq 'VERSION=v1.7.1-xl-ussd' "$payload/RELEASE_INFO" || fail wrong_release
  baseline && new_absent || fail concurrent_modification
- mkdir -m 700 "$BACK" || fail backup_unavailable
- backup_created=1
- cp -p "$UI" "$BACK/ui" && cp "$payload/SHA256SUMS" "$BACK/manifest" || fail backup_copy
- (cd "$BACK" && sha256sum ui > SHA256SUMS && sha256sum -c SHA256SUMS >/dev/null 2>&1) || fail backup_corrupt
+ if [ "$reuse_backup" = 1 ];then
+   old_backup || fail existing_backup_invalid
+   [ "$(sha "$BACK/manifest")" = "$(sha "$payload/SHA256SUMS")" ] ||
+     fail existing_backup_other_release
+ else
+   mkdir -m 700 "$BACK" || fail backup_unavailable
+   backup_created=1
+   cp -p "$UI" "$BACK/ui" && cp "$payload/SHA256SUMS" "$BACK/manifest" || fail backup_copy
+   (cd "$BACK" && sha256sum ui > SHA256SUMS &&
+      sha256sum -c SHA256SUMS >/dev/null 2>&1) || fail backup_corrupt
+ fi
  [ "$(sha "$BACK/ui")" = "$OLD_UI" ] || fail baseline_changed
  changed=1
  atomic "$payload/veci-xl-ussd-once" "$NATIVE" 700 || fail native_install
@@ -125,7 +138,34 @@ apply(){
  atomic "$payload/cellular.js" "$UI" 644 || fail ui_install
  deployed || fail installation_digest
  /etc/init.d/rpcd restart >/dev/null 2>&1 || fail rpcd_restart
- ubus -S list veci.ussd >/dev/null 2>&1 || fail rpc_registration
+ registered=0
+ tries=0
+ # rpcd startup and exec-plugin discovery need not finish before init
+ # returns. A bounded readiness loop avoids a false registration failure.
+ while [ "$tries" -lt 8 ];do
+   if ubus -S list veci.ussd >/dev/null 2>&1;then
+     registered=1;break
+   fi
+   tries=$((tries+1))
+   sleep 1
+ done
+ if [ "$registered" != 1 ];then
+   echo 'VECI_XL_RPC_REGISTRATION_DIAGNOSTIC=begin' >&2
+   [ -x "$RPC" ] && echo 'VECI_XL_RPC_EXECUTABLE=true' >&2 ||
+     echo 'VECI_XL_RPC_EXECUTABLE=false' >&2
+   if "$RPC" list >/dev/null 2>&1;then
+     echo 'VECI_XL_RPC_LIST_EXIT=success' >&2
+   else
+     echo 'VECI_XL_RPC_LIST_EXIT=failure' >&2
+   fi
+   if ubus -S list veci.sms >/dev/null 2>&1;then
+     echo 'VECI_XL_EXISTING_SMS_RPC=registered' >&2
+   else
+     echo 'VECI_XL_EXISTING_SMS_RPC=unavailable' >&2
+   fi
+   echo 'VECI_XL_RPC_REGISTRATION_DIAGNOSTIC=end' >&2
+   fail rpc_registration
+ fi
  deployed || fail integrity_after_rpcd
  ready=1
  echo 'VECI_XL_USSD_V17_FILES_AND_RPC_LIVE_PASS'
