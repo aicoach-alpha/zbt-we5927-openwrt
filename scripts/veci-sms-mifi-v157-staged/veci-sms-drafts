@@ -1,0 +1,91 @@
+#!/bin/sh
+# VeCI SMS v1.5.7 Drafts. Private router storage (maximum 10 PDU drafts).
+# No AT commands; no SMS sending; all mutation under caller RPC lock.
+set -eu
+umask 077
+LC_ALL=C; export LC_ALL
+STORE=/etc/veci-sms-drafts
+FLAG=/etc/veci-sms-feature
+fail(){ printf '{"ok":false,"reason":"draft_unavailable"}\n';exit 1; }
+[ "$(id -u)" = 0 ] || fail
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail
+[ -f "$FLAG" ] && [ ! -L "$FLAG" ] && [ "$(cat "$FLAG" 2>/dev/null || :)" = 1 ] || fail
+[ -f "$STORE" ] && [ ! -L "$STORE" ] && [ "$(wc -c < "$STORE")" -le 6000 ] || fail
+valid_pdu(){
+ n="$(printf %s "$1"|wc -c)"
+ [ "$n" -ge 22 ] && [ "$n" -le 384 ] && [ "$((n%2))" = 0 ] || return 1
+ case "$1" in *[!0-9A-F]*)return 1;;esac
+}
+valid_slot(){
+ case "$1" in 0|1|2|3|4|5|6|7|8|9|10) return 0;;*)return 1;;esac
+}
+verify(){
+ awk -F'|' '
+ NF!=3 || $1 !~ /^[0-9]+$/ || $1+0<1 || $1+0>10 ||
+ $2 !~ /^[0-9]+$/ || length($2)>11 ||
+ $3 !~ /^[0-9A-F]+$/ || length($3)<22 || length($3)>384 ||
+ length($3)%2 {bad=1}
+ {if(NR>10 || ids[$1]++)bad=1}
+ END{exit bad}
+ ' "$STORE"
+}
+[ "$#" -ge 1 ] || fail
+verify || fail
+case "$1" in
+ --list)
+  [ "$#" = 1 ] || fail
+  awk -F'|' '
+  BEGIN{printf "{\"ok\":true,\"source\":\"local_drafts\",\"count\":"}
+  {id[NR]=$1; at[NR]=$2; pdu[NR]=$3}
+  END{
+   printf "%d,\"drafts\":[",NR
+   for(i=NR;i>=1;i--){
+    if(i<NR)printf ","
+    printf "{\"id\":%d,\"at\":%s,\"pdu\":\"%s\"}",id[i],at[i],pdu[i]
+   }
+   print "]}"
+  }' "$STORE"
+  ;;
+ --save)
+  [ "$#" = 3 ] || fail
+  id="$2";old="$3"
+  valid_slot "$id" || fail
+  if [ "$id" = 0 ];then [ "$old" = - ] || fail
+  else valid_pdu "$old" || fail;fi
+  fresh="$(head -c 385)" || fail
+  valid_pdu "$fresh" || fail
+  if [ "$id" = 0 ];then
+   id="$(awk -F'|' '{used[$1]=1}END{for(i=1;i<=10;i++)if(!used[i]){print i;exit}}' "$STORE")"
+   [ -n "$id" ] || fail
+  else
+   awk -F'|' -v id="$id" -v old="$old" '
+    $1==id {found=1;if($3!=old)bad=1}
+    END{exit !(found&&!bad)}
+   ' "$STORE" || fail
+  fi
+  now="$(date +%s)" || fail
+  case "$now" in ''|*[!0-9]*)fail;;esac
+  temp="$STORE.new.$$"
+  awk -F'|' -v id="$id" '$1!=id {print $0}' "$STORE" > "$temp" || {rm -f "$temp";fail;}
+  printf '%s|%s|%s\n' "$id" "$now" "$fresh" >> "$temp" || {rm -f "$temp";fail;}
+  chmod 600 "$temp" || {rm -f "$temp";fail;}
+  mv -f "$temp" "$STORE" || {rm -f "$temp";fail;}
+  unset fresh old
+  printf '{"ok":true,"saved":true,"id":%s}\n' "$id"
+  ;;
+ --delete)
+  [ "$#" = 3 ] || fail
+  id="$2";old="$3"
+  valid_slot "$id" && [ "$id" != 0 ] && valid_pdu "$old" || fail
+  awk -F'|' -v id="$id" -v old="$old" '
+   $1==id{found=1;if($3!=old)bad=1}
+   END{exit !(found&&!bad)}
+  ' "$STORE" || fail
+  temp="$STORE.new.$$"
+  awk -F'|' -v id="$id" '$1!=id {print $0}' "$STORE" > "$temp" || {rm -f "$temp";fail;}
+  chmod 600 "$temp" || {rm -f "$temp";fail;}
+  mv -f "$temp" "$STORE" || {rm -f "$temp";fail;}
+  printf '{"ok":true,"deleted":%s}\n' "$id"
+  ;;
+ *)fail;;
+esac
