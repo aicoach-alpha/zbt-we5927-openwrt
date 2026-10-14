@@ -14,6 +14,7 @@ on:
       - 'scripts/veci-sms-mifi-v1541-delete-copy-hotfix.sh'
       - 'scripts/veci-sms-mifi-v155-staged/**'
       - 'tests/veci_sms_mifi_decoder_smoke.cjs'
+      - 'tests/veci_sms_mifi_send_smoke.cjs'
       - 'tests/test_veci_sms_delete_awk_smoke.py'
 permissions:
   contents: read
@@ -78,6 +79,8 @@ jobs:
           PY
       - name: SMS Delete guarded AT response parser / no hardware
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_delete_awk_smoke.py' -v
+      - name: Single-SMS Compose GSM7/UCS2 PDU smoke
+        run: node tests/veci_sms_mifi_send_smoke.cjs
       - name: Operator sender and DCS PDU smoke
         run: node tests/veci_sms_mifi_decoder_smoke.cjs
       - name: Immutable deployment asset SHA256
