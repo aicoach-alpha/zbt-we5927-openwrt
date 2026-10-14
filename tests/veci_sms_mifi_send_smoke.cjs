@@ -12,7 +12,7 @@ assert(g.endsWith('000005C82293F904'),g);
 const e=build('628123456789','ABC');
 assert(e.startsWith('0001000C81'));
 const u=build('+628123456789','😀');
-assert(u.includes('000808D83DDE00')); // PID, UCS2 DCS, 4 UTF-16 octets
+assert(u.includes('000804D83DDE00')); // PID, UCS2 DCS, 4 UTF-16 octets
 assert.throws(()=>build('+628123456789','a'.repeat(161)),/limit|fit/);
 assert.throws(()=>build('XLPRIORITAS','HELLO'),/recipient/);
 assert.throws(()=>build('+628123456789','😀'.repeat(36)),/Unicode/);
