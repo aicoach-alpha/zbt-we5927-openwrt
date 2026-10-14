@@ -13,7 +13,7 @@ ACL=/usr/share/rpcd/acl.d/veci-sms-inbox-we5927.json
 HELP=/usr/libexec/veci-sms-send-one
 BIN=/usr/libexec/veci-sms-cmgs
 FLAG=/etc/veci-sms-feature
-BACK=/root/veci-sms-send-v155-rollback
+BACK=/root/veci-sms-send-v1551-rollback
 OLD_UI=5161c9c7a2a270dc8dfa9124d6299aa125e78defbd04de257a7c750eaab9a776
 OLD_RPC=0e13a208bbf83562b43ce924ea4c002574560dd28f9228edf7137268e26c11e7
 OLD_ACL=19bffb2761a74dca2b116383ebcfd7254b0610b0c573108afcafaa3fbd0a104e
@@ -43,9 +43,24 @@ new(){
  [ "$(sha "$BIN")" = "$NEW_BIN" ]
 }
 registered(){
+ # ubus documents OPTIONS before COMMAND, e.g. "ubus -v list veci.sms".
+ # Do not pass -v after list: some builds interpret it as a path.
  ubus -S list 2>/dev/null | grep -qx 'veci.sms' &&
  ubus -S list 2>/dev/null | grep -qx 'veci.cellular' &&
- ubus -S list -v veci.sms 2>/dev/null | grep -q 'sendMessage'
+ ubus -v list veci.sms 2>/dev/null | grep -q '"sendMessage"'
+}
+rpc_diagnostics(){
+ # Only boolean registration probes; never show sessions, phone numbers,
+ # SMS contents, credentials or full RPC responses.
+ if ubus -S list 2>/dev/null | grep -qx 'veci.sms';then
+  echo 'SMS_SEND_RPC_OBJECT=present'
+ else echo 'SMS_SEND_RPC_OBJECT=missing';fi
+ if ubus -S list 2>/dev/null | grep -qx 'veci.cellular';then
+  echo 'SMS_CELLULAR_RPC_OBJECT=present'
+ else echo 'SMS_CELLULAR_RPC_OBJECT=missing';fi
+ if ubus -v list veci.sms 2>/dev/null | grep -q '"sendMessage"';then
+  echo 'SMS_SEND_RPC_METHOD=registered'
+ else echo 'SMS_SEND_RPC_METHOD=missing';fi
 }
 anonymous_denied(){
  for method in sendMessage deleteMessage listMessages; do
@@ -57,7 +72,7 @@ anonymous_denied(){
 restart_rpc(){
  /etc/init.d/rpcd restart >/dev/null 2>&1 || return 1
  attempts=0
- while [ "$attempts" -lt 12 ]; do
+ while [ "$attempts" -lt 25 ]; do
   registered && return 0
   attempts=$((attempts+1)); sleep 1
  done
@@ -145,6 +160,7 @@ apply(){
  [ "$(sha "$work/help")" = "$NEW_HELP" ] || fail helper_checksum
  [ "$(sha "$work/bin")" = "$NEW_BIN" ] || fail binary_checksum
  sh -n "$work/rpc" && sh -n "$work/help" || fail shell_syntax
+ "$({ echo /bin/sh; })" "$work/rpc" list | jsonfilter -e '@.sendMessage.pdu' 2>/dev/null | grep -qx str || fail send_rpc_signature
  grep -Fq "sendMessage" "$work/acl" || fail acl_missing_send
  grep -Fq "buildSmsSubmit" "$work/ui" || fail ui_missing_submit
  grep -Fq "veci-sms-cmgs" "$work/help" || fail helper_missing_binary
@@ -163,7 +179,7 @@ apply(){
  atomic "$work/acl" "$ACL" 644 || fail acl_install
  atomic "$work/ui" "$UI" 644 || fail ui_install
  new || fail installed_checksum
- restart_rpc || fail rpc_registration
+ restart_rpc || { rpc_diagnostics; fail rpc_registration; }
  anonymous_denied || fail anonymous_acl
  [ "$(cat "$FLAG")" = "$state" ] || fail sms_toggle_modified
  done_ok=1
