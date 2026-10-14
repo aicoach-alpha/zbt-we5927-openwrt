@@ -66,10 +66,10 @@ case "$1" in
   now="$(date +%s)" || fail
   case "$now" in ''|*[!0-9]*)fail;;esac
   temp="$STORE.new.$$"
-  awk -F'|' -v id="$id" '$1!=id {print $0}' "$STORE" > "$temp" || {rm -f "$temp";fail;}
-  printf '%s|%s|%s\n' "$id" "$now" "$fresh" >> "$temp" || {rm -f "$temp";fail;}
-  chmod 600 "$temp" || {rm -f "$temp";fail;}
-  mv -f "$temp" "$STORE" || {rm -f "$temp";fail;}
+  awk -F'|' -v id="$id" '$1!=id {print $0}' "$STORE" > "$temp" || { rm -f "$temp"; fail; }
+  printf '%s|%s|%s\n' "$id" "$now" "$fresh" >> "$temp" || { rm -f "$temp"; fail; }
+  chmod 600 "$temp" || { rm -f "$temp"; fail; }
+  mv -f "$temp" "$STORE" || { rm -f "$temp"; fail; }
   unset fresh old
   printf '{"ok":true,"saved":true,"id":%s}\n' "$id"
   ;;
@@ -82,9 +82,9 @@ case "$1" in
    END{exit !(found&&!bad)}
   ' "$STORE" || fail
   temp="$STORE.new.$$"
-  awk -F'|' -v id="$id" '$1!=id {print $0}' "$STORE" > "$temp" || {rm -f "$temp";fail;}
-  chmod 600 "$temp" || {rm -f "$temp";fail;}
-  mv -f "$temp" "$STORE" || {rm -f "$temp";fail;}
+  awk -F'|' -v id="$id" '$1!=id {print $0}' "$STORE" > "$temp" || { rm -f "$temp"; fail; }
+  chmod 600 "$temp" || { rm -f "$temp"; fail; }
+  mv -f "$temp" "$STORE" || { rm -f "$temp"; fail; }
   printf '{"ok":true,"deleted":%s}\n' "$id"
   ;;
  *)fail;;
