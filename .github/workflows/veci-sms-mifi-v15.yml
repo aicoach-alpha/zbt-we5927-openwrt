@@ -21,6 +21,7 @@ on:
       - 'scripts/veci-sms-mifi-v156-staged/**'
       - 'scripts/veci-sms-mifi-v157-staged/**'
       - 'scripts/veci-sms-mifi-v157-drafts-install.sh'
+      - 'scripts/veci-sms-mifi-v158-compose-layout-install.sh'
       - 'tests/test_veci_sms_drafts.py'
       - 'scripts/veci-sms-mifi-v156-sent-install.sh'
       - 'tests/test_veci_sms_delete_awk_smoke.py'
@@ -44,6 +45,9 @@ jobs:
           sh -n scripts/veci-sms-mifi-v157-staged/veci-sms-drafts
           if [ -f scripts/veci-sms-mifi-v157-drafts-install.sh ];then
             sh -n scripts/veci-sms-mifi-v157-drafts-install.sh
+          fi
+          if [ -f scripts/veci-sms-mifi-v158-compose-layout-install.sh ];then
+            sh -n scripts/veci-sms-mifi-v158-compose-layout-install.sh
           fi
           if [ -f scripts/veci-sms-mifi-v156-sent-install.sh ]; then
             sh -n scripts/veci-sms-mifi-v156-sent-install.sh
@@ -103,6 +107,21 @@ jobs:
           PY
       - name: SMS Delete guarded AT response parser / no hardware
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_delete_awk_smoke.py' -v
+      - name: Responsive SMS Compose markup with unchanged control IDs
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'),assert=require('assert');
+          const s=fs.readFileSync('scripts/veci-sms-mifi-v15-staged/cellular.js','utf8');
+          for(const id of ['cellular-sms-compose','cellular-sms-to','cellular-sms-text','cellular-sms-send','cellular-sms-draft-save','cellular-sms-compose-close']){
+            assert.strictEqual(s.split('id="'+id+'"').length-1,1,id);
+          }
+          assert(s.includes('#cellular-sms-compose[hidden]'));
+          assert(s.includes('#cellular-sms-compose:not([hidden])'));
+          assert(s.includes('flex-direction: column !important'));
+          assert(s.includes("api.call('veci.sms','sendMessage'"));
+          assert(s.includes("api.call('veci.sms','saveDraft'"));
+          console.log('VECI_SMS_V158_RESPONSIVE_MARKUP_SMOKE_PASS');
+          NODE
       - name: Single-SMS Compose GSM7/UCS2 PDU smoke
         run: node tests/veci_sms_mifi_send_smoke.cjs
       - name: SMS Drafts create/edit/list/delete isolated store
