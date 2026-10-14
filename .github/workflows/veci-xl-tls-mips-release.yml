@@ -1,0 +1,98 @@
+name: VeCI XL direct TLS identity MIPS prerelease
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/veci-xl-tls-probe.c'
+      - '.github/workflows/veci-xl-tls-mips-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate read-only probe security contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('source/veci-telco-indonesia/veci-xl-tls-probe.c').read_text()
+          for required in ('mbedtls_ssl_set_hostname', 'MBEDTLS_SSL_VERIFY_REQUIRED',
+                           'mbedtls_ssl_get_verify_result', 'mbedtls_ssl_conf_ca_chain',
+                           'HEAD / HTTP/1.1', 'VECI_REAL_OPERATOR_LOGIN=not_attempted',
+                           'VECI_OPERATOR_QUOTA=not_verified', 'alarm(DEADLINE_SECONDS)',
+                           'api.myxl.xlaxiata.co.id', 'gede.ciam.xlaxiata.co.id'):
+              assert required in s, required
+          for forbidden in ('MBEDTLS_SSL_VERIFY_NONE','MBEDTLS_SSL_VERIFY_OPTIONAL',
+                            'AT+CMGR','AT+CMGS','AT+CUSD','system(', 'popen(',
+                            'execve(','Authorization: Bearer','Set-Cookie:',
+                            'sysupgrade','/etc/init.d', 'apk add'):
+              assert forbidden not in s, forbidden
+          assert 'if (!success)' in s and 'success=1;' in s
+          print('VECI_XL_TLS_SOURCE_SECURITY_GATE_PASS')
+          PY
+      - name: Get SHA-verified official OpenWrt toolchain and mbedTLS 3.6.6 source
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd cmake
+          name=openwrt-toolchain-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 240 -o /tmp/t.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$name"
+          echo "5e03963e3b5e2c12f8c1519a07d56a74babcd6147e95c4d50948e50ae465d776  /tmp/t.tar.zst" | sha256sum -c -
+          mkdir -p /tmp/toolchain
+          tar -xf /tmp/t.tar.zst -C /tmp/toolchain
+          curl -fL --retry 3 --max-time 150 \
+            -o /tmp/mbedtls.tar.bz2 \
+            https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.6/mbedtls-3.6.6.tar.bz2
+          echo "8fb65fae8dcae5840f793c0a334860a411f884cc537ea290ce1c52bb64ca007a  /tmp/mbedtls.tar.bz2" | sha256sum -c -
+          mkdir -p /tmp/mbed
+          tar -xf /tmp/mbedtls.tar.bz2 -C /tmp/mbed
+      - name: Cross-build verified-TLS native MIPS probe
+        run: |
+          set -eu
+          cc="$(find -L /tmp/toolchain -type f -name '*gcc' -executable | grep '/bin/' | head -1)"
+          [ -n "$cc" ]
+          src=/tmp/mbed/mbedtls-3.6.6
+          cmake -S "$src" -B /tmp/mbed/build \
+            -DCMAKE_C_COMPILER="$cc" \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DENABLE_PROGRAMS=OFF \
+            -DENABLE_TESTING=OFF \
+            -DUSE_SHARED_MBEDTLS_LIBRARY=OFF \
+            -DUSE_STATIC_MBEDTLS_LIBRARY=ON \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections -Os"
+          cmake --build /tmp/mbed/build --target mbedtls mbedx509 mbedcrypto -j 2
+          mkdir -p release
+          "$cc" -static -std=c11 -Os -s -ffunction-sections -fdata-sections \
+            -Wall -Wextra -Werror -o release/veci-xl-tls-probe-mipsel \
+            -I"$src/include" source/veci-telco-indonesia/veci-xl-tls-probe.c \
+            /tmp/mbed/build/library/libmbedtls.a \
+            /tmp/mbed/build/library/libmbedx509.a \
+            /tmp/mbed/build/library/libmbedcrypto.a \
+            -Wl,--gc-sections
+          file release/veci-xl-tls-probe-mipsel
+          readelf -h release/veci-xl-tls-probe-mipsel | grep -Eq 'Machine:[ ]*MIPS'
+          readelf -h release/veci-xl-tls-probe-mipsel | grep -q "2's complement, little endian"
+          ! readelf -l release/veci-xl-tls-probe-mipsel | grep -q INTERP
+          size="$(stat -c %s release/veci-xl-tls-probe-mipsel)"
+          [ "$size" -lt 800000 ]
+          (cd release && sha256sum veci-xl-tls-probe-mipsel > SHA256SUMS)
+          echo "VECI_XL_TLS_NATIVE_MIPS_BUILD_PASS size=$size"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-xl-tls-probe-mipsel
+          path: release
+      - name: Publish native read-only TLS probe prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-xl-tls-probe-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/veci-xl-tls-probe-mipsel release/SHA256SUMS \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI XL direct verified TLS MIPS probe (not quota)" \
+            --notes "Read-only carrier TLS identity check. Strict cert+hostname validation; only HEAD / to fixed carrier candidates. NO credentials, OTP, quota download, UI installation, flash writes, SMS, modem commands or automatic login. Physical UAT pending."
+          echo "VECI_XL_TLS_MIPS_CANDIDATE=$tag"
