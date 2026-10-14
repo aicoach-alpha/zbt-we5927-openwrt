@@ -64,9 +64,9 @@ static int valid_submit(const unsigned char *b, size_t n, int *tpdu_len) {
     unsigned char dcs,udl,toa;
     int multipart;
     if(n<12 || n>MAX_BYTES || b[0]!=0x00 || b[2]!=0x00 ||
-       (b[1]!=0x01 && b[1]!=0x41))
+       (b[1]!=0x01 && b[1]!=0x41 && b[1]!=0x21 && b[1]!=0x61))
         return 0;
-    multipart=(b[1]==0x41);
+    multipart=!!(b[1]&0x40);
     addr_count=b[3];
     toa=b[4];
     if(addr_count<3 || addr_count>15 || (toa!=0x81 && toa!=0x91))return 0;
@@ -125,7 +125,7 @@ static int put_all(int fd,const void *buf,size_t n,long long deadline) {
     }
     return 0;
 }
-static int read_phase(int fd,int prompt_phase,long long deadline){
+static int read_phase(int fd,int prompt_phase,long long deadline,int *out_mr){
     char line[512];size_t linelen=0;
     int mr=0;unsigned bytes=0;
     for(;;){
@@ -158,7 +158,7 @@ static int read_phase(int fd,int prompt_phase,long long deadline){
                             errno=0;v=strtol(p,&end,10);
                             if(!errno&&p!=end&&v>=0&&v<=255){
                                 while(*end==' ')end++;
-                                if(!*end)mr=1;
+                                if(!*end){mr=1;if(out_mr)*out_mr=(int)v;}
                             }
                         }
                         if(!strcmp(line,"OK") && mr)return 1;
@@ -176,7 +176,7 @@ static int read_phase(int fd,int prompt_phase,long long deadline){
 }
 int main(int argc,char **argv){
     unsigned char data[MAX_BYTES]={0};
-    size_t n=0;int len=0,fd=-1,rc=1,phase;
+    size_t n=0;int len=0,fd=-1,rc=1,phase,mr=-1;
     struct termios tty,old;
     char command[32],hex[MAX_HEX+1];
     long long deadline;
@@ -206,7 +206,7 @@ int main(int argc,char **argv){
     snprintf(command,sizeof command,"AT+CMGS=%d\r",len);
     deadline=monotonic_ms()+5000;
     if(put_all(fd,command,strlen(command),deadline) ||
-       (phase=read_phase(fd,1,deadline))!=1){
+       (phase=read_phase(fd,1,deadline,NULL))!=1){
         puts("{\"ok\":false,\"reason\":\"prompt_unavailable\"}");
         goto done;
     }
@@ -218,8 +218,16 @@ int main(int argc,char **argv){
         goto done;
     }
     deadline=monotonic_ms()+35000;
-    phase=read_phase(fd,0,deadline);
-    if(phase==1){puts("{\"ok\":true,\"status\":\"accepted_by_modem\"}");rc=0;}
+    phase=read_phase(fd,0,deadline,&mr);
+    if(phase==1){
+        if((data[1]&0x20) && mr>=0 && mr<=255)
+            printf("{\"ok\":true,\"status\":\"accepted_by_modem\",\"mr\":%d,\"report_requested\":true}\n",mr);
+        else if(data[1]&0x20)
+            puts("{\"ok\":false,\"reason\":\"outcome_unknown\"}");
+        else
+            puts("{\"ok\":true,\"status\":\"accepted_by_modem\"}");
+        if(!(data[1]&0x20) || (mr>=0 && mr<=255))rc=0;
+    }
     else if(phase==0)puts("{\"ok\":false,\"reason\":\"network_rejected\"}");
     else puts("{\"ok\":false,\"reason\":\"outcome_unknown\"}");
 done:
