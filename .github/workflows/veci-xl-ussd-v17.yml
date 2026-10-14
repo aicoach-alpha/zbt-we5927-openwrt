@@ -8,6 +8,7 @@ on:
       - 'tests/test_veci_xl_ussd_ui.cjs'
       - 'tests/test_veci_xl_v17_installer.py'
       - 'tests/test_veci_xl_quota_snapshot.py'
+      - 'tests/test_veci_xl_ussd_no_od.py'
       - 'scripts/veci-xl-v17-ussd-quota-install.sh'
       - '.github/workflows/veci-xl-ussd-v17.yml'
   workflow_dispatch:
@@ -31,6 +32,7 @@ jobs:
           sh -n scripts/veci-xl-v17-ussd-quota-install.sh
           python3 -m unittest discover -s tests -p 'test_veci_xl_v17_installer.py' -v
           python3 -m unittest discover -s tests -p 'test_veci_xl_quota_snapshot.py' -v
+          python3 -m unittest discover -s tests -p 'test_veci_xl_ussd_no_od.py' -v
           python3 - <<'PY'
           import json,pathlib
           base=pathlib.Path("scripts/veci-xl-ussd-v17-staged")
