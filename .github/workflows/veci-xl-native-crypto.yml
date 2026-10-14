@@ -1,0 +1,32 @@
+name: VeCI Indonesia myXL native quota-only crypto
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/veci-xl-crypto.c'
+      - 'tests/test_veci_xl_native_crypto.py'
+      - '.github/workflows/veci-xl-native-crypto.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-crypto:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install CI crypto headers and independent test dependency
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libmbedtls-dev python3-pycryptodome
+      - name: Compile with real compact mbedTLS crypto library
+        run: |
+          set -eu
+          gcc -std=c11 -Os -Wall -Wextra -Werror -D_DEFAULT_SOURCE \
+            -o /tmp/veci-xl-crypto-test \
+            source/veci-telco-indonesia/veci-xl-crypto.c -lmbedcrypto
+          file /tmp/veci-xl-crypto-test
+          echo VECI_XL_NATIVE_CRYPTO_BUILD_PASS
+      - name: Check AES CBC padding, base64url and HMAC signature equivalence
+        run: |
+          python3 -m unittest discover -s tests -p 'test_veci_xl_native_crypto.py' -v
+          echo VECI_XL_CRYPTO_READ_ONLY_OFFLINE_PASS
