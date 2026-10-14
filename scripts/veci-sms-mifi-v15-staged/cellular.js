@@ -160,7 +160,9 @@ function decodeSentPdu(hex) {
   if(typeof hex!=='string'||! /^(?:[0-9A-F]{2}){11,192}$/.test(hex))
     throw Error('Invalid Sent PDU');
   const b=Uint8Array.from(hex.match(/../g),h=>parseInt(h,16));
-  if(b[0]!==0||b[1]!==1||b[2]!==0)throw Error('Unsupported Submit PDU');
+  if(b[0]!==0||(b[1]!==1 && b[1]!==0x41)||b[2]!==0)
+    throw Error('Unsupported Submit PDU');
+  const multipart=b[1]===0x41;
   const count=b[3],toa=b[4];
   if(count<3||count>15||(toa!==0x81&&toa!==0x91))throw Error('Recipient');
   let to=toa===0x91?'+':'';
@@ -172,13 +174,21 @@ function decodeSentPdu(hex) {
   const at=5+Math.ceil(count/2);
   if(at+3>b.length||b[at]!==0)throw Error('Submit header');
   const dcs=b[at+1],len=b[at+2],data=b.slice(at+3);
+  let concat=null;
+  if(multipart){
+    if(data.length<7 || data[0]!==5 || data[1]!==0 || data[2]!==3)
+      throw Error('Unsupported multipart header');
+    if(data[4]<2||data[4]>10||data[5]<1||data[5]>data[4])
+      throw Error('Invalid multipart sequencing');
+    concat={ref:data[3],total:data[4],part:data[5]};
+  }
   let text='';
   if(dcs===0){
-    if(len>160||data.length!==Math.ceil(len*7/8))throw Error('GSM7 length');
+    if(len>160||len<(multipart?8:1)||data.length!==Math.ceil(len*7/8))throw Error('GSM7 length');
     const base=[64,163,36,165,232,233,249,236,242,199,10,216,248,13,197,229,916,95,934,915,923,937,928,936,931,920,926,0,198,230,223,201,32,33,34,35,164,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,161,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,196,214,209,220,167,191,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,228,246,241,252,224];
     const ext={10:12,20:94,40:123,41:125,47:92,60:91,61:126,62:93,64:124,101:8364};
     let esc=false;
-    for(let i=0;i<len;i++){
+    for(let i=multipart?7:0;i<len;i++){
       const bit=i*7,byte=bit>>3,shift=bit&7;
       const septet=((data[byte]>>shift)|((data[byte+1]||0)<<(8-shift)))&127;
       if(esc){if(ext[septet]===undefined)throw Error('Invalid extension');text+=String.fromCodePoint(ext[septet]);esc=false;}
@@ -187,10 +197,12 @@ function decodeSentPdu(hex) {
     }
     if(esc)throw Error('Invalid extension');
   }else if(dcs===8){
-    if(!len||len>140||len%2||data.length!==len)throw Error('UCS2 length');
-    for(let i=0;i<len;i+=2)text+=String.fromCharCode((data[i]<<8)|data[i+1]);
+    if(len<(multipart?8:2)||len>140||
+       (multipart?(len-6)%2:len%2)||data.length!==len)throw Error('UCS2 length');
+    for(let i=multipart?6:0;i<len;i+=2)
+      text+=String.fromCharCode((data[i]<<8)|data[i+1]);
   }else throw Error('Unsupported alphabet');
-  return {to,text};
+  return {to,text,concat};
 }
 
 function formatSmsDate(received) {
@@ -672,7 +684,8 @@ export default {
 					const meta=document.createElement('small');
 					meta.style.cssText='display:block;opacity:.8;margin:5px 0 10px;';
 					meta.textContent=new Date(record.at*1000).toLocaleString('id-ID')+
-					  ' · Accepted by modem (delivery unconfirmed)';
+					  ' · Accepted by modem (delivery unconfirmed)' +
+					  (decoded.concat?' · SMS part '+decoded.concat.part+'/'+decoded.concat.total:'');
 					const body=document.createElement('p');
 					body.textContent=decoded.text;
 					body.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;margin:0;';
