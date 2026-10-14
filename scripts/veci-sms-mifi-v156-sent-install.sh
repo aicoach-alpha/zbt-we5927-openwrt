@@ -4,7 +4,7 @@
 set -eu
 umask 077
 LC_ALL=C;export LC_ALL
-PIN=6af65479de50a6bf5b9eac972537bb66f304f8cf
+PIN=6af65479de50a602ee1daf796153a7c03f8d9dc4
 RAW=https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt
 UI=/www/veci/js/pages/cellular.js
 RPC=/usr/libexec/rpcd/veci.sms
