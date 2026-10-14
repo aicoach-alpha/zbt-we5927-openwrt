@@ -53,12 +53,20 @@ static int parse_hex(unsigned char b[MAX_BYTES], size_t *total) {
     return 0;
 }
 
-/* TPDU is SMS-SUBMIT without user data headers or validity period. */
+/* One SMS-SUBMIT TPDU. A multipart segment uses 3GPP 8-bit concat UDH:
+ * SMS-SUBMIT first octet 0x41, six-byte header 05 00 03 ref total seq.
+ * Payload remains exactly one 140-octet max TP-UD. We deliberately do
+ * NOT turn this into a batch transport; the caller must obtain consent
+ * once and explicitly handle uncertain partial submission.
+ */
 static int valid_submit(const unsigned char *b, size_t n, int *tpdu_len) {
     size_t i,addr_count,ud_start,payload;
     unsigned char dcs,udl,toa;
-    if(n<12 || n>MAX_BYTES || b[0]!=0x00 || b[1]!=0x01 || b[2]!=0x00)
+    int multipart;
+    if(n<12 || n>MAX_BYTES || b[0]!=0x00 || b[2]!=0x00 ||
+       (b[1]!=0x01 && b[1]!=0x41))
         return 0;
+    multipart=(b[1]==0x41);
     addr_count=b[3];
     toa=b[4];
     if(addr_count<3 || addr_count>15 || (toa!=0x81 && toa!=0x91))return 0;
@@ -74,10 +82,26 @@ static int valid_submit(const unsigned char *b, size_t n, int *tpdu_len) {
     dcs=b[ud_start+1];
     udl=b[ud_start+2];
     payload=n-(ud_start+3);
+    if(multipart){
+        if(payload<7 || b[ud_start+3]!=0x05 ||
+           b[ud_start+4]!=0x00 || b[ud_start+5]!=0x03)
+           return 0;
+        /* 8-bit reference, number of parts 2..10, and 1-indexed order.
+         * No bulk-delete flag or delivery report request is accepted.
+         */
+        const unsigned total=b[ud_start+7],part=b[ud_start+8];
+        if(total<2 || total>10 || part<1 || part>total)return 0;
+    }
     if(dcs==0x00){
-        if(udl<1||udl>160||payload!=((size_t)udl*7+7)/8) return 0;
+        /* 6 UDH bytes occupy 7 septets including one fill bit. */
+        if(udl< (multipart?8:1) || udl>160 ||
+           payload!=((size_t)udl*7+7)/8)return 0;
+        if(multipart && payload>140)return 0;
     }else if(dcs==0x08){
-        if(udl<2||udl>140||udl%2||payload!=udl)return 0;
+        /* UD length is OCTETS for UCS2, including the UDH when present. */
+        if(udl<(multipart?8:2) || udl>140 ||
+           (multipart ? ((udl-6)%2)!=0 : (udl%2)!=0) ||
+           payload!=udl)return 0;
     }else return 0;
     if(n-1>190)return 0;
     *tpdu_len=(int)n-1;
