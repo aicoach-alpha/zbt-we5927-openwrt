@@ -109,7 +109,7 @@ exit 1
         cp=self.call("--start")
         self.assertNotEqual(cp.returncode,0)
         self.assertEqual(json.loads(cp.stdout),{"ok":False,"reason":"network_rejected"})
-        self.assertEqual(cp.stdout.count("\\n"),1)
+        self.assertEqual(cp.stdout.count("\n"),1)
         self.assertNotIn("AT+CUSD",cp.stdout)
 
     def test_native_unknown_outcome_is_not_automatically_retried(self):
