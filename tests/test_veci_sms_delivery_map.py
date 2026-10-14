@@ -20,11 +20,13 @@ class DeliveryMap(unittest.TestCase):
         self.lock=d/"lock"
         self.store.write_text("")
         (d/"feature").write_text("1")
+        (d/"secret").write_text("a"*64+"\n")
         (d/"board").write_text("zbtlink,zbt-we5927")
         code=SCRIPT.read_text()
         code=code.replace("/etc/veci-sms-delivery-map",str(self.store))
         code=code.replace("/var/lock/veci-sms-delivery-map.lock",str(self.lock))
         code=code.replace("/etc/veci-sms-feature",str(d/"feature"))
+        code=code.replace("/etc/veci-sms-delivery-secret",str(d/"secret"))
         code=code.replace("/tmp/sysinfo/board_name",str(d/"board"))
         code=code.replace('[ "$(id -u)" = 0 ]','[ 0 = 0 ]')
         self.script=d/"worker"
