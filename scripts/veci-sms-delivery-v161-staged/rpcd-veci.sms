@@ -1,0 +1,376 @@
+#!/bin/sh
+# OPTIONAL WE5927 rpcd exec plugin: status-changing SMS listing; no general AT.
+# v1.6.1 candidate only: this file is NOT referenced by the v1.6.0 live installer.
+# Requires an atomic rollout of native CMGS, map, status viewer, UI, and rollback.
+# Expose via dedicated WRITE-only ubus ACL, never read/public ACL.
+set -eu
+umask 077
+LC_ALL=C; export LC_ALL
+WORKER=/usr/libexec/veci-sms-inbox-index
+RATE_FILE=/tmp/veci-sms-inbox-last-attempt
+RATE_LOCK=/var/lock/veci-sms-inbox-rpc.lock
+
+
+STATE_FILE=/etc/veci-sms-feature
+SMS_MIFI=/usr/libexec/veci-sms-mifi-inbox
+
+sms_state() {
+  [ ! -L "$STATE_FILE" ] && [ -f "$STATE_FILE" ] || return 1
+  [ "$(cat "$STATE_FILE" 2>/dev/null || :)" = 1 ]
+}
+config() {
+  [ "$(id -u)" -eq 0 ] || { deny admin_required; return; }
+  if sms_state; then
+    printf '{"ok":true,"enabled":true}\n'
+  else
+    printf '{"ok":true,"enabled":false}\n'
+  fi
+}
+toggle() {
+  [ "$(id -u)" -eq 0 ] || { deny admin_required; return; }
+  command -v jsonfilter >/dev/null 2>&1 || { deny invalid_request; return; }
+  input="$(head -c 129)" || { deny invalid_request; return; }
+  [ "$(printf %s "$input" | wc -c)" -le 128 ] || { deny invalid_request; return; }
+  state="$(jsonfilter -s "$input" -e '@.state' 2>/dev/null || :)"
+  unset input
+  case "$state" in on) next=1 ;; off) next=0 ;; *) deny invalid_request; return ;; esac
+  unset state
+  [ ! -L "$STATE_FILE" ] && [ -f "$STATE_FILE" ] ||
+      { deny index_unavailable; return; }
+  # State is on persistent flash only upon an explicit user switch.
+  temp="$STATE_FILE.new.$$"
+  (umask 077; printf '%s\n' "$next" > "$temp") ||
+      { deny index_unavailable; return; }
+  chmod 600 "$temp" || { rm -f "$temp"; deny index_unavailable; return; }
+  mv -f "$temp" "$STATE_FILE" ||
+      { rm -f "$temp"; deny index_unavailable; return; }
+  if [ "$next" -eq 1 ]; then
+    printf '{"ok":true,"enabled":true}\n'
+  else
+    printf '{"ok":true,"enabled":false}\n'
+  fi
+}
+list_messages() {
+  [ "$(id -u)" -eq 0 ] || { deny admin_required; return; }
+  sms_state || { deny sms_disabled; return; }
+  [ -x "$SMS_MIFI" ] || { deny worker_unavailable; return; }
+  command -v flock >/dev/null 2>&1 || { deny index_unavailable; return; }
+  # Only explicit calls; never query modem in getConfig or page render.
+  (
+    flock -n -x 8 || { deny request_busy; exit 0; }
+    result="$("$SMS_MIFI" --list-pdu-once 2>/dev/null)" ||
+        { deny index_unavailable; exit 0; }
+    sms_state || { unset result; deny sms_disabled; exit 0; }
+    [ "$(printf '%s' "$result" | wc -c)" -le 10000 ] ||
+        { unset result; deny index_unavailable; exit 0; }
+    # Worker owns strict PDU validation. Never print unparsed AT response.
+    # v1.5.3 worker inserts a verified storage label after source.
+    # Check the full prefix for one of the three explicit memory codes,
+    # not the v1.5.2 prefix which discarded valid results.
+    case "$result" in
+      '{"ok":true,"source":"on_demand_cmgl_pdu","storage":"SM","count":'*|\
+      '{"ok":true,"source":"on_demand_cmgl_pdu","storage":"ME","count":'*|\
+      '{"ok":true,"source":"on_demand_cmgl_pdu","storage":"MT","count":'*)
+        printf '%s\n' "$result" ;;
+      *) deny index_unavailable ;;
+    esac
+    unset result
+  ) 8>"$RATE_LOCK"
+}
+
+
+SMS_DELETE=/usr/libexec/veci-sms-delete-one
+
+delete_message(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required; return; }
+  sms_state || { deny sms_disabled; return; }
+  [ -x "$SMS_DELETE" ] || { deny worker_unavailable; return; }
+  command -v jsonfilter >/dev/null 2>&1 || { deny invalid_request; return; }
+  input="$(head -c 1025)" || { deny invalid_request; return; }
+  [ "$(printf %s "$input" | wc -c)" -le 1024 ] || { deny invalid_request; return; }
+  idx="$(jsonfilter -s "$input" -e '@.index' 2>/dev/null || :)"
+  store="$(jsonfilter -s "$input" -e '@.storage' 2>/dev/null || :)"
+  pdu="$(jsonfilter -s "$input" -e '@.expectedPdu' 2>/dev/null || :)"
+  unset input
+  case "$idx" in ''|*[!0-9]*) deny invalid_request;return;;esac
+  [ "$(printf %s "$idx"|wc -c)" -le 5 ] && [ "$idx" -le 65535 ] ||
+      { deny invalid_request;return; }
+  case "$store" in SM|ME);;*) deny invalid_request;return;;esac
+  n="$(printf %s "$pdu"|wc -c)"
+  [ "$n" -ge 4 ] && [ "$n" -le 512 ] && [ "$((n%2))" -eq 0 ] ||
+      { deny invalid_request;return; }
+  case "$pdu" in *[!0-9A-F]*) deny invalid_request;return;;esac
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    sms_state || { deny sms_disabled;exit 0; }
+    result="$(printf %s "$pdu" | "$SMS_DELETE" "$idx" "$store" 2>/dev/null)" ||
+      { deny index_unavailable;exit 0; }
+    sms_state || { deny sms_disabled;exit 0; }
+    expected="{\"ok\":true,\"deleted\":$idx,\"storage\":\"$store\"}"
+    [ "$result" = "$expected" ] || { deny index_unavailable;exit 0; }
+    printf '%s\n' "$expected"
+  ) 8>"$RATE_LOCK"
+}
+
+
+SMS_SEND=/usr/libexec/veci-sms-send-one
+SENT_HISTORY=/usr/libexec/veci-sms-sent-history
+DELIVERY_MAP=/usr/libexec/veci-sms-delivery-map
+DELIVERY_VIEW=/usr/libexec/veci-sms-sent-delivery-view
+SEND_RATE=/tmp/veci-sms-send-last-attempt
+send_message(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required;return; }
+  sms_state || { deny sms_disabled;return; }
+  [ -x "$SMS_SEND" ] || { deny worker_unavailable;return; }
+  command -v flock >/dev/null 2>&1 || { deny worker_unavailable;return; }
+  input="$(head -c 525)" || { deny invalid_request;return; }
+  [ "$(printf %s "$input" | wc -c)" -le 524 ] || { deny invalid_request;return; }
+  pdu="$(jsonfilter -s "$input" -e '@.pdu' 2>/dev/null || :)"
+  unset input
+  n="$(printf %s "$pdu"|wc -c)"
+  [ "$n" -ge 22 ] && [ "$n" -le 384 ] && [ "$((n%2))" -eq 0 ] ||
+      { deny invalid_request;return; }
+  case "$pdu" in *[!0-9A-F]*)deny invalid_request;return;;esac
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    sms_state || { deny sms_disabled;exit 0; }
+    now="$(date +%s)" || { deny send_unavailable;exit 0; }
+    case "$now" in ''|*[!0-9]*)deny send_unavailable;exit 0;;esac
+    last="$(cat "$SEND_RATE" 2>/dev/null || :)"
+    case "$last" in
+      ''|*[!0-9]*);;
+      *)
+       if [ "$now" -lt "$last" ] || [ "$((now-last))" -lt 5 ];then
+         deny send_rate_limited;exit 0
+       fi;;
+    esac
+    # Reserve before potentially sending; an uncertain outcome must not
+    # provoke automatic retries.
+    printf '%s\n' "$now" > "$SEND_RATE" || { deny send_unavailable;exit 0; }
+    response="$(printf '%s\n' "$pdu" | "$SMS_SEND" 2>/dev/null)" || {
+      deny send_unavailable;exit 0;
+    }
+    sms_state || { deny sms_disabled;exit 0; }
+    # The new native CMGS returns TP-MR only when TP-SRR was requested.
+    # Legacy send responses remain compatible; no report is fabricated.
+    mr=""
+    report_requested=false
+    case "$response" in
+      '{"ok":true,"status":"accepted_by_modem"}')
+        ;;
+      '{"ok":true,"status":"accepted_by_modem","mr":'*',"report_requested":true}')
+        mr="$(jsonfilter -s "$response" -e '@.mr' 2>/dev/null || :)"
+        case "$mr" in ''|*[!0-9]*)mr="";;esac
+        [ -z "$mr" ] || [ "$(printf %s "$mr" | wc -c)" -le 3 ] && [ "$mr" -le 255 ] || mr=""
+        [ -n "$mr" ] || {
+          # SMS may already have been transmitted. NEVER suggest retry.
+          printf '{"ok":true,"status":"accepted_by_modem","history_saved":false,"delivery_tracking":false}\n'
+          exit 0
+        }
+        report_requested=true
+        ;;
+      '{"ok":false,"reason":"network_rejected"}'|\
+      '{"ok":false,"reason":"outcome_unknown"}'|\
+      '{"ok":false,"reason":"prompt_unavailable"}')
+        printf '%s\n' "$response"; exit 0 ;;
+      *)
+        # The one-shot transport outcome may be uncertain: no auto retry.
+        deny send_unavailable; exit 0 ;;
+    esac
+    history_saved=false
+    if [ -x "$SENT_HISTORY" ] &&
+      [ "$(printf '%s' "$pdu" | "$SENT_HISTORY" --add 2>/dev/null)" = '{"ok":true,"saved":true}' ]; then
+      history_saved=true
+    fi
+    delivery_tracking=false
+    # Never track a report for a legacy PDU or a send without saved history.
+    if [ "$history_saved" = true ] && [ "$report_requested" = true ] &&
+       [ -x "$DELIVERY_MAP" ]; then
+      first_octet="$(printf %s "$pdu" | cut -c3-4)"
+      case "$first_octet" in
+        21|61)
+          if [ "$(printf %s "$pdu" | "$DELIVERY_MAP" --track "$mr" 2>/dev/null)" = '{"ok":true,"tracked":true}' ]; then
+            delivery_tracking=true
+          fi ;;
+      esac
+    fi
+    printf '{"ok":true,"status":"accepted_by_modem","history_saved":%s,"delivery_tracking":%s}\n' \
+      "$history_saved" "$delivery_tracking"
+  ) 8>"$RATE_LOCK"
+  unset pdu
+}
+
+get_sent(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required;return; }
+  sms_state || { deny sms_disabled;return; }
+  [ -x "$SENT_HISTORY" ] || { deny worker_unavailable;return; }
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    sms_state || { deny sms_disabled;exit 0; }
+    # v1.6.1 read model joins verified status reports; legacy history is
+    # the safe fallback if the optional delivery component is unavailable.
+    sent_worker="$SENT_HISTORY"
+    if [ -x "$DELIVERY_VIEW" ]; then sent_worker="$DELIVERY_VIEW"; fi
+    result="$("$sent_worker" --list 2>/dev/null)" || {
+      deny history_unavailable;exit 0;
+    }
+    [ "$(printf %s "$result"|wc -c)" -le 15000 ] || {
+      deny history_unavailable;exit 0;
+    }
+    case "$result" in
+      '{"ok":true,"source":"local_sent","count":'*)
+        printf '%s\n' "$result";;
+      *)deny history_unavailable;;
+    esac
+  ) 8>"$RATE_LOCK"
+}
+
+
+SMS_DRAFTS=/usr/libexec/veci-sms-drafts
+draft_request(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required;return; }
+  sms_state || { deny sms_disabled;return; }
+  [ -x "$SMS_DRAFTS" ] || { deny worker_unavailable;return; }
+  command -v flock >/dev/null 2>&1 || { deny worker_unavailable;return; }
+  method="$1"
+  case "$method" in
+    getDrafts) operation=--list ;;
+    saveDraft) operation=--save ;;
+    deleteDraft) operation=--delete ;;
+    *)deny invalid_request;return;;
+  esac
+  if [ "$operation" != --list ];then
+    input="$(head -c 1025)" || { deny invalid_request;return; }
+    [ "$(printf %s "$input"|wc -c)" -le 1024 ] || { deny invalid_request;return; }
+    id="$(jsonfilter -s "$input" -e '@.id' 2>/dev/null || :)"
+    old="$(jsonfilter -s "$input" -e '@.expectedPdu' 2>/dev/null || :)"
+    case "$id" in 0|1|2|3|4|5|6|7|8|9|10);;*)deny invalid_request;return;;esac
+    if [ "$id" = 0 ];then [ "$old" = - ] || { deny invalid_request;return; }
+    else
+      len="$(printf %s "$old"|wc -c)"
+      [ "$len" -ge 22 ] && [ "$len" -le 384 ] && [ "$((len%2))" -eq 0 ] ||
+        { deny invalid_request;return; }
+      case "$old" in *[!0-9A-F]*)deny invalid_request;return;;esac
+    fi
+    if [ "$operation" = --save ];then
+      fresh="$(jsonfilter -s "$input" -e '@.pdu' 2>/dev/null || :)"
+      n="$(printf %s "$fresh"|wc -c)"
+      [ "$n" -ge 22 ] && [ "$n" -le 384 ] && [ "$((n%2))" -eq 0 ] ||
+        { deny invalid_request;return; }
+      case "$fresh" in *[!0-9A-F]*)deny invalid_request;return;;esac
+    fi
+    unset input
+  fi
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    sms_state || { deny sms_disabled;exit 0; }
+    case "$operation" in
+      --list)
+        result="$("$SMS_DRAFTS" --list 2>/dev/null)" ||
+          { deny draft_unavailable;exit 0; }
+        [ "$(printf %s "$result"|wc -c)" -le 6000 ] || { deny draft_unavailable;exit 0; }
+        case "$result" in
+          '{"ok":true,"source":"local_drafts","count":'*)printf '%s\n' "$result";;
+          *)deny draft_unavailable;;
+        esac
+        ;;
+      --save)
+        result="$(printf '%s' "$fresh" | "$SMS_DRAFTS" --save "$id" "$old" 2>/dev/null)" ||
+          { deny draft_unavailable;exit 0; }
+        case "$result" in
+          '{"ok":true,"saved":true,"id":'*)printf '%s\n' "$result";;
+          *)deny draft_unavailable;;
+        esac
+        ;;
+      --delete)
+        result="$("$SMS_DRAFTS" --delete "$id" "$old" 2>/dev/null)" ||
+          { deny draft_unavailable;exit 0; }
+        [ "$result" = "{\"ok\":true,\"deleted\":$id}" ] ||
+          { deny draft_unavailable;exit 0; }
+        printf '%s\n' "$result"
+        ;;
+    esac
+  ) 8>"$RATE_LOCK"
+  unset fresh old
+}
+
+deny() {
+  case "$1" in
+    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy|sms_disabled|send_unavailable|send_rate_limited|history_unavailable|draft_unavailable)
+      reason="$1" ;;
+    *) reason=index_unavailable ;;
+  esac
+  printf '{"ok":false,"reason":"%s","messages":[]}\n' "$reason"
+}
+list_index() {
+  [ "$(id -u)" -eq 0 ] || { deny admin_required; return; }
+  sms_state || { deny sms_disabled; return; }
+  input="$(head -c 513)" || { deny invalid_request; return; }
+  [ "$(printf %s "$input" | wc -c)" -le 512 ] ||
+    { deny invalid_request; return; }
+  command -v jsonfilter >/dev/null 2>&1 || { deny invalid_request; return; }
+  scope="$(jsonfilter -s "$input" -e '@.scope' 2>/dev/null)" ||
+    { deny invalid_request; return; }
+  ack="$(jsonfilter -s "$input" -e '@.ack_unread_status' 2>/dev/null)" ||
+    { deny invalid_request; return; }
+  unset input
+  if [ "$scope" != metadata_only ] ||
+     [ "$ack" != I_ACCEPT_UNREAD_TO_READ ]; then
+    deny ack_required
+    return
+  fi
+  unset scope ack
+  [ -x "$WORKER" ] || { deny worker_unavailable; return; }
+  command -v flock >/dev/null 2>&1 || { deny index_unavailable; return; }
+  # Per-device rate control prevents accidental repeated state-changing lists.
+  # Reserve attempt BEFORE AT I/O, including if modem later times out.
+  (
+    flock -n -x 8 || { deny request_busy; exit 0; }
+    now="$(date +%s)" || { deny index_unavailable; exit 0; }
+    case "$now" in ''|*[!0-9]*) deny index_unavailable; exit 0 ;; esac
+    last="$(cat "$RATE_FILE" 2>/dev/null || :)"
+    case "$last" in
+      ''|*[!0-9]*) ;;
+      *)
+        if [ "$now" -lt "$last" ] || [ "$((now - last))" -lt 60 ]; then
+          deny retry_later
+          exit 0
+        fi
+        ;;
+    esac
+    printf '%s\n' "$now" > "$RATE_FILE" ||
+      { deny index_unavailable; exit 0; }
+    result="$("$WORKER" --show-indices-only --ack-unread-may-be-marked-read 2>/dev/null)" ||
+    { deny index_unavailable; return; }
+  [ "$(printf %s "$result" | wc -c)" -le 1600 ] ||
+    { deny index_unavailable; return; }
+  # Only allow exact numeric metadata schema from validated worker, no PDU.
+  if ! printf '%s\n' "$result" | grep -Eq \
+     '^\{"ok":true,"source":"on_demand_cmgl","side_effect_acknowledged":true,"count":([0-9]|1[0-6]),"messages":\[(\{"index":[0-9]{1,5},"status":[0-4],"tpdu_octets":[0-9]{1,3}\}(,\{"index":[0-9]{1,5},"status":[0-4],"tpdu_octets":[0-9]{1,3}\}){0,15})?\]\}$'; then
+    deny index_unavailable
+    return
+  fi
+  printf '%s\n' "$result"
+  ) 8>"$RATE_LOCK"
+}
+[ "$#" -ge 1 ] || exit 2
+case "$1" in
+  list)
+    printf '{"listIndex":{"scope":"str","ack_unread_status":"str"},"getConfig":{},"setEnabled":{"state":"str"},"listMessages":{},"deleteMessage":{"index":"int","storage":"str","expectedPdu":"str"},"sendMessage":{"pdu":"str"},"getSent":{},"getDrafts":{},"saveDraft":{"id":"int","expectedPdu":"str","pdu":"str"},"deleteDraft":{"id":"int","expectedPdu":"str"}}\n'
+    ;;
+  call)
+    [ "$#" -ge 2 ] || { deny invalid_request; exit 0; }
+    case "$2" in
+      listIndex) list_index ;;
+      getConfig) config ;;
+      setEnabled) toggle ;;
+      listMessages) list_messages ;;
+      deleteMessage) delete_message ;;
+      sendMessage) send_message ;;
+      getSent) get_sent ;;
+      getDrafts|saveDraft|deleteDraft) draft_request "$2" ;;
+      *) deny invalid_request ;;
+    esac
+    ;;
+  *) exit 2 ;;
+esac
