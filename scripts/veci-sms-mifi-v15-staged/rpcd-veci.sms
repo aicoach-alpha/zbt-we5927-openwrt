@@ -110,9 +110,57 @@ delete_message(){
   ) 8>"$RATE_LOCK"
 }
 
+
+SMS_SEND=/usr/libexec/veci-sms-send-one
+SEND_RATE=/tmp/veci-sms-send-last-attempt
+send_message(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required;return; }
+  sms_state || { deny sms_disabled;return; }
+  [ -x "$SMS_SEND" ] || { deny worker_unavailable;return; }
+  command -v flock >/dev/null 2>&1 || { deny worker_unavailable;return; }
+  input="$(head -c 525)" || { deny invalid_request;return; }
+  [ "$(printf %s "$input" | wc -c)" -le 524 ] || { deny invalid_request;return; }
+  pdu="$(jsonfilter -s "$input" -e '@.pdu' 2>/dev/null || :)"
+  unset input
+  n="$(printf %s "$pdu"|wc -c)"
+  [ "$n" -ge 22 ] && [ "$n" -le 384 ] && [ "$((n%2))" -eq 0 ] ||
+      { deny invalid_request;return; }
+  case "$pdu" in *[!0-9A-F]*)deny invalid_request;return;;esac
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    sms_state || { deny sms_disabled;exit 0; }
+    now="$(date +%s)" || { deny send_unavailable;exit 0; }
+    case "$now" in ''|*[!0-9]*)deny send_unavailable;exit 0;;esac
+    last="$(cat "$SEND_RATE" 2>/dev/null || :)"
+    case "$last" in
+      ''|*[!0-9]*);;
+      *)
+       if [ "$now" -lt "$last" ] || [ "$((now-last))" -lt 5 ];then
+         deny send_rate_limited;exit 0
+       fi;;
+    esac
+    # Reserve before potentially sending; an uncertain outcome must not
+    # provoke automatic retries.
+    printf '%s\n' "$now" > "$SEND_RATE" || { deny send_unavailable;exit 0; }
+    response="$(printf '%s\n' "$pdu" | "$SMS_SEND" 2>/dev/null)" || {
+      deny send_unavailable;exit 0;
+    }
+    sms_state || { deny sms_disabled;exit 0; }
+    case "$response" in
+      '{"ok":true,"status":"accepted_by_modem"}'|\
+      '{"ok":false,"reason":"network_rejected"}'|\
+      '{"ok":false,"reason":"outcome_unknown"}'|\
+      '{"ok":false,"reason":"prompt_unavailable"}')
+       printf '%s\n' "$response";;
+      *)deny send_unavailable;;
+    esac
+  ) 8>"$RATE_LOCK"
+  unset pdu
+}
+
 deny() {
   case "$1" in
-    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy|sms_disabled)
+    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy|sms_disabled|send_unavailable|send_rate_limited)
       reason="$1" ;;
     *) reason=index_unavailable ;;
   esac
@@ -172,7 +220,7 @@ list_index() {
 [ "$#" -ge 1 ] || exit 2
 case "$1" in
   list)
-    printf '{"listIndex":{"scope":"str","ack_unread_status":"str"},"getConfig":{},"setEnabled":{"state":"str"},"listMessages":{},"deleteMessage":{"index":"int","storage":"str","expectedPdu":"str"}}\n'
+    printf '{"listIndex":{"scope":"str","ack_unread_status":"str"},"getConfig":{},"setEnabled":{"state":"str"},"listMessages":{},"deleteMessage":{"index":"int","storage":"str","expectedPdu":"str"},"sendMessage":{"pdu":"str"}}\n'
     ;;
   call)
     [ "$#" -ge 2 ] || { deny invalid_request; exit 0; }
@@ -182,6 +230,7 @@ case "$1" in
       setEnabled) toggle ;;
       listMessages) list_messages ;;
       deleteMessage) delete_message ;;
+      sendMessage) send_message ;;
       *) deny invalid_request ;;
     esac
     ;;

@@ -11,7 +11,8 @@
           "getConfig",
           "setEnabled",
           "listMessages",
-          "deleteMessage"
+          "deleteMessage",
+          "sendMessage"
         ]
       }
     }
