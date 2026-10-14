@@ -9,6 +9,7 @@ HISTORY=/etc/veci-sms-sent-history
 MAP=/etc/veci-sms-delivery-map
 FLAG=/etc/veci-sms-feature
 LOCK=/var/lock/veci-sms-delivery-map.lock
+SECRET=/etc/veci-sms-delivery-secret
 fail(){ printf '{"ok":false,"reason":"history_unavailable"}\n'; exit 1; }
 [ "$#" = 1 ] && [ "$1" = --list ] || fail
 [ "$(id -u)" -eq 0 ] || fail
@@ -17,6 +18,11 @@ fail(){ printf '{"ok":false,"reason":"history_unavailable"}\n'; exit 1; }
 [ -f "$HISTORY" ] && [ ! -L "$HISTORY" ] && [ "$(wc -c < "$HISTORY")" -le 18000 ] || fail
 [ -f "$MAP" ] && [ ! -L "$MAP" ] && [ "$(wc -c < "$MAP")" -le 9000 ] || fail
 [ ! -L "$LOCK" ] || fail
+[ -f "$SECRET" ] && [ ! -L "$SECRET" ] &&
+[ "$(wc -c < "$SECRET")" -eq 65 ] || fail
+secret="$(cat "$SECRET" 2>/dev/null || :)"
+[ "$(printf %s "$secret"|wc -c)" -eq 64 ] || fail
+case "$secret" in *[!0-9a-f]*)fail;;esac
 for tool in flock awk sha256sum; do command -v "$tool" >/dev/null 2>&1 || fail; done
 exec 8>"$LOCK" || fail
 flock -n -s 8 || fail
@@ -49,7 +55,7 @@ awk -F'|' '
   awk -F'|' '{print "M|"$1"|"$4"|"$5"|"$6}' "$MAP"
   while IFS='|' read -r timestamp pdu; do
     [ -n "$timestamp" ] || continue
-    digest="$(printf %s "$pdu" | sha256sum | awk '{print $1}')" || fail
+    digest="$(printf '%s:%s:%s:%s' "$secret" pdu "$pdu" "$secret" | sha256sum | awk '{print $1}')" || fail
     printf 'H|%s|%s|%s\n' "$timestamp" "$pdu" "$digest"
   done < "$HISTORY"
 } | awk -F'|' '
