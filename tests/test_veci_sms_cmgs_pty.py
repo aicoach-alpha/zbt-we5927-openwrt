@@ -81,7 +81,8 @@ class CMGS(unittest.TestCase):
                     text=True,capture_output=True,timeout=2)
                 self.assertNotEqual(p.returncode,0)
                 self.assertIn("invalid_submit",p.stdout)
-                self.assertNotIn(bad,p.stdout+p.stderr)
+                if bad:
+                    self.assertNotIn(bad,p.stdout+p.stderr)
 
 if __name__=="__main__":
     unittest.main()
