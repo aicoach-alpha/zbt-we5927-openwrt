@@ -25,7 +25,29 @@ class CMGS(unittest.TestCase):
     def tearDownClass(cls):
         BIN.unlink(missing_ok=True)
 
-    def run_pty(self,reply="ok"):
+    @staticmethod
+    def multipart_pdu(text="HELLO", unicode=False, reference=25, total=2, part=1):
+        udh=bytes([5,0,3,reference,total,part])
+        if unicode:
+            data=udh+text.encode("utf-16-be")
+            udl=len(data)
+            dcs=8
+        else:
+            septets=[ord(char) for char in text]
+            assert all(0<z<128 for z in septets)
+            udl=7+len(septets)
+            data=bytearray((udl*7+7)//8)
+            data[:6]=udh
+            for i,val in enumerate(septets):
+                for bit in range(7):
+                    if val & (1<<bit):
+                        offset=(7+i)*7+bit
+                        data[offset//8] |= 1<<(offset%8)
+            dcs=0
+        header=bytes([0,0x41,0,11,0x91])+bytes.fromhex("2143658709F1")
+        return (header+bytes([0,dcs,udl])+data).hex().upper()
+
+    def run_pty(self,reply="ok",pdu=PDU):
         master,slave=pty.openpty()
         path=os.ttyname(slave)
         transcript={"command":b"", "pdu":b""}
@@ -53,7 +75,7 @@ class CMGS(unittest.TestCase):
         t=threading.Thread(target=emulator,daemon=True)
         t.start()
         try:
-            cp=subprocess.run([str(BIN),path],input=PDU+"\n",
+            cp=subprocess.run([str(BIN),path],input=pdu+"\n",
                 text=True,capture_output=True,timeout=39)
             t.join(timeout=2)
             return cp,transcript
@@ -67,6 +89,36 @@ class CMGS(unittest.TestCase):
         self.assertEqual(got["command"],b"AT+CMGS=18\r")
         self.assertEqual(got["pdu"],PDU.encode()+b"\x1a")
         self.assertNotIn(PDU,p.stdout+p.stderr)
+
+    def test_multipart_gsm7_concat_header_accepted(self):
+        pdu=self.multipart_pdu("HELLO",reference=25,total=2,part=1)
+        p,got=self.run_pty("ok",pdu)
+        self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+        self.assertIn('accepted_by_modem',p.stdout)
+        self.assertEqual(got["command"],f"AT+CMGS={len(pdu)//2-1}\\r".encode().replace(b"\\\\r",b"\\r"))
+        self.assertEqual(got["pdu"],pdu.encode()+b"\\x1a")
+        self.assertNotIn(pdu,p.stdout+p.stderr)
+
+    def test_multipart_ucs2_concat_header_accepted(self):
+        pdu=self.multipart_pdu("你好",unicode=True,reference=59,total=3,part=2)
+        p,got=self.run_pty("ok",pdu)
+        self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+        self.assertIn('accepted_by_modem',p.stdout)
+        self.assertEqual(got["pdu"],pdu.encode()+b"\\x1a")
+
+    def test_reject_malformed_concat_without_modem_commands(self):
+        for pdu in [
+            self.multipart_pdu("HELLO",total=1),
+            self.multipart_pdu("HELLO",part=3),
+            self.multipart_pdu("HELLO",unicode=False)[:-2],
+            self.multipart_pdu("你好",unicode=True)[:-2],
+            self.multipart_pdu("HELLO").replace("05000319","06000319"),
+        ]:
+            with self.subTest(pdu=pdu[:22]):
+                p=subprocess.run([str(BIN),"/dev/ttyUSB2"],input=pdu+"\\n",
+                    text=True,capture_output=True,timeout=2)
+                self.assertNotEqual(p.returncode,0)
+                self.assertIn("invalid_submit",p.stdout)
 
     def test_network_rejection_does_not_claim_sent(self):
         p,got=self.run_pty("error")
