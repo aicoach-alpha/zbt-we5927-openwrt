@@ -22,6 +22,9 @@ on:
       - 'scripts/veci-sms-mifi-v157-staged/**'
       - 'scripts/veci-sms-mifi-v157-drafts-install.sh'
       - 'scripts/veci-sms-mifi-v158-compose-layout-install.sh'
+      - 'scripts/veci-sms-mifi-v159-staged/**'
+      - 'scripts/veci-sms-mifi-v159-csp-css-install.sh'
+      - 'tests/veci_sms_css_csp_smoke.cjs'
       - 'tests/test_veci_sms_drafts.py'
       - 'scripts/veci-sms-mifi-v156-sent-install.sh'
       - 'tests/test_veci_sms_delete_awk_smoke.py'
@@ -57,6 +60,9 @@ jobs:
           sh -n scripts/veci-sms-mifi-v1531-inbox-hotfix.sh
           sh -n scripts/veci-sms-mifi-v154-ui-install.sh
           sh -n scripts/veci-sms-mifi-v1541-delete-copy-hotfix.sh
+          if [ -f scripts/veci-sms-mifi-v159-csp-css-install.sh ];then
+            sh -n scripts/veci-sms-mifi-v159-csp-css-install.sh
+          fi
           if [ -f scripts/veci-sms-mifi-v153-delete-install.sh ]; then
             sh -n scripts/veci-sms-mifi-v153-delete-install.sh
           fi
@@ -107,6 +113,8 @@ jobs:
           PY
       - name: SMS Delete guarded AT response parser / no hardware
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_delete_awk_smoke.py' -v
+      - name: CSP-compliant real CSS asset and external link
+        run: node tests/veci_sms_css_csp_smoke.cjs
       - name: Responsive SMS Compose markup with unchanged control IDs
         run: |
           node - <<'NODE'
@@ -115,9 +123,8 @@ jobs:
           for(const id of ['cellular-sms-compose','cellular-sms-to','cellular-sms-text','cellular-sms-send','cellular-sms-draft-save','cellular-sms-compose-close']){
             assert.strictEqual(s.split('id="'+id+'"').length-1,1,id);
           }
-          assert(s.includes('#cellular-sms-compose[hidden]'));
-          assert(s.includes('#cellular-sms-compose:not([hidden])'));
-          assert(s.includes('flex-direction: column !important'));
+          assert(s.includes('veci-sms-center-v159-css'));
+          assert(s.includes("link.href = '/veci/sms-center.css?v=159'"));
           assert(s.includes("api.call('veci.sms','sendMessage'"));
           assert(s.includes("api.call('veci.sms','saveDraft'"));
           console.log('VECI_SMS_V158_RESPONSIVE_MARKUP_SMOKE_PASS');
@@ -136,6 +143,7 @@ jobs:
           sha256sum scripts/veci-sms-mifi-v15-staged/rpcd-veci.sms \
                     scripts/veci-sms-mifi-v15-staged/veci-sms-mifi-inbox \
                     scripts/veci-sms-mifi-v15-staged/cellular.js \
+                    scripts/veci-sms-mifi-v159-staged/sms-center.css \
                     scripts/veci-sms-mifi-v15-staged/acl.json \
                     scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one \
                     scripts/veci-sms-mifi-v156-staged/veci-sms-sent-history \
