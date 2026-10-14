@@ -99,6 +99,31 @@ printf '{"operator":"XL XL","sim":1}\n'
         reply=self.call("--reply",token,"1")
         self.assertEqual(reply.returncode,0,reply.stdout+reply.stderr)
         self.assertEqual(json.loads(reply.stdout)["session"],token)
+    def test_native_network_rejection_is_returned_once_without_retry(self):
+        native=self.dir/"native"
+        native.write_text("""#!/bin/sh
+printf '{"ok":false,"reason":"network_rejected"}\\n'
+exit 1
+""")
+        native.chmod(0o700)
+        cp=self.call("--start")
+        self.assertNotEqual(cp.returncode,0)
+        self.assertEqual(json.loads(cp.stdout),{"ok":False,"reason":"network_rejected"})
+        self.assertEqual(cp.stdout.count("\\n"),1)
+        self.assertNotIn("AT+CUSD",cp.stdout)
+
+    def test_native_unknown_outcome_is_not_automatically_retried(self):
+        native=self.dir/"native"
+        native.write_text("""#!/bin/sh
+printf '{"ok":false,"reason":"outcome_unknown"}\\n'
+exit 1
+""")
+        native.chmod(0o700)
+        cp=self.call("--start")
+        self.assertNotEqual(cp.returncode,0)
+        self.assertEqual(json.loads(cp.stdout)["reason"],"outcome_unknown")
+        self.assertFalse((self.dir/"state").exists())
+
     def test_invalid_choice_does_not_call_native_modem(self):
         start=self.call("--start")
         self.assertEqual(start.returncode,0)
