@@ -41,17 +41,17 @@ class SmsReport(unittest.TestCase):
                 self.assertNotIn(raw,result.stdout+result.stderr)
     def test_direct_cds_urc_correlates_only_valid_tpdu_length(self):
         pdu=sample(status=0,mr=18)
-        direct=self.run_decode("+CDS: "+str(len(pdu)//2-1)+"\\r\\n"+pdu,"--direct-urc")
+        direct=self.run_decode("+CDS: "+str(len(pdu)//2-1)+"\r\n"+pdu,"--direct-urc")
         self.assertEqual(direct.returncode,0,direct.stdout+direct.stderr)
         data=json.loads(direct.stdout)
         self.assertEqual(data,{"ok":True,"route":"direct_urc","mr":18,
                                "recipient":"+628123456789","tp_st":0,"state":"delivered"})
         self.assertNotIn(pdu,direct.stdout+direct.stderr)
-        for invalid in ["+CDS: 1\\r\\n"+pdu,
-                        "+CDS: 999\\r\\n"+pdu,
-                        "+CDS: -1\\r\\n"+pdu,
-                        "+CMGL: 24\\r\\n"+pdu,
-                        "+CDS: 24;AT+CMGD=1\\r\\n"+pdu]:
+        for invalid in ["+CDS: 1\r\n"+pdu,
+                        "+CDS: 999\r\n"+pdu,
+                        "+CDS: -1\r\n"+pdu,
+                        "+CMGL: 24\r\n"+pdu,
+                        "+CDS: 24;AT+CMGD=1\r\n"+pdu]:
             with self.subTest(header=invalid[:24]):
                 res=self.run_decode(invalid,"--direct-urc")
                 self.assertNotEqual(res.returncode,0)
