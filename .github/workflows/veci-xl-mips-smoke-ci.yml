@@ -1,0 +1,40 @@
+name: VeCI XL 95KB MIPS physical smoke gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-native-mips-smoke-20261014.sh'
+      - '.github/workflows/veci-xl-mips-smoke-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify no modem/network login and pinned MIPS checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          script=scripts/veci-xl-native-mips-smoke-20261014.sh
+          sh -n "$script"
+          mkdir -p /tmp/native
+          gh release download veci-xl-crypto-d5413f5617ae -p veci-xl-crypto-mipsel -D /tmp/native
+          echo "87c2c863edf62add04fa063d9bf5835947002d6aa27467b9c03471978474f123  /tmp/native/veci-xl-crypto-mipsel" | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("scripts/veci-xl-native-mips-smoke-20261014.sh").read_text()
+          assert "87c2c863edf62add04fa063d9bf5835947002d6aa27467b9c03471978474f123" in s
+          assert "veci-xl-crypto-d5413f5617ae" in s
+          assert "--verify" in s
+          assert "1791987600" in s
+          assert "signature" in s and "xdata" in s
+          for forbidden in ("AT+CUSD", "AT+CMGS", "AT+CMGR", "sysupgrade", "apk add", "/etc/init.d", "/usr/libexec/veci-xl-crypto", "otp ", "curl "):
+              assert forbidden not in s, forbidden
+          assert "VECI_OPERATOR_QUOTA=not_verified" in s
+          assert "VECI_REAL_OPERATOR_LOGIN=not_attempted" in s
+          print("VECI_XL_MIPS_SMOKE_NO_OPERATOR_IO_PASS")
+          PY
