@@ -120,6 +120,35 @@ class CMGS(unittest.TestCase):
                 self.assertNotEqual(p.returncode,0)
                 self.assertIn("invalid_submit",p.stdout)
 
+    def test_status_report_requested_returns_tp_mr(self):
+        # TP-SRR=1 changes SMS-SUBMIT first octet 01->21.
+        pdu=PDU.replace("000100","002100",1)
+        p,got=self.run_pty("ok",pdu)
+        self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+        import json
+        self.assertEqual(json.loads(p.stdout),{
+            "ok":True,"status":"accepted_by_modem",
+            "mr":18,"report_requested":True})
+        self.assertEqual(got["pdu"],pdu.encode()+bytes([26]))
+        self.assertNotIn(pdu,p.stdout+p.stderr)
+
+    def test_multipart_status_report_requested_returns_tp_mr(self):
+        pdu=self.multipart_pdu("HELLO",total=2,part=1)
+        pdu=pdu[:2]+"61"+pdu[4:]
+        p,got=self.run_pty("ok",pdu)
+        self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+        import json
+        self.assertEqual(json.loads(p.stdout)["mr"],18)
+        self.assertTrue(json.loads(p.stdout)["report_requested"])
+        self.assertEqual(got["pdu"],pdu.encode()+bytes([26]))
+
+    def test_invalid_submit_first_octet_must_not_send(self):
+        invalid=PDU[:2]+"A1"+PDU[4:]
+        p=subprocess.run([str(BIN),"/dev/ttyUSB2"],input=invalid+chr(10),
+                         text=True,capture_output=True,timeout=3)
+        self.assertIn("invalid_submit",p.stdout)
+        self.assertNotEqual(p.returncode,0)
+
     def test_network_rejection_does_not_claim_sent(self):
         p,got=self.run_pty("error")
         self.assertNotEqual(p.returncode,0)
