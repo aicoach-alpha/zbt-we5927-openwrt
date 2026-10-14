@@ -39,8 +39,19 @@ class XLInstaller(unittest.TestCase):
 cp "$TEST_BUNDLE" "$2"
 ''',
          "ubus":'''#!/bin/sh
+if [ "$3" = veci.sms ];then exit 0;fi
 [ -e "$TEST_FAIL_UBUS" ] && exit 2
+if [ -f "$TEST_DELAY_UBUS" ];then
+ n="$(cat "$TEST_DELAY_UBUS")"
+ if [ "$n" -gt 0 ];then
+  echo "$((n-1))" > "$TEST_DELAY_UBUS"
+  exit 2
+ fi
+fi
 [ "$1" = -S ] && [ "$2" = list ] && [ "$3" = veci.ussd ]
+''',
+         "sleep":'''#!/bin/sh
+exit 0
 ''',
          "restart-rpcd":'''#!/bin/sh
 echo restart >> "$TEST_DIR/restarted"
@@ -82,6 +93,7 @@ exit 0
         self.env["TEST_BUNDLE"]=str(self.tar)
         self.env["TEST_DIR"]=str(self.d)
         self.env["TEST_FAIL_UBUS"]=str(self.d/"fail_ubus")
+        self.env["TEST_DELAY_UBUS"]=str(self.d/"delay_ubus")
     def tearDown(self):self.tmp.cleanup()
     @staticmethod
     def digest(file):return hashlib.sha256(file.read_bytes()).hexdigest()
@@ -106,6 +118,36 @@ exit 0
         self.assertIn("AUTOROLLBACK=PASS",cp.stderr)
         self.assertEqual(self.ui.read_text(),"LIVE_SMS_V160\n")
         self.assertTrue(all(not p.exists() for p in self.paths.values()))
+    def test_register_waits_for_delayed_rpcd_discovery(self):
+        (self.d/"delay_ubus").write_text("3")
+        cp=self.call("apply")
+        self.assertEqual(cp.returncode,0,cp.stdout+cp.stderr)
+        self.assertEqual((self.d/"delay_ubus").read_text().strip(),"0")
+        self.assertIn("VECI_XL_USSD_V17_FILES_AND_RPC_LIVE_PASS",cp.stdout)
+
+    def test_reapply_after_verified_automatic_rollback(self):
+        (self.d/"fail_ubus").write_text("1")
+        failed=self.call("apply")
+        self.assertNotEqual(failed.returncode,0)
+        self.assertIn("AUTOROLLBACK=PASS",failed.stderr)
+        self.assertTrue(self.back.is_dir())
+        (self.d/"fail_ubus").unlink()
+        ok=self.call("apply")
+        self.assertEqual(ok.returncode,0,ok.stdout+ok.stderr)
+        self.assertIn("FILES_AND_RPC_LIVE_PASS",ok.stdout)
+        self.assertEqual(self.cmgs.read_text(),"SMS_V160_BINARY\\n")
+
+    def test_tampered_rollback_backup_stays_blocked(self):
+        (self.d/"fail_ubus").write_text("1")
+        failed=self.call("apply")
+        self.assertNotEqual(failed.returncode,0)
+        (self.d/"fail_ubus").unlink()
+        (self.back/"ui").write_text("tampered")
+        cp=self.call("apply")
+        self.assertNotEqual(cp.returncode,0)
+        self.assertIn("preexisting_backup_invalid",cp.stderr)
+        self.assertEqual(self.ui.read_text(),"LIVE_SMS_V160\\n")
+
     def test_modified_baseline_blocks_install(self):
         self.ui.write_text("unexpected user modification")
         cp=self.call("apply")
