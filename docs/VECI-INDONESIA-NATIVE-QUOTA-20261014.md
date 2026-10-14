@@ -72,3 +72,17 @@ Status: SMS v1.6.0 LIVE. USSD XL network rejected and excluded from automatic qu
 - Verified official operator help confirms myXL uses number + OTP and shows account package data; it DOES NOT document a supported third-party API contract. Public SinergiAPI information found lists other categories (SIM Swap, location, carrier billing), not self-care quota inquiry. Never assume community-derived app key or endpoints are operator-approved for redistribution.
 - Blocker to genuine LIVE: implement and validate an account-owner-authorized first-party session/login flow, and verify an authenticated XL payload format + units on the SIM before allowing carrier_authenticated cache writes. Do not copy third-party app secrets into public source or present simulated quota as genuine.
 - Protect SMS v1.6.0 and LTE; do not deploy unverified auth code into production.
+
+## 2026-10-14 — direct quota pipeline checkpoint
+
+- Physical MIPS native encrypt/decrypt/quota DATA parser and strict XL HTTPS `HEAD /` were reported PASS by owner. These are complete hardware prerequisites, not operator authentication.
+- Added `source/veci-telco-indonesia/files/usr/libexec/veci-xl-quota-chain`: read-only standalone on-router pipeline (fixed verified-HTTPS candidate transport -> root-only temporary response envelope -> `jsonfilter` xdata/xtime -> native AES decryption -> native DATA parser).
+- No cache writes, no LTE/modem/SMS/USSD changes, no OTP auto-reader, no external companion, no hardcoded app credentials and no request to any operator without existing authorized session material.
+- Data returned by this pipeline is `parsed_only`, NOT `carrier_authenticated`; it is not sufficient to show real quota. Raw responses, encrypted/decrypted payloads and related files are kept within a root-owned temporary working directory, removed at exit.
+- GitHub workflow `veci-xl-quota-chain-ci.yml` PASS (run 38552090933), with secret-leak and malformed-response regression fixtures.
+- Hardened the native quota HTTPS POST body to require a canonical exact xdata/xtime request and matching signature time, rejecting arbitrary side-effect fields. Cross-compile and offline framing regression PASS (run 38552297100).
+- Latest SHA-pinned native HTTP staging build: `veci-xl-quota-http-51e0070e6545`, SHA256 `c27cf4c19446ae311c6321df4f35b5d625f6553c800a5a1fe2bc880c5d495282`, binary 546044 bytes. Not installed in production.
+- Hardened the existing quota status cache reader: `ready` requires valid finite positive `total_bytes` and `remaining_bytes <= total_bytes` rather than displaying impossible totals. Quota contract CI PASS (run 38552398872).
+- Official XL public guidance (updated 2026-09-16) confirms myXL app and *808# are supported quota inquiry paths; it does **not** document a supported external native API client-registration / signing credential / quota response unit contract. Ref: https://www.xl.co.id/blog/cek-paket-internet-xl
+- **Active blocker** is an operator-authorized authentication method/client identity and measured authenticated carrier quota response, including validated units. Do not invent a login, copy app credentials from BITS-XL, mark fake cache provenance or claim XL quota LIVE. Next step must be real authorization validation, then authenticated cache commit, then LuCI display and physical UAT.
+- Preserve already-live SMS Center v1.6.0 and LTE. Do not require repeat physical hardware tests without changed target binaries or a genuine account authorization milestone.
