@@ -6,6 +6,8 @@ on:
       - 'scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd'
       - 'tests/test_veci_xl_ussd_rpc_single_json.py'
       - 'scripts/veci-xl-v171-rpc-single-response-hotfix.sh'
+      - 'scripts/veci-xl-ussd-v17-staged/veci-xl-ussd'
+      - 'tests/test_veci_xl_ussd_no_od.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -49,3 +51,23 @@ jobs:
           echo "VECI_XL_RPC_ORIGINAL_SHA256=$(sha256sum "$previous" | cut -d' ' -f1)"
           echo "VECI_XL_RPC_HOTFIX_SHA256=$(sha256sum "$next" | cut -d' ' -f1)"
           echo VECI_XL_RPC_SINGLE_RESPONSE_SCOPE_PASS
+      - name: Pin safe modem-error forwarding to installed od-fixed worker
+        run: |
+          set -eu
+          curl -fLsS --retry 3 -o /tmp/veci-xl-old-worker \
+            "https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/e117318a66a44a9af069dd41faa87678b4ac1964/scripts/veci-xl-ussd-v17-staged/veci-xl-ussd"
+          echo "a15f922315e28c5d17fe165b10aed7d100ff87ad392c11f72a52a07b87c6a886  /tmp/veci-xl-old-worker" | sha256sum -c -
+          python3 - /tmp/veci-xl-old-worker scripts/veci-xl-ussd-v17-staged/veci-xl-ussd <<'PY'
+          import pathlib,sys
+          old=pathlib.Path(sys.argv[1]).read_text()
+          new=pathlib.Path(sys.argv[2]).read_text()
+          fromline=' result="$("$BIN" /dev/ttyUSB2 "$value" 2>/dev/null)" || fail ussd_unavailable'
+          assert fromline in old
+          start=new.index(' # Native may have already sent AT+CUSD;')
+          end=new.index('\n [ "$(printf %s "$result"|wc -c)"',start)
+          assert old.replace(fromline,new[start:end])==new, "worker changed outside error forwarding"
+          print("VECI_XL_WORKER_HOTFIX_SCOPE=only_native_error_forwarding")
+          PY
+          echo "VECI_XL_WORKER_CURRENT_SHA256=$(sha256sum /tmp/veci-xl-old-worker | cut -d' ' -f1)"
+          echo "VECI_XL_WORKER_NEW_SHA256=$(sha256sum scripts/veci-xl-ussd-v17-staged/veci-xl-ussd | cut -d' ' -f1)"
+          echo "VECI_XL_USSD_RECOVERY_PAIR_PASS"
