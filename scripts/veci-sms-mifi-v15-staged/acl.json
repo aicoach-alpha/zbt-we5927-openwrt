@@ -12,7 +12,8 @@
           "setEnabled",
           "listMessages",
           "deleteMessage",
-          "sendMessage"
+          "sendMessage",
+          "getSent"
         ]
       }
     }
