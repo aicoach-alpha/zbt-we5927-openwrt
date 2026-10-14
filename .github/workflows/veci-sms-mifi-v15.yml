@@ -14,6 +14,7 @@ on:
       - 'scripts/veci-sms-mifi-v1541-delete-copy-hotfix.sh'
       - 'scripts/veci-sms-mifi-v155-staged/**'
       - 'scripts/veci-sms-mifi-v155-send-install.sh'
+      - 'scripts/veci-sms-mifi-v156-sent-install.sh'
       - 'tests/veci_sms_mifi_decoder_smoke.cjs'
       - 'tests/veci_sms_mifi_send_smoke.cjs'
       - 'tests/veci_sms_mifi_sent_smoke.cjs'
@@ -41,6 +42,7 @@ jobs:
             sh -n scripts/veci-sms-mifi-v156-sent-install.sh
           fi
           sh -n scripts/veci-sms-mifi-v155-send-install.sh
+          sh -n scripts/veci-sms-mifi-v156-sent-install.sh
           sh -n scripts/veci-sms-mifi-v1531-inbox-hotfix.sh
           sh -n scripts/veci-sms-mifi-v154-ui-install.sh
           sh -n scripts/veci-sms-mifi-v1541-delete-copy-hotfix.sh
