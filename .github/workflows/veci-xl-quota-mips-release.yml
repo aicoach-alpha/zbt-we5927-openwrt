@@ -1,0 +1,66 @@
+name: VeCI XL native MIPS DATA quota parser prerelease
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/veci-xl-quota-normalize.c'
+      - 'tests/test_veci_xl_quota_normalize.py'
+      - '.github/workflows/veci-xl-quota-mips-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host-verify DATA benefit decoder
+        run: |
+          set -eu
+          gcc -std=c11 -Os -Wall -Wextra -Werror \
+            -o /tmp/veci-xl-quota-normalize-test \
+            source/veci-telco-indonesia/veci-xl-quota-normalize.c
+          python3 -m unittest discover -s tests -p test_veci_xl_quota_normalize.py -v
+      - name: Fetch SHA-pinned official OpenWrt 25.12.5 mt76x8 compiler
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd
+          name=openwrt-toolchain-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 240 -o /tmp/toolchain.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$name"
+          echo "5e03963e3b5e2c12f8c1519a07d56a74babcd6147e95c4d50948e50ae465d776  /tmp/toolchain.tar.zst" | sha256sum -c -
+          mkdir -p /tmp/toolchain
+          tar -xf /tmp/toolchain.tar.zst -C /tmp/toolchain
+      - name: Cross-compile native quota parser
+        run: |
+          set -eu
+          gcc="$(find -L /tmp/toolchain -type f -name '*gcc' -executable | grep '/bin/' | head -1)"
+          [ -n "$gcc" ]
+          mkdir -p release
+          "$gcc" -static -std=c11 -Os -s -ffunction-sections -fdata-sections \
+            -Wl,--gc-sections -Wall -Wextra -Werror \
+            -o release/veci-xl-quota-normalize-mipsel \
+            source/veci-telco-indonesia/veci-xl-quota-normalize.c
+          file release/veci-xl-quota-normalize-mipsel
+          readelf -h release/veci-xl-quota-normalize-mipsel | grep -Eq 'Machine:[ ]*MIPS'
+          ! readelf -l release/veci-xl-quota-normalize-mipsel | grep -q INTERP
+          [ "$(stat -c %s release/veci-xl-quota-normalize-mipsel)" -lt 150000 ]
+          (cd release && sha256sum veci-xl-quota-normalize-mipsel > SHA256SUMS)
+          echo VECI_XL_QUOTA_DATA_NATIVE_MIPS_BUILD_PASS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-xl-quota-normalize-mipsel
+          path: release
+      - name: Publish staged MIPS parser only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-xl-quota-normalize-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/veci-xl-quota-normalize-mipsel release/SHA256SUMS \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI XL native DATA quota MIPS parser" \
+            --notes "Static read-only authenticated-payload parser; no operator network/login, SMS, quota cache writes or router installation. Host tests PASS; physical UAT pending."
+          echo "VECI_XL_QUOTA_PARSER_STAGE=$tag"
