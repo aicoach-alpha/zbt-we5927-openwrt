@@ -13,7 +13,10 @@
           "listMessages",
           "deleteMessage",
           "sendMessage",
-          "getSent"
+          "getSent",
+          "getDrafts",
+          "saveDraft",
+          "deleteDraft"
         ]
       }
     }

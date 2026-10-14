@@ -190,9 +190,78 @@ get_sent(){
   ) 8>"$RATE_LOCK"
 }
 
+
+SMS_DRAFTS=/usr/libexec/veci-sms-drafts
+draft_request(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required;return; }
+  sms_state || { deny sms_disabled;return; }
+  [ -x "$SMS_DRAFTS" ] || { deny worker_unavailable;return; }
+  command -v flock >/dev/null 2>&1 || { deny worker_unavailable;return; }
+  method="$1"
+  case "$method" in
+    getDrafts) operation=--list ;;
+    saveDraft) operation=--save ;;
+    deleteDraft) operation=--delete ;;
+    *)deny invalid_request;return;;
+  esac
+  if [ "$operation" != --list ];then
+    input="$(head -c 1025)" || { deny invalid_request;return; }
+    [ "$(printf %s "$input"|wc -c)" -le 1024 ] || { deny invalid_request;return; }
+    id="$(jsonfilter -s "$input" -e '@.id' 2>/dev/null || :)"
+    old="$(jsonfilter -s "$input" -e '@.expectedPdu' 2>/dev/null || :)"
+    case "$id" in 0|1|2|3|4|5|6|7|8|9|10);;*)deny invalid_request;return;;esac
+    if [ "$id" = 0 ];then [ "$old" = - ] || { deny invalid_request;return; }
+    else
+      len="$(printf %s "$old"|wc -c)"
+      [ "$len" -ge 22 ] && [ "$len" -le 384 ] && [ "$((len%2))" -eq 0 ] ||
+        { deny invalid_request;return; }
+      case "$old" in *[!0-9A-F]*)deny invalid_request;return;;esac
+    fi
+    if [ "$operation" = --save ];then
+      fresh="$(jsonfilter -s "$input" -e '@.pdu' 2>/dev/null || :)"
+      n="$(printf %s "$fresh"|wc -c)"
+      [ "$n" -ge 22 ] && [ "$n" -le 384 ] && [ "$((n%2))" -eq 0 ] ||
+        { deny invalid_request;return; }
+      case "$fresh" in *[!0-9A-F]*)deny invalid_request;return;;esac
+    fi
+    unset input
+  fi
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    sms_state || { deny sms_disabled;exit 0; }
+    case "$operation" in
+      --list)
+        result="$("$SMS_DRAFTS" --list 2>/dev/null)" ||
+          { deny draft_unavailable;exit 0; }
+        [ "$(printf %s "$result"|wc -c)" -le 6000 ] || { deny draft_unavailable;exit 0; }
+        case "$result" in
+          '{"ok":true,"source":"local_drafts","count":'*)printf '%s\n' "$result";;
+          *)deny draft_unavailable;;
+        esac
+        ;;
+      --save)
+        result="$(printf '%s' "$fresh" | "$SMS_DRAFTS" --save "$id" "$old" 2>/dev/null)" ||
+          { deny draft_unavailable;exit 0; }
+        case "$result" in
+          '{"ok":true,"saved":true,"id":'*)printf '%s\n' "$result";;
+          *)deny draft_unavailable;;
+        esac
+        ;;
+      --delete)
+        result="$("$SMS_DRAFTS" --delete "$id" "$old" 2>/dev/null)" ||
+          { deny draft_unavailable;exit 0; }
+        [ "$result" = "{\"ok\":true,\"deleted\":$id}" ] ||
+          { deny draft_unavailable;exit 0; }
+        printf '%s\n' "$result"
+        ;;
+    esac
+  ) 8>"$RATE_LOCK"
+  unset fresh old
+}
+
 deny() {
   case "$1" in
-    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy|sms_disabled|send_unavailable|send_rate_limited|history_unavailable)
+    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy|sms_disabled|send_unavailable|send_rate_limited|history_unavailable|draft_unavailable)
       reason="$1" ;;
     *) reason=index_unavailable ;;
   esac
@@ -252,7 +321,7 @@ list_index() {
 [ "$#" -ge 1 ] || exit 2
 case "$1" in
   list)
-    printf '{"listIndex":{"scope":"str","ack_unread_status":"str"},"getConfig":{},"setEnabled":{"state":"str"},"listMessages":{},"deleteMessage":{"index":"int","storage":"str","expectedPdu":"str"},"sendMessage":{"pdu":"str"},"getSent":{}}\n'
+    printf '{"listIndex":{"scope":"str","ack_unread_status":"str"},"getConfig":{},"setEnabled":{"state":"str"},"listMessages":{},"deleteMessage":{"index":"int","storage":"str","expectedPdu":"str"},"sendMessage":{"pdu":"str"},"getSent":{},"getDrafts":{},"saveDraft":{"id":"int","expectedPdu":"str","pdu":"str"},"deleteDraft":{"id":"int","expectedPdu":"str"}}\n'
     ;;
   call)
     [ "$#" -ge 2 ] || { deny invalid_request; exit 0; }
@@ -264,6 +333,7 @@ case "$1" in
       deleteMessage) delete_message ;;
       sendMessage) send_message ;;
       getSent) get_sent ;;
+      getDrafts|saveDraft|deleteDraft) draft_request "$2" ;;
       *) deny invalid_request ;;
     esac
     ;;
