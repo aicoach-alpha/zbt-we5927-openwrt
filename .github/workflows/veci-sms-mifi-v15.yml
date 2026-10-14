@@ -17,6 +17,7 @@ on:
       - 'scripts/veci-sms-mifi-v156-sent-install.sh'
       - 'tests/veci_sms_mifi_decoder_smoke.cjs'
       - 'tests/veci_sms_mifi_send_smoke.cjs'
+      - 'tests/veci_sms_multipart_smoke.cjs'
       - 'tests/veci_sms_mifi_sent_smoke.cjs'
       - 'scripts/veci-sms-mifi-v156-staged/**'
       - 'scripts/veci-sms-mifi-v157-staged/**'
@@ -129,6 +130,8 @@ jobs:
           assert(s.includes("api.call('veci.sms','saveDraft'"));
           console.log('VECI_SMS_V158_RESPONSIVE_MARKUP_SMOKE_PASS');
           NODE
+      - name: Multipart GSM7/UCS2 PDU and Sent decoder round-trip
+        run: node tests/veci_sms_multipart_smoke.cjs
       - name: Single-SMS Compose GSM7/UCS2 PDU smoke
         run: node tests/veci_sms_mifi_send_smoke.cjs
       - name: SMS Drafts create/edit/list/delete isolated store
