@@ -40,11 +40,57 @@ static int valid_scts(const uint8_t *p){
         hour>=0 && hour<=23 && minute>=0 && minute<=59 &&
         second>=0 && second<=59 && bcd(tz)>=0;
 }
-int main(void){
+/*
+ * A serial-port owner can pass a single, already-framed unsolicited
+ * notification here. This decoder never opens the modem or reads messages.
+ * +CDS carries a status PDU; +CDSI carries ONLY a stored index.
+ */
+static int parse_cds_header(unsigned *octets){
+    char line[48]={0};size_t n,i;unsigned value=0;
+    if(!fgets(line,sizeof line,stdin))return 0;
+    n=strcspn(line,"\r\n");
+    if(line[n]=='\0' || n<7 || n>10 || strncmp(line,"+CDS: ",6))return 0;
+    for(i=6;i<n;i++){
+        if(line[i]<'0'||line[i]>'9')return 0;
+        value=value*10+(unsigned)(line[i]-'0');
+    }
+    if(value<1||value>255)return 0;
+    if(line[n]=='\r' && line[n+1]!='\n')return 0;
+    *octets=value;return 1;
+}
+static int parse_stored_urc(void){
+    char line[80]={0};size_t n,i;unsigned index=0;const char *p;
+    if(!fgets(line,sizeof line,stdin))return 0;
+    n=strcspn(line,"\r\n");
+    if(line[n]=='\0' || n<13 || strncmp(line,"+CDSI: \"",8))return 0;
+    p=line+8;
+    if(!((p[0]=='S' && p[1]=='M')||(p[0]=='M' && p[1]=='E')) ||
+        p[2]!='"'||p[3]!=',')return 0;
+    for(i=12;i<n;i++){
+        if(line[i]<'0'||line[i]>'9')return 0;
+        index=index*10+(unsigned)(line[i]-'0');
+        if(index>65535)return 0;
+    }
+    if(i==12 || (line[n]=='\r' && line[n+1]!='\n'))return 0;
+    printf("{\"ok\":true,\"route\":\"stored_indication\",\"storage\":\"%c%c\",\"index\":%u}\n",
+        p[0],p[1],index);
+    return 1;
+}
+int main(int argc,char **argv){
+    int direct=0;unsigned tpdu_length=0;
+    if(argc==2 && strcmp(argv[1],"--stored-urc")==0){
+        if(parse_stored_urc())return 0;
+        goto bad;
+    }
+    if(argc==2 && strcmp(argv[1],"--direct-urc")==0)direct=1;
+    else if(argc!=1)goto bad;
+    if(direct && !parse_cds_header(&tpdu_length))goto bad;
+
     uint8_t b[MAX_PDU]={0};size_t n=0,at,alen,i;
     char recipient[19]={0};size_t k=0;
     unsigned mr,status,toa;
     if(!decode_hex(b,&n))goto bad;
+    if(direct && (1u+(size_t)b[0]>n || n-1u-(size_t)b[0]!=tpdu_length))goto bad;
     at=1+(size_t)b[0]; /* SMSC length in OCTETS, no body data output */
     if(at+5>n || (b[at]&3)!=2)goto bad; /* STATUS-REPORT */
     at++;
@@ -68,8 +114,12 @@ int main(void){
     const char *state=status==0?"delivered":
         status>=0x20 && status<0x40?"pending":
         status>=0x40 && status<0x80?"failed":"unknown";
-    printf("{\"ok\":true,\"mr\":%u,\"recipient\":\"%s\",\"tp_st\":%u,\"state\":\"%s\"}\n",
-           mr,recipient,status,state);
+    if(direct)
+        printf("{\"ok\":true,\"route\":\"direct_urc\",\"mr\":%u,\"recipient\":\"%s\",\"tp_st\":%u,\"state\":\"%s\"}\n",
+            mr,recipient,status,state);
+    else
+        printf("{\"ok\":true,\"mr\":%u,\"recipient\":\"%s\",\"tp_st\":%u,\"state\":\"%s\"}\n",
+            mr,recipient,status,state);
     memset(b,0,sizeof b);
     return 0;
 bad:
