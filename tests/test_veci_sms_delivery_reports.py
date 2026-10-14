@@ -17,8 +17,8 @@ class SmsReport(unittest.TestCase):
         if cp.returncode:raise AssertionError(cp.stderr)
     @classmethod
     def tearDownClass(cls):BIN.unlink(missing_ok=True)
-    def run_decode(self, pdu):
-        return subprocess.run([str(BIN)],input=pdu+"\n",text=True,capture_output=True,timeout=3)
+    def run_decode(self, pdu, *args):
+        return subprocess.run([str(BIN),*args],input=pdu+"\n",text=True,capture_output=True,timeout=3)
     def test_exact_report_statuses(self):
         for code,expect in [(0,"delivered"),(1,"unknown"),(32,"pending"),(64,"failed"),(96,"failed"),(128,"unknown")]:
             with self.subTest(code=code):
@@ -39,6 +39,40 @@ class SmsReport(unittest.TestCase):
                 self.assertNotEqual(result.returncode,0)
                 self.assertEqual(json.loads(result.stdout)["reason"],"invalid_status_report")
                 self.assertNotIn(raw,result.stdout+result.stderr)
+    def test_direct_cds_urc_correlates_only_valid_tpdu_length(self):
+        pdu=sample(status=0,mr=18)
+        direct=self.run_decode("+CDS: "+str(len(pdu)//2-1)+"\\r\\n"+pdu,"--direct-urc")
+        self.assertEqual(direct.returncode,0,direct.stdout+direct.stderr)
+        data=json.loads(direct.stdout)
+        self.assertEqual(data,{"ok":True,"route":"direct_urc","mr":18,
+                               "recipient":"+628123456789","tp_st":0,"state":"delivered"})
+        self.assertNotIn(pdu,direct.stdout+direct.stderr)
+        for invalid in ["+CDS: 1\\r\\n"+pdu,
+                        "+CDS: 999\\r\\n"+pdu,
+                        "+CDS: -1\\r\\n"+pdu,
+                        "+CMGL: 24\\r\\n"+pdu,
+                        "+CDS: 24;AT+CMGD=1\\r\\n"+pdu]:
+            with self.subTest(header=invalid[:24]):
+                res=self.run_decode(invalid,"--direct-urc")
+                self.assertNotEqual(res.returncode,0)
+                self.assertEqual(json.loads(res.stdout)["reason"],"invalid_status_report")
+
+    def test_stored_cdsi_urc_index_only_and_strict_storage(self):
+        for route,expect in [('+CDSI: "ME",3',{"ok":True,"route":"stored_indication",
+                                                "storage":"ME","index":3}),
+                             ('+CDSI: "SM",255',{"ok":True,"route":"stored_indication",
+                                                "storage":"SM","index":255})]:
+            res=self.run_decode(route,"--stored-urc")
+            self.assertEqual(res.returncode,0,res.stdout+res.stderr)
+            self.assertEqual(json.loads(res.stdout),expect)
+        for invalid in ['+CDSI: "MT",3','+CDSI: "ME",-1','+CDSI: "ME",65536',
+                        '+CDSI: "ME",3;AT+CMGD=1','+CDSI: "ME",',
+                        '+CDS: 12','+CDSI: "SM",abc']:
+            with self.subTest(invalid=invalid):
+                res=self.run_decode(invalid,"--stored-urc")
+                self.assertNotEqual(res.returncode,0)
+                self.assertEqual(json.loads(res.stdout)["ok"],False)
+
     def test_cnmi_and_cpms_test_only_preflight(self):
         source=(ROOT/"scripts/veci-sms-delivery-routing-capability-v161.sh").read_text()
         self.assertIn("AT+CNMI=?",source)
