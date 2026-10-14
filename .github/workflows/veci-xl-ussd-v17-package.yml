@@ -17,6 +17,7 @@ jobs:
           set -eu
           python3 -m unittest discover -s tests -p test_veci_xl_ussd_pty.py -q
           node tests/test_veci_xl_ussd_ui.cjs
+          python3 -m unittest discover -s tests -p test_veci_xl_quota_snapshot.py -q
           sh -n scripts/veci-xl-ussd-v17-staged/veci-xl-ussd
           sh -n scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd
       - name: Fetch SHA-pinned MIPS executable and bundle verified source
@@ -32,11 +33,12 @@ jobs:
           install -m 0700 /tmp/veci-native/veci-xl-ussd-once-mipsel release/veci-xl-v17/veci-xl-ussd-once
           install -m 0700 scripts/veci-xl-ussd-v17-staged/veci-xl-ussd release/veci-xl-v17/veci-xl-ussd
           install -m 0700 scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd release/veci-xl-v17/veci.ussd
+          install -m 0700 scripts/veci-xl-ussd-v17-staged/veci-xl-quota-cache release/veci-xl-v17/veci-xl-quota-cache
           install -m 0600 scripts/veci-xl-ussd-v17-staged/veci-ussd-acl.json release/veci-xl-v17/veci-xl-ussd.json
           install -m 0600 scripts/veci-xl-ussd-v17-staged/cellular-v160.js release/veci-xl-v17/cellular.js
           ( cd release/veci-xl-v17 &&
-            sha256sum veci-xl-ussd-once veci-xl-ussd veci.ussd veci-xl-ussd.json cellular.js > SHA256SUMS
-            printf 'SOURCE_COMMIT=%s\nVERSION=v1.7.0-xl-ussd\nNO_MODEM_COMMAND_DURING_INSTALL=1\n' "$GITHUB_SHA" > RELEASE_INFO )
+            sha256sum veci-xl-ussd-once veci-xl-ussd veci.ussd veci-xl-quota-cache veci-xl-ussd.json cellular.js > SHA256SUMS
+            printf 'SOURCE_COMMIT=%s\nVERSION=v1.7.1-xl-ussd\nNO_MODEM_COMMAND_DURING_INSTALL=1\n' "$GITHUB_SHA" > RELEASE_INFO )
           tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
             -C release -czf release/veci-xl-v17.tar.gz veci-xl-v17
           sha256sum release/veci-xl-v17.tar.gz
@@ -54,6 +56,6 @@ jobs:
           tag="veci-xl-v17-$(echo "$GITHUB_SHA" | cut -c1-12)"
           gh release create "$tag" release/veci-xl-v17.tar.gz \
             --target "$GITHUB_SHA" --prerelease \
-            --title "VeCI XL USSD + quota v1.7.0 deployment candidate" \
+            --title "VeCI XL USSD + quota v1.7.1 deployment candidate" \
             --notes "Full binary and UI integrated; does not automatically install or dial. Physical WE5927 UAT and rollback required before LIVE designation."
           echo "VECI_XL_INSTALL_PACKAGE=$tag"
