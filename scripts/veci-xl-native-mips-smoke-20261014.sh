@@ -33,6 +33,21 @@ encoded="$(printf '{"lang":"en"}' | "$binary" xdata 1791987600000 "$work/aes" 2>
  fail native_aes_unavailable
 [ "$(printf %s "$encoded" | wc -c)" -eq 24 ] ||
  fail unexpected_aes_ciphertext_size
+# Second self-contained native MIPS executable, no operator API call.
+PARSER_SHA=2105dea88ef4f2990fd580a349fc563403b59564e3a8673b360f9b1f7c746284
+PARSER_URL=https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/veci-xl-quota-normalize-17e5e160caa2/veci-xl-quota-normalize-mipsel
+parser="$work/veci-xl-quota-normalize"
+wget -qO "$parser" "$PARSER_URL" || fail quota_parser_download
+[ "$(sha256sum "$parser"|awk '{print $1}')" = "$PARSER_SHA" ] || fail quota_parser_checksum
+chmod 700 "$parser" || fail quota_parser_permissions
+sample='{"quotas":[{"benefits":[{"data_type":"DATA","remaining":512,"total":1024},{"data_type":"VOICE","remaining":999,"total":999}]}]}'
+normalized="$(printf %s "$sample" | "$parser" 2>/dev/null)" ||
+ fail quota_parser_incompatible
+[ "$normalized" = '{"ok":true,"parsed_only":true,"provider":"xl","remaining_bytes":512,"total_bytes":1024}' ] ||
+ fail quota_parser_wrong_data
+if printf '%s' '{"status":"FAILED","quota_display":"Buy 10 GB"}' |
+   "$parser" >/dev/null 2>&1;then fail quota_parser_false_positive;fi
+printf 'VECI_XL_NATIVE_QUOTA_DATA_PARSER=pass\n'
 printf 'VECI_XL_NATIVE_MIPS_SHA256=pass\n'
 printf 'VECI_XL_NATIVE_MIPS_HMAC=pass\n'
 printf 'VECI_XL_NATIVE_MIPS_AES=pass\n'
