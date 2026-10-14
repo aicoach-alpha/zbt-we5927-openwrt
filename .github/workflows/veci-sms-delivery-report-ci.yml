@@ -5,6 +5,7 @@ on:
       - 'source/we5927-lte/src/veci-sms-status-report.c'
       - 'source/we5927-lte/src/veci-sms-cmgs.c'
       - 'scripts/veci-sms-delivery-report-readonly-preflight.sh'
+      - 'scripts/veci-sms-delivery-routing-capability-v161.sh'
       - 'tests/test_veci_sms_delivery_reports.py'
       - '.github/workflows/veci-sms-delivery-report-ci.yml'
   workflow_dispatch:

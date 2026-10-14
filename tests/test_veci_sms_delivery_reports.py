@@ -39,6 +39,21 @@ class SmsReport(unittest.TestCase):
                 self.assertNotEqual(result.returncode,0)
                 self.assertEqual(json.loads(result.stdout)["reason"],"invalid_status_report")
                 self.assertNotIn(raw,result.stdout+result.stderr)
+    def test_cnmi_and_cpms_test_only_preflight(self):
+        source=(ROOT/"scripts/veci-sms-delivery-routing-capability-v161.sh").read_text()
+        self.assertIn("AT+CNMI=?",source)
+        self.assertIn("AT+CPMS=?",source)
+        self.assertNotIn("AT+CNMI=2,",source)
+        self.assertNotIn("AT+CNMI=1,",source)
+        for dangerous in ("AT+CMGS=","AT+CMGD=","AT+CMGR=","AT+CMGL=",
+                          "/etc/init.d/rpcd restart","sysupgrade"):
+            self.assertNotIn(dangerous,source)
+        cp=subprocess.run(["sh","-n",str(ROOT/"scripts/veci-sms-delivery-routing-capability-v161.sh")],
+            capture_output=True,text=True,timeout=3)
+        self.assertEqual(cp.returncode,0,cp.stderr)
+        self.assertIn("STATUS_REPORT_STORED_INDICATION_SUPPORTED=",source)
+        self.assertIn("ROUTING_CONFIGURATION_CHANGED=false",source)
+
     def test_readonly_preflight_no_mutations(self):
         s=(ROOT/"scripts/veci-sms-delivery-report-readonly-preflight.sh").read_text()
         for query in ("AT+CMGF?","AT+CSMS?","AT+CNMI?","AT+CNMI=?","AT+CPMS?","AT+CPMS=?"):
