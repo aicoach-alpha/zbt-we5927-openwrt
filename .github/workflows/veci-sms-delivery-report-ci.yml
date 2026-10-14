@@ -7,11 +7,13 @@ on:
       - 'scripts/veci-sms-delivery-report-readonly-preflight.sh'
       - 'scripts/veci-sms-delivery-routing-capability-v161.sh'
       - 'scripts/veci-sms-delivery-v161-staged/**'
+      - 'scripts/veci-sms-v161-inactive-stage-install.sh'
       - 'tests/test_veci_sms_delivery_map.py'
       - 'tests/test_veci_sms_delivery_sent_view.py'
       - 'tests/test_veci_sms_delivery_rpc.py'
       - 'tests/test_veci_sms_delivery_ingest.py'
       - 'tests/test_veci_sms_delivery_send_bridge.py'
+      - 'tests/test_veci_sms_v161_stage_installer.py'
       - 'tests/test_veci_sms_delivery_ui.cjs'
       - 'tests/test_veci_sms_delivery_reports.py'
       - '.github/workflows/veci-sms-delivery-report-ci.yml'
@@ -38,6 +40,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_ingest.py' -v
       - name: Test delivery-report PDU encoding, multipart decode, and UI syntax
         run: node tests/test_veci_sms_delivery_ui.cjs
+      - name: Verify inactive stage, atomic rollback, and preserved LIVE files
+        run: |
+          sh -n scripts/veci-sms-v161-inactive-stage-install.sh
+          python3 -m unittest discover -s tests -p 'test_veci_sms_v161_stage_installer.py' -v
       - name: Require original live v1.6.0 still selected
         run: |
           grep -Fq 'v1.6.0' scripts/veci-sms-mifi-v160-multipart-install.sh
