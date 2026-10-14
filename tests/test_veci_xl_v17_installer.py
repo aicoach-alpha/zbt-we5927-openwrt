@@ -135,7 +135,7 @@ exit 0
         ok=self.call("apply")
         self.assertEqual(ok.returncode,0,ok.stdout+ok.stderr)
         self.assertIn("FILES_AND_RPC_LIVE_PASS",ok.stdout)
-        self.assertEqual(self.cmgs.read_text(),"SMS_V160_BINARY\\n")
+        self.assertEqual(self.cmgs.read_text(),"SMS_V160_BINARY\n")
 
     def test_tampered_rollback_backup_stays_blocked(self):
         (self.d/"fail_ubus").write_text("1")
@@ -146,7 +146,7 @@ exit 0
         cp=self.call("apply")
         self.assertNotEqual(cp.returncode,0)
         self.assertIn("preexisting_backup_invalid",cp.stderr)
-        self.assertEqual(self.ui.read_text(),"LIVE_SMS_V160\\n")
+        self.assertEqual(self.ui.read_text(),"LIVE_SMS_V160\n")
 
     def test_modified_baseline_blocks_install(self):
         self.ui.write_text("unexpected user modification")
