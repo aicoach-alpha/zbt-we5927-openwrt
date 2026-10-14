@@ -71,7 +71,7 @@ jobs:
           acl=json.loads((d/'acl.json').read_text())
           assert acl['veci-sms-inbox-we5927']['read']['ubus']=={}
           assert acl['veci-sms-inbox-we5927']['write']['ubus']['veci.sms']==[
-              'listIndex','getConfig','setEnabled','listMessages','deleteMessage','sendMessage','getSent']
+              'listIndex','getConfig','setEnabled','listMessages','deleteMessage','sendMessage','getSent','getDrafts','saveDraft','deleteDraft']
           assert 'sms_state || { deny sms_disabled; return; }' in rpc
           assert 'sms_state || { unset result; deny sms_disabled; exit 0; }' in rpc
           assert 'smsState.textContent' in ui and 'clearSms()' in ui
