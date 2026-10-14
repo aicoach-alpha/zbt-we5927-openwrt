@@ -8,11 +8,19 @@ LC_ALL=C;export LC_ALL
 STORE=/etc/veci-sms-delivery-map
 FLAG=/etc/veci-sms-feature
 LOCK=/var/lock/veci-sms-delivery-map.lock
+SECRET=/etc/veci-sms-delivery-secret
 fail(){ printf '{"ok":false,"reason":"delivery_unavailable"}\n';exit 1; }
 [ "$(id -u)" = 0 ] || fail
 [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail
 [ -f "$FLAG" ] && [ ! -L "$FLAG" ] && [ "$(cat "$FLAG" 2>/dev/null || :)" = 1 ] || fail
 [ -f "$STORE" ] && [ ! -L "$STORE" ] && [ "$(wc -c < "$STORE")" -le 9000 ] || fail
+# Root-owned, per-device random 32-byte key (hex), created by installer.
+# Never commit it, return it to RPC, or silently regenerate it after loss.
+[ -f "$SECRET" ] && [ ! -L "$SECRET" ] &&
+[ "$(wc -c < "$SECRET")" -eq 65 ] || fail
+secret="$(cat "$SECRET" 2>/dev/null || :)"
+[ "$(printf %s "$secret"|wc -c)" -eq 64 ] || fail
+case "$secret" in *[!0-9a-f]*) fail;; esac
 # Serialize tracking and applying reports: concurrent SMS sends and URCs
 # must never overwrite each other's read/modify/write cycle.
 # This lock is independent of the serial lock. No AT commands are executed.
@@ -22,7 +30,13 @@ exec 8>"$LOCK" || fail
 flock -n -x 8 || fail
 number(){ case "$1" in ''|*[!0-9]*)return 1;;*)return 0;;esac; }
 mr_ok(){ number "$1" && [ "$(printf %s "$1"|wc -c)" -le 3 ] && [ "$1" -le 255 ]; }
-sha(){ printf %s "$1" | sha256sum | awk '{print $1}'; }
+# Domain-separated device-keyed digests: phone numbers cannot be simply
+# dictionary-hashed offline from a stolen map without the per-device secret.
+# Secret is mixed on both sides; this is NOT a general-purpose HMAC service.
+sha(){
+ printf '%s:%s:%s:%s' "$secret" "$1" "$2" "$secret" |
+   sha256sum | awk '{print $1}'
+}
 norm(){
  value="$1"
  case "$value" in +*)value="$(printf %s "$value"|cut -c 2-)";;esac
@@ -79,7 +93,7 @@ case "$1" in
   case "$pdu" in *[!0-9A-F]*)fail;;esac
   recipient="$(pdu_to "$pdu")" || fail
   normalized="$(norm "$recipient")" || fail
-  rcpt_hash="$(sha "$normalized")";pdu_hash="$(sha "$pdu")"
+  rcpt_hash="$(sha recipient "$normalized")";pdu_hash="$(sha pdu "$pdu")"
   now="$(date +%s)";number "$now" || fail
   awk -F'|' -v key="$pdu_hash" '$4==key{duplicate=1}END{exit duplicate}' "$STORE" || fail
   (tail -n 29 "$STORE";printf '%s|%s|%s|%s|accepted|255\n' "$now" "$2" "$rcpt_hash" "$pdu_hash") | atomic
@@ -90,7 +104,7 @@ case "$1" in
   # Privileged future report receiver only. Never public HTTP API.
   [ "$#" = 4 ] && mr_ok "$2" && mr_ok "$4" || fail
   normalized="$(norm "$3")" || fail
-  rcpt_hash="$(sha "$normalized")"
+  rcpt_hash="$(sha recipient "$normalized")"
   status="$4";state=unknown
   if [ "$status" -eq 0 ];then state=delivered
   elif [ "$status" -ge 32 ] && [ "$status" -lt 64 ];then state=pending
