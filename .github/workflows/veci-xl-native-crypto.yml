@@ -4,6 +4,8 @@ on:
     paths:
       - 'source/veci-telco-indonesia/veci-xl-crypto.c'
       - 'tests/test_veci_xl_native_crypto.py'
+      - 'source/veci-telco-xl-native/Makefile'
+      - 'scripts/veci-telco-native-preflight-20261014.sh'
       - '.github/workflows/veci-xl-native-crypto.yml'
   workflow_dispatch:
 permissions:
@@ -26,6 +28,18 @@ jobs:
             source/veci-telco-indonesia/veci-xl-crypto.c -lmbedcrypto
           file /tmp/veci-xl-crypto-test
           echo VECI_XL_NATIVE_CRYPTO_BUILD_PASS
+          sh -n scripts/veci-telco-native-preflight-20261014.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("scripts/veci-telco-native-preflight-20261014.sh").read_text()
+          for forbidden in ("AT+CUSD", "AT+CMGR", "AT+CMGS", "curl ", "wget ", "apk add", "sysupgrade ", "reboot "):
+              assert forbidden not in p, forbidden
+          assert "VECI_EXTERNAL_INTERMEDIARY=false" in p
+          assert "VECI_NATIVE_QUOTA_PROVIDER_STATUS=not_authenticated" in p
+          mk=Path("source/veci-telco-xl-native/Makefile").read_text()
+          assert "+libmbedtls21" in mk and "-lmbedcrypto" in mk
+          assert "PKG_NAME:=veci-telco-xl-native" in mk
+          PY
       - name: Check AES CBC padding, base64url and HMAC signature equivalence
         run: |
           python3 -m unittest discover -s tests -p 'test_veci_xl_native_crypto.py' -v
