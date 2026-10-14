@@ -31,7 +31,7 @@ old(){
  [ "$(sha "$RPC")" = "$OLD_RPC" ] &&
  [ "$(sha "$ACL")" = "$OLD_ACL" ] &&
  [ ! -e "$HELP" ] && [ ! -L "$HELP" ] &&
- [ ! -e "$STORE" ] && [ ! -L "$STORE" ]
+ [ ! -L "$STORE" ]
 }
 new(){
  [ "$(sha "$UI")" = "$NEW_UI" ] &&
@@ -69,7 +69,8 @@ restore(){
  atomic "$BACK/ui" "$UI" 644 &&
  atomic "$BACK/rpc" "$RPC" 755 &&
  atomic "$BACK/acl" "$ACL" 644 || return 1
- rm -f "$HELP" "$STORE" || return 1
+ # Sent history is user data. Never delete it during rollback.
+ rm -f "$HELP" || return 1
  [ "$(sha "$UI")" = "$OLD_UI" ] &&
  [ "$(sha "$RPC")" = "$OLD_RPC" ] &&
  [ "$(sha "$ACL")" = "$OLD_ACL" ]
@@ -89,6 +90,10 @@ apply(){
  old || fail expected_v155_live_files_mismatch
  [ ! -e "$BACK" ] && [ ! -L "$BACK" ] || fail backup_exists
  [ -f "$SWITCH" ] && [ ! -L "$SWITCH" ] || fail sms_switch_missing
+ [ ! -L "$STORE" ] || fail history_symlink
+ if [ -e "$STORE" ];then
+  [ -f "$STORE" ] && [ "$(wc -c < "$STORE")" -le 18000 ] || fail history_unrecognized
+ fi
  original="$(cat "$SWITCH" 2>/dev/null || :)"
  case "$original" in 0|1);;*)fail switch_invalid;;esac
  [ -x /etc/init.d/rpcd ] || fail rpcd_missing
@@ -122,7 +127,7 @@ apply(){
  [ "$(sha "$temp/acl")" = "$NEW_ACL" ] || fail acl_hash
  [ "$(sha "$temp/help")" = "$NEW_HELP" ] || fail helper_hash
  sh -n "$temp/rpc" && sh -n "$temp/help" || fail syntax
- sh "$temp/rpc" list | jsonfilter -e '@.getSent' >/dev/null 2>&1 || fail rpc_missing_getSent
+ sh "$temp/rpc" list | grep -Fq '"getSent":{}' || fail rpc_missing_getSent
  grep -Fq "api.call('veci.sms','getSent'" "$temp/ui" || fail ui_missing_getSent
  old || fail concurrent_modification
  mkdir "$BACK" || fail backup_create
@@ -132,7 +137,9 @@ apply(){
  (cd "$BACK" && sha256sum ui rpc acl > SHA256SUMS &&
  sha256sum -c SHA256SUMS >/dev/null 2>&1) || fail backup_verify
  started=1
- (umask 077; : > "$STORE") || fail history_create
+ if [ ! -e "$STORE" ];then
+  (umask 077; : > "$STORE") || fail history_create
+ fi
  chmod 600 "$STORE" || fail history_permissions
  atomic "$temp/help" "$HELP" 700 || fail worker_install
  atomic "$temp/rpc" "$RPC" 755 || fail rpc_install
