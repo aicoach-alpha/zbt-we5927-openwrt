@@ -36,8 +36,8 @@ case "$1" in
     (tail -n 29 "$STORE";printf '%s|%s\n' "$timestamp" "$pdu") > "$temp" || {
       rm -f "$temp";fail;
     }
-    chmod 600 "$temp" || {rm -f "$temp";fail;}
-    mv -f "$temp" "$STORE" || {rm -f "$temp";fail;}
+    chmod 600 "$temp" || { rm -f "$temp"; fail; }
+    mv -f "$temp" "$STORE" || { rm -f "$temp"; fail; }
     unset pdu
     printf '{"ok":true,"saved":true}\n'
     ;;
