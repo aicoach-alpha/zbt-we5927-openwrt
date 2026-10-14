@@ -36,34 +36,34 @@ class DeliveryMap(unittest.TestCase):
         r=self.cmd("--track","18",pdu=PDU)
         self.assertEqual(r.returncode,0,r.stdout+r.stderr)
         self.assertEqual(json.loads(r.stdout),{"ok":True,"tracked":True})
-        self.assertNotIn("21436587091",self.store.read_text())
+        self.assertNotIn("12345678901",self.store.read_text())
         self.assertNotIn(PDU,self.store.read_text())
-        r=self.cmd("--apply","18","+21436587091","0")
+        r=self.cmd("--apply","18","+12345678901","0")
         self.assertEqual(r.returncode,0,r.stdout+r.stderr)
         entry=json.loads(self.cmd("--list").stdout)["reports"][0]
         self.assertEqual(entry["state"],"delivered")
         self.assertEqual(entry["tp_st"],0)
-        self.assertEqual(self.cmd("--apply","18","21436587091","32").returncode,0)
+        self.assertEqual(self.cmd("--apply","18","12345678901","32").returncode,0)
         self.assertEqual(json.loads(self.cmd("--list").stdout)["reports"][0]["state"],"delivered")
     def test_wrong_recipient_and_mr_never_deliver(self):
         self.assertEqual(self.cmd("--track","18",pdu=PDU).returncode,0)
-        for args in [("19","21436587091","0"),("18","+21436587092","0")]:
+        for args in [("19","12345678901","0"),("18","+21436587092","0")]:
             r=self.cmd("--apply",*args)
             self.assertNotEqual(r.returncode,0)
-            self.assertNotIn("21436587091",r.stdout+r.stderr)
+            self.assertNotIn("12345678901",r.stdout+r.stderr)
         entry=json.loads(self.cmd("--list").stdout)["reports"][0]
         self.assertEqual(entry["state"],"accepted")
     def test_ambiguous_mr_collision_blocks_delivery(self):
         self.assertEqual(self.cmd("--track","18",pdu=PDU).returncode,0)
         self.assertEqual(self.cmd("--track","18",pdu=OTHER).returncode,0)
-        self.assertNotEqual(self.cmd("--apply","18","21436587091","0").returncode,0)
+        self.assertNotEqual(self.cmd("--apply","18","12345678901","0").returncode,0)
         self.assertTrue(all(e["state"]=="accepted" for e in json.loads(self.cmd("--list").stdout)["reports"]))
     def test_old_mr_is_not_reused_after_48_hours(self):
         self.assertEqual(self.cmd("--track","18",pdu=PDU).returncode,0)
         s=self.store.read_text().split("|")
         s[0]=str(int(time.time())-172801)
         self.store.write_text("|".join(s))
-        self.assertNotEqual(self.cmd("--apply","18","21436587091","0").returncode,0)
+        self.assertNotEqual(self.cmd("--apply","18","12345678901","0").returncode,0)
     def test_fail_closed_on_invalid_input(self):
         self.assertNotEqual(self.cmd("--track","300",pdu=PDU).returncode,0)
         self.assertNotEqual(self.cmd("--track","18",pdu="AT+CMGD=1").returncode,0)
@@ -73,5 +73,5 @@ class DeliveryMap(unittest.TestCase):
         self.assertEqual(self.cmd("--track","18",pdu=PDU).returncode,0)
         self.script.parent.joinpath("feature").write_text("0")
         self.assertNotEqual(self.cmd("--list").returncode,0)
-        self.assertNotEqual(self.cmd("--apply","18","21436587091","0").returncode,0)
+        self.assertNotEqual(self.cmd("--apply","18","12345678901","0").returncode,0)
 if __name__=="__main__":unittest.main()
