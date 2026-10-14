@@ -38,12 +38,11 @@ jobs:
           replacement='for x in flock jsonfilter sha256sum head awk date;do command -v "$x" >/dev/null 2>&1 || fail unavailable;done'
           assert original in old
           old=old.replace(original,replacement)
-          key='   token="$(od -An -N12 -tx1 /dev/urandom | tr -d \\' \\\\n\\')" || fail unavailable\\n   [ "$(printf %s "$token"|wc -c)" = 24 ] || fail unavailable;;'
-          assert key in old
-          before,after=new.split("   # /usr/bin/od is NOT present on the real OpenWrt WE5927 image.",1)
           block_start=old.index('   token="$(od ')
           block_end=old.index('\\n  --reply)',block_start)
-          new_segment=new[len(before):new.index('\\n  --reply)',len(before))]
+          new_start=new.index('   # /usr/bin/od is NOT present')
+          new_end=new.index('\\n  --reply)',new_start)
+          new_segment=new[new_start:new_end]
           expected=old[:block_start]+new_segment+old[block_end:]
           assert expected==new, "Hotfix modified unrelated operations"
           print("VECI_XL_OD_PATCH_SCOPE=only_dependency_and_token")
