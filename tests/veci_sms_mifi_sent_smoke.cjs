@@ -8,7 +8,7 @@ const decode=vm.runInNewContext('(()=>{'+source.slice(a,b)+';return decodeSentPd
 const good='0001000B912143658709F1000005C82293F904';
 assert.strictEqual(decode(good).recipient,'+12345678901');
 assert.strictEqual(decode(good).message,'HELLO');
-assert.throws(()=>decode('AT+CMGS=18'),/PDU/);
+assert.throws(()=>decode('AT+CMGS=18'),/Invalid sent record/);
 assert.throws(()=>decode(good.slice(0,-2)),/Invalid GSM7/);
 const unicode='0001000B912143658709F100080400480049';
 assert.strictEqual(decode(unicode).message,'HI');
