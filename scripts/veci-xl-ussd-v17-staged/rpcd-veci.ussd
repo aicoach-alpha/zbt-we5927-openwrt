@@ -1,0 +1,34 @@
+#!/bin/sh
+# Authenticated rpcd exec object. ACL must provide WRITE access only.
+set -eu
+umask 077
+RUN=/usr/libexec/veci-xl-ussd
+fail(){ printf '{"ok":false,"reason":"%s"}\n' "$1";exit 0; }
+[ "$(id -u)" = 0 ] || fail admin_required
+[ -x "$RUN" ] || fail unavailable
+case "$1" in
+ list)
+  printf '{"start":{},"reply":{"session":"str","choice":"str","approval":"str"},"cancel":{"session":"str"}}\n';;
+ call)
+  case "$2" in
+   start) "$RUN" --start || fail ussd_unavailable;;
+   reply|cancel)
+    command -v jsonfilter >/dev/null 2>&1 || fail unavailable
+    payload="$(head -c 257)" || fail invalid_request
+    [ "$(printf %s "$payload"|wc -c)" -le 256 ] || fail invalid_request
+    session="$(jsonfilter -s "$payload" -e '@.session' 2>/dev/null || :)"
+    [ "$(printf %s "$session"|wc -c)" -eq 24 ] || fail invalid_request
+    case "$session" in *[!0-9a-f]*)fail invalid_request;;esac
+    if [ "$2" = cancel ];then
+     "$RUN" --cancel "$session" || fail ussd_unavailable
+    else
+     choice="$(jsonfilter -s "$payload" -e '@.choice' 2>/dev/null || :)"
+     approval="$(jsonfilter -s "$payload" -e '@.approval' 2>/dev/null || :)"
+     [ "$approval" = I_APPROVE_THIS_USSD_CHOICE ] || fail approval_required
+     case "$choice" in 0|[1-9]|[1-9][0-9]);;*)fail invalid_request;;esac
+     "$RUN" --reply "$session" "$choice" || fail ussd_unavailable
+    fi;;
+   *)fail invalid_request;;
+  esac;;
+ *)fail invalid_request;;
+esac
