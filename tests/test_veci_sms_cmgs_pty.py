@@ -95,7 +95,7 @@ class CMGS(unittest.TestCase):
         p,got=self.run_pty("ok",pdu)
         self.assertEqual(p.returncode,0,p.stdout+p.stderr)
         self.assertIn('accepted_by_modem',p.stdout)
-        self.assertEqual(got["command"],f"AT+CMGS={len(pdu)//2-1}\\r".encode().replace(b"\\\\r",b"\\r"))
+        self.assertEqual(got["command"],f"AT+CMGS={len(pdu)//2-1}".encode()+bytes([13]))
         self.assertEqual(got["pdu"],pdu.encode()+bytes([26]))
         self.assertNotIn(pdu,p.stdout+p.stderr)
 
