@@ -75,7 +75,7 @@ static int valid_submit(const unsigned char *b, size_t n, int *tpdu_len) {
     udl=b[ud_start+2];
     payload=n-(ud_start+3);
     if(dcs==0x00){
-        if(udl<1||udl>160||payload!=(udl*7+7)/8) return 0;
+        if(udl<1||udl>160||payload!=((size_t)udl*7+7)/8) return 0;
     }else if(dcs==0x08){
         if(udl<2||udl>140||udl%2||payload!=udl)return 0;
     }else return 0;
