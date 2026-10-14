@@ -100,7 +100,7 @@ except (ValueError,KeyError,TypeError,IndexError):
     def test_unknown_or_rejected_never_writes_history(self):
         for reason in ["network_rejected","outcome_unknown","prompt_unavailable"]:
             with self.subTest(reason=reason):
-                (self.d/"send_response").write_text(json.dumps({"ok":False,"reason":reason})+"\n")
+                (self.d/"send_response").write_text(json.dumps({"ok":False,"reason":reason},separators=(",",":"))+"\n")
                 (self.d/"send_rate").unlink(missing_ok=True)
                 result=self.assert_ok("sendMessage")
                 self.assertEqual(result["reason"],reason)
@@ -122,7 +122,7 @@ except (ValueError,KeyError,TypeError,IndexError):
                  "messages":[{"at":1700000000,"pdu":PDU,
                               "status":"accepted_by_modem",
                               "delivery_status":"delivered","tp_st":0}]}
-        (self.d/"view_response").write_text(json.dumps(fixture)+"\n")
+        (self.d/"view_response").write_text(json.dumps(fixture,separators=(",",":"))+"\n")
         response=self.assert_ok("getSent")
         self.assertEqual(response,fixture)
         self.assertFalse((self.d/"map_pdu").exists())
