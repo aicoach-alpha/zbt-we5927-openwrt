@@ -1,0 +1,58 @@
+#!/bin/sh
+# VeCI SMS Sent History: max 30 locally stored, modem-accepted SMS PDUs.
+# Private root-only file; no modem commands, recipient/body logs or auto retries.
+set -eu
+umask 077
+LC_ALL=C;export LC_ALL
+STORE=/etc/veci-sms-sent-history
+FLAG=/etc/veci-sms-feature
+fail(){ printf '{"ok":false,"reason":"history_unavailable"}\n';exit 1; }
+[ "$#" -eq 1 ] || fail
+[ "$(id -u)" -eq 0 ] || fail
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail
+[ -f "$FLAG" ] && [ ! -L "$FLAG" ] && [ "$(cat "$FLAG" 2>/dev/null || :)" = 1 ] || fail
+[ -f "$STORE" ] && [ ! -L "$STORE" ] || fail
+[ "$(wc -c < "$STORE")" -le 18000 ] || fail
+verify_history(){
+  awk -F'|' '
+    NF!=2||$1 !~ /^[0-9]+$/||length($1)>11||
+    $2 !~ /^[0-9A-F]+$/||length($2)<22||length($2)>384||
+    length($2)%2{bad=1}
+    {if(NR>30)bad=1}
+    END{exit bad}
+  ' "$STORE"
+}
+case "$1" in
+  --add)
+    pdu="$(head -c 385)" || fail
+    n="$(printf %s "$pdu"|wc -c)" || fail
+    [ "$n" -ge 22 ] && [ "$n" -le 384 ] && [ "$((n%2))" -eq 0 ] || fail
+    case "$pdu" in *[!0-9A-F]*)fail;;esac
+    timestamp="$(date +%s)" || fail
+    case "$timestamp" in ''|*[!0-9]*)fail;;esac
+    [ "$(printf %s "$timestamp"|wc -c)" -le 11 ] || fail
+    verify_history || fail
+    temp="$STORE.new.$$"
+    (tail -n 29 "$STORE";printf '%s|%s\n' "$timestamp" "$pdu") > "$temp" || {
+      rm -f "$temp";fail;
+    }
+    chmod 600 "$temp" || {rm -f "$temp";fail;}
+    mv -f "$temp" "$STORE" || {rm -f "$temp";fail;}
+    unset pdu
+    printf '{"ok":true,"saved":true}\n'
+    ;;
+  --list)
+    verify_history || fail
+    awk -F'|' 'BEGIN {printf "{\"ok\":true,\"source\":\"local_sent\",\"count\":"}
+      {a[NR]=$1;b[NR]=$2}
+      END{
+        printf "%d,\"messages\":[",NR
+        for(i=NR;i>=1;i--){
+          if(i<NR)printf ","
+          printf "{\"at\":%s,\"pdu\":\"%s\",\"status\":\"accepted_by_modem\"}",a[i],b[i]
+        }
+        print "]}"
+      }' "$STORE"
+    ;;
+  *) fail ;;
+esac
