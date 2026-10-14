@@ -98,6 +98,31 @@ static int numeric(const unsigned char *s,size_t n){
  for(size_t i=0;i<n;i++)if(!isdigit(s[i]))return 0;
  return 1;
 }
+/*
+ * Only accept the exact quota query JSON envelope produced locally:
+ * {"xdata":"<base64url>","xtime":<13-digit-ms>}
+ * This forbids POST side-effect parameters and ties the encrypted body to
+ * its 10-digit HTTP signature timestamp. No arbitrary JSON fields allowed.
+ */
+static int valid_quota_envelope(const unsigned char *b,size_t n,const unsigned char *ts){
+ const char *prefix="{\"xdata\":\"",*suffix="\",\"xtime\":";
+ const size_t plen=strlen(prefix),slen=strlen(suffix);
+ if(n<plen+slen+4+13+1 || memcmp(b,prefix,plen))return 0;
+ size_t at=plen,encoded=0;
+ while(at<n&&b[at]!='"'){
+  unsigned char c=b[at++];
+  if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||
+       (c>='0'&&c<='9')||c=='-'||c=='_'||c=='='))return 0;
+  if(++encoded>4088)return 0;
+ }
+ if(encoded<4||encoded%4==1)return 0;
+ if(at+slen+13+1!=n || memcmp(b+at,suffix,slen))return 0;
+ at+=slen;
+ if(memcmp(b+at,ts,10))return 0;
+ for(size_t i=0;i<13;i++)if(b[at+i]<'0'||b[at+i]>'9')return 0;
+ return b[at+13]=='}';
+}
+
 static int load_request(size_t *bodylen){
  size_t a,b,c,d;
  if(private_file("id_token",token,sizeof(token)-2,&a) ||
@@ -113,11 +138,8 @@ static int load_request(size_t *bodylen){
  time_t now=time(NULL);
  if(now<0||timestamp>(unsigned long long)now+120 ||
     (unsigned long long)now>timestamp+120)return -1;
- /* Local encrypted xdata request: reject arbitrary commands/paths. */
- if(*bodylen<20||request_body[0]!='{'||
-    !strstr((const char *)request_body,"\"xdata\"")||
-    !strstr((const char *)request_body,"\"xtime\""))return -1;
- for(size_t i=0;i<*bodylen;i++)if(request_body[i]==0)return -1;
+ /* Only the canonical quota envelope may be sent to the fixed route. */
+ if(!valid_quota_envelope(request_body,*bodylen,sig_time))return -1;
  int n=snprintf((char *)headers,sizeof(headers),
    "POST " ROUTE " HTTP/1.1\r\n"
    "Host: " HOST "\r\n"
