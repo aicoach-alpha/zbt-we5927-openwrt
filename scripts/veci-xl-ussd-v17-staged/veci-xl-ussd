@@ -11,7 +11,7 @@ fail(){ printf '{"ok":false,"reason":"%s"}\n' "$1";exit 1; }
 [ "$(id -u)" = 0 ] || fail admin_required
 [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail wrong_router
 [ -x "$BIN" ] && [ -x "$LTE" ] || fail unavailable
-for x in flock jsonfilter od tr date;do command -v "$x" >/dev/null 2>&1 || fail unavailable;done
+for x in flock jsonfilter sha256sum head awk date;do command -v "$x" >/dev/null 2>&1 || fail unavailable;done
 case "$1" in
  --start) [ "$#" = 1 ] || fail invalid_request;;
  --reply) [ "$#" = 3 ] || fail invalid_request;;
@@ -60,8 +60,13 @@ EOF
   --start)
    [ -z "$old" ] || fail session_active
    value='*808#'
-   token="$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')" || fail unavailable
-   [ "$(printf %s "$token"|wc -c)" = 24 ] || fail unavailable;;
+   # /usr/bin/od is NOT present on the real OpenWrt WE5927 image.
+   # Use the kernel CSPRNG, hash 32 random bytes and return 96-bit hex.
+   # No token bytes, text, account data or OTP written to flash/logs.
+   [ -c /dev/urandom ] && [ -r /dev/urandom ] || fail token_unavailable
+   token="$(head -c 32 /dev/urandom | sha256sum | awk '{print substr($1,1,24)}')" || fail token_unavailable
+   [ "$(printf %s "$token"|wc -c)" = 24 ] || fail token_unavailable
+   case "$token" in *[!0-9a-f]*)fail token_unavailable;;esac;;
   --reply)
    [ -n "$old" ] && [ "$2" = "$token" ] || fail session_expired
    [ "$steps" -lt 6 ] || fail step_limit
