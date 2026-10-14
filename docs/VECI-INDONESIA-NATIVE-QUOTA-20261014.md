@@ -51,3 +51,24 @@ Status: SMS v1.6.0 LIVE. USSD XL network rejected and excluded from automatic qu
 - One new on-router RAM-only test for changed decrypt primitive: `scripts/veci-xl-decrypt-physical-20261014.sh --verify`. This intentionally does not repeat the previously PASS TLS, modem, SMS, HMAC or legacy encryption tests.
 - Carrier account login/refresh and a verified authenticated quota HTTP response remain **NOT implemented/not LIVE**. Community candidate protocols are not official public integration contracts. Never copy upstream mobile application client secrets into public firmware; avoid requesting or printing real OTP/token in ChatGPT, shell history or CI logs. Only account-owner-authorized local secrets are acceptable.
 - Final production design should directly use operator-verified HTTPS and allow only read-only profile/quota requests, with no purchase/payment side effects and no developer server dependency.
+
+## Physical decrypt result and authenticated-transport candidate — 14 Oct 2026
+- Owner's router executed the SHA-pinned decrypt-stage script from /tmp successfully:
+  - VECI_XL_NATIVE_DECRYPT=pass
+  - VECI_XL_NATIVE_ENCRYPT_DECRYPT_ROUNDTRIP=pass
+  - VECI_XL_NATIVE_DECRYPT_QUOTA_PARSER=pass
+  - VECI_XL_RELEASE_SHA256=pass
+  - VECI_REAL_OPERATOR_LOGIN=not_attempted
+  - VECI_OPERATOR_QUOTA=not_verified
+  - VECI_MODEM_AND_SMS_UNCHANGED=true
+  - VECI_FLASH_WRITES=none
+- This CLOSED the earlier native AES decrypt/normalizer on-device stage. Do not re-run it unchanged.
+- Implemented independent source/veci-telco-indonesia/veci-xl-quota-http.c native TLS quota-request transport, NOT enabled in the runtime image and NOT an auth client:
+  - Fixed XL HTTPS hostname, fixed quota-only POST path, strict certificate+hostname verification and <=65536-byte JSON body.
+  - Root-owned /tmp/veci-telco-private (0700), regular files 0600; protected file reads with O_NOFOLLOW and no symlink/hard-link acceptance. Access token, request signature, API key and encrypted request are NOT accepted via CLI args/environment and NOT printed.
+  - Missing authorized user session fails before network; no OTP read, USSD, modem commands, purchases, cache mutation or developer intermediary.
+  - Only successful 2xx JSON is passed to a local pipe/file; HTTP success alone is not carrier quota authentication. The final verification and cache-write gate must be downstream.
+- GitHub release candidate veci-xl-quota-http-d9a5092fc6a4 is CI PASS and MIPS cross-built (545892 bytes; sha256 323cf58613fbd7fe9567e25e650392d147f0b919a5dfd4a9aea6c93387c4ae22). This prerelease has NOT been installed or run on physical router.
+- Verified official operator help confirms myXL uses number + OTP and shows account package data; it DOES NOT document a supported third-party API contract. Public SinergiAPI information found lists other categories (SIM Swap, location, carrier billing), not self-care quota inquiry. Never assume community-derived app key or endpoints are operator-approved for redistribution.
+- Blocker to genuine LIVE: implement and validate an account-owner-authorized first-party session/login flow, and verify an authenticated XL payload format + units on the SIM before allowing carrier_authenticated cache writes. Do not copy third-party app secrets into public source or present simulated quota as genuine.
+- Protect SMS v1.6.0 and LTE; do not deploy unverified auth code into production.
