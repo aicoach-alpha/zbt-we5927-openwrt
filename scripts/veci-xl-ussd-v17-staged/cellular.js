@@ -170,7 +170,7 @@ function requestSmsDeliveryReport(pdu) {
  */
 function parseXlUssdQuota(text) {
   if(typeof text!=='string'||text.length>768)return null;
-  const match=text.match(/\\bsisa\\s+(?:kuota|paket(?:\\s+internet)?)\\s*[:=\\-]?\\s*([0-9]+(?:[.,][0-9]{1,2})?)\\s*(GB|MB|KB)\\b/i);
+  const match=text.match(/\bsisa\s+(?:kuota|paket(?:\s+internet)?)\s*[:=\-]?\s*([0-9]+(?:[.,][0-9]{1,2})?)\s*(GB|MB|KB)\b/i);
   if(!match)return null;
   const value=Number(match[1].replace(',','.'));
   if(!Number.isFinite(value)||value<0||value>100000)return null;
