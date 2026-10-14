@@ -25,6 +25,7 @@ on:
       - 'scripts/veci-sms-mifi-v158-compose-layout-install.sh'
       - 'scripts/veci-sms-mifi-v159-staged/**'
       - 'scripts/veci-sms-mifi-v159-csp-css-install.sh'
+      - 'scripts/veci-sms-mifi-v160-multipart-install.sh'
       - 'tests/veci_sms_css_csp_smoke.cjs'
       - 'tests/test_veci_sms_drafts.py'
       - 'scripts/veci-sms-mifi-v156-sent-install.sh'
@@ -61,6 +62,9 @@ jobs:
           sh -n scripts/veci-sms-mifi-v1531-inbox-hotfix.sh
           sh -n scripts/veci-sms-mifi-v154-ui-install.sh
           sh -n scripts/veci-sms-mifi-v1541-delete-copy-hotfix.sh
+          if [ -f scripts/veci-sms-mifi-v160-multipart-install.sh ];then
+            sh -n scripts/veci-sms-mifi-v160-multipart-install.sh
+          fi
           if [ -f scripts/veci-sms-mifi-v159-csp-css-install.sh ];then
             sh -n scripts/veci-sms-mifi-v159-csp-css-install.sh
           fi
