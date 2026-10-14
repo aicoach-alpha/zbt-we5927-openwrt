@@ -41,9 +41,9 @@ class SmsReport(unittest.TestCase):
                 self.assertNotIn(raw,result.stdout+result.stderr)
     def test_readonly_preflight_no_mutations(self):
         s=(ROOT/"scripts/veci-sms-delivery-report-readonly-preflight.sh").read_text()
-        for query in ("AT+CMGF?","AT+CSMS?","AT+CNMI?","AT+CPMS?"):
+        for query in ("AT+CMGF?","AT+CSMS?","AT+CNMI?","AT+CNMI=?","AT+CPMS?","AT+CPMS=?"):
             self.assertIn(query,s)
-        for forbidden in ("AT+CMGS=","AT+CNMI=","AT+CMGD=","AT+CMGR=","AT+CMGL=",
+        for forbidden in ("AT+CMGS=","AT+CNMI=0","AT+CNMI=1","AT+CNMI=2","AT+CMGD=","AT+CMGR=","AT+CMGL=",
                           "sysupgrade","/etc/init.d/rpcd restart"):
             self.assertNotIn(forbidden,s)
         result=subprocess.run(["sh","-n",str(ROOT/"scripts/veci-sms-delivery-report-readonly-preflight.sh")],
