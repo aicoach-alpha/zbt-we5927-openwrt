@@ -96,7 +96,7 @@ class CMGS(unittest.TestCase):
         self.assertEqual(p.returncode,0,p.stdout+p.stderr)
         self.assertIn('accepted_by_modem',p.stdout)
         self.assertEqual(got["command"],f"AT+CMGS={len(pdu)//2-1}\\r".encode().replace(b"\\\\r",b"\\r"))
-        self.assertEqual(got["pdu"],pdu.encode()+b"\\x1a")
+        self.assertEqual(got["pdu"],pdu.encode()+bytes([26]))
         self.assertNotIn(pdu,p.stdout+p.stderr)
 
     def test_multipart_ucs2_concat_header_accepted(self):
@@ -104,7 +104,7 @@ class CMGS(unittest.TestCase):
         p,got=self.run_pty("ok",pdu)
         self.assertEqual(p.returncode,0,p.stdout+p.stderr)
         self.assertIn('accepted_by_modem',p.stdout)
-        self.assertEqual(got["pdu"],pdu.encode()+b"\\x1a")
+        self.assertEqual(got["pdu"],pdu.encode()+bytes([26]))
 
     def test_reject_malformed_concat_without_modem_commands(self):
         for pdu in [
@@ -115,7 +115,7 @@ class CMGS(unittest.TestCase):
             self.multipart_pdu("HELLO").replace("05000319","06000319"),
         ]:
             with self.subTest(pdu=pdu[:22]):
-                p=subprocess.run([str(BIN),"/dev/ttyUSB2"],input=pdu+"\\n",
+                p=subprocess.run([str(BIN),"/dev/ttyUSB2"],input=pdu+chr(10),
                     text=True,capture_output=True,timeout=2)
                 self.assertNotEqual(p.returncode,0)
                 self.assertIn("invalid_submit",p.stdout)
