@@ -1,0 +1,38 @@
+name: VeCI XL protected quota pipeline
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/files/usr/libexec/veci-xl-quota-chain'
+      - 'tests/test_veci_xl_quota_chain.py'
+      - '.github/workflows/veci-xl-quota-chain-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run real shell with mocked operator, crypto and parser
+        run: |
+          set -e
+          python3 -m unittest discover -s tests -p test_veci_xl_quota_chain.py -v
+          echo VECI_XL_QUOTA_CHAIN_OFFLINE_PASS
+      - name: Verify production binaries cannot write carrier-authenticated cache
+        run: |
+          set -e
+          sh -n source/veci-telco-indonesia/files/usr/libexec/veci-xl-quota-chain
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('source/veci-telco-indonesia/files/usr/libexec/veci-xl-quota-chain').read_text()
+          assert 'carrier_authenticated' not in s
+          assert 'quota-xl.json' not in s
+          assert 'veci-xl-quota-http' in s
+          assert 'veci-xl-crypto' in s
+          assert 'veci-xl-quota-normalize' in s
+          assert 'VECI_XL_CHAIN_ERROR=' in s
+          assert 'umask 077' in s
+          assert 'jsonfilter' in s
+          print('VECI_XL_CHAIN_NO_FAKE_QUOTA_CACHE_PASS')
+          PY
