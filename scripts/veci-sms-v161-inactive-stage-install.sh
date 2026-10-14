@@ -36,20 +36,21 @@ live_ok(){
   [ -f "$SENT" ] && [ ! -L "$SENT" ] &&
   [ -f "$DRAFT" ] && [ ! -L "$DRAFT" ]
 }
-manifest_ok(){
-  [ -d "$STAGE" ] && [ ! -L "$STAGE" ] ||
-    return 1
-  [ -f "$STAGE/SHA256SUMS" ] && [ ! -L "$STAGE/SHA256SUMS" ] || return 1
-  [ -f "$STAGE/RELEASE_INFO" ] && [ ! -L "$STAGE/RELEASE_INFO" ] || return 1
-  grep -Fxq "SOURCE_COMMIT=$RELEASE_SHA" "$STAGE/RELEASE_INFO" || return 1
-  grep -Fxq 'NO_AUTO_ACTIVATION=1' "$STAGE/RELEASE_INFO" || return 1
-  (cd "$STAGE" && sha256sum -c SHA256SUMS >/dev/null 2>&1) || return 1
+manifest_in(){
+  root="$1"
+  [ -d "$root" ] && [ ! -L "$root" ] || return 1
+  [ -f "$root/SHA256SUMS" ] && [ ! -L "$root/SHA256SUMS" ] || return 1
+  [ -f "$root/RELEASE_INFO" ] && [ ! -L "$root/RELEASE_INFO" ] || return 1
+  grep -Fxq "SOURCE_COMMIT=$RELEASE_SHA" "$root/RELEASE_INFO" || return 1
+  grep -Fxq 'NO_AUTO_ACTIVATION=1' "$root/RELEASE_INFO" || return 1
+  (cd "$root" && sha256sum -c SHA256SUMS >/dev/null 2>&1) || return 1
   for f in cellular.js rpcd-veci.sms veci-sms-cmgs veci-sms-status-report \
            veci-sms-send-one veci-sms-delivery-map veci-sms-sent-delivery-view \
            veci-sms-report-ingest;do
-    [ -f "$STAGE/$f" ] && [ ! -L "$STAGE/$f" ] || return 1
+    [ -f "$root/$f" ] && [ ! -L "$root/$f" ] || return 1
   done
 }
+manifest_ok(){ manifest_in "$STAGE"; }
 status(){
   board
   if live_ok;then echo 'VECI_V160_LIVE_FILE_INTEGRITY=pass'
@@ -95,6 +96,7 @@ stage(){
   chmod 700 "$dest" || fail stage_permission
   [ "$(cat "$FLAG" 2>/dev/null || :)" = "$original" ] || fail switch_changed
   live_ok || fail live_changed_during_stage
+  manifest_in "$dest" || fail stage_integrity_before_commit
   mv "$dest" "$STAGE" || fail stage_commit
   complete=1
   manifest_ok || fail stage_integrity_after_commit
