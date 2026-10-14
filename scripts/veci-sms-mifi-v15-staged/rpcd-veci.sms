@@ -112,6 +112,7 @@ delete_message(){
 
 
 SMS_SEND=/usr/libexec/veci-sms-send-one
+SENT_HISTORY=/usr/libexec/veci-sms-sent-history
 SEND_RATE=/tmp/veci-sms-send-last-attempt
 send_message(){
   [ "$(id -u)" -eq 0 ] || { deny admin_required;return; }
@@ -147,20 +148,51 @@ send_message(){
     }
     sms_state || { deny sms_disabled;exit 0; }
     case "$response" in
-      '{"ok":true,"status":"accepted_by_modem"}'|\
+      '{"ok":true,"status":"accepted_by_modem"}')
+        # Store only after positive modem acceptance, never on unknown status.
+        # Persist the already-authorized bounded Submit PDU, never log it.
+        if [ -x "$SENT_HISTORY" ] &&
+          [ "$(printf '%s' "$pdu" | "$SENT_HISTORY" --add 2>/dev/null)" = '{"ok":true,"saved":true}' ]; then
+          printf '{"ok":true,"status":"accepted_by_modem","history_saved":true}\n'
+        else
+          # The SMS was already sent; a flash error must never trigger retry.
+          printf '{"ok":true,"status":"accepted_by_modem","history_saved":false}\n'
+        fi
+        ;;
       '{"ok":false,"reason":"network_rejected"}'|\
       '{"ok":false,"reason":"outcome_unknown"}'|\
       '{"ok":false,"reason":"prompt_unavailable"}')
-       printf '%s\n' "$response";;
+        printf '%s\n' "$response";;
       *)deny send_unavailable;;
     esac
   ) 8>"$RATE_LOCK"
   unset pdu
 }
 
+get_sent(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required;return; }
+  sms_state || { deny sms_disabled;return; }
+  [ -x "$SENT_HISTORY" ] || { deny worker_unavailable;return; }
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    sms_state || { deny sms_disabled;exit 0; }
+    result="$("$SENT_HISTORY" --list 2>/dev/null)" || {
+      deny history_unavailable;exit 0;
+    }
+    [ "$(printf %s "$result"|wc -c)" -le 15000 ] || {
+      deny history_unavailable;exit 0;
+    }
+    case "$result" in
+      '{"ok":true,"source":"local_sent","count":'*)
+        printf '%s\n' "$result";;
+      *)deny history_unavailable;;
+    esac
+  ) 8>"$RATE_LOCK"
+}
+
 deny() {
   case "$1" in
-    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy|sms_disabled|send_unavailable|send_rate_limited)
+    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy|sms_disabled|send_unavailable|send_rate_limited|history_unavailable)
       reason="$1" ;;
     *) reason=index_unavailable ;;
   esac
@@ -220,7 +252,7 @@ list_index() {
 [ "$#" -ge 1 ] || exit 2
 case "$1" in
   list)
-    printf '{"listIndex":{"scope":"str","ack_unread_status":"str"},"getConfig":{},"setEnabled":{"state":"str"},"listMessages":{},"deleteMessage":{"index":"int","storage":"str","expectedPdu":"str"},"sendMessage":{"pdu":"str"}}\n'
+    printf '{"listIndex":{"scope":"str","ack_unread_status":"str"},"getConfig":{},"setEnabled":{"state":"str"},"listMessages":{},"deleteMessage":{"index":"int","storage":"str","expectedPdu":"str"},"sendMessage":{"pdu":"str"},"getSent":{}}\n'
     ;;
   call)
     [ "$#" -ge 2 ] || { deny invalid_request; exit 0; }
@@ -231,6 +263,7 @@ case "$1" in
       listMessages) list_messages ;;
       deleteMessage) delete_message ;;
       sendMessage) send_message ;;
+      getSent) get_sent ;;
       *) deny invalid_request ;;
     esac
     ;;
