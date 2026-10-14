@@ -160,7 +160,7 @@ apply(){
  [ "$(sha "$work/help")" = "$NEW_HELP" ] || fail helper_checksum
  [ "$(sha "$work/bin")" = "$NEW_BIN" ] || fail binary_checksum
  sh -n "$work/rpc" && sh -n "$work/help" || fail shell_syntax
- "$({ echo /bin/sh; })" "$work/rpc" list | jsonfilter -e '@.sendMessage.pdu' 2>/dev/null | grep -qx str || fail send_rpc_signature
+ sh "$work/rpc" list | jsonfilter -e '@.sendMessage.pdu' 2>/dev/null | grep -qx str || fail send_rpc_signature
  grep -Fq "sendMessage" "$work/acl" || fail acl_missing_send
  grep -Fq "buildSmsSubmit" "$work/ui" || fail ui_missing_submit
  grep -Fq "veci-sms-cmgs" "$work/help" || fail helper_missing_binary
