@@ -39,7 +39,8 @@ check('{'.repeat(155),3);
 check('你好'.repeat(35),1); // 70 UTF-16 units.
 check('你好'.repeat(40),2);
 check('😀'.repeat(50),2); // never split surrogate pair.
-check('😀'.repeat(134),4);
+check('😀'.repeat(132),4);
+assert.throws(()=>buildSmsSubmitSegments('+628123456789','😀'.repeat(134)),/four-part/);
 assert.throws(()=>buildSmsSubmitSegments('+628123456789','A'.repeat(613)),/612/);
 assert.throws(()=>buildSmsSubmitSegments('+628123456789','😀'.repeat(135)),/268/);
 assert.throws(()=>buildSmsSubmitSegments('XLPRIORITAS','Hello'),/recipient/);
