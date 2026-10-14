@@ -39,6 +39,28 @@ class MyXLCrypto(unittest.TestCase):
    pad=plain[-1]
    self.assertEqual(plain[-pad:],bytes([pad])*pad)
    self.assertEqual(plain[:-pad],payload)
+ def test_decrypt_roundtrip_with_public_synthetic_payload(self):
+  xtime="1791987600000"
+  payload=b'{"data":{"quotas":[{"benefits":[{"data_type":"DATA","remaining":512,"total":1024}]}]}}'
+  enc=self.run_cli("xdata",xtime,self.aes,stdin=payload)
+  self.assertEqual(enc.returncode,0,enc.stderr.decode())
+  dec=self.run_cli("decrypt",xtime,self.aes,stdin=enc.stdout.strip())
+  self.assertEqual(dec.returncode,0,dec.stderr.decode())
+  self.assertEqual(dec.stdout,payload)
+  # URL-safe Base64 may arrive without trailing padding.
+  dec2=self.run_cli("decrypt",xtime,self.aes,stdin=enc.stdout.strip().rstrip(b'='))
+  self.assertEqual(dec2.returncode,0,dec2.stderr.decode())
+  self.assertEqual(dec2.stdout,payload)
+ def test_decrypt_rejects_corruption_and_bad_permissions(self):
+  xtime="1791987600000"
+  valid=self.run_cli("xdata",xtime,self.aes,stdin=b'{"status":"SUCCESS"}').stdout.strip()
+  for cipher in (b"",b"***",b"a",b"aaaa",valid[:-2]+b"**",b"A"*6000):
+   with self.subTest(cipher=cipher[:20]):
+    dec=self.run_cli("decrypt",xtime,self.aes,stdin=cipher)
+    self.assertNotEqual(dec.returncode,0)
+    self.assertNotIn(b"SUCCESS",dec.stdout+dec.stderr)
+  self.aes.chmod(0o644)
+  self.assertNotEqual(self.run_cli("decrypt",xtime,self.aes,stdin=valid).returncode,0)
  def test_hmac_sha512_exact_reference_formula(self):
   ts="1791987600"
   cp=self.run_cli("signature",ts,self.secret,self.token)
