@@ -120,6 +120,22 @@ class CacheSafetyTests(unittest.TestCase):
                 obj,_=self.decoded()
                 self.assertEqual(obj["state"],"unavailable")
 
+    def test_impossible_totals_never_display_as_carrier_quota(self):
+        for patch in (
+            {"total_bytes":None},
+            {"total_bytes":0},
+            {"total_bytes":"unknown"},
+            {"total_bytes":-1},
+            {"total_bytes":4_000_000_000-1},
+            {"remaining_bytes":11_000_000_000},
+        ):
+            with self.subTest(patch=patch):
+                self.put(self.data(**patch))
+                status,display=self.decoded()
+                self.assertEqual(status["state"],"unavailable")
+                self.assertIsNone(status["remaining_bytes"])
+                self.assertNotIn("SECRET_TOKEN",display)
+
     def test_signed_source_and_provider_are_mandatory(self):
         for patch in ({"source":"router_traffic"},{"provider":"axis"},
                       {"state":"otp_required"},{"schema":2}):
