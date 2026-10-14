@@ -9,6 +9,8 @@ on:
       - 'scripts/veci-sms-delivery-v161-staged/**'
       - 'tests/test_veci_sms_delivery_map.py'
       - 'tests/test_veci_sms_delivery_sent_view.py'
+      - 'tests/test_veci_sms_delivery_rpc.py'
+      - 'tests/test_veci_sms_delivery_ui.cjs'
       - 'tests/test_veci_sms_delivery_reports.py'
       - '.github/workflows/veci-sms-delivery-report-ci.yml'
   workflow_dispatch:
@@ -26,8 +28,13 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_map.py' -v
       - name: Verify read-only Sent History / Delivery Report join
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_sent_view.py' -v
+      - name: Test staged authenticated send/getSent RPC with mock native transport
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_rpc.py' -v
+      - name: Test delivery-report PDU encoding, multipart decode, and UI syntax
+        run: node tests/test_veci_sms_delivery_ui.cjs
       - name: Require original live v1.6.0 still selected
         run: |
           grep -Fq 'v1.6.0' scripts/veci-sms-mifi-v160-multipart-install.sh
+          test ! -e source/we5927-lte/src/veci-sms-delivery-live-enable.flag
           ! grep -Fq 'veci-sms-status-report.c' source/we5927-lte/Makefile
           echo VECI_DELIVERY_REPORT_SOURCE_ONLY_PASS
