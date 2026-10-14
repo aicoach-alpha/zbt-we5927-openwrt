@@ -12,6 +12,21 @@ static int check(const char *raw,int expected){
  if(valid && (out<2||normalized[0]!='{'))return 1;
  return 0;
 }
+static int check_body_restrictions(void){
+ const char *ts="1791987600";
+ const char *good="{\"xdata\":\"AAAAAA==\",\"xtime\":1791987600000}";
+ const char *bad_extra="{\"xdata\":\"AAAAAA==\",\"xtime\":1791987600000,\"action\":\"purchase\"}";
+ const char *bad_time="{\"xdata\":\"AAAAAA==\",\"xtime\":1791987601000}";
+ const char *bad_injection="{\"xdata\":\"AAAA\nAA==\",\"xtime\":1791987600000}";
+ const char *bad_alt="{\"xdata\":\"AAAAAA==\",\"xtime\":\"1791987600000\"}";
+ if(!valid_quota_envelope((const unsigned char *)good,strlen(good),(const unsigned char *)ts))return 1;
+ for(int i=0;i<4;i++){
+  const char *bad=i==0?bad_extra:i==1?bad_time:i==2?bad_injection:bad_alt;
+  if(valid_quota_envelope((const unsigned char *)bad,strlen(bad),(const unsigned char *)ts))return 1;
+ }
+ return 0;
+}
+
 int main(void){
  const char *ok="HTTP/1.1 200 OK\r\nContent-Length: 7\r\nContent-Type: application/json\r\n\r\n{\"a\":1}";
  const char *chunk="HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Type: application/json\r\n\r\n7\r\n{\"a\":1}\r\n0\r\n\r\n";
@@ -21,7 +36,7 @@ int main(void){
  const char *invalid_redirect="HTTP/1.1 302 Found\r\nContent-Length: 7\r\n\r\n{\"a\":1}";
  const char *invalid_chunk="HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n6\r\n{\"a\":1}\r\n0\r\n\r\n";
  const char *invalid_html="HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\n<html></html>";
- if(check(ok,1)||check(chunk,1)||check(invalid_cl,0)||
+ if(check_body_restrictions()||check(ok,1)||check(chunk,1)||check(invalid_cl,0)||
     check(invalid_double,0)||check(invalid_gzip,0)||
     check(invalid_redirect,0)||check(invalid_chunk,0)||
     check(invalid_html,0)){
