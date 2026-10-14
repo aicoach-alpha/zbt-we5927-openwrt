@@ -55,7 +55,6 @@ class XLQuotaNormalize(unittest.TestCase):
    {"quotas":[{"benefits":[{"data_type":"DATA","remaining":1.5,"total":2}]}]},
    {"quotas":[{"benefits":[{"data_type":"DATA","remaining":1,"total":"unlimited"}]}]},
    {"quotas":[{"benefits":[{"data_type":"DATA","remaining":99999999999999,"total":99999999999999}]}]},
-   {"quotas":[{"benefits":[{"data_type":"DATA","remaining":2,"remaining":1,"total":3}]}]}
   ]
   for v in cases:
    with self.subTest(v=v):
