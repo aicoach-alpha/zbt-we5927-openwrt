@@ -7,6 +7,7 @@ on:
       - 'tests/test_veci_xl_ussd_pty.py'
       - 'tests/test_veci_xl_ussd_ui.cjs'
       - 'tests/test_veci_xl_v17_installer.py'
+      - 'tests/test_veci_xl_quota_snapshot.py'
       - 'scripts/veci-xl-v17-ussd-quota-install.sh'
       - '.github/workflows/veci-xl-ussd-v17.yml'
   workflow_dispatch:
@@ -29,19 +30,21 @@ jobs:
           node tests/test_veci_xl_ussd_ui.cjs
           sh -n scripts/veci-xl-v17-ussd-quota-install.sh
           python3 -m unittest discover -s tests -p 'test_veci_xl_v17_installer.py' -v
+          python3 -m unittest discover -s tests -p 'test_veci_xl_quota_snapshot.py' -v
           python3 - <<'PY'
           import json,pathlib
           base=pathlib.Path("scripts/veci-xl-ussd-v17-staged")
           acl=json.loads((base/"veci-ussd-acl.json").read_text())["veci-xl-ussd"]
           assert not acl.get("read")
-          assert acl["write"]["ubus"]["veci.ussd"] == ["start","reply","cancel"]
+          assert acl["write"]["ubus"]["veci.ussd"] == ["start","reply","cancel","quotaStatus"]
           text=(base/"veci-xl-ussd").read_text()
           assert "flock -n -x 9" in text
           assert "AT+CMGL" not in text and "AT+CMGR" not in text
           assert "'*808#'" in text
           assert "/dev/ttyUSB2" in text
           ui=(base/"cellular.js").read_text()
-          assert "parseXlUssdQuota" in ui and "I_APPROVE_THIS_USSD_CHOICE" in ui
+          assert "parseXlUssdQuota" in ui
+          assert "quotaStatus" in (base/"rpcd-veci.ussd").read_text() and "I_APPROVE_THIS_USSD_CHOICE" in ui
           assert "api.call('veci.ussd','start'" in ui
           assert "api.call('veci.ussd','reply'" in ui
           assert "api.call('veci.ussd','cancel'" in ui
