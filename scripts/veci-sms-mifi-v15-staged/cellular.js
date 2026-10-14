@@ -25,6 +25,55 @@ function normalizeOperator(value) {
  * No persistence, no logging. Supports GSM7 & UCS2 SMS-DELIVER.
  */
 
+
+/* SMS-SUBMIT PDU for a SINGLE outbound message; no multipart sending.
+ * Numbers only (alphanumeric senders such as XLPRIORITAS cannot be replied to).
+ * Browser never persists or logs the SMS. No auto resend.
+ */
+function buildSmsSubmit(recipient, message) {
+  if(typeof recipient!=='string' || !/^\+?[0-9]{3,15}$/.test(recipient))throw Error('Invalid recipient number');
+  if(typeof message!=='string' || message.length===0 || message.length>160)throw Error('Message must fit one SMS');
+  const base=[64,163,36,165,232,233,249,236,242,199,10,216,248,13,197,229,916,95,934,915,923,937,928,936,931,920,926,0,198,230,223,201,32,33,34,35,164,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,161,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,196,214,209,220,167,191,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,228,246,241,252,224];
+  const glyphs=new Map(base.map((p,i)=>[p,i]).filter(([p])=>p!==0));
+  const ext=new Map([[12,10],[94,20],[123,40],[125,41],[92,47],[91,60],[126,61],[93,62],[124,64],[8364,101]]);
+  let septets=[],canGsm=true;
+  for(const char of message) {
+    const p=char.codePointAt(0);
+    if(glyphs.has(p))septets.push(glyphs.get(p));
+    else if(ext.has(p))septets.push(27,ext.get(p));
+    else {canGsm=false;break;}
+  }
+  let dcs,udl,payload=[];
+  if(canGsm) {
+    if(septets.length<1 || septets.length>160)throw Error('SMS exceeds GSM7 single-message limit (160 septets)');
+    dcs=0;udl=septets.length;
+    payload=Array(Math.ceil(udl*7/8)).fill(0);
+    septets.forEach((val,i)=>{
+      for(let b=0;b<7;b++)if(val&(1<<b)){
+        const bit=i*7+b;payload[bit>>3]|=1<<(bit&7);
+      }
+    });
+  }else{
+    // DCS 0x08, UTF-16BE: max 140 octets/70 UTF-16 code units.
+    if(message.length>70)throw Error('Unicode SMS limit is 70 characters (UTF-16 code units)');
+    dcs=8;udl=message.length*2;
+    for(let i=0;i<message.length;i++){
+      const v=message.charCodeAt(i);
+      payload.push(v>>8,v&255);
+    }
+  }
+  const digits=recipient[0]==='+'?recipient.slice(1):recipient;
+  const addr=[];
+  for(let i=0;i<digits.length;i+=2){
+    const low=Number(digits[i]),high=i+1<digits.length?Number(digits[i+1]):15;
+    addr.push(low|(high<<4));
+  }
+  const bytes=[0,1,0,digits.length,recipient[0]==='+'?0x91:0x81,
+    ...addr,0,dcs,udl,...payload];
+  if(bytes.length>192)throw Error('Message exceeds modem SMS limit');
+  return bytes.map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+
 function formatSmsDate(received) {
   if (!received || !Number.isFinite(received.unixMs))return 'Time unavailable';
   const d=new Date(received.unixMs);
@@ -283,7 +332,23 @@ export default {
 					<div class="cellular-actions">
 						<button class="button button-secondary" id="cellular-sms-open" type="button">Open Inbox</button>
 						<button class="button button-secondary" id="cellular-sms-clear" type="button">Clear screen</button>
+						<button class="button button-secondary" id="cellular-sms-compose-open" type="button">Compose SMS</button>
 					</div>
+					<form id="cellular-sms-compose" hidden style="border:1px solid #dce6ef;padding:14px 16px;border-radius:12px;margin:12px 0">
+						<strong>Compose SMS</strong>
+						<label for="cellular-sms-to" style="display:block;margin-top:10px">Recipient number
+							<input id="cellular-sms-to" type="tel" inputmode="tel" placeholder="+628123456789" autocomplete="off" required pattern="\\+?[0-9]{3,15}" style="display:block;width:100%;margin-top:4px"/>
+						</label>
+						<label for="cellular-sms-text" style="display:block;margin-top:10px">Message
+							<textarea id="cellular-sms-text" maxlength="160" rows="4" required placeholder="Write a message…" style="display:block;width:100%;margin-top:4px"></textarea>
+						</label>
+						<p id="cellular-sms-length" aria-live="polite">One SMS maximum · 160 GSM7 or 70 Unicode characters</p>
+						<p id="cellular-sms-send-status" role="status">Not sent.</p>
+						<div class="cellular-actions">
+							<button class="button" id="cellular-sms-send" type="submit">Send SMS</button>
+							<button class="button button-secondary" id="cellular-sms-compose-close" type="button">Close</button>
+						</div>
+					</form>
 					<div class="cellular-actions" style="margin:12px 0;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
 						<label for="cellular-sms-search" style="flex:1;min-width:180px">Search Inbox
 							<input id="cellular-sms-search" type="search" placeholder="Sender or message text" autocomplete="off" disabled style="display:block;width:100%;margin-top:4px"/>
@@ -331,6 +396,14 @@ export default {
 		const smsOpen = root.querySelector('#cellular-sms-open');
 		const smsClear = root.querySelector('#cellular-sms-clear');
 		const smsOutput = root.querySelector('#cellular-sms-messages');
+		const smsComposeOpen = root.querySelector('#cellular-sms-compose-open');
+		const smsCompose = root.querySelector('#cellular-sms-compose');
+		const smsTo = root.querySelector('#cellular-sms-to');
+		const smsText = root.querySelector('#cellular-sms-text');
+		const smsLength = root.querySelector('#cellular-sms-length');
+		const smsSendStatus = root.querySelector('#cellular-sms-send-status');
+		const smsSend = root.querySelector('#cellular-sms-send');
+		const smsComposeClose = root.querySelector('#cellular-sms-compose-close');
 		const smsSearch = root.querySelector('#cellular-sms-search');
 		const smsFilter = root.querySelector('#cellular-sms-filter');
 		let smsSearchItems = [];
@@ -366,7 +439,13 @@ export default {
 			smsToggle.disabled = false;
 			smsControls.hidden = !enabled;
 			smsState.textContent = enabled ? 'SMS enabled' : 'SMS disabled — no messages can be read';
-			if (!enabled) clearSms();
+			if (!enabled) {
+				clearSms();
+				smsCompose.hidden=true;
+				smsText.value='';
+				smsTo.value='';
+				smsSendStatus.textContent='Not sent.';
+			}
 		}
 		try {
 			const settings = await api.call('veci.sms', 'getConfig', {}, { timeout: 4000 });
@@ -378,6 +457,63 @@ export default {
 			smsControls.hidden = true;
 			smsState.textContent = 'SMS settings unavailable for this account.';
 		}
+		const openCompose = (number='')=>{
+			if(!smsEnabled)return;
+			smsCompose.hidden=false;
+			if(number)smsTo.value=number;
+			smsTo.focus();
+		};
+		smsComposeOpen.addEventListener('click',()=>openCompose());
+		smsComposeClose.addEventListener('click',()=>{
+			smsCompose.hidden=true;
+			smsSendStatus.textContent='Not sent.';
+		});
+		smsText.addEventListener('input',()=>{
+			try{
+				buildSmsSubmit(smsTo.value||'+628123456789',smsText.value);
+				smsLength.textContent='One SMS · '+smsText.value.length+' characters';
+			}catch(e){
+				smsLength.textContent=String(e?.message||'Message limit exceeded');
+			}
+		});
+		smsCompose.addEventListener('submit',async(event)=>{
+			event.preventDefault();
+			if(!smsEnabled || smsSend.disabled)return;
+			let pdu;
+			try{pdu=buildSmsSubmit(smsTo.value.trim(),smsText.value);}
+			catch(e){smsSendStatus.textContent=String(e?.message||'Invalid SMS');return;}
+			const recipient=smsTo.value.trim();
+			const approved=await confirm({
+				title:'Send SMS to '+recipient+'?',
+				message:'Send this message using the active SIM? Carrier SMS charges may apply.',
+				confirmLabel:'Send SMS'
+			});
+			if(!approved || !smsEnabled)return;
+			setBusy(smsSend,true,'Sending…');
+			smsSendStatus.textContent='Waiting for modem confirmation…';
+			try{
+				const r=await api.call('veci.sms','sendMessage',{pdu},{timeout:46000});
+				if(r?.ok===true && r.status==='accepted_by_modem'){
+					smsSendStatus.textContent='Accepted by modem. Network delivery is not yet confirmed.';
+					smsText.value='';
+					smsLength.textContent='One SMS maximum · 160 GSM7 or 70 Unicode characters';
+					toast('SMS accepted by modem.','success');
+				}else if(r?.reason==='network_rejected'){
+					smsSendStatus.textContent='SMS rejected by modem/network; not accepted.';
+				}else if(r?.reason==='send_rate_limited'){
+					smsSendStatus.textContent='Please wait a few seconds before sending another SMS.';
+				}else if(r?.reason==='prompt_unavailable'){
+					smsSendStatus.textContent='Modem did not allow SMS submission.';
+				}else{
+					smsSendStatus.textContent='Send outcome unknown. Do not immediately retry: the SMS may have been sent.';
+				}
+			}catch{
+				smsSendStatus.textContent='Send outcome unknown. Check recipient before manually trying again.';
+			}finally{
+				pdu=null;
+				setBusy(smsSend,false);
+			}
+		});
 		smsToggle?.addEventListener('change', async () => {
 			const desired = smsToggle.checked;
 			smsToggle.disabled = true;
@@ -491,6 +627,18 @@ export default {
 						});
 						deleteBtn.style.cssText='width:auto;min-width:110px;';
 						card.append(deleteBtn);
+					}
+					// Reply is only possible if sender is a real phone number.
+					if(item.decoded && /^\\+?[0-9]{3,15}$/.test(item.decoded.sender)){
+						const replyBtn=document.createElement('button');
+						replyBtn.type='button';
+						replyBtn.className='button button-secondary';
+						replyBtn.style.cssText='width:auto;margin-right:8px;';
+						replyBtn.textContent='Reply';
+						replyBtn.addEventListener('click',()=>{
+							if(smsEnabled && turn===smsGeneration)openCompose(item.decoded.sender);
+						});
+						card.append(replyBtn);
 					}
 					// Native clipboard only on explicit click. Never transmit
 					// or persist private SMS text beyond the rendered page.
