@@ -48,7 +48,7 @@ static int response_code(const char *line)
 }
 static int probe(const struct carrier *carrier)
 {
-    int ret=-1, status=-1;
+    int ret=-1, status=-1, success=0;
     char request[REQUEST_LIMIT], response[MAX_RESPONSE_LINE+1];
     size_t used=0;
     mbedtls_net_context net;
@@ -115,7 +115,7 @@ static int probe(const struct carrier *carrier)
     printf("VECI_OPERATOR_QUOTA=not_verified\n");
     printf("VECI_MODEM_AND_SMS_UNCHANGED=true\n");
     printf("VECI_FLASH_WRITES=none\n");
-    ret=0;
+    success=1;
 cleanup:
     mbedtls_ssl_free(&ssl);
     mbedtls_ssl_config_free(&config);
@@ -123,7 +123,7 @@ cleanup:
     mbedtls_ctr_drbg_free(&rng);
     mbedtls_entropy_free(&entropy);
     mbedtls_net_free(&net);
-    if (ret!=0) {
+    if (!success) {
         fputs("VECI_XL_DIRECT_TLS=failed\n",stderr);
         return 1;
     }
