@@ -1,0 +1,116 @@
+name: VeCI XL root-local authenticated quota HTTPS transport (candidate)
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/veci-xl-quota-http.c'
+      - 'tests/veci_xl_quota_http_synthetic.c'
+      - '.github/workflows/veci-xl-quota-http-mips.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read-only, root-local secret and operator allowlist static gate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('source/veci-telco-indonesia/veci-xl-quota-http.c').read_text()
+          must=['MBEDTLS_SSL_VERIFY_REQUIRED','mbedtls_ssl_set_hostname',
+                'mbedtls_ssl_get_verify_result','O_NOFOLLOW',
+                'st.st_uid!=0','st.st_nlink!=1',
+                'isatty(STDOUT_FILENO)', 'HOST "api.myxl.xlaxiata.co.id"',
+                'ROUTE "/api/v8/packages/quota-details"',
+                'Content-Length:', 'MAX_WIRE 73728',
+                'authorized_session_not_configured']
+          for x in must: assert x in s,x
+          for x in ('MBEDTLS_SSL_VERIFY_NONE','system(', 'popen(', 'execve(',
+                    'AT+CMGR','AT+CMGS','AT+CUSD',
+                    'apk add', 'sysupgrade', 'refresh_token=',
+                    'POST /api/v8/packages/activate', 'http://'):
+              assert x not in s,x
+          assert 'fwrite(normalized,1,result,stdout)' in s
+          assert 'VECI_OPERATOR_QUOTA=verified' not in s
+          print('VECI_XL_QUOTA_HTTP_FAIL_CLOSED_SOURCE_PASS')
+          PY
+      - name: Compile and run offline HTTP framing test on host
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd cmake libmbedtls-dev
+          gcc -std=c11 -Os -Wall -Wextra -Werror -o /tmp/veci-xl-http-synthetic \
+            tests/veci_xl_quota_http_synthetic.c \
+            -lmbedtls -lmbedx509 -lmbedcrypto
+          /tmp/veci-xl-http-synthetic
+          gcc -std=c11 -Os -Wall -Wextra -Werror \
+            -o /tmp/veci-xl-quota-http-host \
+            source/veci-telco-indonesia/veci-xl-quota-http.c \
+            -lmbedtls -lmbedx509 -lmbedcrypto
+          if /tmp/veci-xl-quota-http-host quota >/tmp/veci-no-session.out 2>/tmp/veci-no-session.err; then
+            echo "unexpected unauthenticated quota request"; exit 1
+          fi
+          grep -q 'root_required\|authorized_session_not_configured' /tmp/veci-no-session.err
+          test ! -s /tmp/veci-no-session.out
+          echo VECI_XL_QUOTA_NO_SESSION_NO_NETWORK_PASS
+      - name: Fetch SHA-pinned OpenWrt RAMIPS toolchain and mbedTLS 3.6.6
+        run: |
+          set -eu
+          name=openwrt-toolchain-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 240 -o /tmp/t.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$name"
+          echo "5e03963e3b5e2c12f8c1519a07d56a74babcd6147e95c4d50948e50ae465d776  /tmp/t.tar.zst" | sha256sum -c -
+          mkdir -p /tmp/toolchain
+          tar -xf /tmp/t.tar.zst -C /tmp/toolchain
+          curl -fL --retry 3 --max-time 150 -o /tmp/mbedtls.tar.bz2 \
+            https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.6/mbedtls-3.6.6.tar.bz2
+          echo "8fb65fae8dcae5840f793c0a334860a411f884cc537ea290ce1c52bb64ca007a  /tmp/mbedtls.tar.bz2" | sha256sum -c -
+          mkdir -p /tmp/mbed
+          tar -xf /tmp/mbedtls.tar.bz2 -C /tmp/mbed
+      - name: Cross-compile native MIPS executable with verified TLS support
+        run: |
+          set -eu
+          cc="$(find -L /tmp/toolchain -type f -name '*gcc' -executable | grep '/bin/' | head -1)"
+          [ -n "$cc" ]
+          src=/tmp/mbed/mbedtls-3.6.6
+          cmake -S "$src" -B /tmp/mbed/build \
+            -DCMAKE_C_COMPILER="$cc" -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DENABLE_PROGRAMS=OFF -DENABLE_TESTING=OFF \
+            -DUSE_SHARED_MBEDTLS_LIBRARY=OFF \
+            -DUSE_STATIC_MBEDTLS_LIBRARY=ON \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections -Os"
+          cmake --build /tmp/mbed/build --target mbedtls mbedx509 mbedcrypto -j 2
+          mkdir -p release
+          "$cc" -static -std=c11 -Os -s -ffunction-sections -fdata-sections \
+            -Wall -Wextra -Werror -o release/veci-xl-quota-http-mipsel \
+            -I"$src/include" source/veci-telco-indonesia/veci-xl-quota-http.c \
+            /tmp/mbed/build/library/libmbedtls.a \
+            /tmp/mbed/build/library/libmbedx509.a \
+            /tmp/mbed/build/library/libmbedcrypto.a \
+            -Wl,--gc-sections
+          file release/veci-xl-quota-http-mipsel
+          readelf -h release/veci-xl-quota-http-mipsel | grep -Eq 'Machine:[ ]*MIPS'
+          readelf -h release/veci-xl-quota-http-mipsel | grep -q "2's complement, little endian"
+          ! readelf -l release/veci-xl-quota-http-mipsel | grep -q INTERP
+          size="$(stat -c %s release/veci-xl-quota-http-mipsel)"
+          [ "$size" -lt 800000 ]
+          (cd release && sha256sum veci-xl-quota-http-mipsel > SHA256SUMS)
+          echo "VECI_XL_QUOTA_HTTP_NATIVE_BUILD_PASS size=$size"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-xl-quota-http-mipsel
+          path: release
+      - name: Publish read-only staged binary, no account login or installation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-xl-quota-http-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/veci-xl-quota-http-mipsel release/SHA256SUMS \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI XL protected-session HTTPS quota transport candidate" \
+            --notes "Candidate ONLY, NOT LIVE. Needs authorized private credentials and physical carrier response. Root-only /tmp session files; no CLI or environment secrets; fixed operator hostname and quota path; strict TLS verification; bounded JSON response. No manual OTP, login, firmware install, modem or SMS access."
+          echo "VECI_XL_QUOTA_HTTP_STAGE=$tag"
