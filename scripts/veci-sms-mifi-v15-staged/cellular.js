@@ -359,6 +359,76 @@ export default {
 				</section>
 			</div>
 
+
+				<style id="veci-sms-center-v158-styles">
+					#cellular-sms-inbox-controls { min-width: 0; }
+					#cellular-sms-inbox-controls button { cursor: pointer; }
+					#cellular-sms-compose[hidden],
+					#cellular-sms-drafts-panel[hidden],
+					#cellular-sms-sent-panel[hidden] { display: none !important; }
+					#cellular-sms-compose:not([hidden]) {
+						display: flex !important;
+						flex-direction: column !important;
+						align-items: stretch !important;
+						gap: 14px !important;
+						width: 100%;
+						min-width: 0;
+						max-width: 800px;
+						box-sizing: border-box;
+						padding: 20px !important;
+						margin: 16px 0 18px !important;
+						border: 1px solid #d8e6f1 !important;
+						border-radius: 14px !important;
+						background: #f9fcff !important;
+					}
+					#cellular-sms-compose .sms-compose-title { display: block; font-size: 17px; font-weight: 750; color: #12304a; }
+					#cellular-sms-compose .sms-compose-subtitle { margin: 2px 0 0; color: #586e83; font-size: 13px; }
+					#cellular-sms-compose .sms-compose-field {
+						display: flex !important; flex-direction: column !important;
+						gap: 6px; margin: 0 !important; min-width: 0;
+						font-size: 13px; font-weight: 650; color: #27445e;
+					}
+					#cellular-sms-compose #cellular-sms-to,
+					#cellular-sms-compose #cellular-sms-text {
+						display: block !important; width: 100% !important; min-width: 0; max-width: none;
+						box-sizing: border-box; border: 1px solid #c5d6e5;
+						border-radius: 9px; padding: 11px 12px;
+						margin: 0 !important; background: #fff; color: #102f49;
+						font-size: 14px; line-height: 1.5; font-family: inherit;
+					}
+					#cellular-sms-compose #cellular-sms-text {
+						resize: vertical; min-height: 124px; max-height: 300px;
+					}
+					#cellular-sms-compose :is(input, textarea):focus-visible {
+						outline: 2px solid #1b8abc; outline-offset: 2px;
+					}
+					#cellular-sms-compose #cellular-sms-length {
+						margin: -6px 0 0; font-size: 12px; color: #596f82;
+					}
+					#cellular-sms-compose #cellular-sms-send-status {
+						margin: 0; padding: 10px 12px; border-radius: 9px;
+						background: #ecf3f9; color: #254764; font-size: 13px;
+					}
+					#cellular-sms-compose .sms-compose-actions {
+						display: flex !important; flex-direction: row !important;
+						flex-wrap: wrap; gap: 8px; align-items: center;
+						margin: 0 !important;
+					}
+					#cellular-sms-compose .sms-compose-actions button {
+						min-width: 110px; width: auto !important;
+					}
+					#cellular-sms-drafts-panel { max-width: 900px; }
+					#cellular-sms-drafts-list article { background: #fff; }
+					#cellular-sms-inbox-controls > .cellular-actions:first-of-type {
+						display: flex; flex-wrap: wrap; gap: 8px;
+					}
+					@media(max-width: 600px) {
+						#cellular-sms-compose:not([hidden]) { padding: 14px !important; }
+						#cellular-sms-compose .sms-compose-actions button {
+							flex: 1 1 130px; min-width: 0;
+						}
+					}
+				</style>
 			<section class="panel" aria-labelledby="cellular-sms-mifi-title">
 				<div class="panel-heading">
 					<div><p class="eyebrow">MESSAGING</p><h3 id="cellular-sms-mifi-title">SMS Inbox</h3></div>
@@ -376,17 +446,20 @@ export default {
 						<button class="button button-secondary" id="cellular-sms-sent-open" type="button">Sent Messages</button>
 						<button class="button button-secondary" id="cellular-sms-drafts-open" type="button">Drafts</button>
 					</div>
-					<form id="cellular-sms-compose" hidden style="border:1px solid #dce6ef;padding:14px 16px;border-radius:12px;margin:12px 0">
-						<strong>Compose SMS</strong>
-						<label for="cellular-sms-to" style="display:block;margin-top:10px">Recipient number
-							<input id="cellular-sms-to" type="tel" inputmode="tel" placeholder="+628123456789" autocomplete="off" required pattern="\\+?[0-9]{3,15}" style="display:block;width:100%;margin-top:4px"/>
+					<form id="cellular-sms-compose" hidden autocomplete="off" aria-label="Compose SMS">
+						<div>
+							<strong class="sms-compose-title">New message</strong>
+							<p class="sms-compose-subtitle">Compose an SMS using the currently active SIM card.</p>
+						</div>
+						<label class="sms-compose-field" for="cellular-sms-to">Recipient number
+							<input id="cellular-sms-to" type="tel" inputmode="tel" placeholder="+628123456789" autocomplete="off" required pattern="\\+?[0-9]{3,15}" />
 						</label>
-						<label for="cellular-sms-text" style="display:block;margin-top:10px">Message
-							<textarea id="cellular-sms-text" maxlength="160" rows="4" required placeholder="Write a message…" style="display:block;width:100%;margin-top:4px"></textarea>
+						<label class="sms-compose-field" for="cellular-sms-text">Message
+							<textarea id="cellular-sms-text" maxlength="160" rows="5" required placeholder="Write your message here…"></textarea>
 						</label>
 						<p id="cellular-sms-length" aria-live="polite">One SMS maximum · 160 GSM7 or 70 Unicode characters</p>
-						<p id="cellular-sms-send-status" role="status">Not sent.</p>
-						<div class="cellular-actions">
+						<p id="cellular-sms-send-status" role="status" aria-live="polite">Not sent.</p>
+						<div class="sms-compose-actions">
 							<button class="button" id="cellular-sms-send" type="submit">Send SMS</button>
 							<button class="button button-secondary" id="cellular-sms-draft-save" type="button">Save Draft</button>
 							<button class="button button-secondary" id="cellular-sms-compose-close" type="button">Close</button>
