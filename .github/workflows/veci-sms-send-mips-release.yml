@@ -36,6 +36,7 @@ jobs:
           mkdir -p release
           "$gcc" -static -std=c11 -Os -s -fno-ident -Wall -Wextra -Werror \
             -o release/veci-sms-cmgs-mipsel source/we5927-lte/src/veci-sms-cmgs.c
+          # Rebuild candidate with the 512-byte CMGS echo parser from current HEAD.
           file release/veci-sms-cmgs-mipsel
           readelf -h release/veci-sms-cmgs-mipsel | grep -Eq 'Machine:[ ]*MIPS'
           readelf -h release/veci-sms-cmgs-mipsel | grep -q "2's complement, little endian"
