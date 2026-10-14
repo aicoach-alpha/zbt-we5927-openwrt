@@ -153,7 +153,7 @@ static int main_parse(void){
  }
  if(failed||quota<0||tokens[quota].kind!=ARRAY)return 1;
  uint64_t remaining=0,total=0;
- int data_benefits=0,rows=0;
+ int data_benefits=0,benefit_rows=0,rows=0;
  for(int q=quota+1;q<tokens[quota].after;q=tokens[q].after){
   if(tokens[q].kind!=OBJECT||++rows>256)return 1;
   int benefits=field(q,"benefits");
@@ -161,7 +161,7 @@ static int main_parse(void){
   if(benefits<0)continue;
   if(tokens[benefits].kind!=ARRAY)return 1;
   for(int i=benefits+1;i<tokens[benefits].after;i=tokens[i].after){
-   if(tokens[i].kind!=OBJECT||++data_benefits>MAX_BENEFITS)return 1;
+   if(tokens[i].kind!=OBJECT||++benefit_rows>MAX_BENEFITS)return 1;
    int kind=field(i,"data_type");
    if(failed)return 1;
    if(!ieq(kind,"DATA"))continue;
