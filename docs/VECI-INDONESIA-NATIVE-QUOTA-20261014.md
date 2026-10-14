@@ -29,4 +29,17 @@
 4. Owner-approved manual MyXL OTP login, operator-authenticated quota and refresh verified physically, cache updated from authenticated response only.
 5. Reversible atomic rollout and UI LIVE confirmation; independent adapters for other brands afterward.
 
-Status: SMS v1.6.0 LIVE. USSD XL network rejected and excluded from automatic quota. Native myXL cryptography HOST CI only, no carrier API login/response yet.
+Status: SMS v1.6.0 LIVE. USSD XL network rejected and excluded from automatic quota. Native myXL crypto AND DATA parser physically PASS on WE5927 (owner-provided output 2026-10-14), but no carrier API login/response yet.
+## Physical validation — 2026-10-14
+- Owner executed `scripts/veci-xl-native-mips-smoke-20261014.sh --verify` on `root@192.168.1.1` via SSH.
+- Device printed `VECI_XL_NATIVE_QUOTA_DATA_PARSER=pass`, `VECI_XL_NATIVE_MIPS_SHA256=pass`, `VECI_XL_NATIVE_MIPS_HMAC=pass`, `VECI_XL_NATIVE_MIPS_AES=pass`, `VECI_XL_NATIVE_MIPS_EXECUTABLE=pass`.
+- Device printed `VECI_REAL_OPERATOR_LOGIN=not_attempted`, `VECI_OPERATOR_QUOTA=not_verified`, `VECI_MODEM_AND_SMS_UNCHANGED=true`, `VECI_FLASH_WRITES=none`.
+- Treat crypto and parser as a closed physical stage. Do not repeat that same test unless the binary changes.
+
+## Next staged major feature — verified operator HTTPS (no authentication yet)
+- New `source/veci-telco-indonesia/veci-xl-tls-probe.c` opens one TCP+TLS connection directly to one hardcoded candidate XL host (`api.myxl.xlaxiata.co.id` or `gede.ciam.xlaxiata.co.id`).
+- Uses embedded mbedTLS native C, existing device CA bundle, `MBEDTLS_SSL_VERIFY_REQUIRED`, `mbedtls_ssl_set_hostname` and `mbedtls_ssl_get_verify_result`; no certificate bypass, credential, OTP, modem, SMS, or disk writes.
+- Sends only `HEAD /`, reads first HTTP status line with bounded memory, never follows redirects. A 4xx response proves only transport identity, not operator API usability.
+- Target build workflow: `.github/workflows/veci-xl-tls-mips-release.yml`. Stage as prerelease and perform one physical operator TLS test from `/tmp`, without installation into firmware.
+- **Not yet tested on device; not an authenticated quota client.**
+- Future quota client MUST keep authorization secrets out of argv, process listings, GitHub, logs, and developer servers; no API implementation may presume a community endpoint is still valid. Implement manual OTP only after account-owner consent and verified operator-compatible login, and authenticate + normalize a real quota response before any cache source can be set to `carrier_authenticated`.
