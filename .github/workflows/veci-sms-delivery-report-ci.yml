@@ -1,0 +1,25 @@
+name: VeCI SMS Delivery Report offline gate
+on:
+  push:
+    paths:
+      - 'source/we5927-lte/src/veci-sms-status-report.c'
+      - 'source/we5927-lte/src/veci-sms-cmgs.c'
+      - 'scripts/veci-sms-delivery-report-readonly-preflight.sh'
+      - 'tests/test_veci_sms_delivery_reports.py'
+      - '.github/workflows/veci-sms-delivery-report-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  report-parser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode 3GPP status report with no modem commands
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_reports.py' -v
+      - name: Require original live v1.6.0 still selected
+        run: |
+          grep -Fq 'v1.6.0' scripts/veci-sms-mifi-v160-multipart-install.sh
+          ! grep -Fq 'veci-sms-status-report.c' source/we5927-lte/Makefile
+          echo VECI_DELIVERY_REPORT_SOURCE_ONLY_PASS
