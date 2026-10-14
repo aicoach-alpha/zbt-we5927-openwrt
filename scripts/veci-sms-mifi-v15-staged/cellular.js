@@ -374,6 +374,7 @@ export default {
 						<button class="button button-secondary" id="cellular-sms-clear" type="button">Clear screen</button>
 						<button class="button button-secondary" id="cellular-sms-compose-open" type="button">Compose SMS</button>
 						<button class="button button-secondary" id="cellular-sms-sent-open" type="button">Sent Messages</button>
+						<button class="button button-secondary" id="cellular-sms-drafts-open" type="button">Drafts</button>
 					</div>
 					<form id="cellular-sms-compose" hidden style="border:1px solid #dce6ef;padding:14px 16px;border-radius:12px;margin:12px 0">
 						<strong>Compose SMS</strong>
@@ -387,9 +388,15 @@ export default {
 						<p id="cellular-sms-send-status" role="status">Not sent.</p>
 						<div class="cellular-actions">
 							<button class="button" id="cellular-sms-send" type="submit">Send SMS</button>
+							<button class="button button-secondary" id="cellular-sms-draft-save" type="button">Save Draft</button>
 							<button class="button button-secondary" id="cellular-sms-compose-close" type="button">Close</button>
 						</div>
 					</form>
+					<div id="cellular-sms-drafts-panel" hidden style="border:1px solid #dce6ef;border-radius:12px;padding:14px 16px;margin:12px 0">
+						<strong>Drafts</strong>
+						<p id="cellular-sms-drafts-status" role="status">Open Drafts to load saved messages. Up to 10 drafts.</p>
+						<div id="cellular-sms-drafts-list"></div>
+					</div>
 					<div class="cellular-actions" style="margin:12px 0;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
 						<label for="cellular-sms-search" style="flex:1;min-width:180px">Search Inbox
 							<input id="cellular-sms-search" type="search" placeholder="Sender or message text" autocomplete="off" disabled style="display:block;width:100%;margin-top:4px"/>
@@ -460,6 +467,20 @@ export default {
 		const smsSendStatus = root.querySelector('#cellular-sms-send-status');
 		const smsSend = root.querySelector('#cellular-sms-send');
 		const smsComposeClose = root.querySelector('#cellular-sms-compose-close');
+		const smsDraftOpen = root.querySelector('#cellular-sms-drafts-open');
+		const smsDraftSave = root.querySelector('#cellular-sms-draft-save');
+		const smsDraftPanel = root.querySelector('#cellular-sms-drafts-panel');
+		const smsDraftStatus = root.querySelector('#cellular-sms-drafts-status');
+		const smsDraftList = root.querySelector('#cellular-sms-drafts-list');
+		let selectedDraft=null;
+		let draftGeneration=0;
+		function clearDrafts(){
+			draftGeneration++;
+			selectedDraft=null;
+			smsDraftSave.textContent='Save Draft';
+			smsDraftList.replaceChildren();
+			smsDraftPanel.hidden=true;
+		}
 		const smsSearch = root.querySelector('#cellular-sms-search');
 		const smsFilter = root.querySelector('#cellular-sms-filter');
 		let smsSearchItems = [];
@@ -481,6 +502,7 @@ export default {
 		let smsGeneration = 0;
 		function clearSms() {
 			smsGeneration += 1;
+			clearDrafts();
 			smsSearchItems = [];
 			smsSearch.value = '';
 			smsFilter.value = 'all';
@@ -516,6 +538,8 @@ export default {
 		}
 		const openCompose = (number='')=>{
 			if(!smsEnabled)return;
+			selectedDraft=null;
+			smsDraftSave.textContent='Save Draft';
 			smsCompose.hidden=false;
 			if(number)smsTo.value=number;
 			smsTo.focus();
@@ -565,6 +589,109 @@ export default {
 				if(turn===smsSentGeneration && smsEnabled)
 					smsSentOutput.textContent='Unable to load Sent Messages. Please try again.';
 			}finally{setBusy(smsSentOpen,false);}
+		});
+
+
+		async function renderDrafts(){
+			if(!smsEnabled)return;
+			const turn=++draftGeneration;
+			smsDraftPanel.hidden=false;
+			smsDraftStatus.textContent='Loading Drafts…';
+			smsDraftList.replaceChildren();
+			setBusy(smsDraftOpen,true,'Loading…');
+			try{
+				const r=await api.call('veci.sms','getDrafts',{}, {timeout:6000});
+				if(!smsEnabled || turn!==draftGeneration)return;
+				if(r?.ok!==true||r.source!=='local_drafts' ||
+					!Number.isSafeInteger(r.count)||r.count<0||r.count>10 ||
+					!Array.isArray(r.drafts)||r.drafts.length!==r.count)
+					throw Error('Invalid draft listing');
+				const frag=document.createDocumentFragment();
+				const seen=new Set();
+				for(const item of r.drafts){
+					if(!Number.isSafeInteger(item.id)||item.id<1||item.id>10 ||
+						seen.has(item.id)||!Number.isSafeInteger(item.at)||
+						item.at<0||typeof item.pdu!=='string'||item.pdu.length>384)
+						throw Error('Invalid draft entry');
+					seen.add(item.id);
+					const decoded=decodeSentPdu(item.pdu);
+					const card=document.createElement('article');
+					card.style.cssText='border:1px solid #dce6ef;border-radius:12px;padding:12px;margin:10px 0;overflow-wrap:anywhere;';
+					const title=document.createElement('strong');
+					title.textContent='To: '+decoded.to;
+					const date=document.createElement('small');
+					date.style.cssText='display:block;opacity:.78;margin:6px 0';
+					date.textContent=new Date(item.at*1000).toLocaleString('id-ID')+' · Unsent draft';
+					const body=document.createElement('p');
+					body.textContent=decoded.text;
+					body.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere';
+					const edit=document.createElement('button');
+					edit.type='button';edit.className='button button-secondary';
+					edit.textContent='Edit Draft';
+					edit.addEventListener('click',()=>{
+						if(!smsEnabled || turn!==draftGeneration)return;
+						openCompose(decoded.to);
+						smsText.value=decoded.text;
+						selectedDraft={id:item.id,original:item.pdu};
+						smsDraftSave.textContent='Update Draft';
+						smsSendStatus.textContent='Editing saved draft. Not sent.';
+					});
+					const del=document.createElement('button');
+					del.type='button';del.className='button button-secondary';
+					del.textContent='Delete Draft';
+					del.style.cssText='margin-left:8px';
+					del.addEventListener('click',async()=>{
+						if(!smsEnabled || turn!==draftGeneration)return;
+						const yes=await confirm({
+							title:'Delete this draft?',
+							message:'Remove this unsent draft from router storage? This cannot be undone.',
+							confirmLabel:'Delete Draft'
+						});
+						if(!yes || !smsEnabled || turn!==draftGeneration)return;
+						setBusy(del,true,'Deleting…');
+						try{
+							const result=await api.call('veci.sms','deleteDraft',
+								{id:item.id,expectedPdu:item.pdu},{timeout:6500});
+							if(result?.ok!==true || result.deleted!==item.id)throw Error('Delete unsuccessful');
+							if(selectedDraft?.id===item.id){
+								selectedDraft=null;smsDraftSave.textContent='Save Draft';
+							}
+							toast('Draft deleted.','success');
+							await renderDrafts();
+						}catch{smsDraftStatus.textContent='Draft deletion failed; refresh list before retrying.';}
+						finally{setBusy(del,false);}
+					});
+					card.append(title,date,body,edit,del);
+					frag.appendChild(card);
+				}
+				smsDraftList.replaceChildren(frag);
+				smsDraftStatus.textContent=r.count+
+					' saved drafts on this router. Only valid single-SMS drafts can be saved.';
+			}catch{
+				if(turn===draftGeneration)smsDraftStatus.textContent='Could not load Drafts. Inbox and Sent are unchanged.';
+			}finally{setBusy(smsDraftOpen,false);}
+		}
+		smsDraftOpen.addEventListener('click',renderDrafts);
+		smsDraftSave.addEventListener('click',async()=>{
+			if(!smsEnabled || smsDraftSave.disabled)return;
+			let pdu;
+			try{pdu=buildSmsSubmit(smsTo.value.trim(),smsText.value);}
+			catch(e){smsSendStatus.textContent='Draft not saved: '+String(e?.message||'Invalid message');return;}
+			const saved=selectedDraft;
+			setBusy(smsDraftSave,true,'Saving…');
+			try{
+				const r=await api.call('veci.sms','saveDraft',{
+					id:saved?.id??0,expectedPdu:saved?.original??'-',pdu
+				},{timeout:6500});
+				if(r?.ok!==true || r.saved!==true ||
+					!Number.isSafeInteger(r.id)||r.id<1||r.id>10)throw Error('Draft save failed');
+				selectedDraft={id:r.id,original:pdu};
+				smsDraftSave.textContent='Update Draft';
+				smsSendStatus.textContent='Draft saved on the router. It has not been sent.';
+				toast('Draft saved.','success');
+				await renderDrafts();
+			}catch{smsSendStatus.textContent='Draft not saved. Check storage or reopen Drafts before retrying.';}
+			finally{setBusy(smsDraftSave,false);}
 		});
 
 		smsComposeClose.addEventListener('click',()=>{
