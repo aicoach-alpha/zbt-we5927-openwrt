@@ -22,7 +22,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define MAX_INPUT 4096
+#define VECI_MAX_INPUT 4096
 #define MAX_SECRET 512
 #define MAX_TOKEN 3072
 #define QUOTA_PATH "api/v8/packages/quota-details"
@@ -60,12 +60,12 @@ static int digest(const unsigned char *src,size_t n,unsigned char out[32]){
  return inf?mbedtls_md(inf,src,n,out):-1;
 }
 static int encryption(const char *time,const char *file){
- unsigned char key[MAX_SECRET+2]={0},plain[MAX_INPUT+32]={0};
- unsigned char hashed[32],iv[16],encrypted[MAX_INPUT+32]={0},encoded[(MAX_INPUT+64)*2]={0};
+ unsigned char key[MAX_SECRET+2]={0},plain[VECI_MAX_INPUT+32]={0};
+ unsigned char hashed[32],iv[16],encrypted[VECI_MAX_INPUT+32]={0},encoded[(VECI_MAX_INPUT+64)*2]={0};
  size_t klen=0,n=0,olen=0;int rc=1;
  if(!numeric(time,13)||load(file,key,MAX_SECRET,&klen)||klen!=32)goto done;
- n=fread(plain,1,MAX_INPUT+1,stdin);
- if(n==0||n>MAX_INPUT||ferror(stdin))goto done;
+ n=fread(plain,1,VECI_MAX_INPUT+1,stdin);
+ if(n==0||n>VECI_MAX_INPUT||ferror(stdin))goto done;
  if(digest((const unsigned char *)time,strlen(time),hashed))goto done;
  const char hex[]="0123456789abcdef";char ivhex[65];
  for(size_t i=0;i<32;i++){ivhex[i*2]=hex[hashed[i]>>4];ivhex[i*2+1]=hex[hashed[i]&15];}
