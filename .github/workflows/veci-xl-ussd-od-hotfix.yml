@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - '.github/workflows/veci-xl-ussd-od-hotfix.yml'
+      - 'scripts/veci-xl-v171-nood-hotfix.sh'
+      - 'tests/test_veci_xl_nood_hotfix.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -50,3 +52,7 @@ jobs:
           echo "VECI_XL_USSD_ORIGINAL_SHA256=$(sha256sum "$old" | cut -d' ' -f1)"
           echo "VECI_XL_USSD_HOTFIX_SHA256=$(sha256sum "$new" | cut -d' ' -f1)"
           echo "VECI_XL_USSD_NO_OD_HOTFIX_PASS"
+          sh -n scripts/veci-xl-v171-nood-hotfix.sh
+          VECI_TEST_OLD="$old" VECI_TEST_NEW="$new" \
+            python3 -m unittest discover -s tests -p test_veci_xl_nood_hotfix.py -v
+          echo "VECI_XL_USSD_ATOMIC_HOTFIX_AND_ROLLBACK_PASS"
