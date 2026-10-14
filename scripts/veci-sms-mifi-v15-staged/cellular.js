@@ -299,6 +299,17 @@ export default {
 		const operator = normalizeOperator(status.operator);
 		const technology = status.access_tech || status.registration_status || 'Unknown';
 
+		// The router's Content-Security-Policy is style-src 'self'.
+		// Inline <style> and style="..." are blocked; load a local CSS file.
+		// Keep a single stylesheet when navigating away/back to Cellular.
+		if (!document.getElementById('veci-sms-center-v159-css')) {
+			const link = document.createElement('link');
+			link.id = 'veci-sms-center-v159-css';
+			link.rel = 'stylesheet';
+			link.href = '/veci/sms-center.css?v=159';
+			document.head.appendChild(link);
+		}
+
 		root.innerHTML = `
 			<div class="page-intro">
 				<div>
@@ -360,75 +371,7 @@ export default {
 			</div>
 
 
-				<style id="veci-sms-center-v158-styles">
-					#cellular-sms-inbox-controls { min-width: 0; }
-					#cellular-sms-inbox-controls button { cursor: pointer; }
-					#cellular-sms-compose[hidden],
-					#cellular-sms-drafts-panel[hidden],
-					#cellular-sms-sent-panel[hidden] { display: none !important; }
-					#cellular-sms-compose:not([hidden]) {
-						display: flex !important;
-						flex-direction: column !important;
-						align-items: stretch !important;
-						gap: 14px !important;
-						width: 100%;
-						min-width: 0;
-						max-width: 800px;
-						box-sizing: border-box;
-						padding: 20px !important;
-						margin: 16px 0 18px !important;
-						border: 1px solid #d8e6f1 !important;
-						border-radius: 14px !important;
-						background: #f9fcff !important;
-					}
-					#cellular-sms-compose .sms-compose-title { display: block; font-size: 17px; font-weight: 750; color: #12304a; }
-					#cellular-sms-compose .sms-compose-subtitle { margin: 2px 0 0; color: #586e83; font-size: 13px; }
-					#cellular-sms-compose .sms-compose-field {
-						display: flex !important; flex-direction: column !important;
-						gap: 6px; margin: 0 !important; min-width: 0;
-						font-size: 13px; font-weight: 650; color: #27445e;
-					}
-					#cellular-sms-compose #cellular-sms-to,
-					#cellular-sms-compose #cellular-sms-text {
-						display: block !important; width: 100% !important; min-width: 0; max-width: none;
-						box-sizing: border-box; border: 1px solid #c5d6e5;
-						border-radius: 9px; padding: 11px 12px;
-						margin: 0 !important; background: #fff; color: #102f49;
-						font-size: 14px; line-height: 1.5; font-family: inherit;
-					}
-					#cellular-sms-compose #cellular-sms-text {
-						resize: vertical; min-height: 124px; max-height: 300px;
-					}
-					#cellular-sms-compose :is(input, textarea):focus-visible {
-						outline: 2px solid #1b8abc; outline-offset: 2px;
-					}
-					#cellular-sms-compose #cellular-sms-length {
-						margin: -6px 0 0; font-size: 12px; color: #596f82;
-					}
-					#cellular-sms-compose #cellular-sms-send-status {
-						margin: 0; padding: 10px 12px; border-radius: 9px;
-						background: #ecf3f9; color: #254764; font-size: 13px;
-					}
-					#cellular-sms-compose .sms-compose-actions {
-						display: flex !important; flex-direction: row !important;
-						flex-wrap: wrap; gap: 8px; align-items: center;
-						margin: 0 !important;
-					}
-					#cellular-sms-compose .sms-compose-actions button {
-						min-width: 110px; width: auto !important;
-					}
-					#cellular-sms-drafts-panel { max-width: 900px; }
-					#cellular-sms-drafts-list article { background: #fff; }
-					#cellular-sms-inbox-controls > .cellular-actions:first-of-type {
-						display: flex; flex-wrap: wrap; gap: 8px;
-					}
-					@media(max-width: 600px) {
-						#cellular-sms-compose:not([hidden]) { padding: 14px !important; }
-						#cellular-sms-compose .sms-compose-actions button {
-							flex: 1 1 130px; min-width: 0;
-						}
-					}
-				</style>
+				
 			<section class="panel" aria-labelledby="cellular-sms-mifi-title">
 				<div class="panel-heading">
 					<div><p class="eyebrow">MESSAGING</p><h3 id="cellular-sms-mifi-title">SMS Inbox</h3></div>
