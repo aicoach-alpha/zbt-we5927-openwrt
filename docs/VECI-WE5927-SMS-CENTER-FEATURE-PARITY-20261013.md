@@ -1,52 +1,30 @@
-# VeCI / WE5927 SMS Center — feature parity and releases (13 Oct 2026)
+# VeCI WE5927 SMS Center — physical UAT status (14 October 2026)
 
-The owner physically verified SMS v1.5.1 UI: SMS feature ON, Open Inbox
-successfully displays five actual XL operator SMS, including sender and
-GSM7 message text. This is **real Inbox read LIVE**, not a simulated success.
+## Verified LIVE on the owner's physical ZBT WE5927
 
-## Incremental releases
+- SMS feature persistent ON/OFF switch; active SMS Inbox and current modem storage identified as ME.
+- SMS Inbox originally displayed five XL SMS segments, joined into three readable messages, with sender, network date/time, read/unread status, and full body.
+- Delete SMS **functionally PASS**: user confirmed deleting one multipart SMS (two underlying stored slots), storage count fell from 5 to 3 after a fresh Inbox read.
+- Copy Message **functionally PASS** on the user's local HTTP router page.
+- SMS Compose/Send **end-to-end LIVE/PASS**: owner submitted an SMS through VeCI v1.5.5, browser reported “Accepted by modem,” **and owner confirmed the recipient device received the message**.
+- Admin auth/ACL and SMS feature switch remain in place. No SMS was transmitted during installation.
+- Do not re-test previously verified features without a reproducible regression. Existing UI visible in latest UAT is functional but Compose form styling needs polish.
 
-- **v1.5.2 UI-only READY**: parse original 3GPP SMSC timestamp (SCTS)
-  with signed quarter-hour timezone; display local received date/time;
-  read/unread status; sort newest-first; reassemble 8-/16-bit UDH
-  multipart segments only when complete, same sender/reference/count and
-  within 48 hours. Do not invent missing timestamps. SHA-pinned rollback.
-- **v1.5.3 READY for owner physical install, NOT YET LIVE**:
-  identify selected SMS memory through `AT+CPMS?` (`SM` SIM, `ME`
-  modem, `MT` combined/ambiguous); show it in Inbox. Support one-at-a-
-  time deletion only in a *known selected* SM/ME storage, with a single
-  explicit permanent-deletion confirmation. The admin WRITE-only
-  `veci.sms.deleteMessage` handler requires persistent SMS feature ON,
-  decimal slot 0..65535, expected memory, and exact PDU of the displayed
-  message. Under the existing shared modem lock the worker validates
-  physical USB identity, verifies current `AT+CPMS?` memory and PDU
-  mode, re-reads `AT+CMGR=<slot>` and compares the full PDU to the
-  expected one, then sends `AT+CMGD=<slot>,0` for only that message.
-  A deleted multipart message invokes separately for each segment;
-  there is **no bulk delete**. Anonymous access is denied. Modem
-  is untouched during installation. The current user-selected SMS
-  ON/OFF setting is preserved.
-- **not yet implemented**: selecting/temporarily switching SMS memory
-  between `SM` and `ME` with state restoration and UAT; deleting in
-  ambiguous `MT`; reply/send SMS, Sent folder, delivery reports,
-  drafts, search/filter and export. Do not present these as LIVE.
+## Deployment evidence / scope
 
-## Outgoing SMS transport gate
+- v1.5.5 installer: `scripts/veci-sms-mifi-v155-send-install.sh`, hotfix commit `4cc2d7537d09d3495d02476ed27f8bb51da529e8` applied by owner.
+- Owner reported final installation: `SMS_SEND_V155_BACKEND_AND_UI_LIVE_INSTALL_PASS`, native MIPS binary SHA PASS, anonymous denied, ON/OFF preserved, with zero modem commands during install.
+- The original v1.5.5 install attempt failed RPC-registration check and rolled back; subsequent corrected installer succeeded.
+- **Reply** UI is present for numeric-originator messages but user has not separately demonstrated a Reply send.
+- **Delete from SIM (SM)** is implemented conditionally but not physically verified: observed store was ME.
+- Do not claim delivery reports, Sent folder, Drafts, multipart sending, cross-store switching, or USSD are LIVE.
 
-The existing `we5927-at` CLI is explicitly a single printable
-`AT...\r` command and waits for terminal `OK`; it **cannot** carry a
-two-stage `AT+CMGS` prompt, PDU plus Ctrl-Z transaction. Do not hack a
-transmit feature using shell-embedded control characters or switch to text
-mode without a robust transport. Implement one bounded modem transaction
-worker using the same modem lock; validate recipient, GSM7/UCS2 encoding,
-multipart and exact send confirmation; require one click (not repeated
-overconfirmation); never log SMS/OTP or number; do not retry an uncertain
-send automatically. Test the transport on a synthetic PTY first, then
-release after targeted UAT without affecting LTE.
+## Next changes — execute as small releasable vertical slices
 
-## Execution cadence
+1. **Sent Messages**: record a bounded, private Sent history only when the modem confirms acceptance. Clearly distinguish accepted-by-modem from received-by-recipient. Make it viewable across VeCI devices, never store message content in logs; preserve ON/OFF.
+2. **Drafts**: create/edit/delete persisted private drafts with explicit user actions and reasonable small storage limits. Avoid browser-local storage that leaks across users.
+3. **Compose polish**: responsive form layout, clear recipient input, status, character count, actions; Reply only to real phone numbers, not brand names.
+4. **Multipart SMS-SUBMIT**: implement proper concatenation UDH, sensible confirmation for the complete message and per-part non-retry handling; physically verify separately.
+5. **Sent storage, delivery report, SM/ME memory switching, USSD**: discover modem support before enabling controls; don't infer missing support.
 
-Feature implementation -> focused test -> SHA-pinned reversible deployment
--> physical LIVE functional check -> next feature. Do not claim the new
-delete route LIVE from source or CI alone. Do not read real OTP/message
-contents in logs or user-visible diagnostics.
+Keep each cycle: implement → focused tests → SHA-pinned reversible deploy → actual device functional verification → next. Never delete existing SMS, change SIM, reboot, flash, or send test messages without direct user action.
