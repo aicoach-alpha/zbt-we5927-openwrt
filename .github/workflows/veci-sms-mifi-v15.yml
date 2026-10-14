@@ -16,6 +16,9 @@ on:
       - 'scripts/veci-sms-mifi-v155-send-install.sh'
       - 'tests/veci_sms_mifi_decoder_smoke.cjs'
       - 'tests/veci_sms_mifi_send_smoke.cjs'
+      - 'tests/veci_sms_mifi_sent_smoke.cjs'
+      - 'scripts/veci-sms-mifi-v156-staged/**'
+      - 'scripts/veci-sms-mifi-v156-sent-install.sh'
       - 'tests/test_veci_sms_delete_awk_smoke.py'
 permissions:
   contents: read
@@ -33,6 +36,10 @@ jobs:
           sh -n scripts/veci-sms-mifi-v15-staged/veci-sms-mifi-inbox
           sh -n scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one
           sh -n scripts/veci-sms-mifi-v155-staged/veci-sms-send-one
+          sh -n scripts/veci-sms-mifi-v156-staged/veci-sms-sent-history
+          if [ -f scripts/veci-sms-mifi-v156-sent-install.sh ]; then
+            sh -n scripts/veci-sms-mifi-v156-sent-install.sh
+          fi
           sh -n scripts/veci-sms-mifi-v155-send-install.sh
           sh -n scripts/veci-sms-mifi-v1531-inbox-hotfix.sh
           sh -n scripts/veci-sms-mifi-v154-ui-install.sh
@@ -55,7 +62,7 @@ jobs:
           acl=json.loads((d/'acl.json').read_text())
           assert acl['veci-sms-inbox-we5927']['read']['ubus']=={}
           assert acl['veci-sms-inbox-we5927']['write']['ubus']['veci.sms']==[
-              'listIndex','getConfig','setEnabled','listMessages','deleteMessage','sendMessage']
+              'listIndex','getConfig','setEnabled','listMessages','deleteMessage','sendMessage','getSent']
           assert 'sms_state || { deny sms_disabled; return; }' in rpc
           assert 'sms_state || { unset result; deny sms_disabled; exit 0; }' in rpc
           assert 'smsState.textContent' in ui and 'clearSms()' in ui
@@ -68,6 +75,9 @@ jobs:
           assert "'AT+CPMS?'" in worker
           assert 'delete_message()' in rpc
           assert 'send_message()' in rpc
+          assert 'get_sent()' in rpc
+          assert 'history_saved' in rpc
+          assert "api.call('veci.sms','getSent'" in ui
           assert "api.call('veci.sms','sendMessage'" in ui
           # v1.5.3 adds storage before count; exact old v1.5.2 pattern
           # silently rejected ALL valid full-SMS lists after upgrade.
@@ -83,6 +93,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_delete_awk_smoke.py' -v
       - name: Single-SMS Compose GSM7/UCS2 PDU smoke
         run: node tests/veci_sms_mifi_send_smoke.cjs
+      - name: Saved Sent SMS PDU decoder and privacy smoke
+        run: node tests/veci_sms_mifi_sent_smoke.cjs
       - name: Operator sender and DCS PDU smoke
         run: node tests/veci_sms_mifi_decoder_smoke.cjs
       - name: Immutable deployment asset SHA256
@@ -92,5 +104,6 @@ jobs:
                     scripts/veci-sms-mifi-v15-staged/veci-sms-mifi-inbox \
                     scripts/veci-sms-mifi-v15-staged/cellular.js \
                     scripts/veci-sms-mifi-v15-staged/acl.json \
-                    scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one
+                    scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one \
+                    scripts/veci-sms-mifi-v156-staged/veci-sms-sent-history
           echo VECI_MIFI_SMS_V15_SHA_END
