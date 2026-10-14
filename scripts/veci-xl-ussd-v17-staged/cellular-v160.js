@@ -1126,6 +1126,15 @@ export default {
 		const xlResponse=root.querySelector('#cellular-xl-ussd-response');
 		const xlQuota=root.querySelector('#cellular-xl-quota');
 		let xlToken=null;
+		// Local cache read only: this does NOT dial USSD during page load.
+		api.call('veci.ussd','quotaStatus',{}, {timeout:3000}).then(data=>{
+			if(data?.ok!==true||data.provider!=='xl'||data.state!=='ready')return;
+			if(typeof data.remaining_display!=='string'||
+			   !/^[0-9]{1,6}(?:[.,][0-9]{1,2})? (?:GB|MB|KB)$/.test(data.remaining_display))return;
+			xlQuota.hidden=false;
+			xlQuota.textContent='Last XL-reported remaining quota: '+data.remaining_display;
+			xlStatus.textContent='Cached XL USSD result (up to 15 minutes old); not a live billing API.';
+		}).catch(()=>{ /* Optional local cache is absent on older firmware. */ });
 		function presentXl(data){
 			if(data?.ok!==true||data.source!=='operator_ussd'||
 			   !Number.isInteger(data.mode)||data.mode<0||data.mode>5||
