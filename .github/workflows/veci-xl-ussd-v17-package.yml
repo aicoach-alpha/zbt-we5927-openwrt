@@ -1,0 +1,59 @@
+name: VeCI XL USSD and quota installation package
+on:
+  push:
+    paths:
+      - '.github/workflows/veci-xl-ussd-v17-package.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run on-demand USSD and v1.6.0 regression gates
+        run: |
+          set -eu
+          python3 -m unittest discover -s tests -p test_veci_xl_ussd_pty.py -q
+          node tests/test_veci_xl_ussd_ui.cjs
+          sh -n scripts/veci-xl-ussd-v17-staged/veci-xl-ussd
+          sh -n scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd
+      - name: Fetch SHA-pinned MIPS executable and bundle verified source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir -p /tmp/veci-native release/veci-xl-v17
+          gh release download veci-xl-ussd-fa34262c1e18 \
+            -p veci-xl-ussd-once-mipsel -D /tmp/veci-native
+          echo "4ea065b7a562ac6f261bd19b0f7f475eaec63a81493889bd56be646243e1cd7a  /tmp/veci-native/veci-xl-ussd-once-mipsel" | sha256sum -c -
+          install -m 0700 /tmp/veci-native/veci-xl-ussd-once-mipsel release/veci-xl-v17/veci-xl-ussd-once
+          install -m 0700 scripts/veci-xl-ussd-v17-staged/veci-xl-ussd release/veci-xl-v17/veci-xl-ussd
+          install -m 0700 scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd release/veci-xl-v17/veci.ussd
+          install -m 0600 scripts/veci-xl-ussd-v17-staged/veci-ussd-acl.json release/veci-xl-v17/veci-xl-ussd.json
+          install -m 0600 scripts/veci-xl-ussd-v17-staged/cellular-v160.js release/veci-xl-v17/cellular.js
+          ( cd release/veci-xl-v17 &&
+            sha256sum veci-xl-ussd-once veci-xl-ussd veci.ussd veci-xl-ussd.json cellular.js > SHA256SUMS
+            printf 'SOURCE_COMMIT=%s\nVERSION=v1.7.0-xl-ussd\nNO_MODEM_COMMAND_DURING_INSTALL=1\n' "$GITHUB_SHA" > RELEASE_INFO )
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
+            -C release -czf release/veci-xl-v17.tar.gz veci-xl-v17
+          sha256sum release/veci-xl-v17.tar.gz
+          echo VECI_XL_USSD_INSTALL_PACKAGE_BUILT_PASS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-xl-v17-install-package
+          path: release/veci-xl-v17.tar.gz
+      - name: Publish immutable deployment candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-xl-v17-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/veci-xl-v17.tar.gz \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI XL USSD + quota v1.7.0 deployment candidate" \
+            --notes "Full binary and UI integrated; does not automatically install or dial. Physical WE5927 UAT and rollback required before LIVE designation."
+          echo "VECI_XL_INSTALL_PACKAGE=$tag"
