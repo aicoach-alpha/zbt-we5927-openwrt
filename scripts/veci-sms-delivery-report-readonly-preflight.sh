@@ -1,6 +1,6 @@
 #!/bin/sh
 # VeCI WE5927 SMS Delivery Report capability check.
-# Only AT+CMGF?, AT+CSMS?, AT+CNMI?, AT+CPMS? queries under modem lock.
+# Only AT+CMGF?, AT+CSMS?, AT+CNMI?, AT+CNMI=?, AT+CPMS?, AT+CPMS=? queries under modem lock.
 # No SMS text/number/PDU, session, tokens or raw AT replies are printed.
 # Does NOT enable routing, change CNMI, read or delete SMS, reboot LTE, or send SMS.
 set -eu
@@ -62,6 +62,15 @@ echo 'VECI_SMS_DELIVERY_PREFLIGHT=read_only'
      *)echo 'STATUS_REPORT_ROUTING=unknown';;
    esac
  else echo 'STATUS_REPORT_ROUTING=unavailable';fi
+ # Capability-query forms are strictly read-only; do not alter CNMI/CPMS.
+ if cnmicap="$(probe 'AT+CNMI=?' '+CNMI')";then
+   # The modem can advertise <ds> capability set but we never print raw
+   # modem responses. Values must be reviewed before any configuration.
+   echo 'CNMI_SUPPORTED_VALUES_QUERY=responded'
+ else echo 'CNMI_SUPPORTED_VALUES_QUERY=unavailable';fi
+ if cpmscap="$(probe 'AT+CPMS=?' '+CPMS')";then
+   echo 'CPMS_SUPPORTED_STORES_QUERY=responded'
+ else echo 'CPMS_SUPPORTED_STORES_QUERY=unavailable';fi
  if cpms="$(probe 'AT+CPMS?' '+CPMS')";then
    echo 'SMS_STORAGE_QUERY=responded'
  else echo 'SMS_STORAGE_QUERY=unavailable';fi
