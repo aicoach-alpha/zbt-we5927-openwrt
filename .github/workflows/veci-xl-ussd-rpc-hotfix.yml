@@ -1,0 +1,51 @@
+name: VeCI XL USSD rpcd single-response hotfix check
+on:
+  push:
+    paths:
+      - '.github/workflows/veci-xl-ussd-rpc-hotfix.yml'
+      - 'scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd'
+      - 'tests/test_veci_xl_ussd_rpc_single_json.py'
+      - 'scripts/veci-xl-v171-rpc-single-response-hotfix.sh'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test one-response RPC contract
+        run: |
+          set -eu
+          python3 -m unittest discover -s tests -p test_veci_xl_ussd_rpc_single_json.py -v
+          sh -n scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd
+      - name: Pin checksums to already installed v1.7.1 archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir -p /tmp/veci-rpc-release
+          gh release download veci-xl-v17-fbf0fc346a1b -p veci-xl-v17.tar.gz -D /tmp/veci-rpc-release
+          echo "f59f566c964f5dee70ce246c37a78e0a9eca01a16d1c530588adc6aebd23900c  /tmp/veci-rpc-release/veci-xl-v17.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/veci-rpc-release/veci-xl-v17.tar.gz -C /tmp/veci-rpc-release
+          previous=/tmp/veci-rpc-release/veci-xl-v17/veci.ussd
+          next=scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd
+          python3 - "$previous" "$next" <<'PY'
+          import sys,difflib,pathlib
+          old=pathlib.Path(sys.argv[1]).read_text()
+          new=pathlib.Path(sys.argv[2]).read_text()
+          assert old!=new
+          assert 'start) "$RUN" --start || fail ussd_unavailable;;' in old
+          assert 'start) emit "$RUN" --start;;' in new
+          assert "quotaStatus" in old and "quotaStatus" in new
+          assert "emit(){" in new and "jsonfilter" in new
+          assert "exit 0; }" in new
+          delta=list(difflib.unified_diff(old.splitlines(),new.splitlines(),lineterm=''))
+          assert len(delta)<90, "unexpected wide plugin changes"
+          print("VECI_XL_RPC_DIFF_LINES="+str(len(delta)))
+          PY
+          echo "VECI_XL_RPC_ORIGINAL_SHA256=$(sha256sum "$previous" | cut -d' ' -f1)"
+          echo "VECI_XL_RPC_HOTFIX_SHA256=$(sha256sum "$next" | cut -d' ' -f1)"
+          echo VECI_XL_RPC_SINGLE_RESPONSE_SCOPE_PASS
