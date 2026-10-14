@@ -10,6 +10,7 @@ import unittest
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 SOURCE=ROOT/"scripts/veci-sms-delivery-v161-staged/veci-sms-sent-delivery-view"
+SECRET="b"*64
 PDU="0021000B912143658709F1000005C82293F904"
 OTHER="0021000B912143658709F1000003C14021"
 LEGACY="0001000B912143658709F1000005C82293F904"
@@ -22,16 +23,19 @@ class SentDeliveryView(unittest.TestCase):
         self.mapping=d/"mapping"
         self.feature=d/"feature"
         self.board=d/"board"
+        self.secret=d/"secret"
         self.lock=d/"lock"
         self.history.write_text("")
         self.mapping.write_text("")
         self.feature.write_text("1")
         self.board.write_text("zbtlink,zbt-we5927")
+        self.secret.write_text(SECRET+"\n")
         source=SOURCE.read_text()
         for old,new in [
             ("/etc/veci-sms-sent-history",str(self.history)),
             ("/etc/veci-sms-delivery-map",str(self.mapping)),
             ("/etc/veci-sms-feature",str(self.feature)),
+            ("/etc/veci-sms-delivery-secret",str(self.secret)),
             ("/tmp/sysinfo/board_name",str(self.board)),
             ("/var/lock/veci-sms-delivery-map.lock",str(self.lock)),
             ('[ "$(id -u)" -eq 0 ]','[ 0 -eq 0 ]'),
@@ -53,8 +57,8 @@ class SentDeliveryView(unittest.TestCase):
     def put_map(self,pdu=PDU,state="delivered",st=0,at=None,mr=18,
                 recipient="12345678901"):
         at=at or int(time.time())
-        rh=hashlib.sha256(recipient.encode()).hexdigest()
-        ph=hashlib.sha256(pdu.encode()).hexdigest()
+        rh=hashlib.sha256(f"{SECRET}:recipient:{recipient}:{SECRET}".encode()).hexdigest()
+        ph=hashlib.sha256(f"{SECRET}:pdu:{pdu}:{SECRET}".encode()).hexdigest()
         with self.mapping.open("a") as f:
             f.write(f"{at}|{mr}|{rh}|{ph}|{state}|{st}\n")
     def messages(self):
