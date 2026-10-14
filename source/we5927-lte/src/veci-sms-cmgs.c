@@ -102,7 +102,7 @@ static int put_all(int fd,const void *buf,size_t n,long long deadline) {
     return 0;
 }
 static int read_phase(int fd,int prompt_phase,long long deadline){
-    char line[256];size_t linelen=0;
+    char line[512];size_t linelen=0;
     int mr=0;unsigned bytes=0;
     for(;;){
         long long now=monotonic_ms();
