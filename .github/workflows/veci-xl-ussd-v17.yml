@@ -5,6 +5,7 @@ on:
       - 'source/we5927-lte/src/veci-xl-ussd-once.c'
       - 'scripts/veci-xl-ussd-v17-staged/**'
       - 'tests/test_veci_xl_ussd_pty.py'
+      - 'tests/test_veci_xl_ussd_ui.cjs'
       - '.github/workflows/veci-xl-ussd-v17.yml'
   workflow_dispatch:
 permissions:
@@ -22,7 +23,8 @@ jobs:
           set -eu
           sh -n scripts/veci-xl-ussd-v17-staged/veci-xl-ussd
           sh -n scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd
-          node --check --input-type=module < scripts/veci-xl-ussd-v17-staged/cellular.js
+          node --check --input-type=module < scripts/veci-xl-ussd-v17-staged/cellular-v160.js
+          node tests/test_veci_xl_ussd_ui.cjs
           python3 - <<'PY'
           import json,pathlib
           base=pathlib.Path("scripts/veci-xl-ussd-v17-staged")
