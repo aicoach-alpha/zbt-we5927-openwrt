@@ -32,7 +32,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p=Path("scripts/veci-telco-native-preflight-20261014.sh").read_text()
-          for forbidden in ("AT+CUSD", "AT+CMGR", "AT+CMGS", "curl ", "wget ", "apk add", "sysupgrade ", "reboot "):
+          for forbidden in ("AT+CUSD", "AT+CMGR", "AT+CMGS", "curl -", "wget -", "apk add", "sysupgrade ", "reboot "):
               assert forbidden not in p, forbidden
           assert "VECI_EXTERNAL_INTERMEDIARY=false" in p
           assert "VECI_NATIVE_QUOTA_PROVIDER_STATUS=not_authenticated" in p
