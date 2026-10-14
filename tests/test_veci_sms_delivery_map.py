@@ -1,4 +1,5 @@
 """Offline v1.6.1 correlated Delivery Report tests; no modem, SMS or personal data."""
+import fcntl
 import json
 import pathlib
 import subprocess
@@ -16,11 +17,13 @@ class DeliveryMap(unittest.TestCase):
         self.context=tempfile.TemporaryDirectory()
         d=pathlib.Path(self.context.name)
         self.store=d/"map"
+        self.lock=d/"lock"
         self.store.write_text("")
         (d/"feature").write_text("1")
         (d/"board").write_text("zbtlink,zbt-we5927")
         code=SCRIPT.read_text()
         code=code.replace("/etc/veci-sms-delivery-map",str(self.store))
+        code=code.replace("/var/lock/veci-sms-delivery-map.lock",str(self.lock))
         code=code.replace("/etc/veci-sms-feature",str(d/"feature"))
         code=code.replace("/tmp/sysinfo/board_name",str(d/"board"))
         code=code.replace('[ "$(id -u)" = 0 ]','[ 0 = 0 ]')
@@ -69,6 +72,19 @@ class DeliveryMap(unittest.TestCase):
         self.assertNotEqual(self.cmd("--track","18",pdu="AT+CMGD=1").returncode,0)
         self.assertNotEqual(self.cmd("--apply","18","not-a-number","0").returncode,0)
         self.assertEqual(self.store.read_text(),"")
+    def test_busy_correlator_lock_denies_changes_and_reads(self):
+        # A report arriving while a send is being tracked must fail closed,
+        # not interleave its write or produce a stale state.
+        with self.lock.open("w") as handle:
+            fcntl.flock(handle,fcntl.LOCK_EX)
+            for args in [("--track","18"),("--list",),("--apply","18","+12345678901","0")]:
+                result=self.cmd(*args,pdu=PDU)
+                self.assertNotEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertEqual(json.loads(result.stdout)["ok"],False)
+            self.assertEqual(self.store.read_text(),"")
+        self.assertEqual(self.cmd("--track","18",pdu=PDU).returncode,0)
+        self.assertEqual(self.cmd("--apply","18","+12345678901","0").returncode,0)
+
     def test_sms_off_blocks_read_and_mutation(self):
         self.assertEqual(self.cmd("--track","18",pdu=PDU).returncode,0)
         self.script.parent.joinpath("feature").write_text("0")
