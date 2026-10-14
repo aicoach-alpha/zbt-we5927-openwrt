@@ -192,8 +192,8 @@ static int parse_response(size_t size,size_t *result){
  at+=2;
  while(at<sep){
   size_t end=at;
-  while(end+1<sep&&!(wire[end]=='\r'&&wire[end+1]=='\n'))end++;
-  if(end+1>=sep)return -1;
+  while(end+1<=sep&&!(wire[end]=='\r'&&wire[end+1]=='\n'))end++;
+  if(end>sep)return -1;
   size_t colon=at;
   while(colon<end&&wire[colon]!=':')colon++;
   if(colon==end)return -1;
