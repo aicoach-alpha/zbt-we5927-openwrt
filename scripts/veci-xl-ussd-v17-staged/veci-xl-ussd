@@ -74,7 +74,19 @@ EOF
    value="$3";steps=$((steps+1))
    rm -f "$STATE";;
  esac
- result="$("$BIN" /dev/ttyUSB2 "$value" 2>/dev/null)" || fail ussd_unavailable
+ # Native may have already sent AT+CUSD; do not auto-retry after a
+ # transport or network failure. Preserve only well-known native reasons.
+ if result="$("$BIN" /dev/ttyUSB2 "$value" 2>/dev/null)";then :
+ else
+  [ "$(printf %s "$result"|wc -c)" -le 160 ] || fail ussd_unavailable
+  native_reason="$(jsonfilter -s "$result" -e '@.reason' 2>/dev/null || :)"
+  case "$native_reason" in
+   outcome_unknown|network_rejected|serial_unavailable|invalid_response|invalid_request)
+    [ "$result" = "{\"ok\":false,\"reason\":\"$native_reason\"}" ] || fail ussd_unavailable
+    fail "$native_reason";;
+   *)fail ussd_unavailable;;
+  esac
+ fi
  [ "$(printf %s "$result"|wc -c)" -le 1300 ] || fail invalid_response
  case "$result" in '{"ok":true,"source":"operator_ussd","mode":'*',"dcs":'*',"text_supported":'*',"interactive":'*',"text":'*'}') ;; *)fail invalid_response;;esac
  [ ! -x /usr/libexec/veci-xl-quota-cache ] || printf '%s\n' "$result" | /usr/libexec/veci-xl-quota-cache --record >/dev/null 2>&1 || :
