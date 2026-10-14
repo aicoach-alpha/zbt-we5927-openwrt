@@ -5,7 +5,8 @@ on:
       - '.github/workflows/veci-xl-ussd-rpc-hotfix.yml'
       - 'scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd'
       - 'tests/test_veci_xl_ussd_rpc_single_json.py'
-      - 'scripts/veci-xl-v171-rpc-single-response-hotfix.sh'
+      - 'scripts/veci-xl-v171-response-hotfix.sh'
+      - 'tests/test_veci_xl_response_hotfix.py'
       - 'scripts/veci-xl-ussd-v17-staged/veci-xl-ussd'
       - 'tests/test_veci_xl_ussd_no_od.py'
   workflow_dispatch:
@@ -71,3 +72,11 @@ jobs:
           echo "VECI_XL_WORKER_CURRENT_SHA256=$(sha256sum /tmp/veci-xl-old-worker | cut -d' ' -f1)"
           echo "VECI_XL_WORKER_NEW_SHA256=$(sha256sum scripts/veci-xl-ussd-v17-staged/veci-xl-ussd | cut -d' ' -f1)"
           echo "VECI_XL_USSD_RECOVERY_PAIR_PASS"
+      - name: Verify SHA-pinned two-file hotfix apply rollback and fail closed
+        run: |
+          set -eu
+          sh -n scripts/veci-xl-v171-response-hotfix.sh
+          VECI_TEST_OLD_RPC=/tmp/veci-rpc-release/veci-xl-v17/veci.ussd \
+          VECI_TEST_OLD_WORKER=/tmp/veci-xl-old-worker \
+            python3 -m unittest discover -s tests -p test_veci_xl_response_hotfix.py -v
+          echo "VECI_XL_USSD_RESPONSE_PAIR_ATOMIC_ROLLBACK_PASS"
