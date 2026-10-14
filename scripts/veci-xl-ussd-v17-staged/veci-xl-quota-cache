@@ -52,7 +52,7 @@ EOF
         u=substr(x,length(x)-1,2)
         if(u!="gb"&&u!="mb"&&u!="kb")exit 1
         v=substr(x,1,length(x)-2)
-        if(v ~ /^[0-9]{1,6}([.,][0-9]{1,2})?$/) {
+        if(v ~ /^[0-9]+([.,][0-9][0-9]?)?$/) {
           printf "%s|%s",v,toupper(u);exit 0
         }
       }
