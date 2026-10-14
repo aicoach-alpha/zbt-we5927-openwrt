@@ -4,12 +4,13 @@
 set -eu
 umask 077
 LC_ALL=C;export LC_ALL
-TAG=veci-xl-v17-47f92db74148
-PIN=d000420c1956c491843ea04700bc298fbded2f5ac2edb87fa1da7abbf3c5ca9a
-URL=https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/veci-xl-v17-47f92db74148/veci-xl-v17.tar.gz
+TAG=veci-xl-v17-fbf0fc346a1b
+PIN=f59f566c964f5dee70ce246c37a78e0a9eca01a16d1c530588adc6aebd23900c
+URL=https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/veci-xl-v17-fbf0fc346a1b/veci-xl-v17.tar.gz
 UI=/www/veci/js/pages/cellular.js
 CMGS=/usr/libexec/veci-sms-cmgs
 WRAPPER=/usr/libexec/veci-xl-ussd
+CACHE=/usr/libexec/veci-xl-quota-cache
 NATIVE=/usr/libexec/veci-xl-ussd-once
 RPC=/usr/libexec/rpcd/veci.ussd
 ACL=/usr/share/rpcd/acl.d/veci-xl-ussd.json
@@ -26,6 +27,7 @@ board(){
 baseline(){ [ "$(sha "$UI")" = "$OLD_UI" ] && [ "$(sha "$CMGS")" = "$OLD_CMGS" ]; }
 new_absent(){
  [ ! -e "$WRAPPER" ] && [ ! -L "$WRAPPER" ] &&
+ [ ! -e "$CACHE" ] && [ ! -L "$CACHE" ] &&
  [ ! -e "$NATIVE" ] && [ ! -L "$NATIVE" ] &&
  [ ! -e "$RPC" ] && [ ! -L "$RPC" ] &&
  [ ! -e "$ACL" ] && [ ! -L "$ACL" ]
@@ -47,6 +49,7 @@ deployed(){
  old_backup &&
  expected "$UI" cellular.js &&
  expected "$WRAPPER" veci-xl-ussd &&
+ expected "$CACHE" veci-xl-quota-cache &&
  expected "$NATIVE" veci-xl-ussd-once &&
  expected "$RPC" veci.ussd &&
  expected "$ACL" veci-xl-ussd.json &&
@@ -60,7 +63,7 @@ atomic(){
 restore(){
  old_backup || return 1
  atomic "$BACK/ui" "$UI" 644 || return 1
- rm -f "$WRAPPER" "$NATIVE" "$RPC" "$ACL" || return 1
+ rm -f "$WRAPPER" "$CACHE" "$NATIVE" "$RPC" "$ACL" || return 1
  /etc/init.d/rpcd restart >/dev/null 2>&1 || return 1
  baseline && new_absent
 }
@@ -106,7 +109,7 @@ apply(){
  payload="$work/veci-xl-v17"
  [ -d "$payload" ] && [ ! -L "$payload" ] || fail invalid_layout
  (cd "$payload" && sha256sum -c SHA256SUMS >/dev/null 2>&1) || fail payload_corrupt
- grep -Fxq 'VERSION=v1.7.0-xl-ussd' "$payload/RELEASE_INFO" || fail wrong_release
+ grep -Fxq 'VERSION=v1.7.1-xl-ussd' "$payload/RELEASE_INFO" || fail wrong_release
  baseline && new_absent || fail concurrent_modification
  mkdir -m 700 "$BACK" || fail backup_unavailable
  backup_created=1
@@ -116,6 +119,7 @@ apply(){
  changed=1
  atomic "$payload/veci-xl-ussd-once" "$NATIVE" 700 || fail native_install
  atomic "$payload/veci-xl-ussd" "$WRAPPER" 700 || fail worker_install
+ atomic "$payload/veci-xl-quota-cache" "$CACHE" 700 || fail cache_install
  atomic "$payload/veci.ussd" "$RPC" 700 || fail rpc_install
  atomic "$payload/veci-xl-ussd.json" "$ACL" 644 || fail acl_install
  atomic "$payload/cellular.js" "$UI" 644 || fail ui_install
