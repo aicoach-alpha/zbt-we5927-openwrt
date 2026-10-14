@@ -29,7 +29,37 @@ jobs:
       - name: Build stripped MIPS little-endian standalone binary
         run: |
           set -eu
-          gcc="$(find /tmp/owrt-mips -type f -name '*gcc' -perm /111 | grep -E '/bin/.*gcc$' | head -1)"
+          find /tmp/owrt-mips -maxdepth 6 -name '*gcc' | head -12
+          gcc="$(find -L /tmp/owrt-mips -type f -name '*gcc' -executable | grep -E '/bin/.*gcc
+          [ -n "$gcc" ]
+          echo "Cross compiler: $(basename "$gcc")"
+          mkdir -p release
+          "$gcc" -static -std=c11 -Os -s -fno-ident -Wall -Wextra -Werror \
+            -o release/veci-sms-cmgs-mipsel source/we5927-lte/src/veci-sms-cmgs.c
+          file release/veci-sms-cmgs-mipsel
+          readelf -h release/veci-sms-cmgs-mipsel | grep -Eq 'Machine:[ ]*MIPS'
+          readelf -h release/veci-sms-cmgs-mipsel | grep -q "2's complement, little endian"
+          if readelf -l release/veci-sms-cmgs-mipsel | grep -q INTERP;then exit 1;fi
+          test "$(stat -c %s release/veci-sms-cmgs-mipsel)" -lt 350000
+          sha256sum release/veci-sms-cmgs-mipsel | tee release/sha256sums
+          echo SMS_MIPS_BIN_COMPILED_PASS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-sms-cmgs-mipsel
+          path: release/
+      - name: Publish pinned prerelease binary for router install (NOT deployed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-sms-cmgs-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/veci-sms-cmgs-mipsel release/sha256sums \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI WE5927 SMS CMGS candidate $(echo "$GITHUB_SHA" | cut -c1-12)" \
+            --notes "OpenWrt 25.12.5 ramips mt76x8 native binary. Not installed on router. User-initiated sending only."
+          echo "SMS_MIPS_PRERELEASE_CREATED=$tag"
+ | head -1)"
           [ -n "$gcc" ]
           echo "Cross compiler: $(basename "$gcc")"
           mkdir -p release
