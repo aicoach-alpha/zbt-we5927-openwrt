@@ -75,6 +75,85 @@ function buildSmsSubmit(recipient, message) {
 }
 
 
+
+/* One user-approved multipart SMS transaction. Individual modem submissions
+ * are carried by the existing authenticated sendMessage RPC, in sequence.
+ * A segment uses 8-bit concat UDH 05 00 03 ref total part. Never auto-retry
+ * after failure or uncertain delivery, because parts may already be sent.
+ * v1.6.0 supports at most four segments: 4x153 GSM7 / 4x67 UCS2 units.
+ */
+function buildSmsSubmitSegments(recipient, message, reference=1) {
+  if(typeof recipient!=='string'|| !/^\+?[0-9]{3,15}$/.test(recipient))
+    throw Error('Invalid recipient number');
+  if(typeof message!=='string'||message.length===0||message.length>612)
+    throw Error('Message must be 1–612 characters');
+  if(!Number.isInteger(reference)||reference<1||reference>255)
+    throw Error('Invalid SMS concatenation reference');
+  const map=[64,163,36,165,232,233,249,236,242,199,10,216,248,13,197,229,916,95,934,915,923,937,928,936,931,920,926,0,198,230,223,201,32,33,34,35,164,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,161,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,196,214,209,220,167,191,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,228,246,241,252,224];
+  const basic=new Map(map.map((p,i)=>[p,i]).filter(([p])=>p!==0));
+  const ext=new Map([[12,10],[94,20],[123,40],[125,41],[92,47],[91,60],[126,61],[93,62],[124,64],[8364,101]]);
+  const chars=[];
+  let gsm=true,septetCount=0;
+  for(const char of message) {
+    const cp=char.codePointAt(0);
+    if(basic.has(cp)){chars.push({str:char,codes:[basic.get(cp)]});septetCount++;}
+    else if(ext.has(cp)){chars.push({str:char,codes:[27,ext.get(cp)]});septetCount+=2;}
+    else {gsm=false;break;}
+  }
+  if(gsm && septetCount<=160)return [buildSmsSubmit(recipient,message)];
+  if(!gsm && message.length<=70)return [buildSmsSubmit(recipient,message)];
+  const digits=recipient.startsWith('+')?recipient.slice(1):recipient;
+  const addr=[];
+  for(let i=0;i<digits.length;i+=2){
+    addr.push(Number(digits[i])|((i+1<digits.length?Number(digits[i+1]):15)<<4));
+  }
+  const base=[0,0x41,0,digits.length,recipient.startsWith('+')?0x91:0x81,...addr,0,gsm?0:8];
+  const chunks=[];
+  if(gsm){
+    let chunk=[],length=0;
+    for(const value of chars){
+      if(length+value.codes.length>153){chunks.push(chunk);chunk=[];length=0;}
+      chunk.push(...value.codes);length+=value.codes.length;
+    }
+    if(chunk.length)chunks.push(chunk);
+  }else{
+    if(message.length>268)throw Error('Unicode multipart limit is 268 UTF-16 units');
+    let chunk='';
+    for(const ch of message){
+      if(chunk.length+ch.length>67){chunks.push(chunk);chunk='';}
+      chunk+=ch;
+    }
+    if(chunk)chunks.push(chunk);
+  }
+  if(chunks.length<2||chunks.length>4)throw Error('SMS exceeds four-part message limit');
+  return chunks.map((chunk,i)=>{
+    const udh=[5,0,3,reference,chunks.length,i+1];
+    let payload,udl;
+    if(gsm){
+      // UDH spans 6 octets, equal to 7 septets including 1 fill bit.
+      udl=7+chunk.length;
+      payload=Array(Math.ceil(udl*7/8)).fill(0);
+      udh.forEach((v,j)=>{payload[j]=v;});
+      chunk.forEach((value,j)=>{
+        for(let b=0;b<7;b++)if(value&(1<<b)){
+          const pos=(7+j)*7+b;
+          payload[pos>>3]|=1<<(pos&7);
+        }
+      });
+    }else{
+      payload=[...udh];
+      for(let j=0;j<chunk.length;j++){
+        const cp=chunk.charCodeAt(j);
+        payload.push(cp>>8,cp&255);
+      }
+      udl=payload.length;
+    }
+    if(payload.length>140||udl>160)throw Error('SMS segment exceeds modem limit');
+    const all=[...base,udl,...payload];
+    return all.map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase();
+  });
+}
+
 /* Decode only locally-saved, successful outgoing SMS-SUBMIT PDUs.
  * No re-fetch from modem, no network requests or browser persistence. */
 function decodeSentPdu(hex) {
@@ -398,9 +477,9 @@ export default {
 							<input id="cellular-sms-to" type="tel" inputmode="tel" placeholder="+628123456789" autocomplete="off" required pattern="\\+?[0-9]{3,15}" />
 						</label>
 						<label class="sms-compose-field" for="cellular-sms-text">Message
-							<textarea id="cellular-sms-text" maxlength="160" rows="5" required placeholder="Write your message here…"></textarea>
+							<textarea id="cellular-sms-text" maxlength="612" rows="5" required placeholder="Write your message here…"></textarea>
 						</label>
-						<p id="cellular-sms-length" aria-live="polite">One SMS maximum · 160 GSM7 or 70 Unicode characters</p>
+						<p id="cellular-sms-length" aria-live="polite">Up to 4 SMS parts · 153 GSM7 or 67 Unicode units per multipart segment</p>
 						<p id="cellular-sms-send-status" role="status" aria-live="polite">Not sent.</p>
 						<div class="sms-compose-actions">
 							<button class="button" id="cellular-sms-send" type="submit">Send SMS</button>
@@ -716,8 +795,10 @@ export default {
 		});
 		smsText.addEventListener('input',()=>{
 			try{
-				buildSmsSubmit(smsTo.value||'+628123456789',smsText.value);
-				smsLength.textContent='One SMS · '+smsText.value.length+' characters';
+				if(!smsText.value){smsLength.textContent='Up to 4 SMS parts · 153 GSM7 or 67 Unicode units per multipart segment';return;}
+				const parts=buildSmsSubmitSegments(smsTo.value||'+628123456789',smsText.value,1);
+				smsLength.textContent=smsText.value.length+' characters · '+parts.length+
+					(parts.length===1?' SMS':' SMS parts')+' · Carrier may charge per part';
 			}catch(e){
 				smsLength.textContent=String(e?.message||'Message limit exceeded');
 			}
@@ -725,40 +806,66 @@ export default {
 		smsCompose.addEventListener('submit',async(event)=>{
 			event.preventDefault();
 			if(!smsEnabled || smsSend.disabled)return;
-			let pdu;
-			try{pdu=buildSmsSubmit(smsTo.value.trim(),smsText.value);}
+			const recipient=smsTo.value.trim(),message=smsText.value;
+			let plan;
+			try{plan=buildSmsSubmitSegments(recipient,message,1);}
 			catch(e){smsSendStatus.textContent=String(e?.message||'Invalid SMS');return;}
-			const recipient=smsTo.value.trim();
+			const count=plan.length;
 			const approved=await confirm({
-				title:'Send SMS to '+recipient+'?',
-				message:'Send this message using the active SIM? Carrier SMS charges may apply.',
+				title:'Send '+count+' SMS '+(count===1?'part':'parts')+' to '+recipient+'?',
+				message:'Send this message using the active SIM? '+count+
+					' SMS submission(s) may be billed. If an outcome is uncertain, VeCI will stop instead of retrying.',
 				confirmLabel:'Send SMS'
 			});
 			if(!approved || !smsEnabled)return;
+			const reference=window.crypto?.getRandomValues
+				? (window.crypto.getRandomValues(new Uint8Array(1))[0]||1)
+				: (1+Math.floor(Math.random()*255));
+			try{plan=buildSmsSubmitSegments(recipient,message,reference);}
+			catch{smsSendStatus.textContent='Could not prepare SMS segments.';return;}
 			setBusy(smsSend,true,'Sending…');
-			smsSendStatus.textContent='Waiting for modem confirmation…';
+			smsTo.disabled=true;smsText.disabled=true;
+			smsComposeClose.disabled=true;smsDraftSave.disabled=true;
+			let accepted=0,historyMissing=false,failure='';
 			try{
-				const r=await api.call('veci.sms','sendMessage',{pdu},{timeout:46000});
-				if(r?.ok===true && r.status==='accepted_by_modem'){
-					smsSendStatus.textContent=r.history_saved===false
-						?'Accepted by modem, but Sent History could not be saved. Delivery remains unconfirmed.'
-						:'Accepted by modem. Network delivery is not yet confirmed.';
-					smsText.value='';
-					smsLength.textContent='One SMS maximum · 160 GSM7 or 70 Unicode characters';
-					toast('SMS accepted by modem.','success');
-				}else if(r?.reason==='network_rejected'){
-					smsSendStatus.textContent='SMS rejected by modem/network; not accepted.';
-				}else if(r?.reason==='send_rate_limited'){
-					smsSendStatus.textContent='Please wait a few seconds before sending another SMS.';
-				}else if(r?.reason==='prompt_unavailable'){
-					smsSendStatus.textContent='Modem did not allow SMS submission.';
-				}else{
-					smsSendStatus.textContent='Send outcome unknown. Do not immediately retry: the SMS may have been sent.';
+				for(let i=0;i<plan.length;i++){
+					if(!smsEnabled){failure='SMS was disabled; remaining parts not sent.';break;}
+					if(i>0){
+						// Existing backend enforces 5s between separate modem submissions.
+						// This is the next planned part, NOT a retry of the prior part.
+						smsSendStatus.textContent=accepted+'/'+count+' parts accepted. Waiting to send next part…';
+						await new Promise(resolve=>setTimeout(resolve,5300));
+						if(!smsEnabled){failure='SMS was disabled; remaining parts not sent.';break;}
+					}
+					smsSendStatus.textContent='Sending SMS part '+(i+1)+'/'+count+'…';
+					let r;
+					try{r=await api.call('veci.sms','sendMessage',{pdu:plan[i]},{timeout:46000});}
+					catch{failure='Outcome unknown for part '+(i+1)+'/'+count+'. No automatic retry.';break;}
+					if(r?.ok===true && r.status==='accepted_by_modem'){
+						accepted++;
+						if(r.history_saved===false)historyMissing=true;
+						smsSendStatus.textContent=accepted+'/'+count+' SMS parts accepted by modem.';
+					}else{
+						failure=(r?.reason==='network_rejected'?'Modem/network rejected':
+							r?.reason==='send_rate_limited'?'Rate-limited':'Outcome unknown for')+
+							' part '+(i+1)+'/'+count+'. Do not automatically resend.';
+						break;
+					}
 				}
-			}catch{
-				smsSendStatus.textContent='Send outcome unknown. Check recipient before manually trying again.';
+				if(accepted===count){
+					smsSendStatus.textContent='All '+count+' part(s) accepted by modem. '+(historyMissing?
+						'Some Sent records could not be saved. ':'')+'Delivery to recipient is not yet confirmed.';
+					smsText.value='';
+					smsLength.textContent='Up to 4 SMS parts · 153 GSM7 or 67 Unicode units per multipart segment';
+					toast('SMS accepted by modem ('+count+' part(s)).','success');
+				}else{
+					smsSendStatus.textContent=accepted+'/'+count+' parts confirmed accepted. '+failure+
+						' Other parts may already have arrived. Check the recipient before attempting a new message.';
+				}
 			}finally{
-				pdu=null;
+				plan=null;
+				smsTo.disabled=false;smsText.disabled=false;
+				smsComposeClose.disabled=false;smsDraftSave.disabled=false;
 				setBusy(smsSend,false);
 			}
 		});
