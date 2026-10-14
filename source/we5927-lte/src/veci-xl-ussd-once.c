@@ -61,7 +61,7 @@ static int append_cp(char *out,size_t *used,unsigned cp){
  memcpy(out+*used,a,n);*used+=n;out[*used]=0;return 0;
 }
 static int parse_urc(const char *s,int *mode,int *dcs,char out[MAX_TEXT],int *supported){
- const char *p=s,*q;int n=0,v=0,seen=0;
+ const char *p=s,*q;int v=0,seen=0;
  if(strncmp(p,"+CUSD:",6))return -1;
  p+=6;while(*p==' ')p++;
  if(*p<'0'||*p>'5')return -1;
