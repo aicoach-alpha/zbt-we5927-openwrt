@@ -8,6 +8,7 @@ on:
       - 'scripts/veci-sms-delivery-routing-capability-v161.sh'
       - 'scripts/veci-sms-delivery-v161-staged/**'
       - 'tests/test_veci_sms_delivery_map.py'
+      - 'tests/test_veci_sms_delivery_sent_view.py'
       - 'tests/test_veci_sms_delivery_reports.py'
       - '.github/workflows/veci-sms-delivery-report-ci.yml'
   workflow_dispatch:
@@ -23,6 +24,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_reports.py' -v
       - name: Correlate TP-MR and hashed destination, deny ambiguous receipt
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_map.py' -v
+      - name: Verify read-only Sent History / Delivery Report join
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_sent_view.py' -v
       - name: Require original live v1.6.0 still selected
         run: |
           grep -Fq 'v1.6.0' scripts/veci-sms-mifi-v160-multipart-install.sh
