@@ -6,7 +6,8 @@
         "veci.ussd": [
           "start",
           "reply",
-          "cancel"
+          "cancel",
+          "quotaStatus"
         ]
       }
     }
