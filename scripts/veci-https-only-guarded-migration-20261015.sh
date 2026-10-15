@@ -85,7 +85,8 @@ prepare(){
  [ ! -e "$BASE" ] && [ ! -L "$BASE" ] || fail recovery_dir_already_exists
  has_http || fail http_not_enabled_no_transition_required
  regular "$0" || fail installer_source_not_regular
- command -v nohup >/dev/null 2>&1 || fail watchdog_nohup_missing
+ # BusyBox ash supports a HUP-immune child; no nohup package required.
+ command -v sh >/dev/null 2>&1 || fail watchdog_shell_missing
  command -v sleep >/dev/null 2>&1 || fail watchdog_sleep_missing
  tls_files || fail tls_certificate_or_key_missing
  mkdir -m 700 "$BASE" || fail recovery_dir_create_failed
@@ -122,13 +123,23 @@ switch(){
  valid_hash "$ready_hash" && [ "$(hash "$UHTTPD")" = "$ready_hash" ] ||
    fail config_changed_since_prepare
  has_http && has_https && tls_files || fail both_listeners_not_ready
- command -v nohup >/dev/null 2>&1 || fail watchdog_unavailable
+ command -v sh >/dev/null 2>&1 || fail watchdog_shell_missing
+ command -v sleep >/dev/null 2>&1 || fail watchdog_sleep_missing
  regular "$CONTROL" && [ "$(hash "$CONTROL")" = "$(hash "$0")" ] ||
    fail controller_integrity_changed
  printf 'pending\n' > "$PENDING"
- # Start backup recovery before removing HTTP; the child survives SSH closing.
- nohup sh "$CONTROL" --watchdog >/dev/null 2>&1 </dev/null &
- echo "$!" > "$BASE/watchdog.pid"
+ # Detached BusyBox ash watchdog: ignore SSH hangup BEFORE exec, inherit
+ # ignored SIGHUP, and close all SSH streams. No nohup binary/app needed.
+ sh -c 'trap "" HUP; exec sh "$1" --watchdog' veci-watchdog "$CONTROL" \
+   </dev/null >/dev/null 2>&1 &
+ watcher="$!"
+ echo "$watcher" > "$BASE/watchdog.pid"
+ # Confirm worker stays alive before disabling HTTP; fail closed if not.
+ sleep 1
+ if ! kill -0 "$watcher" 2>/dev/null; then
+   restore
+   fail watchdog_start_failed
+ fi
  uci -q delete uhttpd.main.listen_http || { restore; fail http_remove_failed; }
  uci commit uhttpd >/dev/null 2>&1 || { restore; fail http_commit_failed; }
  /etc/init.d/uhttpd restart >/dev/null 2>&1 || { restore; fail http_restart_failed; }
