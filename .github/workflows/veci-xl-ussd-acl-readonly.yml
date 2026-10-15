@@ -1,0 +1,27 @@
+name: VeCI XL USSD ACL read-only scope
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-ussd-acl-readonly-20261015.sh'
+      - '.github/workflows/veci-xl-ussd-acl-readonly.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sh -n scripts/veci-xl-ussd-acl-readonly-20261015.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-xl-ussd-acl-readonly-20261015.sh').read_text()
+          assert 'VECI_USSD_ACL_READONLY=pass' in s
+          assert 'VECI_USSD_REQUEST_SENT=false' in s
+          assert 'VECI_USSD_ACL_START_DECLARED' in s
+          for bad in ('ubus call','ubus -S call','AT+CUSD','/dev/ttyUSB2',
+                      'uci commit','uci set','apk add','sysupgrade','/etc/init.d/'):
+              assert bad not in s,bad
+          print('VECI_USSD_ACL_READONLY_SCOPE=pass')
+          PY
