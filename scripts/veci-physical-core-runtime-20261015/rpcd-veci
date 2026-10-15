@@ -1,0 +1,292 @@
+#!/bin/sh
+
+clean_token() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9._:-'
+}
+
+clean_text() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9 ._:/()%+-'
+}
+
+json_bool_file() {
+	[ -e "$1" ] && printf true || printf false
+}
+
+method_capabilities() {
+	opennds=$(json_bool_file /etc/config/opennds)
+	sqm=$(json_bool_file /etc/config/sqm)
+	ddns=$(json_bool_file /etc/config/ddns)
+	if command -v wg >/dev/null 2>&1 || grep -qs "option proto 'wireguard'" /etc/config/network; then
+		wireguard=true
+	else
+		wireguard=false
+	fi
+	if ubus list 2>/dev/null | grep -qx 'veci.voucher'; then
+		voucher=true
+	else
+		voucher=false
+	fi
+	if ubus list 2>/dev/null | grep -qx 'veci.cellular'; then
+		cellular=true
+	else
+		cellular=false
+	fi
+	printf '{ "opennds": %s, "sqm": %s, "ddns": %s, "wireguard": %s, "voucher": %s, "cellular": %s }\\n' \
+		"$opennds" "$sqm" "$ddns" "$wireguard" "$voucher" "$cellular"
+}
+
+method_clients() {
+	now=$(date +%s)
+	items=''
+	if [ -f /tmp/dhcp.leases ]; then
+		while read -r expiry mac ip host _; do
+			mac=$(clean_token "$mac")
+			ip=$(clean_token "$ip")
+			host=$(clean_token "$host")
+			[ -n "$ip" ] || continue
+			[ "$host" = "*" ] && host=''
+			if [ "$expiry" -gt 0 ] 2>/dev/null; then
+				remaining=$((expiry - now))
+				[ "$remaining" -lt 0 ] && remaining=0
+			else
+				remaining=0
+			fi
+			item="{ \"expires\": $remaining, \"macaddr\": \"$mac\", \"ipaddr\": \"$ip\", \"hostname\": \"$host\" }"
+			items="${items:+$items, }$item"
+		done < /tmp/dhcp.leases
+	fi
+	printf '{ "clients": [ %s ] }\n' "$items"
+}
+
+method_network_inventory() {
+	bridges=''
+	ports=''
+
+	for path in /sys/class/net/*; do
+		[ -e "$path" ] || continue
+		name=$(clean_token "${path##*/}")
+		[ -n "$name" ] || continue
+
+		if [ -d "$path/bridge" ]; then
+			members=''
+			for member_path in "$path/brif/"*; do
+				[ -e "$member_path" ] || continue
+				member=$(clean_token "${member_path##*/}")
+				[ -n "$member" ] || continue
+				members="${members:+$members, }\"$member\""
+			done
+			bridge="{ \"name\": \"$name\", \"members\": [ $members ] }"
+			bridges="${bridges:+$bridges, }$bridge"
+			continue
+		fi
+
+		[ "$name" = "lo" ] && continue
+		[ -e "$path/phy80211" ] && continue
+		[ -e "$path/device" ] || continue
+		ports="${ports:+$ports, }\"$name\""
+	done
+
+	printf '{ "bridges": [ %s ], "ports": [ %s ] }\n' "$bridges" "$ports"
+}
+
+method_health() {
+	overlay='unavailable'
+	if command -v df >/dev/null 2>&1; then
+		overlay=$(df -h /overlay 2>/dev/null | awk 'NR==2 { printf "%s used / %s total (%s)", $3, $2, $5 }')
+		[ -n "$overlay" ] || overlay='unavailable'
+	fi
+	overlay=$(clean_text "$overlay")
+	printf '{ "overlay": "%s" }\n' "$overlay"
+}
+
+method_internet_status() {
+	cache=/tmp/veci-internet-status
+	now=$(date +%s)
+
+	if [ -r "$cache" ]; then
+		read -r stamp state target < "$cache" || true
+		case "$stamp" in
+			*[!0-9]*|'') ;;
+			*)
+				age=$((now - stamp))
+				if [ "$age" -ge 0 ] && [ "$age" -lt 10 ]; then
+					case "$state" in
+						reachable) printf '{ "status": "reachable", "reachable": true, "probe": "icmp", "target": "%s", "cached": true }\n' "$target"; return ;;
+						unreachable) printf '{ "status": "unreachable", "reachable": false, "probe": "icmp", "cached": true }\n'; return ;;
+					esac
+				fi
+				;;
+		esac
+	fi
+
+	command -v ping >/dev/null 2>&1 || {
+		printf '{ "status": "unknown", "reachable": null, "probe": "unavailable", "cached": false }\n'
+		return
+	}
+
+	for target in 1.1.1.1 8.8.8.8; do
+		if ping -c 1 -W 1 "$target" >/dev/null 2>&1; then
+			printf '%s reachable %s\n' "$now" "$target" > "$cache"
+			printf '{ "status": "reachable", "reachable": true, "probe": "icmp", "target": "%s", "cached": false }\n' "$target"
+			return
+		fi
+	done
+
+	printf '%s unreachable -\n' "$now" > "$cache"
+	printf '{ "status": "unreachable", "reachable": false, "probe": "icmp", "cached": false }\n'
+}
+
+method_diagnostic() {
+	input=$(cat)
+	tool=$(printf '%s' "$input" | jsonfilter -e '@.tool' 2>/dev/null)
+	target=$(printf '%s' "$input" | jsonfilter -e '@.target' 2>/dev/null)
+	safe_target=$(clean_token "$target")
+
+	[ -n "$target" ] && [ "$safe_target" = "$target" ] && [ "${#target}" -le 253 ] || {
+		printf '{ "ok": false, "error": "invalid_target" }\n'
+		return
+	}
+
+	case "$tool" in
+		ping)
+			output=$(ping -c 4 -W 2 "$target" 2>&1)
+			rc=$?
+			;;
+		traceroute)
+			command -v traceroute >/dev/null 2>&1 || {
+				printf '{ "ok": false, "error": "traceroute_not_available" }\n'
+				return
+			}
+			output=$(traceroute -m 10 -w 1 -q 1 "$target" 2>&1)
+			rc=$?
+			;;
+		*)
+			printf '{ "ok": false, "error": "tool_not_allowed" }\n'
+			return
+			;;
+	esac
+
+	output=$(printf '%s\n' "$output" | sed -n '1,30p')
+	. /usr/share/libubox/jshn.sh
+	json_init
+	[ "$rc" -eq 0 ] && json_add_boolean ok 1 || json_add_boolean ok 0
+	json_add_string tool "$tool"
+	json_add_string target "$target"
+	json_add_string output "$output"
+	json_dump
+}
+
+root_password_is_set() {
+	hash=$(awk -F: '$1 == "root" { print $2; exit }' /etc/shadow 2>/dev/null)
+	case "$hash" in
+		''|'!'|'*'|'!!') return 1 ;;
+		*) return 0 ;;
+	esac
+}
+
+method_security_status() {
+	if root_password_is_set; then
+		printf '{ "root_password_set": true }\n'
+	else
+		printf '{ "root_password_set": false }\n'
+	fi
+}
+
+method_set_admin_password() {
+	root_password_is_set && {
+		printf '{ "ok": false, "error": "password_already_set" }\n'
+		return
+	}
+
+	input=$(cat)
+	password=$(printf '%s' "$input" | jsonfilter -e '@.password' 2>/dev/null)
+	length=${#password}
+	flat_password=$(printf '%s' "$password" | tr -d '\r\n')
+
+	[ "$flat_password" = "$password" ] || {
+		printf '{ "ok": false, "error": "password_characters" }\n'
+		return
+	}
+
+	[ "$length" -ge 8 ] && [ "$length" -le 72 ] || {
+		printf '{ "ok": false, "error": "password_length" }\n'
+		return
+	}
+
+	LC_ALL=C printf '%s' "$password" | grep -q '^[ -~]*$' || {
+		printf '{ "ok": false, "error": "password_characters" }\n'
+		return
+	}
+
+	command -v passwd >/dev/null 2>&1 || {
+		printf '{ "ok": false, "error": "passwd_not_available" }\n'
+		return
+	}
+
+	if printf '%s\n%s\n' "$password" "$password" | passwd root >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "password_change_failed" }\n'
+	fi
+}
+
+method_service_action() {
+	input=$(cat)
+	service=$(printf '%s' "$input" | jsonfilter -e '@.service')
+	action=$(printf '%s' "$input" | jsonfilter -e '@.action')
+
+	case "$service" in
+		network|firewall|dnsmasq|uhttpd|opennds) ;;
+		*) printf '{ "ok": false, "error": "service_not_allowed" }\n'; return ;;
+	esac
+
+	case "$action" in
+		start|stop|restart|reload) ;;
+		*) printf '{ "ok": false, "error": "action_not_allowed" }\n'; return ;;
+	esac
+
+	script="/etc/init.d/$service"
+	[ -x "$script" ] || {
+		printf '{ "ok": false, "error": "service_not_installed" }\n'
+		return
+	}
+
+	if "$script" "$action" >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "service_action_failed" }\n'
+	fi
+}
+
+method_wifi_reload() {
+	if ! command -v wifi >/dev/null 2>&1; then
+		printf '{ "ok": false, "error": "wifi_command_not_found" }\n'
+		return
+	fi
+	if wifi reload >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "wifi_reload_failed" }\n'
+	fi
+}
+
+case "$1" in
+	list)
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		;;
+	call)
+		case "$2" in
+			capabilities) method_capabilities ;;
+			clients) method_clients ;;
+			networkInventory) method_network_inventory ;;
+			health) method_health ;;
+			internetStatus) method_internet_status ;;
+			securityStatus) method_security_status ;;
+			setAdminPassword) method_set_admin_password ;;
+			diagnostic) method_diagnostic ;;
+			serviceAction) method_service_action ;;
+			wifiReload) method_wifi_reload ;;
+			*) printf '{ "error": "method_not_found" }\n' ;;
+		esac
+		;;
+esac
