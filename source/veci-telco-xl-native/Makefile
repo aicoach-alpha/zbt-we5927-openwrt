@@ -4,7 +4,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-telco-xl-native
-PKG_VERSION:=0.3.2
+PKG_VERSION:=0.3.3
 PKG_RELEASE:=1
 PKG_BUILD_DEPENDS:=mbedtls
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
@@ -22,7 +22,7 @@ define Package/veci-telco-xl-native/description
   Native XL components: AES/HMAC crypto, strict HTTPS quota-only
   transport and bounded DATA-only parser, plus owner-initiated
   CIAM OTP, isolated token staging and strict MSISDN identity check.
-  Profile transport is not yet wired. No automatic login or polling, no operator
+  Profile read-only transport is staged with exact-identity gate; no automatic polling, no operator
   credentials, no SMS reader, no payment commands and no daemon.
   THIS IS NOT AN AUTHENTICATED OPERATOR INTEGRATION UNTIL UAT.
 endef
@@ -43,6 +43,12 @@ define Build/Compile
 		$(CURDIR)/../veci-telco-indonesia/veci-xl-quota-http.c \
 		$(TARGET_LDFLAGS) -Wl,--gc-sections -lmbedtls -lmbedx509 -lmbedcrypto
 	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) \
+		-DVECI_XL_PROFILE_VARIANT \
+		-Os -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+		-o $(PKG_BUILD_DIR)/veci-xl-profile-http \
+		$(CURDIR)/../veci-telco-indonesia/veci-xl-quota-http.c \
+		$(TARGET_LDFLAGS) -Wl,--gc-sections -lmbedtls -lmbedx509 -lmbedcrypto
+	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) \
 		-Os -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 		-o $(PKG_BUILD_DIR)/veci-xl-ciam \
 		$(CURDIR)/../veci-telco-indonesia/veci-xl-ciam.c \
@@ -60,8 +66,10 @@ define Package/veci-telco-xl-native/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/veci-xl-quota-http $(1)/usr/libexec/veci-xl-quota-http
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/veci-xl-quota-normalize $(1)/usr/libexec/veci-xl-quota-normalize
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/veci-xl-ciam $(1)/usr/libexec/veci-xl-ciam
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/veci-xl-profile-http $(1)/usr/libexec/veci-xl-profile-http
 	$(INSTALL_BIN) $(CURDIR)/../veci-telco-indonesia/files/usr/libexec/veci-xl-token-stage $(1)/usr/libexec/veci-xl-token-stage
 	$(INSTALL_BIN) $(CURDIR)/../veci-telco-indonesia/files/usr/libexec/veci-xl-profile-identity-check $(1)/usr/libexec/veci-xl-profile-identity-check
+	$(INSTALL_BIN) $(CURDIR)/../veci-telco-indonesia/files/usr/libexec/veci-xl-profile-chain $(1)/usr/libexec/veci-xl-profile-chain
 	$(INSTALL_BIN) $(CURDIR)/../veci-telco-indonesia/files/usr/libexec/veci-xl-quota-chain $(1)/usr/libexec/veci-xl-quota-chain
 endef
 
