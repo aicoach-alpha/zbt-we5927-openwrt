@@ -4,7 +4,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-telco-xl-native
-PKG_VERSION:=0.3.6
+PKG_VERSION:=0.3.7
 PKG_RELEASE:=1
 PKG_BUILD_DEPENDS:=mbedtls
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
