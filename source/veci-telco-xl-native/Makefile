@@ -4,7 +4,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-telco-xl-native
-PKG_VERSION:=0.3.5
+PKG_VERSION:=0.3.6
 PKG_RELEASE:=1
 PKG_BUILD_DEPENDS:=mbedtls
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
@@ -72,6 +72,13 @@ define Package/veci-telco-xl-native/install
 	$(INSTALL_BIN) $(CURDIR)/../veci-telco-indonesia/files/usr/libexec/veci-xl-profile-chain $(1)/usr/libexec/veci-xl-profile-chain
 	$(INSTALL_BIN) $(CURDIR)/../veci-telco-indonesia/files/usr/libexec/veci-xl-session-activate $(1)/usr/libexec/veci-xl-session-activate
 	$(INSTALL_BIN) $(CURDIR)/../veci-telco-indonesia/files/usr/libexec/veci-xl-quota-refresh $(1)/usr/libexec/veci-xl-quota-refresh
+	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
+	$(INSTALL_BIN) $(CURDIR)/files/usr/libexec/rpcd/veci.xl $(1)/usr/libexec/rpcd/veci.xl
+	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
+	$(INSTALL_DATA) $(CURDIR)/files/usr/share/rpcd/acl.d/veci-xl-owner.json $(1)/usr/share/rpcd/acl.d/veci-xl-owner.json
+	$(INSTALL_DIR) $(1)/www/veci
+	$(INSTALL_DATA) $(CURDIR)/files/www/veci/xl-account.html $(1)/www/veci/xl-account.html
+	$(INSTALL_DATA) $(CURDIR)/files/www/veci/xl-account.js $(1)/www/veci/xl-account.js
 	$(INSTALL_BIN) $(CURDIR)/../veci-telco-indonesia/files/usr/libexec/veci-xl-quota-chain $(1)/usr/libexec/veci-xl-quota-chain
 endef
 
