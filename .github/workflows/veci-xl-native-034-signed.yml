@@ -1,4 +1,4 @@
-name: VeCI XL native only APK 0.3.4 production UAT candidate
+name: VeCI XL native only APK 0.3.5 production UAT candidate
 on:
   push:
     paths:
@@ -8,7 +8,8 @@ on:
       - 'source/veci-telco-indonesia/veci-xl-crypto.c'
       - 'source/veci-telco-indonesia/veci-xl-quota-normalize.c'
       - 'source/veci-telco-indonesia/files/usr/libexec/veci-xl-*'
-      - '.github/workflows/veci-xl-native-034-signed.yml'
+      - 'tests/test_veci_xl_quota_refresh.py'
+      - '.github/workflows/veci-xl-native-035-signed.yml'
   workflow_dispatch:
 permissions:
   contents: write
@@ -24,18 +25,30 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           pkg=Path('source/veci-telco-xl-native/Makefile').read_text()
-          assert 'PKG_VERSION:=0.3.4' in pkg
+          assert 'PKG_VERSION:=0.3.5' in pkg
           assert 'DEPENDS:=+libmbedtls21 +jsonfilter' in pkg
           assert 'luci-' not in pkg.lower() and '+veci-telco-indonesia' not in pkg
           assert 'postinst' not in pkg and 'preinst' not in pkg
           for script in ('veci-xl-profile-chain','veci-xl-profile-identity-check',
                          'veci-xl-quota-chain','veci-xl-token-stage'):
               assert script in pkg
-          print('VECI_XL_034_PACKAGE_SCOPE=pass')
+          print('VECI_XL_035_PACKAGE_SCOPE=pass')
           PY
           for s in source/veci-telco-indonesia/files/usr/libexec/veci-xl-*; do
             sh -n "$s"
           done
+          sudo python3 tests/test_veci_xl_quota_refresh.py
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path('source/veci-telco-indonesia/files/usr/libexec/veci-xl-profile-chain').read_text()
+          b=Path('source/veci-telco-indonesia/files/usr/libexec/veci-xl-session-activate').read_text()
+          assert 'veci-xl-session-activate --activate' in a
+          assert 'veci-xl-profile-identity-check --check' in a
+          assert 'veci-xl-profile-identity-check --check' in b
+          assert 'VECI_XL_SESSION_PROMOTED=true' in a
+          assert 'quota-xl.json' not in b
+          print('VECI_XL_PROFILE_ACTIVATION_SCOPE=pass')
+          PY
       - name: Install OpenWrt SDK host dependencies
         run: |
           sudo apt-get update -qq
@@ -71,7 +84,7 @@ jobs:
           test -f "$toolprefix/usr/include/mbedtls/aes.h"
           test -e "$toolprefix/usr/lib/libmbedcrypto.so"
           test -e "$toolprefix/usr/lib/libmbedtls.so"
-          echo VECI_XL_034_MBEDTLS_TOOLCHAIN_ABI=pass
+          echo VECI_XL_035_MBEDTLS_TOOLCHAIN_ABI=pass
       - name: Compile only optional VeCI XL package to APK
         run: |
           set -eu
@@ -100,31 +113,32 @@ jobs:
           root="${root%/usr/libexec/veci-xl-ciam}"
           for exe in veci-xl-ciam veci-xl-profile-http veci-xl-quota-http \
                      veci-xl-crypto veci-xl-quota-normalize veci-xl-token-stage \
-                     veci-xl-profile-chain veci-xl-profile-identity-check veci-xl-quota-chain; do
+                     veci-xl-profile-chain veci-xl-profile-identity-check veci-xl-quota-chain \
+                     veci-xl-session-activate veci-xl-quota-refresh; do
             test -x "$root/usr/libexec/$exe"
           done
           mkdir -p "$GITHUB_WORKSPACE/release"
           tool=/tmp/sdk/staging_dir/host/bin/apk
           "$tool" mkpkg \
             --info 'name:veci-telco-xl-native' \
-            --info 'version:0.3.4-r1' \
+            --info 'version:0.3.5-r1' \
             --info 'arch:mipsel_24kc' \
             --info 'origin:veci-telco-xl-native' \
             --info 'description:VeCI-only XL native read-only account and quota UAT package' \
             --info 'depends:libmbedtls21 jsonfilter' \
             --files "$root" \
-            --output "$GITHUB_WORKSPACE/release/veci-telco-xl-native-0.3.4-r1.apk"
-          test -s "$GITHUB_WORKSPACE/release/veci-telco-xl-native-0.3.4-r1.apk"
-          echo VECI_XL_034_COMPILED_FILES_PACKAGED=pass
+            --output "$GITHUB_WORKSPACE/release/veci-telco-xl-native-0.3.5-r1.apk"
+          test -s "$GITHUB_WORKSPACE/release/veci-telco-xl-native-0.3.5-r1.apk"
+          echo VECI_XL_035_COMPILED_FILES_PACKAGED=pass
       - name: Verify manifest and sign isolated production test candidate
         run: |
           set -eu
-          p=release/veci-telco-xl-native-0.3.4-r1.apk
+          p=release/veci-telco-xl-native-0.3.5-r1.apk
           tool=/tmp/sdk/staging_dir/host/bin/apk
           umask 077
           mkdir -p /tmp/sign/keys /tmp/sign/none
           openssl ecparam -name prime256v1 -genkey -noout -out /tmp/sign/private.pem
-          openssl pkey -in /tmp/sign/private.pem -pubout -out /tmp/sign/keys/veci-xl-034.pem
+          openssl pkey -in /tmp/sign/private.pem -pubout -out /tmp/sign/keys/veci-xl-035.pem
           "$tool" --allow-untrusted adbsign --reset-signatures --sign-key /tmp/sign/private.pem "$p"
           "$tool" --keys-dir /tmp/sign/keys verify "$p"
           if "$tool" --keys-dir /tmp/sign/none verify "$p" >/dev/null 2>&1; then exit 1; fi
@@ -135,18 +149,19 @@ jobs:
           s=json.dumps(json.loads(Path('release/manifest.json').read_text())).lower()
           for item in ('veci-telco-xl-native','veci-xl-ciam','veci-xl-profile-http',
                        'veci-xl-quota-http','veci-xl-token-stage','veci-xl-profile-chain',
-                       'veci-xl-profile-identity-check','veci-xl-crypto'):
+                       'veci-xl-profile-identity-check','veci-xl-crypto',
+                       'veci-xl-session-activate','veci-xl-quota-refresh'):
               assert item in s,item
           assert '/luci-static/' not in s
-          print('VECI_XL_034_APK_SIGNATURE_AND_CONTENT=pass')
+          print('VECI_XL_035_APK_SIGNATURE_AND_CONTENT=pass')
           PY
-          cp /tmp/sign/keys/veci-xl-034.pem release/
-          chmod 644 release/veci-xl-034.pem
-          sha256sum "$p" release/veci-xl-034.pem > release/SHA256SUMS
-          echo VECI_XL_034_SIGNED_PACKAGE=pass
+          cp /tmp/sign/keys/veci-xl-035.pem release/
+          chmod 644 release/veci-xl-035.pem
+          sha256sum "$p" release/veci-xl-035.pem > release/SHA256SUMS
+          echo VECI_XL_035_SIGNED_PACKAGE=pass
       - uses: actions/upload-artifact@v4
         with:
-          name: veci-xl-native-034-signed
+          name: veci-xl-native-035-signed
           path: release/
       - name: Publish staged candidate; never auto-deploy
         env:
@@ -154,7 +169,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -eu
-          tag="veci-xl-native-034-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          tag="veci-xl-native-035-$(echo "$GITHUB_SHA" | cut -c1-12)"
           gh release create "$tag" release/* --target "$GITHUB_SHA" --prerelease \
-            --title "VeCI XL native 0.3.4 signed production test candidate" \
+            --title "VeCI XL native 0.3.5 signed production test candidate" \
             --notes "MIPS APK signed and content verified. CIAM OTP, read-only profile TLS, strict number gate and quota parser are packaged. NOT installed; no real operator login/profile/quota validated, no credentials included. VeCI Core 0.2.2 remains unchanged. Operator-authenticated quota may only be shown after real account-verified UAT."
