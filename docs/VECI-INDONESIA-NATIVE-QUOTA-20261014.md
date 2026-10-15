@@ -214,3 +214,23 @@ Signing trust, exact artifact integrity and dependency solver pass with a tempor
 Scoped installer prepared in `scripts/veci-indonesia-quota-apk-deploy-20261015.sh` with explicit `--install`, `--status`, `--rollback`: only 6 new quota-specific files, refuses existing files or installed package, SHA-pinned signed APK, one-time trusted public key, local-only dependency solver, volatile backup of /etc/config and installed package inventory, automatic package removal on installation/UAT failure, optional one-time rpcd restart if plugin not auto-discovered. Does not change LTE, modem, SMS, firmware image or UCI network settings. Package installation DOES intentionally write to OpenWrt overlay and package database.
 
 **Do not confuse candidate installer with LIVE deployment.** Installer is unexecuted on physical router; GitHub Actions deployment script static/CLI verification must PASS before issuing the on-device command. The private signing key was one-time, so future updates need a deliberately stable signing key/identity and an approved package feed. The status page cannot show verified XL quota until an operator-authorized integration exists.
+
+## 2026-10-15 — Actual signed APK install failed RPC UAT and automatically rolled back
+
+Owner executed the previously staged signed installer on the office-laptop-connected WE5927. Physical output:
+```text
+VECI_QUOTA_SIGNATURE=pass
+VECI_QUOTA_DEPENDENCIES=pass
+VECI_QUOTA_VOLATILE_BACKUP=pass
+VECI_QUOTA_DEPLOY=blocked
+VECI_QUOTA_REASON=quota_rpc_missing
+VECI_QUOTA_AUTO_ROLLBACK=pass
+```
+
+The actual install DID reach the overlay package transaction, but failed to make the `veci.quota` ubus endpoint available immediately after `/etc/init.d/rpcd restart`. Automatic APK removal/restart reported PASS. No LIVE claim and no verified real XL quota. Note: rollback output is not an independent read-after-rollback audit of all affected files; treat this as script-reported rollback rather than proven full configuration restoration.
+
+The OpenWrt rpcd executable-plugin mechanism registers method objects at service startup from `/usr/libexec/rpcd/<name>`, using its `list` response. The original installer made one immediate ubus request after restart, which may have hit an asynchronous startup race. Actual reason is NOT yet proven; it could be delayed registration, malformed script output, missing plugin executable or other runtime issue.
+
+Remediation in script only, signed v0.2.1 APK UNCHANGED: check installed executable and its direct `list` and `call status`, then allow bounded 12 one-second ubus retries after rpcd restart; on failure report whether the object was not registered or the method call failed, and auto rollback again. The script refuses file collisions and leaves all non-quota services untouched. CI installation/rollback safety gate PASS run 38677442971.
+
+The next single physical transaction is running the updated SHA-pinned installer from office PowerShell; only report LuCI UI installed once on-device `VECI_QUOTA_PACKAGE_INSTALL=pass`, `VECI_QUOTA_RPC=pass`, and `VECI_QUOTA_PROVIDER_REGISTRY=pass` are observed. No operator authentication is implemented. Do not repeat closed AES/SDK/PKG signature tests except for changed artifacts.
