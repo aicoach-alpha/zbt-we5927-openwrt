@@ -48,3 +48,20 @@ Pinned file commit `b412695a088d8cd625b3231f60b8d1fd49d9483c`.
 - Install gate CI PASS: https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38724752584
 
 The optional guide must not be reported LIVE until the owner installs it and confirms it opens in VeCI. It cannot bypass per-selection confirmations or guarantee a fixed carrier menu. A carrier quota display also requires an actual operator response, not merely a successful file install.
+
+
+## Physical guide UAT and diagnostic follow-up (owner screenshot, Oct 15)
+
+Owner reported:
+- \`VECI_XL_GUIDE_SHA256=pass\`
+- \`VECI_XL_GUIDE_INSTALL=pass\`
+- \`VECI_XL_GUIDE_CORE_PRESERVED=pass\`
+- \`VECI_XL_GUIDE=installed\`, modem calls by installer \`false\`.
+
+The owner opened \`/veci/xl-ussd-guide.html\` and saw both route buttons. After pressing a route, the page only reported the generic text “USSD gagal, sesi kedaluwarsa, atau hasilnya tidak pasti”. This proves UI installed and an operation was attempted, **not** that the operator returned any quota. Root cause still unknown.
+
+A genuine guide bug was found: the UI discarded \`result.reason\` on \`ok:false\` in \`begin()\` and used a general \`catch\` for all other failures. The script now maps only a strict allowlist of non-sensitive RPC reasons to human-readable feedback. No automatically repeated USSD. Source UI diagnostic CI PASS: https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38725840722.
+
+A read-only physical root-cause script, \`scripts/veci-xl-ussd-failure-rootcause-readonly-20261015.sh\`, checks registration, method manifest, executability/dependencies, modem USB path/IDs, and sanitized \`we5927-lte status-fast\` SIM/operator guard. It does not send any USSD or print IMEI, phone number or raw operator text. A checksum-pinned one-JS-file update \`scripts/veci-xl-ussd-guide-diagnostic-update-20261015.sh\` preserves the signed Core and XL 0.3.7, verifies old/new SHA256, and backs up only the optional guide JS for rollback. Overlay CI PASS: https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38726102723.
+
+**Neither follow-up is yet physically executed at time of documentation.** Do not claim real *808# quota PASS without the operator response and verified local cache. If the sanitized preflight flags unexpected USB interface, SIM or operator label, investigate those actual physical guard checks before any next USSD request; do not weaken them speculatively.
