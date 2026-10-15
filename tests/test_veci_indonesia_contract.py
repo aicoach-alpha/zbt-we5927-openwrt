@@ -61,6 +61,10 @@ class TelcoContract(unittest.TestCase):
         self.assertNotIn("python3",pkg.lower())
         self.assertNotIn("nodejs",pkg.lower())
         self.assertIn("veci-quota-cache",pkg)
+        self.assertIn("DEPENDS:=+rpcd +luci-base +jsonfilter",pkg)
+        self.assertNotIn("DEPENDS:=+veci",pkg)
+        self.assertIn("PKG_VERSION:=0.2.1",pkg)
+
         self.assertIn("luci-app-veci-quota.json",pkg)
         self.assertIn("view/veci/quota.js",pkg)
     def test_standalone_public_edition_contract(self):
