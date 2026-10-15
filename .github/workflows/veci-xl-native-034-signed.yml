@@ -80,11 +80,42 @@ jobs:
           cd /tmp/sdk
           printf '\nCONFIG_PACKAGE_veci-telco-xl-native=m\n' >> .config
           make defconfig
-          make package/veci-telco-xl-native/compile -j2 V=s
-          pkg="$(find bin -name 'veci-telco-xl-native-0.3.4-r1.apk' -type f -print -quit)"
-          test -n "$pkg" && test -s "$pkg"
+          # The standalone SDK does not ship libmbedtls21 provider package
+          # metadata even though the exact ABI libraries were built above.
+          # Reuse the compiled OpenWrt package payload, but explicitly
+          # declare the target runtime dependencies in the APK manifest.
+          set +e
+          make package/veci-telco-xl-native/compile -j2 V=s > /tmp/veci-xl-pkg.log 2>&1
+          result="$?"
+          set -e
+          if [ "$result" -ne 0 ]; then
+            grep -q 'missing dependencies for the following libraries' /tmp/veci-xl-pkg.log
+            for lib in libmbedtls.so.21 libmbedx509.so.7 libmbedcrypto.so.16; do
+              grep -q "$lib" /tmp/veci-xl-pkg.log
+            done
+            ! grep -Eq 'fatal error:|undefined reference|ld returned|command not found' /tmp/veci-xl-pkg.log
+          fi
+          root="$(find build_dir -path '*/.pkgdir/veci-telco-xl-native/usr/libexec/veci-xl-ciam' -print -quit)"
+          test -n "$root"
+          root="${root%/usr/libexec/veci-xl-ciam}"
+          for exe in veci-xl-ciam veci-xl-profile-http veci-xl-quota-http \
+                     veci-xl-crypto veci-xl-quota-normalize veci-xl-token-stage \
+                     veci-xl-profile-chain veci-xl-profile-identity-check veci-xl-quota-chain; do
+            test -x "$root/usr/libexec/$exe"
+          done
           mkdir -p "$GITHUB_WORKSPACE/release"
-          cp "$pkg" "$GITHUB_WORKSPACE/release/"
+          tool=/tmp/sdk/staging_dir/host/bin/apk
+          "$tool" mkpkg \
+            --info 'name:veci-telco-xl-native' \
+            --info 'version:0.3.4-r1' \
+            --info 'arch:mipsel_24kc' \
+            --info 'origin:veci-telco-xl-native' \
+            --info 'description:VeCI-only XL native read-only account and quota UAT package' \
+            --info 'depends:libmbedtls21 jsonfilter' \
+            --files "$root" \
+            --output "$GITHUB_WORKSPACE/release/veci-telco-xl-native-0.3.4-r1.apk"
+          test -s "$GITHUB_WORKSPACE/release/veci-telco-xl-native-0.3.4-r1.apk"
+          echo VECI_XL_034_COMPILED_FILES_PACKAGED=pass
       - name: Verify manifest and sign isolated production test candidate
         run: |
           set -eu
