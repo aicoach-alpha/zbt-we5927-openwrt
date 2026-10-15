@@ -234,3 +234,27 @@ The OpenWrt rpcd executable-plugin mechanism registers method objects at service
 Remediation in script only, signed v0.2.1 APK UNCHANGED: check installed executable and its direct `list` and `call status`, then allow bounded 12 one-second ubus retries after rpcd restart; on failure report whether the object was not registered or the method call failed, and auto rollback again. The script refuses file collisions and leaves all non-quota services untouched. CI installation/rollback safety gate PASS run 38677442971.
 
 The next single physical transaction is running the updated SHA-pinned installer from office PowerShell; only report LuCI UI installed once on-device `VECI_QUOTA_PACKAGE_INSTALL=pass`, `VECI_QUOTA_RPC=pass`, and `VECI_QUOTA_PROVIDER_REGISTRY=pass` are observed. No operator authentication is implemented. Do not repeat closed AES/SDK/PKG signature tests except for changed artifacts.
+
+## 2026-10-15 — Signed quota UI v0.2.1 physical installation & RPC UAT PASS
+
+Owner retried the corrected, commit-pinned installer via SSH from the **office Windows laptop** to the actual ZBT-WE5927. Full physical stdout:
+```text
+VECI_QUOTA_SIGNATURE=pass
+VECI_QUOTA_DEPENDENCIES=pass
+VECI_QUOTA_VOLATILE_BACKUP=pass
+VECI_QUOTA_RPC_EXECUTABLE=pass
+VECI_QUOTA_PACKAGE_INSTALL=pass
+VECI_QUOTA_RPC=pass
+VECI_QUOTA_PROVIDER_REGISTRY=pass
+VECI_QUOTA_LOCAL_STATE=not_connected
+VECI_QUOTA_ROLLBACK_COMMAND_AVAILABLE=true
+VECI_XL_ACCOUNT_LOGIN=not_attempted
+VECI_OPERATOR_QUOTA=not_verified
+VECI_MODEM_AND_SMS_UNCHANGED=true
+```
+
+**Deployment milestone CLOSED/PASS**: APK `veci-telco-indonesia-0.2.1-r1.apk` installed to router overlay, signed package verified, executable rpcd plugin recognized, `ubus veci.quota status` and provider registry function, with state `not_connected` (correct fail-closed behavior). `rpcd` retry/direct-plugin-contract correction fixed the observed previous install blocker. Script reports LTE/SMS unchanged; additional independent modem/SMS regression not conducted in this transaction.
+
+**Remaining verification distinct from installation:** LuCI web navigation/rendering through authenticated browser, persistence after a normal reboot (do not reboot just to close the gate), and eventual approved actual XL operator account/remaining-quota integration. No credentials or OTP were supplied. Authentication NOT LIVE, operator balance NOT verified. Optional application package installation LIVE is NOT equivalent to operator quota LIVE.
+
+**Release discipline:** preserve physical PASS, do not reinstall or run signed preflights again unless the package changes. Owner should keep a recovery path because rollback is available through existing installer `--rollback`; future upgrades require a stable operator-controlled APK signing key rather than this one-time ephemeral CI signing key. GitHub feature PR #4 remains open pending broader release gates.
