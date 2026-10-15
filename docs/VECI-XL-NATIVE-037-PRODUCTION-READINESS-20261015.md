@@ -25,3 +25,25 @@ Office laptop device `25NBCABA13CF` was listed as connected but the account's De
 **Next single production decision:** owner approval to safely migrate web administration to HTTPS-only while retaining a tested recovery path, followed by authorized local XL credential provisioning. Only after those prerequisites are actually satisfied should the user perform one real account-owner OTP→profile→quota UAT. No broad LTE/SMS/firmware retests.
 
 Production UI stays entirely in VeCI and does not create any LuCI UI.
+
+## Physical production update — verified by owner on 15 October 2026
+
+Actual physical WE5927 OpenWrt 25.12.5 console output confirms XL Native **0.3.7 installed and RPC live**:
+
+- `VECI_XL_037_SIGNED_PREFLIGHT=pass`; `VECI_XL_037_INSTALL=pass`.
+- `VECI_XL_037_RPC_REGISTRATION=pass`; `VECI_XL_037_RPC=registered`.
+- `VECI_XL_037_HTTPS_POLICY=enforced`, `VECI_XL_037_ROUTER_HTTPS_ONLY=pass`.
+- `VECI_XL_037_CORE_022_PRESERVED=pass`, `VECI_XL_037_ROLLBACK=available`.
+- `VECI_XL_037_LUCI_MODIFIED=false`, `VECI_XL_037_MODEM_SMS_UNCHANGED=true`.
+- Actual sanitized `veci.xl status`: `{"https_only":true,"operator_configured":false,"session":"not_connected","quota_status":"read_local_only"}`.
+- `VECI_XL_037_ACCOUNT_UAT=blocked_operator_configuration`; `VECI_XL_037_OTP_ACTIONS=disabled`; `VECI_XL_037_OPERATOR_QUOTA=not_authenticated`.
+
+The former paragraph **"Physical production UAT: not yet authorized as ready"** above is a *historical pre-deployment snapshot*, superseded by this physical log for APK/RPC/HTTPS. **Only carrier authentication and real quota remain blocked.** Do not regress the working signed package or Core for this blocker.
+
+### Authentication integration gap
+
+The native XL backend needs independently permitted integration material for two distinct hosts. CIAM OTP transport (`veci-xl-ciam.c`) requires locally protected `basic_auth`, `user_agent`, `fingerprint`, `device_id`, and OTP-signature key `ax_api_sig_key`. Profile/quota crypto and HTTPS (`veci-xl-quota-http.c` and chains) require `xdata_key`, `api_key`, and `signature_secret`. Those are integration/client credentials **in addition to the subscriber's normal SMS OTP**. The current root-only credential directories are not configured, and sending OTP must remain disabled.
+
+An open-source BITS-XL reference implementation describes undocumented app requests and ships its own defaults; that code is not proof of authorization to reuse its application secrets. Do not copy third-party keys into the repository, firmware, chat, logs, or router shell commands. The official XL myXL customer help documents the normal number + SMS/email OTP process, but no public end-user quota API is confirmed from it. Integration credentials must be provisioned through an authorized channel; don't fabricate them, downgrade TLS, fake quota, or initiate unsolicited OTP.
+
+The VeCI-native UI entrypoint has been packaged under `/veci/xl-account.html`; display should state `Not configured` and disable account OTP. No further HTTPS-only migration, Core upgrade, LTE reset, or SMS test is required.
