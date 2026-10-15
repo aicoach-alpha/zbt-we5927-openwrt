@@ -43,6 +43,22 @@ function failure(answer) {
     ? answer.reason : 'rpc_transport_or_permission';
   return new Error(reason);
 }
+// The signed VeCI 0.2.2 VeciApi throws non-zero JSON-RPC ubus statuses.
+// Report finite, non-sensitive diagnostic codes only; never raw messages.
+function transportCode(error) {
+  if (Number.isInteger(error?.ubusStatus) &&
+      error.ubusStatus >= 1 && error.ubusStatus <= 20) {
+    return 'ubus_status_' + error.ubusStatus;
+  }
+  const message = error && typeof error.message === 'string' ? error.message : '';
+  if (message === 'Not authenticated') return 'session_not_authenticated';
+  if (/^(?:veci\.ussd|session)\.(?:start|reply|cancel|quotaStatus|access) timed out$/.test(message)) {
+    return 'request_timeout';
+  }
+  if (/^HTTP 4[0-9]{2}$/.test(message)) return 'http_4xx';
+  if (/^HTTP 5[0-9]{2}$/.test(message)) return 'http_5xx';
+  return 'transport_unknown';
+}
 function report(value) { $('guide-feedback').textContent = value; }
 function invalidate() {
   session = '';
@@ -108,10 +124,11 @@ async function diagnoseRpc() {
       ubus_rpc_session: api.sessionId, scope: 'ubus',
       object: 'veci.ussd', function: 'start'
     }, { timeout: 7000 });
-    if (result && (result.access === true || result.access === 1)) access = 'allowed';
-    else if (result && (result.access === false || result.access === 0)) access = 'denied';
-  } catch {
-    access = 'unknown';
+    if (result && [true, 1, 'true', '1'].includes(result.access)) access = 'allowed';
+    else if (result && [false, 0, 'false', '0'].includes(result.access)) access = 'denied';
+    else access = 'no_access_field';
+  } catch (err) {
+    access = transportCode(err);
   }
   output.textContent = 'VeCI RPC: ' + core +
     ' | USSD status RPC: ' + cached +
@@ -146,7 +163,7 @@ async function guarded(work) {
   catch (err) {
     const reason = err && typeof err.message === 'string' ? err.message : '';
     const text = Object.hasOwn(REASONS, reason)
-      ? REASONS[reason] : 'RPC USSD tidak merespons, izin ditolak, atau koneksi gagal.';
+      ? REASONS[reason] : 'Permintaan RPC gagal (' + transportCode(err) + ').';
     report('USSD gagal: ' + text + ' Tidak dilakukan pengulangan otomatis.');
     invalidate();
   }
