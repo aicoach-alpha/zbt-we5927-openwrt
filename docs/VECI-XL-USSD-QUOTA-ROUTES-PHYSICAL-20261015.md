@@ -33,3 +33,18 @@ The existing native worker `veci-xl-ussd-once` accepts only literal `*808#` for 
 6. Subscriber identity, OTP, package keys and carrier menu response text must not be logged to GitHub.
 
 `USSD operator actual quota success`: **not yet observed**. Native RPC availability is not evidence that the operator returned quota.
+
+## Optional VeCI-only guided page prepared (not yet on physical router)
+
+Two standalone VeCI files `xl-ussd-guide.html` and `xl-ussd-guide.js` implement the observed 7→3→2→1 and 7→3→2→2 menu hints. They use the existing authenticated `veci.ussd` RPC; each `start` and `reply` is a separate user-confirmed action, never an automatic loop. The actual operator text is displayed only in transient DOM and is not written to disk or logged. No new service/API keys or altered modem binaries are needed.
+
+Focused UI CI PASS: https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38723959879.
+
+An optional **SHA256-pinned two-file static installer** was created: `scripts/veci-xl-ussd-guided-static-deploy-20261015.sh`. It adds only previously absent `/www/veci/xl-ussd-guide.html` and `/www/veci/xl-ussd-guide.js`, verifies original Core 0.2.2 fingerprints, both existing XL RPCs, installed XL Native 0.3.7, HTTPS-only, original source commit and SHA256 before install. No package changes, no rpcd restart, no unsolicited USSD. Rollback removes only the two files if byte-for-byte matches. It does not claim a new APK signature: this is a checksum-pinned additive static asset overlay.
+
+Pinned file commit `b412695a088d8cd625b3231f60b8d1fd49d9483c`.
+- HTML SHA256: `7878226966d40fbdeea0daab66088660a29c0f5a396b61a5675681594cb84023`
+- JS SHA256: `7fe4df1ee56cf64fdc1d04239ee59ffc29b09db3deb51a0b2b657049201874b4`
+- Install gate CI PASS: https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38724752584
+
+The optional guide must not be reported LIVE until the owner installs it and confirms it opens in VeCI. It cannot bypass per-selection confirmations or guarantee a fixed carrier menu. A carrier quota display also requires an actual operator response, not merely a successful file install.
