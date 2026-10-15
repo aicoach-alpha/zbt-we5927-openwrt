@@ -73,7 +73,7 @@ return view.extend({
 		var providers = Array.isArray(registry.providers) ? registry.providers : [];
 		var seen = {};
 		var providerRows = providers.filter(function(p) {
-			if (!p || typeof p.id !== 'string' || seen[p.id])
+			if (!p || typeof p.id !== 'string' || p.id === 'xl' || seen[p.id])
 				return false;
 			seen[p.id] = true;
 			return true;
