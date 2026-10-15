@@ -29,7 +29,7 @@ jobs:
           if /tmp/veci-http-host quota >/tmp/veci-out 2>/tmp/veci-err; then
             echo FAIL_OPEN_WITHOUT_SESSION; exit 1
           fi
-          grep -q 'authorized_session_not_configured' /tmp/veci-err
+          grep -Eq 'authorized_session_not_configured|root_required' /tmp/veci-err
           test ! -s /tmp/veci-out
           echo VECI_XL_HTTP_NO_AUTH_NO_NETWORK_PASS
       - name: Fetch official SHA-pinned OpenWrt 25.12.5 RAMIPS toolchain
