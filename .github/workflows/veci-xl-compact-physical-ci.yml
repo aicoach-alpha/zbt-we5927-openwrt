@@ -24,8 +24,8 @@ jobs:
           from pathlib import Path
           s=Path('scripts/veci-xl-compact-runtime-physical-20261015.sh').read_text()
           for x in ("AT+CMGR", "AT+CUSD", "AT+CMGS", "/etc/init.d/",
-                    "sysupgrade", "apk add", "otp ", "quota-http quota",
-                    "veci-xl-http quota", "/overlay", "reboot", "Authorization:"):
+                    "sysupgrade", "apk add", "otp ", '"$http" quota',
+                    '"$http" --read-only', "/overlay", "reboot", "Authorization:"):
               assert x not in s,x
           for good in ("--invalid-no-network", "VECI_REAL_OPERATOR_LOGIN=not_attempted",
                        "VECI_OPERATOR_QUOTA=not_verified",
