@@ -4,7 +4,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-telco-xl-native
-PKG_VERSION:=0.3.0
+PKG_VERSION:=0.3.1
 PKG_RELEASE:=1
 PKG_BUILD_DEPENDS:=mbedtls
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
@@ -19,8 +19,9 @@ define Package/veci-telco-xl-native
 endef
 
 define Package/veci-telco-xl-native/description
-  Three small native XL components: AES/HMAC crypto, strict HTTPS
-  quota-only transport and bounded DATA-only parser, with staged
+  Native XL components: AES/HMAC crypto, strict HTTPS quota-only
+  transport and bounded DATA-only parser, plus owner-initiated
+  CIAM OTP and isolated pending-profile token staging. With staged
   protected local pipeline. No automatic login or polling, no operator
   credentials, no SMS reader, no payment commands and no daemon.
   THIS IS NOT AN AUTHENTICATED OPERATOR INTEGRATION UNTIL UAT.
@@ -43,6 +44,11 @@ define Build/Compile
 		$(TARGET_LDFLAGS) -Wl,--gc-sections -lmbedtls -lmbedx509 -lmbedcrypto
 	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) \
 		-Os -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+		-o $(PKG_BUILD_DIR)/veci-xl-ciam \
+		$(CURDIR)/../veci-telco-indonesia/veci-xl-ciam.c \
+		$(TARGET_LDFLAGS) -Wl,--gc-sections -lmbedtls -lmbedx509 -lmbedcrypto
+	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) \
+		-Os -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 		-o $(PKG_BUILD_DIR)/veci-xl-quota-normalize \
 		$(CURDIR)/../veci-telco-indonesia/veci-xl-quota-normalize.c \
 		$(TARGET_LDFLAGS) -Wl,--gc-sections
@@ -53,6 +59,8 @@ define Package/veci-telco-xl-native/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/veci-xl-crypto $(1)/usr/libexec/veci-xl-crypto
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/veci-xl-quota-http $(1)/usr/libexec/veci-xl-quota-http
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/veci-xl-quota-normalize $(1)/usr/libexec/veci-xl-quota-normalize
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/veci-xl-ciam $(1)/usr/libexec/veci-xl-ciam
+	$(INSTALL_BIN) $(CURDIR)/../veci-telco-indonesia/files/usr/libexec/veci-xl-token-stage $(1)/usr/libexec/veci-xl-token-stage
 	$(INSTALL_BIN) $(CURDIR)/../veci-telco-indonesia/files/usr/libexec/veci-xl-quota-chain $(1)/usr/libexec/veci-xl-quota-chain
 endef
 
