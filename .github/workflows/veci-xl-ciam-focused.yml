@@ -1,0 +1,52 @@
+name: VeCI XL CIAM native OTP focused gate
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/veci-xl-ciam.c'
+      - 'tests/veci_xl_ciam_focused.c'
+      - '.github/workflows/veci-xl-ciam-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host compile and two-step OTP protocol regression
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libmbedtls-dev
+          cc -std=c11 -Os -Wall -Wextra -Werror \
+             -o /tmp/veci-xl-ciam \
+             source/veci-telco-indonesia/veci-xl-ciam.c \
+             -lmbedtls -lmbedx509 -lmbedcrypto
+          cc -std=c11 -Os -Wall -Wextra -Werror \
+             -o /tmp/veci-xl-ciam-test tests/veci_xl_ciam_focused.c \
+             -lmbedtls -lmbedx509 -lmbedcrypto
+          /tmp/veci-xl-ciam-test
+          if /tmp/veci-xl-ciam request-otp >/tmp/veci-ciam.out 2>/tmp/veci-ciam.err; then
+            echo FAIL_OPEN_WITHOUT_CREDENTIALS; exit 1
+          fi
+          grep -q 'VECI_XL_CIAM=not_configured' /tmp/veci-ciam.out
+          test ! -s /tmp/veci-ciam.err
+          echo VECI_XL_CIAM_NO_CREDENTIALS_NO_NETWORK=pass
+      - name: Confirm narrow transport surface
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          c=Path('source/veci-telco-indonesia/veci-xl-ciam.c').read_text()
+          assert 'gede.ciam.xlaxiata.co.id' in c
+          assert 'MBEDTLS_SSL_VERIFY_REQUIRED' in c
+          assert 'mbedtls_ssl_set_hostname(&ssl,HOST)' in c
+          assert 'O_NOFOLLOW' in c and '0700' in c and '0600' in c
+          assert 'otp_request_accepted' in c and 'token_candidate_received' in c
+          assert 'carrier_authenticated' not in c
+          for banned in ('AT+CMGR','AT+CUSD','/luci-static/',
+                         '/api/v8/purchases','/api/v8/store',
+                         'MBEDTLS_SSL_VERIFY_NONE','getenv('):
+              assert banned not in c,banned
+          print('VECI_XL_CIAM_OTP_SCOPE=pass')
+          PY
