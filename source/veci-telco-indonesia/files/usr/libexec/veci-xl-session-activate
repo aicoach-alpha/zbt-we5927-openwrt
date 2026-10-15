@@ -1,0 +1,64 @@
+#!/bin/sh
+# Called ONLY after successful verified TLS/decryption and strict MSISDN check
+# inside veci-xl-profile-chain. Never prints account numbers or tokens.
+set -eu
+umask 077
+LC_ALL=C
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LC_ALL PATH
+ROOT=/tmp/veci-telco-private
+PENDING="$ROOT/pending-profile"
+fail(){ printf 'VECI_XL_ACTIVATION=blocked\nVECI_XL_REASON=%s\n' "$1"; exit 1; }
+file_ok(){
+ [ -f "$1" ] && [ ! -L "$1" ] &&
+ [ "$(ls -ldn "$1" | awk '{ print $1 " " $3 }')" = "-rw------- $(id -u)" ]
+}
+dir_ok(){
+ [ -d "$1" ] && [ ! -L "$1" ] &&
+ [ "$(ls -ldn "$1" | awk '{ print $1 " " $3 }')" = "drwx------ $(id -u)" ]
+}
+[ "$#" -eq 1 ] && [ "$1" = --activate ] || fail usage
+[ "$(id -u)" = 0 ] || fail root_required
+dir_ok "$ROOT" && dir_ok "$PENDING" || fail private_directory_insecure
+for name in id_token access_token refresh_token requested_number created_epoch; do
+ file_ok "$PENDING/$name" || fail pending_secret_insecure
+done
+file_ok "$ROOT/profile-verified-transport.json" || fail profile_missing
+[ -x /usr/libexec/veci-xl-profile-identity-check ] || fail identity_guard_missing
+# Still require the narrow operator-response match gate immediately before
+# activating. No independent user input or token can bypass this test.
+/usr/libexec/veci-xl-profile-identity-check --check >/dev/null 2>&1 ||
+ fail profile_account_mismatch
+for name in id_token access_token refresh_token verified_number verified_epoch; do
+ [ ! -e "$ROOT/$name" ] && [ ! -L "$ROOT/$name" ] ||
+ fail active_session_already_exists
+done
+now="$(date +%s)"
+case "$now" in ''|*[!0-9]*) fail bad_clock ;; esac
+[ "$now" -ge 1700000000 ] || fail bad_clock
+created="$(cat "$PENDING/created_epoch")"
+case "$created" in ''|*[!0-9]*) fail bad_creation_time ;; esac
+[ "$now" -ge "$created" ] && [ $((now-created)) -le 900 ] ||
+ fail candidate_expired
+# Create root-private staged files in same filesystem and atomically rename.
+tmp="$ROOT/.activate.$$"
+[ ! -e "$tmp" ] && [ ! -L "$tmp" ] || fail temporary_path_exists
+mkdir -m 700 "$tmp" || fail staging_failed
+trap 'rm -rf "$tmp"' EXIT
+for name in id_token access_token refresh_token; do
+ cp "$PENDING/$name" "$tmp/$name" || fail token_stage_failed
+done
+cp "$PENDING/requested_number" "$tmp/verified_number" ||
+ fail number_stage_failed
+printf '%s\n' "$now" > "$tmp/verified_epoch"
+chmod 600 "$tmp/"* || fail token_mode_failed
+for name in id_token access_token refresh_token verified_number verified_epoch; do
+ file_ok "$tmp/$name" || fail staging_integrity_failed
+done
+# Commit to directory that is not consumed by the old profile frontend.
+# A subsequent quota read must check 'verified_epoch' AND source TLS again.
+for name in id_token access_token refresh_token verified_number verified_epoch; do
+ mv "$tmp/$name" "$ROOT/$name" || fail commit_failed
+done
+echo VECI_XL_ACTIVATION=profile_matched
+echo VECI_XL_QUOTA_REFRESH=not_run
