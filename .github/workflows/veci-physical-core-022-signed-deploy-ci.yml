@@ -1,0 +1,69 @@
+name: VeCI physical core 0.2.2 signed live-parity deployment gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-physical-core-022-signed-deploy-20261015.sh'
+      - '.github/workflows/veci-physical-core-022-signed-deploy-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify BusyBox shell and fail-closed rollback contract
+        run: |
+          set -eu
+          p=scripts/veci-physical-core-022-signed-deploy-20261015.sh
+          sh -n "$p"
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-physical-core-022-signed-deploy-20261015.sh').read_text()
+          active='\n'.join(line for line in s.splitlines() if not line.lstrip().startswith('#'))
+          required=(
+              'TAG=veci-physical-core-022-c76cb7f13f06',
+              'NEW_SHA=e06ad0b5f57f29630f20ff4bdaa06665261c09cbaef21a17a5a5504c092ff168',
+              'OLD_SHA=2b18a8c1e230314837068649023c097e1c354b9b8bdd77a4a148692fb7f3fd9a',
+              'KEY_SHA=c9915940535bdc8f9f388af8a924f329e77cc20217cb3b3d8fbc495f80628fcc',
+              'CELL_SHA=b075a4852d3eeb5f717e4db568a0929fc732b225f025a154beb24961a3f85379',
+              'MODULE_SHA=5c1f66b5a5aa292be202897ef538f67ed7933e857ff3e11bcaabb075b75c692d',
+              'RPCD_SHA=d08edadd38f0d9b992fc54d879eabf9f797bf54df83fa8c8cf7b59e55b9e99ce',
+              'ACL_SHA=d655406fd94214c22cf047bf5fc49e66876365634958be9d25171e6100e6a171',
+              'CONFIG_SHA=95927da8bad40be6ac0eb14d8c92d13fa82ffc1594a8f608d59a06680275caae',
+              'VECI_022_DEPLOY=pass','VECI_022_BROWSER_UAT=pending',
+              'VECI_022_CONFIG_PRESERVED=pass','VECI_022_ROLLBACK=pass',
+              'existing_core_version_not_0_2_0','existing_rollback_backup_drift',
+              'apk_signature_rejected','transaction_simulation_failed',
+              'unrelated_packages_modified','rollback_to_live',
+              'chmod 755 "$RPCD"','chmod 644 "$PAGE" "$MODULE" "$ACL" "$CSS"',
+              'apk --no-network --keys-dir "$WORK/keys" add "$WORK/$NEW"',
+              'apk --no-network --keys-dir "$WORK/keys" add "$WORK/$OLD"',
+              'VECI_MODEM_SMS_UNCHANGED=true',
+          )
+          for x in required: assert x in active,x
+          for x in ('sysupgrade','--allow-untrusted','uci set',
+                    '/etc/init.d/network','/etc/init.d/we5927','AT+CMGR',
+                    'AT+CMGS','AT+CUSD','/luci-static','apk upgrade'):
+              assert x not in active,x
+          assert active.count('apk --keys-dir "$WORK/keys" verify') == 1
+          assert 'APPLIED=1' in active and 'FINISHED=1' in active
+          assert 'restore_files' in active
+          print('VECI_022_SIGNED_DEPLOY_SAFETY_STATIC_PASS')
+          PY
+      - name: Verify immutable signed pair checksums from release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir /tmp/veci-022-signed
+          gh release download veci-physical-core-022-c76cb7f13f06 \
+            -p 'veci-0.2.0-r1.apk' -p 'veci-0.2.2-r1.apk' \
+            -p 'veci-physical-022.pem' -D /tmp/veci-022-signed
+          printf '%s  %s\n' \
+            '2b18a8c1e230314837068649023c097e1c354b9b8bdd77a4a148692fb7f3fd9a' /tmp/veci-022-signed/veci-0.2.0-r1.apk \
+            'e06ad0b5f57f29630f20ff4bdaa06665261c09cbaef21a17a5a5504c092ff168' /tmp/veci-022-signed/veci-0.2.2-r1.apk \
+            'c9915940535bdc8f9f388af8a924f329e77cc20217cb3b3d8fbc495f80628fcc' /tmp/veci-022-signed/veci-physical-022.pem | sha256sum -c -
+          echo VECI_022_RELEASE_INTEGRITY=pass
