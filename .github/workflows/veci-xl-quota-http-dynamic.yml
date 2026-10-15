@@ -1,4 +1,4 @@
-name: VeCI XL quota HTTP small dynamic MIPS prerelease
+name: VeCI XL compact dynamic MIPS runtime prerelease
 on:
   push:
     paths:
@@ -80,11 +80,34 @@ jobs:
           size="$(stat -c %s release/veci-xl-quota-http-dynamic-mipsel)"
           test "$size" -gt 0
           test "$size" -lt 120000
-          sha256sum release/veci-xl-quota-http-dynamic-mipsel > release/SHA256SUMS
-          echo "VECI_XL_DYNAMIC_MIPS_ABI_PASS size=$size"
+          # Reuse built-in crypto library for smaller AES/HMAC runtime.
+          "$cc" -std=c11 -D_DEFAULT_SOURCE -Os -s -ffunction-sections -fdata-sections \
+            -Wall -Wextra -Werror -I"$src/include" \
+            -o release/veci-xl-crypto-dynamic-mipsel \
+            source/veci-telco-indonesia/veci-xl-crypto.c \
+            -L/tmp/veci-mbed/build/library \
+            -Wl,-rpath-link,/tmp/veci-mbed/build/library \
+            -Wl,--gc-sections -lmbedcrypto
+          "$cc" -std=c11 -Os -s -ffunction-sections -fdata-sections \
+            -Wall -Wextra -Werror \
+            -o release/veci-xl-quota-normalize-dynamic-mipsel \
+            source/veci-telco-indonesia/veci-xl-quota-normalize.c \
+            -Wl,--gc-sections
+          readelf -d release/veci-xl-crypto-dynamic-mipsel | grep -q 'libmbedcrypto.so.16'
+          ! readelf -d release/veci-xl-crypto-dynamic-mipsel | grep -Eq 'RPATH|RUNPATH'
+          readelf -h release/veci-xl-quota-normalize-dynamic-mipsel | grep -Eq 'Machine:[ ]*MIPS'
+          for f in release/*-mipsel; do
+            test "$(stat -c %s "$f")" -lt 120000
+            sha256sum "$f"
+          done > release/SHA256SUMS
+          cp source/veci-telco-indonesia/files/usr/libexec/veci-xl-quota-chain \
+             release/veci-xl-quota-chain
+          sh -n release/veci-xl-quota-chain
+          echo "VECI_XL_DYNAMIC_RUNTIME_ABI_PASS"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: veci-xl-http-dynamic-mipsel
+          name: veci-xl-runtime-compact-mipsel
           path: release
       - name: Publish staged small executable, no automatic device install
         env:
@@ -92,10 +115,13 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -eu
-          tag="veci-xl-http-dynamic-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          tag="veci-xl-runtime-compact-$(echo "$GITHUB_SHA" | cut -c1-12)"
           gh release create "$tag" \
-            release/veci-xl-quota-http-dynamic-mipsel release/SHA256SUMS \
+            release/veci-xl-quota-http-dynamic-mipsel \
+            release/veci-xl-crypto-dynamic-mipsel \
+            release/veci-xl-quota-normalize-dynamic-mipsel \
+            release/veci-xl-quota-chain release/SHA256SUMS \
             --target "$GITHUB_SHA" --prerelease \
-            --title "VeCI XL read-only quota HTTP compact dynamic MIPS prerelease" \
+            --title "VeCI XL three-component compact dynamic MIPS quota runtime" \
             --notes "Staged only; not LIVE. Uses system libmbedtls.so.21, libmbedx509.so.7 and libmbedcrypto.so.16. Strict TLS and root-owned session policy; rejects missing user authorization before network. No SMS, USSD, tokens, OTP capture or flash install. Physical dynamic ABI execution still unverified."
-          echo "VECI_XL_HTTP_DYNAMIC_STAGED=$tag"
+          echo "VECI_XL_RUNTIME_DYNAMIC_STAGED=$tag"
