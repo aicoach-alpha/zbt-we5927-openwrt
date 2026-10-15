@@ -33,6 +33,37 @@ The **actual router's runtime and ACL must be independently checked** before rep
 4. Browser UAT after eventual controlled install must recheck Cellular quota panel, all SMS Inbox/Sent/Drafts controls, read-only XL USSD controls, LTE data Internet status, and package version; avoid sending real SMS or requesting an unsolicited USSD session merely to claim a test PASS.
 5. XL account authentication and a real operator-verified quota response remain NOT implemented or proven. The only valid display currently is `Not connected`; no synthetic or router-traffic quota can be shown as carrier quota.
 
+
+## 2026-10-15 — Physical runtime/ACL compatibility result: BLOCKED, correctly fail-closed
+
+Operator executed the immutable read-only identity and signed-APK preflight from the authorized Windows office laptop against the actual WE5927. Live facts (read-only):
+
+```text
+VECI_RELEASE_INSTALLED_CORE=0.2.0
+VECI_RELEASE_CELLULAR_SHA256=b075a4852d3eeb5f717e4db568a0929fc732b225f025a154beb24961a3f85379
+VECI_RELEASE_QUOTA_MODULE_SHA256=5c1f66b5a5aa292be202897ef538f67ed7933e857ff3e11bcaabb075b75c692d
+VECI_RELEASE_RPCD_SHA256=d08edadd38f0d9b992fc54d879eabf9f797bf54df83fa8c8cf7b59e55b9e99ce
+VECI_RELEASE_CORE_ACL_SHA256=d655406fd94214c22cf047bf5fc49e66876365634958be9d25171e6100e6a171
+VECI_RELEASE_CONFIG_SHA256=95927da8bad40be6ac0eb14d8c92d13fa82ffc1594a8f608d59a06680275caae
+VECI_RELEASE_SMS_CSS_SHA256=fd3b3540109d815d9b3cb5151298af04ef865e55557d8a8a91d9c30f1548fdb2
+VECI_RELEASE_CORE_RPCD_PARITY=drift
+VECI_RELEASE_CORE_ACL_PARITY=drift
+VECI_RELEASE_BACKEND_BASELINE=blocked_pending_reconciliation
+VECI_RELEASE_BACKEND_QUOTA=pass
+VECI_RELEASE_BACKEND_CELLULAR=pass
+VECI_RELEASE_OVERLAY_FREE_KB=1336
+VECI_022_PREFLIGHT=blocked
+VECI_022_REASON=existing_core_rpcd_drift
+```
+
+Interpretation: all **frontend** source fingerprint checks match the operator-verified deployed snapshot, but the *live core backend RPCD* and *live core ACL* differ from the upstream baseline packed in the signed candidate. The difference might come from legitimate prior hotfixes; absence of an exact source match is **not evidence of compromise**. The preflight did not reach the package transaction phase. No APK was installed; the live 0.2.0 + native quota overlay remains intact.
+
+**RELEASE HOLD / NO-GO:** do NOT attempt `apk add` / `apk upgrade`, use `--allow-untrusted`, relax the fingerprint gate, replace core RPCD/ACL with upstream defaults, or install the previously signed 0.2.0 APK as a purported rollback. That signed 0.2.0 APK is only frontend-identical and does **not** reproduce the live backend; rollback fidelity is not yet established.
+
+**Required next evidence:** read-only copies of `/usr/libexec/rpcd/veci` and `/usr/share/rpcd/acl.d/veci.json` from the *office laptop to a private local ZIP*. Verify the SHA-256 fingerprints above on the laptop before sharing them for inspection. Do not export `/etc/config/veci` or arbitrary private secrets. Inspect the captured files for credentials or device-specific data before any public GitHub commit or GitHub Actions artifact.
+
+After inspection, reconstruct a candidate whose packaged core runtime and ACL match the physical files (or a narrowly audited superset), rebuild and re-sign an exact rollback package, and revalidate the package simulation and physical browser UAT. Keep modem/LTE/SMS unchanged throughout. Note signed APK CI PASS alone does not supersede this LIVE NO-GO.
+
 ## Current LIVE milestone
 
 Owner supplied screenshot and router output confirming the **VeCI native Operator Data Quota status panel** LIVE/PASS, backend `veci.quota` PASS, local operator label XL with `Not connected`, LTE Internet Reachable, and visible existing SMS/USSD UI. On-router Core version is STILL `0.2.0`, plus reversible overlay. No LuCI UI development or change has been performed for this release. Never route to `andre-nas`, whose `192.168.1.1` is unrelated hardware.
