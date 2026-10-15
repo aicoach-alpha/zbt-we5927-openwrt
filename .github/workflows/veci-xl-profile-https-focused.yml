@@ -1,0 +1,66 @@
+name: VeCI XL profile HTTPS focused
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/veci-xl-quota-http.c'
+      - 'source/veci-telco-indonesia/veci-xl-crypto.c'
+      - 'source/veci-telco-indonesia/files/usr/libexec/veci-xl-profile-chain'
+      - 'source/veci-telco-xl-native/Makefile'
+      - 'tests/veci_xl_profile_transport_focused.c'
+      - '.github/workflows/veci-xl-profile-https-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build profile-only transport and run exact scope tests
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libmbedtls-dev
+          sh -n source/veci-telco-indonesia/files/usr/libexec/veci-xl-profile-chain
+          cc -std=c11 -Os -Wall -Wextra -Werror -DVECI_XL_PROFILE_VARIANT \
+            -o /tmp/veci-xl-profile-http source/veci-telco-indonesia/veci-xl-quota-http.c \
+            -lmbedtls -lmbedx509 -lmbedcrypto
+          cc -std=c11 -Os -Wall -Wextra -Werror \
+            -o /tmp/veci-profile-test tests/veci_xl_profile_transport_focused.c \
+            -lmbedtls -lmbedx509 -lmbedcrypto
+          cc -std=c11 -Os -Wall -Wextra -Werror \
+            -o /tmp/veci-xl-crypto source/veci-telco-indonesia/veci-xl-crypto.c \
+            -lmbedcrypto
+          /tmp/veci-profile-test
+          if sudo /tmp/veci-xl-profile-http profile >/tmp/veci-profile-out 2>/tmp/veci-profile-err; then
+            echo "FAIL_OPEN_UNVERIFIED_PROFILE"; exit 1
+          fi
+          grep -q 'authorized_session_not_configured' /tmp/veci-profile-err
+          test ! -s /tmp/veci-profile-out
+          if sudo /tmp/veci-xl-profile-http quota >/tmp/veci-profile-out 2>/tmp/veci-profile-err; then
+            echo "CROSS_ROUTE_ALLOWED"; exit 1
+          fi
+          grep -q 'invalid_operation' /tmp/veci-profile-err
+          echo VECI_XL_PROFILE_NO_TOKEN_NO_NETWORK=pass
+      - name: Validate package inclusion and absence of automatic quota activation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          pkg=Path('source/veci-telco-xl-native/Makefile').read_text()
+          chain=Path('source/veci-telco-indonesia/files/usr/libexec/veci-xl-profile-chain').read_text()
+          check=Path('source/veci-telco-indonesia/files/usr/libexec/veci-xl-profile-identity-check').read_text()
+          crypto=Path('source/veci-telco-indonesia/veci-xl-crypto.c').read_text()
+          assert 'PKG_VERSION:=0.3.3' in pkg
+          assert '-DVECI_XL_PROFILE_VARIANT' in pkg
+          assert 'veci-xl-profile-http' in pkg and 'veci-xl-profile-chain' in pkg
+          assert '"profile-signature"' in crypto and 'PROFILE_PATH "api/v8/profile"' in crypto
+          assert 'veci-xl-profile-identity-check --check' in chain
+          assert 'VECI_XL_SESSION_PROMOTED=false' in chain
+          assert 'VECI_XL_QUOTA_TRUST=not_authenticated' in chain
+          assert 'carrier_authenticated' not in check
+          for forbidden in ('AT+CMGS','AT+CUSD','/luci-static/','apk add','sysupgrade',
+                            'quota-xl.json','/api/v8/packages/unsubscribe'):
+            assert forbidden not in chain, forbidden
+          print('VECI_XL_PROFILE_CHAIN_SCOPE=pass')
+          PY
