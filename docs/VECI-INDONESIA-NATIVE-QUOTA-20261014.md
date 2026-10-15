@@ -110,3 +110,30 @@ Status: SMS v1.6.0 LIVE. USSD XL network rejected and excluded from automatic qu
 - Combined compact release contains ALL improvements: `veci-xl-runtime-compact-24653c5bc779`, GitHub Actions run 38669639452 PASS. Native sizes: HTTP 13992 bytes, crypto 8120 bytes, parser 7688 bytes, shell chain 3620 bytes. SHA256 HTTP 64c140562ddbc4fd1bb35597ef3a69022e392227a7a89d04ca1bea0c5ca4401b; crypto 4bb8f2cb62d18aa7da34bf84aba25a2681cc0dc1ef75d5d984dd0fd68b44d931; parser 756daba7b1db1dbede615cf6154ed1ca767e66f42118aee947b515a9cdee1015.
 - Physical one-shot script updated to this exact release: `scripts/veci-xl-compact-runtime-physical-20261015.sh --verify`; SHA-pinned transport binaries loaded only into /tmp. It deliberately invokes HTTP with invalid command to test dynamic loader without ANY carrier network request. The shell script is NOT an installer and touches no firmware/SMS/modem.
 - Legacy AES, HTTPS identity and parser physical PASS results remain closed. New compact MIPS executable runtime compatibility on router remains UNVERIFIED until device evidence. No operator-authenticated login or quota result exists, no credentials should be passed through ChatGPT.
+
+## 2026-10-15 — Compact MIPS physical UAT CLOSED/PASS
+
+Owner ran SHA-pinned scripts/veci-xl-compact-runtime-physical-20261015.sh --verify via SSH on the ZBT-WE5927 (root@192.168.1.1). Device reported:
+```text
+VECI_XL_COMPACT_RUNTIME_MIPS_ABI=pass
+VECI_XL_COMPACT_RUNTIME_SHA256=pass
+VECI_XL_COMPACT_CRYPTO_ROUNDTRIP=pass
+VECI_XL_COMPACT_QUOTA_PARSER=pass
+VECI_XL_COMPACT_HTTP_LOADER=pass
+VECI_REAL_OPERATOR_LOGIN=not_attempted
+VECI_OPERATOR_QUOTA=not_verified
+VECI_MODEM_AND_SMS_UNCHANGED=true
+VECI_FLASH_WRITES=none
+```
+
+**Closed:** compact runtime native MIPS binary physical ABI and synthetic AES+DATA parser UAT PASS. CI also PASS (compact runtime build run 38669639452 and on-device one-shot script integrity gate run 38669737201). Prior sections of this doc reporting physical gate pending are historic; this checkpoint supersedes them. Do not re-run unchanged MIPS/crypto/parser/TLS/loader checks.
+**Not LIVE:** new compact runtime was only downloaded into volatile /tmp, not installed to flash. XL account login not attempted, real quota not verified. Network access and runtime authenticity alone do NOT establish supported XL subscriber-quota API access or correct units.
+
+## Next actual integration blocker: operator-approved authentication and quota
+
+- As of Oct 15 2026, publicly verifiable XL help describes manual number+OTP login using myXL and checking actual quota via myXL or *808#, but no validated third-party consumer selfcare quota API onboarding agreement/client credential procedure was established.
+- Public XLSMART business bulk-data and CAMARA APIs are distinct product categories, not evidence of a subscriber selfcare quota-read grant.
+- Obtain a supported operator integration/delegated access method before issuing authenticated quota requests. Do not redistribute reverse-engineered app secrets or embed other parties' signing keys. Never request the owner's OTP in ChatGPT.
+- VeCI auto SMS-OTP reading must remain disabled. A modem CMTI slot notice is insufficient to distinguish an XL OTP from banking OTP; reading SMS blindly violates the existing safety policy.
+- After authorization is verified, implement a single local authenticated session and a real operator DATA response validation including units, expiry, per-SIM binding and no side-effects. Only then permit a trusted producer to mark root-only cache source=carrier_authenticated, and deploy to LuCI.
+- Preserve live SMS v1.6.0, modem LTE, OpenWrt and any existing dashboard configuration. No new unnecessary tests without changing relevant code/binaries.
