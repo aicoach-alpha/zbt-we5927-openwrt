@@ -193,3 +193,24 @@ Fix prepared: SHA-pinned original v0.2.1 APK was signed in CI with a short-lived
 - If signature verification PASS but dependency simulation BLOCKED, report that exact blocker; do not try `--allow-untrusted`, `apk upgrade`, overwrite keys or sysupgrade.
 - After signed preflight PASS on the actual office-attached WE5927, only then undertake narrowly scoped installation with pre-change backup and specific rollback, preserving existing SMS Center v1.6.0 and LTE services.
 - XL login remains not attempted and real operator quota not verified; this milestone addresses only the LuCI status page distribution.
+
+## 2026-10-15 — Signed APK on-device trust gate CLOSED/PASS
+
+Owner ran the SHA-pinned signed-APK preflight from the **office laptop SSH session** on the ZBT-WE5927 router. Actual router output:
+```text
+VECI_SIGNED_APK_SHA256=pass
+VECI_SIGNED_APK_SIGNATURE=pass
+VECI_SIGNED_APK_DEPENDENCY_SIMULATION=pass
+VECI_SIGNED_APK_PREFLIGHT=pass
+VECI_SIGNED_APK_INSTALLED=false
+VECI_MODEM_AND_SMS_UNCHANGED=true
+VECI_FLASH_WRITES=none
+VECI_XL_ACCOUNT_LOGIN=not_attempted
+VECI_OPERATOR_QUOTA=not_verified
+```
+
+Signing trust, exact artifact integrity and dependency solver pass with a temporary, root-only public-key directory. **Close this preflight: do not repeat it without changed APK or install logic.** No persistent signing key enrollment has occurred.
+
+Scoped installer prepared in `scripts/veci-indonesia-quota-apk-deploy-20261015.sh` with explicit `--install`, `--status`, `--rollback`: only 6 new quota-specific files, refuses existing files or installed package, SHA-pinned signed APK, one-time trusted public key, local-only dependency solver, volatile backup of /etc/config and installed package inventory, automatic package removal on installation/UAT failure, optional one-time rpcd restart if plugin not auto-discovered. Does not change LTE, modem, SMS, firmware image or UCI network settings. Package installation DOES intentionally write to OpenWrt overlay and package database.
+
+**Do not confuse candidate installer with LIVE deployment.** Installer is unexecuted on physical router; GitHub Actions deployment script static/CLI verification must PASS before issuing the on-device command. The private signing key was one-time, so future updates need a deliberately stable signing key/identity and an approved package feed. The status page cannot show verified XL quota until an operator-authorized integration exists.
