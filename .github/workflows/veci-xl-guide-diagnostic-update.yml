@@ -1,0 +1,51 @@
+name: VeCI XL guide diagnostic one-file overlay gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-ussd-guide-diagnostic-update-20261015.sh'
+      - '.github/workflows/veci-xl-guide-diagnostic-update.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify pinned JS hash and no Core/modem changes
+        run: |
+          set -eu
+          sh -n scripts/veci-xl-ussd-guide-diagnostic-update-20261015.sh
+          node --check source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js
+          echo '7c3141c0903e8af9b4c45f3faac794dd8bae8daa7029863a1a02821a41fd5e14  source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js' | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-xl-ussd-guide-diagnostic-update-20261015.sh').read_text()
+          for x in (
+            'REV=c55d458ca1a3cc95967297eb8fab285c404c3c89',
+            'OLD_SHA=7fe4df1ee56cf64fdc1d04239ee59ffc29b09db3deb51a0b2b657049201874b4',
+            'NEW_SHA=7c3141c0903e8af9b4c45f3faac794dd8bae8daa7029863a1a02821a41fd5e14',
+            'HTML_SHA=7878226966d40fbdeea0daab66088660a29c0f5a396b61a5675681594cb84023',
+            'VECI_XL_GUIDE_CORE_PRESERVED=pass',
+            'VECI_XL_GUIDE_DIAG_ROLLBACK=available',
+            'VECI_XL_GUIDE_MODEM_CALLS=false',
+            'same "$FILE" "$NEW_SHA"',
+            'same "$FILE" "$OLD_SHA"',
+            'same "$BACKUP" "$OLD_SHA"',
+            'VECI_XL_GUIDE_DIAG_SHA256=pass',
+            'wget -qO "$TEMP" "$URL"',
+            'mode_wrong_placeholder' if False else '--verify'
+          ):
+            assert x in s,x
+          # Verify must NOT create or overwrite persistent recovery backup.
+          assert s.index('if [ "$MODE" = --verify ]; then') < s.index('cp "$FILE" "$BACKUP"')
+          for forbidden in ('AT+CUSD','AT+CMGS', 'ubus -S call', 'ubus call',
+                            'sysupgrade', 'apk add', 'apk del', 'uci commit',
+                            'uci set', 'uci add', 'uci delete','/etc/init.d/',
+                            '/etc/config/network','/luci-static/'):
+            assert forbidden not in s,forbidden
+          assert s.count('mv -f "$FILE.next.$$" "$FILE"') == 1
+          print('VECI_XL_GUIDE_DIAG_ONE_FILE_SCOPE=pass')
+          print('VECI_XL_GUIDE_DIAG_ROLLBACK_GUARD=pass')
+          PY
