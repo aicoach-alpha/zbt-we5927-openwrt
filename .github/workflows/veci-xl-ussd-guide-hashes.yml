@@ -1,5 +1,9 @@
 name: VeCI XL optional USSD guide asset SHA256
 on:
+  push:
+    paths:
+      - 'source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.*'
+      - '.github/workflows/veci-xl-ussd-guide-hashes.yml'
   workflow_dispatch:
 permissions:
   contents: read
