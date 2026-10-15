@@ -154,11 +154,10 @@ if [ ! -x /usr/libexec/rpcd/veci.quota ]; then
 fi
 /usr/libexec/rpcd/veci.quota list > "$WORK/plugin-list.json" 2>/dev/null ||
     fail quota_rpc_plugin_list_error
-if [ "$(jsonfilter -i "$WORK/plugin-list.json" -e '@.status' 2>/dev/null || :)" != "{}" ]; then
-    # jsonfilter formatting of an empty object can differ across builds;
-    # only reject missing advertised methods using a strict substring check.
-    grep -q '"status"' "$WORK/plugin-list.json" || fail quota_rpc_plugin_methods_missing
-fi
+# rpcd exec plugin protocol: top-level method names with signatures.
+# Check both methods, not the exact rendering of an empty JSON object.
+grep -q '"status"' "$WORK/plugin-list.json" || fail quota_rpc_plugin_methods_missing
+grep -q '"providers"' "$WORK/plugin-list.json" || fail quota_rpc_plugin_methods_missing
 /usr/libexec/rpcd/veci.quota call status > "$WORK/direct-status.json" 2>/dev/null ||
     fail quota_rpc_direct_call_failed
 state_direct="$(jsonfilter -i "$WORK/direct-status.json" -e '@.state' 2>/dev/null || :)"
