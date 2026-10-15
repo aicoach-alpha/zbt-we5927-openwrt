@@ -23,7 +23,10 @@ jobs:
           from pathlib import Path
           src=Path('scripts/veci-https-only-guarded-migration-20261015.sh').read_text()
           assert 'WATCH_SECONDS=180' in src
-          assert src.index('nohup sh "$CONTROL" --watchdog') < src.index('uci -q delete uhttpd.main.listen_http')
+          assert "command -v nohup" not in src
+          assert 'trap "" HUP; exec sh "$1" --watchdog' in src
+          assert src.index('sh -c \'trap "" HUP; exec sh "$1" --watchdog\'') < src.index('uci -q delete uhttpd.main.listen_http')
+          assert src.index('kill -0 "$watcher"') < src.index('uci -q delete uhttpd.main.listen_http')
           assert src.index('cp "$UHTTPD" "$BACKUP"') < src.index('uci add_list uhttpd.main.listen_https')
           for banned in ('sysupgrade','apk add','AT+CUSD','AT+CMGS',
                          '/etc/config/network','/etc/config/veci',
