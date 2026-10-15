@@ -1,0 +1,63 @@
+name: VeCI XL 0.3.7 dormant install focused gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-native-037-dormant-deploy-20261015.sh'
+      - '.github/workflows/veci-xl-native-037-dormant-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check only signed dormant-install delta and RPC fail-closed policy
+        run: |
+          set -eu
+          sh -n scripts/veci-xl-native-037-dormant-deploy-20261015.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          original=Path('scripts/veci-xl-native-037-signed-deploy-20261015.sh').read_text()
+          patched=Path('scripts/veci-xl-native-037-dormant-deploy-20261015.sh').read_text()
+          before='https_ready || fail https_only_configuration_required\noperator_ready || fail authorized_operator_configuration_missing\napk list -I'
+          after='''https_ready || fail https_only_configuration_required
+          # Package installation is safe without operator secrets: the bundled native
+          # RPC's preflight() independently rejects ALL OTP/quota actions until the
+          # private operator credential files are present and HTTPS-only is enabled.
+          # Install does not invent or provision any third-party application secrets.
+          apk list -I'''.replace('\n          ', '\n')
+          ending='echo VECI_XL_037_ACCOUNT_UAT=pending\n'
+          replacement='''if operator_ready; then
+           echo VECI_XL_037_ACCOUNT_UAT=awaiting_owner_operator_login
+          else
+           echo VECI_XL_037_ACCOUNT_UAT=blocked_operator_configuration
+           echo VECI_XL_037_OTP_ACTIONS=disabled
+           echo VECI_XL_037_OPERATOR_QUOTA=not_authenticated
+          fi
+          '''.replace('\n          ', '\n')
+          assert before in original
+          assert ending in original
+          assert patched == original.replace(before,after).replace(ending,replacement), 'unexpected installer delta'
+          assert 'TAG=veci-xl-native-037-6307ad9f38e1' in patched
+          assert 'APK_SHA=045c263790a99ac6aa0856a6167207797d1c19824f8ce59793a6a2351771fde7' in patched
+          assert 'KEY_SHA=a01cb8213802ada0a256dfe444bda4011c1ac1dc75dc08c57374730ad8f789ec' in patched
+          for x in ('core_guard','target_guard','CORE_CONFIG_SHA','CORE_RPCD_SHA',
+                    'apk --keys-dir "$WORK/keys" verify',
+                    'apk --no-network --keys-dir "$WORK/keys" --simulate add',
+                    'apk --no-network --keys-dir "$WORK/keys" add',
+                    'apk --no-network del veci-telco-xl-native',
+                    'https_ready || fail https_only_configuration_required',
+                    'VECI_XL_037_ROLLBACK=available'):
+            assert x in patched,x
+          rpc=Path('source/veci-telco-xl-native/files/usr/libexec/rpcd/veci.xl').read_text()
+          assert 'have_config || fail operator_config_unavailable' in rpc
+          assert 'https_only || fail https_only_required' in rpc
+          for method in ('request_otp()','submit_otp()','refresh_quota()'):
+            assert method in rpc
+          for blocked in ('--allow-untrusted','apk upgrade','sysupgrade','AT+CMGS','AT+CUSD'):
+            assert blocked not in patched
+          print('VECI_XL_037_DORMANT_INSTALL_SCOPE=pass')
+          print('VECI_XL_037_OTP_UNCONFIGURED_FAIL_CLOSED=pass')
+          PY
