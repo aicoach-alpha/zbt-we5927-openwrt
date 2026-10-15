@@ -133,6 +133,9 @@ restore_files() {
     cp "$BACKUP/rpcd-veci" "$RPCD" || return 1
     cp "$BACKUP/veci-acl.json" "$ACL" || return 1
     cp "$BACKUP/sms-center.css" "$CSS" || return 1
+    # Backups are root-only 0600, but restored RPCD must remain executable.
+    chmod 755 "$RPCD" || return 1
+    chmod 644 "$PAGE" "$MODULE" "$ACL" "$CSS" || return 1
     check "$CONF" "$CONFIG_SHA" &&
     check "$PAGE" "$CELL_SHA" &&
     check "$MODULE" "$MODULE_SHA" &&
