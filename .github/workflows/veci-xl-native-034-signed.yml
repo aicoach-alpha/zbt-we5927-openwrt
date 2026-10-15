@@ -1,0 +1,105 @@
+name: VeCI XL native only APK 0.3.4 production UAT candidate
+on:
+  push:
+    paths:
+      - 'source/veci-telco-xl-native/Makefile'
+      - 'source/veci-telco-indonesia/veci-xl-ciam.c'
+      - 'source/veci-telco-indonesia/veci-xl-quota-http.c'
+      - 'source/veci-telco-indonesia/veci-xl-crypto.c'
+      - 'source/veci-telco-indonesia/veci-xl-quota-normalize.c'
+      - 'source/veci-telco-indonesia/files/usr/libexec/veci-xl-*'
+      - '.github/workflows/veci-xl-native-034-signed.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify only changed source and VeCI-only package dependency
+        run: |
+          set -eu
+          python3 - <<'PY'
+          from pathlib import Path
+          pkg=Path('source/veci-telco-xl-native/Makefile').read_text()
+          assert 'PKG_VERSION:=0.3.4' in pkg
+          assert 'DEPENDS:=+libmbedtls21 +jsonfilter' in pkg
+          assert 'luci-' not in pkg.lower() and '+veci-telco-indonesia' not in pkg
+          assert 'postinst' not in pkg and 'preinst' not in pkg
+          for script in ('veci-xl-profile-chain','veci-xl-profile-identity-check',
+                         'veci-xl-quota-chain','veci-xl-token-stage'):
+              assert script in pkg
+          print('VECI_XL_034_PACKAGE_SCOPE=pass')
+          PY
+          for s in source/veci-telco-indonesia/files/usr/libexec/veci-xl-*; do
+            sh -n "$s"
+          done
+      - name: Install OpenWrt SDK host dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd make gcc g++ gawk flex bison gettext libncurses-dev libssl-dev rsync unzip python3 file openssl
+      - name: Download SHA-pinned OpenWrt 25.12.5 WE5927 SDK
+        run: |
+          set -eu
+          sdk=openwrt-sdk-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 360 -o /tmp/sdk.tar.zst "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$sdk"
+          echo 'b44636e0a53f0d769cbce64edb9ca3831e1a9ecdc8c53a5caf128884be6c490e  /tmp/sdk.tar.zst' | sha256sum -c -
+          mkdir /tmp/sdk
+          tar -xf /tmp/sdk.tar.zst -C /tmp/sdk --strip-components=1
+      - name: Compile only optional VeCI XL package to APK
+        run: |
+          set -eu
+          cp -a source/veci-telco-xl-native /tmp/sdk/package/
+          cp -a source/veci-telco-indonesia /tmp/sdk/package/
+          cd /tmp/sdk
+          printf '\nCONFIG_PACKAGE_veci-telco-xl-native=m\n' >> .config
+          make defconfig
+          make package/veci-telco-xl-native/compile -j2 V=s
+          pkg="$(find bin -name 'veci-telco-xl-native-0.3.4-r1.apk' -type f -print -quit)"
+          test -n "$pkg" && test -s "$pkg"
+          mkdir -p "$GITHUB_WORKSPACE/release"
+          cp "$pkg" "$GITHUB_WORKSPACE/release/"
+      - name: Verify manifest and sign isolated production test candidate
+        run: |
+          set -eu
+          p=release/veci-telco-xl-native-0.3.4-r1.apk
+          tool=/tmp/sdk/staging_dir/host/bin/apk
+          umask 077
+          mkdir -p /tmp/sign/keys /tmp/sign/none
+          openssl ecparam -name prime256v1 -genkey -noout -out /tmp/sign/private.pem
+          openssl pkey -in /tmp/sign/private.pem -pubout -out /tmp/sign/keys/veci-xl-034.pem
+          "$tool" --allow-untrusted adbsign --reset-signatures --sign-key /tmp/sign/private.pem "$p"
+          "$tool" --keys-dir /tmp/sign/keys verify "$p"
+          if "$tool" --keys-dir /tmp/sign/none verify "$p" >/dev/null 2>&1; then exit 1; fi
+          "$tool" --keys-dir /tmp/sign/keys adbdump --format json "$p" > release/manifest.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          s=json.dumps(json.loads(Path('release/manifest.json').read_text())).lower()
+          for item in ('veci-telco-xl-native','veci-xl-ciam','veci-xl-profile-http',
+                       'veci-xl-quota-http','veci-xl-token-stage','veci-xl-profile-chain',
+                       'veci-xl-profile-identity-check','veci-xl-crypto'):
+              assert item in s,item
+          assert '/luci-static/' not in s
+          print('VECI_XL_034_APK_SIGNATURE_AND_CONTENT=pass')
+          PY
+          cp /tmp/sign/keys/veci-xl-034.pem release/
+          chmod 644 release/veci-xl-034.pem
+          sha256sum "$p" release/veci-xl-034.pem > release/SHA256SUMS
+          echo VECI_XL_034_SIGNED_PACKAGE=pass
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-xl-native-034-signed
+          path: release/
+      - name: Publish staged candidate; never auto-deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-xl-native-034-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/* --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI XL native 0.3.4 signed production test candidate" \
+            --notes "MIPS APK signed and content verified. CIAM OTP, read-only profile TLS, strict number gate and quota parser are packaged. NOT installed; no real operator login/profile/quota validated, no credentials included. VeCI Core 0.2.2 remains unchanged. Operator-authenticated quota may only be shown after real account-verified UAT."
