@@ -92,6 +92,26 @@ class QuotaChainTests(unittest.TestCase):
         self.assertFalse(stamp.exists())
         self.assertIn("session_not_configured",p.stderr)
 
+    def test_aes_key_security_fails_before_network(self):
+        stamp=self.root/"network-touched"
+        self.write_mock("http",f"#!/bin/sh\n: > '{stamp}'\n")
+        for mode,contents in ((0o644,"a"*32),(0o600,"a"*31)):
+            with self.subTest(mode=mode,size=len(contents)):
+                self.secret.write_text(contents)
+                self.secret.chmod(mode)
+                p=self.run_chain()
+                self.assertNotEqual(p.returncode,0)
+                self.assertIn("session_key_insecure",p.stderr)
+                self.assertFalse(stamp.exists())
+                self.assertEqual(p.stdout,"")
+        self.secret.write_text("a"*32)
+        self.secret.chmod(0o600)
+        self.private.chmod(0o755)
+        p=self.run_chain()
+        self.assertNotEqual(p.returncode,0)
+        self.assertIn("session_key_insecure",p.stderr)
+        self.assertFalse(stamp.exists())
+
     def test_bad_envelope_fails_closed(self):
         for bad in (
             '{"xtime":"wrong","xdata":"AAAA=="}',
