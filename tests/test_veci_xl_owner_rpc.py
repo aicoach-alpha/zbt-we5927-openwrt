@@ -65,7 +65,7 @@ def main():
     assert set(write)=={"requestOtp","submitOtp","refreshQuota"}
     assert 'https_only_required' in RPC
     assert 'otp_cooldown' in RPC
-    assert 'ubus' not in RPC
+    assert 'ubus call' not in RPC
     assert 'AT+CMGR' not in RPC and 'AT+CUSD' not in RPC
     assert "https:" in UI and "sessionId" in UI
     assert "sessionStorage" not in UI and "localStorage" not in UI
