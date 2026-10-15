@@ -29,7 +29,7 @@ jobs:
           cc -std=c11 -Os -Wall -Wextra -Werror \
             -o /tmp/veci-profile-test tests/veci_xl_profile_transport_focused.c \
             -lmbedtls -lmbedx509 -lmbedcrypto
-          cc -std=c11 -Os -Wall -Wextra -Werror \
+          cc -std=c11 -D_DEFAULT_SOURCE -Os -Wall -Wextra -Werror \
             -o /tmp/veci-xl-crypto source/veci-telco-indonesia/veci-xl-crypto.c \
             -lmbedcrypto
           /tmp/veci-profile-test
