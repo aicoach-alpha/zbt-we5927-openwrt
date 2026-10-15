@@ -41,6 +41,29 @@ hash_file RPCD /usr/libexec/rpcd/veci
 hash_file CORE_ACL /usr/share/rpcd/acl.d/veci.json
 hash_file CONFIG /etc/config/veci
 hash_file SMS_CSS /www/veci/sms-center.css
+# Guard native backend files that a full core APK transaction would replace.
+# Deviations require a source-preserving package revision, never a bypass.
+BACKEND_OK=true
+if [ -f /usr/libexec/rpcd/veci ] && [ ! -L /usr/libexec/rpcd/veci ] &&
+   [ "$(sha256sum /usr/libexec/rpcd/veci | awk '{print $1}')" = 2b83fac1da487188617888757a2b769d6ed9bf94d32aeaa9a87139b008f913da ]; then
+    echo VECI_RELEASE_CORE_RPCD_PARITY=pass
+else
+    echo VECI_RELEASE_CORE_RPCD_PARITY=drift
+    BACKEND_OK=false
+fi
+if [ -f /usr/share/rpcd/acl.d/veci.json ] &&
+   [ ! -L /usr/share/rpcd/acl.d/veci.json ] &&
+   [ "$(sha256sum /usr/share/rpcd/acl.d/veci.json | awk '{print $1}')" = 1c59a295448483147507d58336a554db96803aebf4eff8263bc73e89ace6eb5b ]; then
+    echo VECI_RELEASE_CORE_ACL_PARITY=pass
+else
+    echo VECI_RELEASE_CORE_ACL_PARITY=drift
+    BACKEND_OK=false
+fi
+if [ "$BACKEND_OK" = true ]; then
+    echo VECI_RELEASE_BACKEND_BASELINE=compatible
+else
+    echo VECI_RELEASE_BACKEND_BASELINE=blocked_pending_reconciliation
+fi
 if ubus -S call veci.quota status >/dev/null 2>&1; then
     echo VECI_RELEASE_BACKEND_QUOTA=pass
 else
