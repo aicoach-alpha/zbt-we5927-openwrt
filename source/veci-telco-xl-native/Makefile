@@ -1,10 +1,10 @@
-# Optional VeCI Indonesia XL native read-only quota components.
+# Optional VeCI-only XL native read-only components; does not depend on LuCI.
 # Does not enable login, schedule refresh, alter modem, or generate credentials.
 # All native libraries are dynamically linked from the EXISTING firmware.
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-telco-xl-native
-PKG_VERSION:=0.3.3
+PKG_VERSION:=0.3.4
 PKG_RELEASE:=1
 PKG_BUILD_DEPENDS:=mbedtls
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
@@ -15,7 +15,7 @@ define Package/veci-telco-xl-native
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI Indonesia XL native read-only quota client components
-  DEPENDS:=+veci-telco-indonesia +libmbedtls21
+  DEPENDS:=+libmbedtls21 +jsonfilter
 endef
 
 define Package/veci-telco-xl-native/description
@@ -24,7 +24,7 @@ define Package/veci-telco-xl-native/description
   CIAM OTP, isolated token staging and strict MSISDN identity check.
   Profile read-only transport is staged with exact-identity gate; no automatic polling, no operator
   credentials, no SMS reader, no payment commands and no daemon.
-  THIS IS NOT AN AUTHENTICATED OPERATOR INTEGRATION UNTIL UAT.
+  No LuCI dependency or UI changes; authentication remains unverified until physical UAT.
 endef
 
 define Build/Prepare
