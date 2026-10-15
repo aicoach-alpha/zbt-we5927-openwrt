@@ -77,13 +77,13 @@ def test():
     r=invoke(["sh",str(script),"--prepare"])
     assert r.returncode==0,(r.stdout,r.stderr)
     assert "VECI_HTTPS_PREPARE=pass" in r.stdout
-    assert "list listen_http" in cfg.read_text()
-    assert "list listen_https" in cfg.read_text()
+    assert "listen_http '" in cfg.read_text()
+    assert "listen_https '" in cfg.read_text()
     assert (backup/"original-uhttpd").read_bytes()==orig
     r=invoke(["sh",str(script),"--switch"])
     assert r.returncode==0,(r.stdout,r.stderr)
     assert "VECI_HTTPS_SWITCH=pass" in r.stdout
-    assert "list listen_http" not in cfg.read_text(),(r.stdout,r.stderr,cfg.read_text())
+    assert "listen_http '" not in cfg.read_text(),(r.stdout,r.stderr,cfg.read_text())
     time.sleep(4)
     assert cfg.read_bytes()==orig,("watchdog did not restore uhttpd",cfg.read_text())
     assert not (backup/"pending").exists()
@@ -98,8 +98,8 @@ def test():
     r=invoke(["sh",str(script),"--confirm"])
     assert r.returncode==0,(r.stdout,r.stderr)
     time.sleep(3)
-    assert "list listen_http" not in cfg.read_text()
-    assert "list listen_https" in cfg.read_text()
+    assert "listen_http '" not in cfg.read_text()
+    assert "listen_https '" in cfg.read_text()
     assert invoke(["sh",str(script),"--rollback"]).returncode==0
     assert cfg.read_bytes()==orig
     print("VECI_HTTPS_TEST=confirm_then_manual_rollback_pass")
