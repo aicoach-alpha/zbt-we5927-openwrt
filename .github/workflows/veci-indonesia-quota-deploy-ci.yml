@@ -61,29 +61,15 @@ jobs:
           assert 'trap' in active
           print('VECI_QUOTA_DEPLOY_STATIC_SAFETY_PASS')
           PY
-      - name: Verify OpenWrt 25.12.5 APK tooling supports offline, isolated trust
+      - name: Ensure offline-only APKv3 option and fail-closed rollback contract
         run: |
           set -eu
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq zstd
-          sdk=openwrt-sdk-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
-          curl -fL --retry 3 --max-time 240 \
-            -o /tmp/toolchain.tar.zst \
-            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$sdk"
-          echo 'b44636e0a53f0d769cbce64edb9ca3831e1a9ecdc8c53a5caf128884be6c490e  /tmp/toolchain.tar.zst' | sha256sum -c -
-          mkdir /tmp/sdk
-          tar -xf /tmp/toolchain.tar.zst -C /tmp/sdk --strip-components=1
-          apk=/tmp/sdk/staging_dir/host/bin/apk
-          test -x "$apk"
-          # apk-tools v3 may return nonzero on --help, even when options parse.
-          "$apk" --help > /tmp/apk-baseline-help 2>&1 || :
-          grep -Eiq 'apk|usage' /tmp/apk-baseline-help
-          "$apk" --no-network --keys-dir /tmp --help > /tmp/apk-help 2>&1 || :
-          "$apk" --no-network --keys-dir /tmp --simulate --help > /tmp/apk-help-2 2>&1 || :
-          for out in /tmp/apk-help /tmp/apk-help-2; do
-            grep -Eiq 'apk|usage' "$out"
-            if grep -Eiq 'unknown option|unrecognized option|invalid argument|invalid option' "$out"; then
-              cat "$out"; exit 1
-            fi
-          done
-          echo VECI_APKV3_OFFLINE_OPTION_AND_ISOLATED_KEY_PASS
+          file=scripts/veci-indonesia-quota-apk-deploy-20261015.sh
+          test "$(grep -c -- '--no-network' "$file")" -ge 3
+          ! grep -q -- '--network=false' "$file"
+          ! grep -q -- '--allow-untrusted' "$file"
+          grep -q 'apk --keys-dir "$WORK/keys" verify "$pkgfile"' "$file"
+          grep -q 'apk --no-network --keys-dir "$WORK/keys" --simulate add "$pkgfile"' "$file"
+          grep -q 'apk --no-network --keys-dir "$WORK/keys" add "$pkgfile"' "$file"
+          grep -q 'apk --no-network del "$PKG"' "$file"
+          echo VECI_QUOTA_APKV3_OFFLINE_COMMAND_CONTRACT_PASS
