@@ -36,10 +36,18 @@ int main(void){
  const char *invalid_redirect="HTTP/1.1 302 Found\r\nContent-Length: 7\r\n\r\n{\"a\":1}";
  const char *invalid_chunk="HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n6\r\n{\"a\":1}\r\n0\r\n\r\n";
  const char *invalid_html="HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\n<html></html>";
+ const char *invalid_missing_type="HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\n{\"a\":1}";
+ const char *invalid_html_type="HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 7\r\n\r\n{\"a\":1}";
+ const char *invalid_no_framing="HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"a\":1}";
+ const char *valid_json_charset="HTTP/1.1 200 OK\r\nContent-Length: 7\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{\"a\":1}";
+ const char *invalid_conflict="HTTP/1.1 200 OK\r\nContent-Length: 7\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n{\"a\":1}";
+
  if(check_body_restrictions()||check(ok,1)||check(chunk,1)||check(invalid_cl,0)||
     check(invalid_double,0)||check(invalid_gzip,0)||
     check(invalid_redirect,0)||check(invalid_chunk,0)||
-    check(invalid_html,0)){
+    check(invalid_html,0)||check(invalid_missing_type,0)||
+    check(invalid_html_type,0)||check(invalid_no_framing,0)||
+    check(valid_json_charset,1)||check(invalid_conflict,0)){
   fputs("VECI_XL_HTTP_OFFLINE_SYNTHETIC=failed\n",stderr);
   return 1;
  }
