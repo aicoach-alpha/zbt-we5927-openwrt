@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'scripts/veci-physical-core-022-signed-deploy-20261015.sh'
+      - 'tests/test_veci_022_config_reconcile.py'
       - '.github/workflows/veci-physical-core-022-signed-deploy-ci.yml'
   workflow_dispatch:
 permissions:
@@ -18,6 +19,7 @@ jobs:
           set -eu
           p=scripts/veci-physical-core-022-signed-deploy-20261015.sh
           sh -n "$p"
+          python3 tests/test_veci_022_config_reconcile.py
           python3 - <<'PY'
           from pathlib import Path
           s=Path('scripts/veci-physical-core-022-signed-deploy-20261015.sh').read_text()
@@ -41,6 +43,10 @@ jobs:
               'apk --no-network --keys-dir "$WORK/keys" add "$WORK/$NEW"',
               'apk --no-network --keys-dir "$WORK/keys" add "$WORK/$OLD"',
               'VECI_MODEM_SMS_UNCHANGED=true',
+              'PACKAGED_CONFIG_SHA=63518b50a5cc75eafceea120424e8125194310ac8829f0a5a3e16ab6a172ae54',
+              'postinstall_config_unexpected_drift',
+              'reconcile_config_after_upgrade',
+              'VECI_022_CONFIG_PRESERVATION=restored_from_verified_backup',
           )
           for x in required: assert x in active,x
           for x in ('sysupgrade','--allow-untrusted','uci set',
