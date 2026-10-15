@@ -73,6 +73,19 @@ def main():
     assert "Content-Security-Policy" in PAGE
     assert "form-action 'none'" in PAGE and "connect-src 'self'" in PAGE
     assert 'type="password"' in PAGE
+    # HTTPS has a separate session origin from the HTTP VeCI dashboard.
+    # The XL page must be able to authenticate directly in the same tab,
+    # not ask the user to reopen it with an unavailable existing session.
+    for field in ('xl-veci-signin','xl-veci-user','xl-veci-password',
+                  'xl-veci-signin-button'):
+        assert f'id="{field}"' in PAGE,field
+    assert "await api.login(username, password)" in UI
+    assert "await api.validateSession()" in UI
+    assert "if (!secure())" in UI
+    assert "'xl-veci-password'" in UI
+    assert "passwordField.value = ''" in UI
+    assert "signin.hidden = true" in UI
+    assert "sign in to VeCI first, then reopen" not in UI.lower()
     assert 'src="./xl-account.js"' in PAGE
     assert 'href="/veci/#/cellular"' in PAGE
     pkg=pathlib.Path("source/veci-telco-xl-native/Makefile").read_text()
