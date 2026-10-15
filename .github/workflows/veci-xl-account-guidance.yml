@@ -1,0 +1,22 @@
+name: VeCI XL official-account guidance (focused)
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-account-guidance/**'
+      - '.github/workflows/veci-xl-account-guidance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-guidance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Focused native guidance test only
+        run: |
+          node --check scripts/veci-xl-account-guidance/myxl-guidance.js
+          node --test scripts/veci-xl-account-guidance/myxl-guidance.test.mjs
