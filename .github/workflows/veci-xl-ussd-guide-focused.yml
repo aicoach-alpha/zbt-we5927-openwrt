@@ -1,0 +1,53 @@
+name: VeCI optional XL USSD guided routes UI
+on:
+  push:
+    paths:
+      - 'source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.*'
+      - '.github/workflows/veci-xl-ussd-guide-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify UI access, user confirmation and no automatic modem calls
+        run: |
+          set -eu
+          node --check source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js').read_text()
+          html=Path('source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.html').read_text()
+          for field in ('guide-signin','guide-login','guide-password','guide-route-one',
+                        'guide-route-two','guide-menu','guide-response','guide-send',
+                        'guide-cancel','guide-feedback'):
+              assert 'id="'+field+'"' in html,field
+          assert 'Content-Security-Policy' in html
+          assert "connect-src 'self'" in html and "form-action 'none'" in html
+          assert 'textContent' in ui and 'innerHTML' not in ui
+          assert 'one: [7, 3, 2, 1]' in ui
+          assert 'two: [7, 3, 2, 2]' in ui
+          assert 'await api.login(username, password)' in ui
+          assert 'await api.validateSession()' in ui
+          assert "passwordField.value = ''" in ui
+          assert 'window.confirm(' in ui
+          assert ui.count('window.confirm(')==2
+          assert "call('start', {})" in ui
+          assert "call('reply'," in ui
+          assert "approval: 'I_APPROVE_THIS_USSD_CHOICE'" in ui
+          assert "call('cancel'," in ui
+          assert "answer.source !== 'operator_ussd'" in ui
+          assert 'answer.text_supported === true' in ui
+          assert 'index < route.length' in ui
+          assert 'while (' not in ui and 'setInterval(' not in ui and 'setTimeout(' not in ui
+          for bad in ('fetch(', 'localStorage', 'AT+CUSD', 'AT+CMGS', '/luci-static/',
+                      'requestOtp','submitOtp', 'console.log', 'auto-retry', 'quota_refreshed'):
+              assert bad not in ui,bad
+          assert 'void init()' in ui
+          print('VECI_XL_USSD_GUIDED_ROUTES=pass')
+          print('VECI_XL_USSD_MENU_CONFIRMATIONS_REQUIRED=pass')
+          print('VECI_XL_USSD_NO_AUTO_DIAL_OR_QUOTA_CLAIM=pass')
+          PY
