@@ -5,6 +5,7 @@ on:
       - 'scripts/veci-physical-core-stage-20261015.py'
       - '.github/workflows/veci-physical-core-022.yml'
       - 'scripts/veci-native-quota-overlay/native-quota.js'
+      - 'scripts/veci-physical-core-runtime-20261015/**'
   workflow_dispatch:
 permissions:
   contents: write
@@ -46,12 +47,18 @@ jobs:
           diff -u /tmp/veci-physical/rollback/files/rpcd-veci /tmp/veci-physical/update/files/rpcd-veci
           diff -u /tmp/veci-physical/rollback/rpcd-acl.json /tmp/veci-physical/update/rpcd-acl.json
           diff -u /tmp/veci-physical/rollback/files/veci.config /tmp/veci-physical/update/files/veci.config
+          for kind in rollback update; do
+            echo 'd08edadd38f0d9b992fc54d879eabf9f797bf54df83fa8c8cf7b59e55b9e99ce  /tmp/veci-physical/'"$kind"'/files/rpcd-veci' | sha256sum -c -
+            echo 'd655406fd94214c22cf047bf5fc49e66876365634958be9d25171e6100e6a171  /tmp/veci-physical/'"$kind"'/rpcd-acl.json' | sha256sum -c -
+            echo 'b075a4852d3eeb5f717e4db568a0929fc732b225f025a154beb24961a3f85379  /tmp/veci-physical/'"$kind"'/veci/js/pages/cellular.js' | sha256sum -c -
+            echo '5c1f66b5a5aa292be202897ef538f67ed7933e857ff3e11bcaabb075b75c692d  /tmp/veci-physical/'"$kind"'/veci/js/lib/native-quota.js' | sha256sum -c -
+          done
           echo VECI_BACKEND_PACKAGE_PARITY=pass
           node --check /tmp/veci-physical/rollback/veci/js/pages/cellular.js
           node --check /tmp/veci-physical/update/veci/js/pages/cellular.js
           node --check /tmp/veci-physical/update/veci/js/lib/native-quota.js
           node --test scripts/veci-native-quota-overlay/native-quota.test.mjs
-          ! grep -q 'quotaSummary' /tmp/veci-physical/rollback/veci/js/pages/cellular.js
+          grep -q 'mountOperatorQuota' /tmp/veci-physical/rollback/veci/js/pages/cellular.js
           grep -q 'mountOperatorQuota' /tmp/veci-physical/update/veci/js/pages/cellular.js
           echo VECI_022_SOURCE_AND_JS_TESTS=pass
       - name: Install toolchain requirements
@@ -108,10 +115,9 @@ jobs:
           version=sys.argv[2]
           for text in ('veci',version,'cellular.js','sms-center.css'):
               assert text in data, text
-          if version=='0.2.2':
-              assert 'native-quota.js' in data
-          else:
-              assert 'native-quota.js' not in data
+          assert 'native-quota.js' in data
+          assert 'rpcd/veci' in data
+          assert 'veci.json' in data
           assert '/luci-static' not in data
           print('VECI_SIGNED_PHYSICAL_CORE_CONTENT_PASS',version)
           PY
@@ -123,6 +129,8 @@ jobs:
           echo 'PHYSICAL_BASE_CELLULAR_SHA256=8f9219c21ca49b44ea5d5a2705fccdde77315249c53c21715974df384d4adef6' > release/PHYSICAL_SHA256.txt
           echo 'LIVE_QUOTA_PATCHED_CELLULAR_SHA256=b075a4852d3eeb5f717e4db568a0929fc732b225f025a154beb24961a3f85379' >> release/PHYSICAL_SHA256.txt
           echo 'VECI_NATIVE_MODULE_SHA256=5c1f66b5a5aa292be202897ef538f67ed7933e857ff3e11bcaabb075b75c692d' >> release/PHYSICAL_SHA256.txt
+          echo 'VECI_CORE_RPCD_SHA256=d08edadd38f0d9b992fc54d879eabf9f797bf54df83fa8c8cf7b59e55b9e99ce' >> release/PHYSICAL_SHA256.txt
+          echo 'VECI_CORE_ACL_SHA256=d655406fd94214c22cf047bf5fc49e66876365634958be9d25171e6100e6a171' >> release/PHYSICAL_SHA256.txt
           echo VECI_PHYSICAL_CORE_SIGNED_PAIR=pass
       - uses: actions/upload-artifact@v4
         with:
@@ -137,4 +145,4 @@ jobs:
           tag="veci-physical-core-022-$(echo "$GITHUB_SHA" | cut -c1-12)"
           gh release create "$tag" release/* --target "$GITHUB_SHA" --prerelease \
             --title "VeCI 0.2.2 physical SMS/USSD + native quota signed candidate" \
-            --notes "Unsigned source reconstruction parity and signed APK manifests verified by CI. Physical source hash pins are owner-observed. DOES NOT claim router installed. Installation requires exact live backend/ACL package-source fingerprint checks and transaction simulation, reversible persistent backup, and physical UAT. No modem/SMS command is executed in CI; real XL operator quota authentication is not implemented."
+            --notes "LIVE-PARITY REBUILD: owner-verified 19-file frontend, exact live native quota UI and original RPCD/ACL integrated into both 0.2.2 and signed 0.2.0 rollback. Signed APKs CI only, NOT installed. Existing UCI config is a managed conffile and must be preserved and verified by physical installer; do not overwrite it with generic defaults. Physical installation requires signed-gate, transaction simulation, persistent backup and rollback. No modem/SMS touched. XL carrier authentication is NOT implemented."
