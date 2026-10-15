@@ -3,7 +3,9 @@ on:
   push:
     paths:
       - 'source/veci-telco-indonesia/veci-xl-quota-http.c'
+      - 'source/veci-telco-indonesia/files/usr/libexec/veci-xl-quota-chain'
       - 'tests/veci_xl_quota_http_synthetic.c'
+      - 'tests/test_veci_xl_quota_chain.py'
       - '.github/workflows/veci-xl-quota-http-dynamic.yml'
   workflow_dispatch:
 permissions:
