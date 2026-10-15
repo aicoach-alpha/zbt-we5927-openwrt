@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<title>VeCI · XL Account</title>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<main class="login-shell">
+ <section class="login-card" aria-labelledby="xl-title">
+  <div class="login-heading">
+   <p class="eyebrow">VeCI · CELLULAR · XL</p>
+   <h1 id="xl-title">XL Account</h1>
+   <p>Operator account verification for your own XL number. No OTP is read from the modem or stored in the browser.</p>
+  </div>
+  <div class="detail-list">
+   <div><span>Secure transport</span><strong id="xl-transport">Checking…</strong></div>
+   <div><span>Operator integration</span><strong id="xl-credentials">Checking…</strong></div>
+   <div><span>Account session</span><strong id="xl-session">Checking…</strong></div>
+  </div>
+  <label class="field" for="xl-number"><span>XL number (62…)</span>
+   <input id="xl-number" type="tel" autocomplete="off" inputmode="numeric" pattern="62[0-9]{8,13}" maxlength="15">
+  </label>
+  <button class="button button-secondary" type="button" id="xl-start" disabled>Request OTP</button>
+  <label class="field" for="xl-otp"><span>One-time code</span>
+   <input id="xl-otp" type="password" autocomplete="one-time-code" inputmode="numeric" maxlength="8">
+  </label>
+  <button class="button button-primary" type="button" id="xl-submit" disabled>Verify account</button>
+  <button class="button button-secondary" type="button" id="xl-refresh" disabled>Refresh verified quota</button>
+  <p id="xl-feedback" role="status" aria-live="polite"></p>
+  <p class="login-note">Actions are only available with HTTPS-only administration and authorized local operator integration. Failed requests do not invent quota data.</p>
+  <a class="button button-secondary" href="/veci/#/cellular">Back to Cellular</a>
+ </section>
+</main>
+<script type="module" src="./xl-account.js"></script>
+</body>
+</html>
