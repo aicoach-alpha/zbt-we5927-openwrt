@@ -67,3 +67,27 @@ After inspection, reconstruct a candidate whose packaged core runtime and ACL ma
 ## Current LIVE milestone
 
 Owner supplied screenshot and router output confirming the **VeCI native Operator Data Quota status panel** LIVE/PASS, backend `veci.quota` PASS, local operator label XL with `Not connected`, LTE Internet Reachable, and visible existing SMS/USSD UI. On-router Core version is STILL `0.2.0`, plus reversible overlay. No LuCI UI development or change has been performed for this release. Never route to `andre-nas`, whose `192.168.1.1` is unrelated hardware.
+
+## 2026-10-15 — superseding exact-backend signed release READY FOR PHYSICAL INSTALL
+
+After the previous release gate failed due to source runtime drift, the owner copied **exactly** two root-owned existing backend files from the office laptop using `scp -O`, then supplied `veci-core-runtime-20261015.zip` in the conversation. Checksums were independently verified both on Windows and from the ZIP:
+
+- Original core RPCD `/usr/libexec/rpcd/veci`: 7,935 bytes, SHA256 `d08edadd38f0d9b992fc54d879eabf9f797bf54df83fa8c8cf7b59e55b9e99ce`.
+- Original core ACL `/usr/share/rpcd/acl.d/veci.json`: 834 bytes, SHA256 `d655406fd94214c22cf047bf5fc49e66876365634958be9d25171e6100e6a171`.
+
+The files contain code and ACL rules, with no embedded account password, API key or bearer token found on inspection. They are included with exact hash checks at `scripts/veci-physical-core-runtime-20261015/`. All 19 verified frontend files, the installed native quota module, SMS Center UI, RPCD script, and ACL are preserved identically in the **new** target package **and** its rollback partner. Rollback target core version remains `0.2.0`, but with the **current patched LIVE frontend**; never use the superseded earlier rollback APK that lacked native quota or the correct core backend.
+
+**Superseding immutable prerelease**: [veci-physical-core-022-c76cb7f13f06](https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/tag/veci-physical-core-022-c76cb7f13f06)
+
+| Artifact | Bytes | SHA256 |
+|---|---:|---|
+| `veci-0.2.2-r1.apk` | 55,594 | `e06ad0b5f57f29630f20ff4bdaa06665261c09cbaef21a17a5a5504c092ff168` |
+| `veci-0.2.0-r1.apk` | 55,595 | `2b18a8c1e230314837068649023c097e1c354b9b8bdd77a4a148692fb7f3fd9a` |
+| `veci-physical-022.pem` | 178 | `c9915940535bdc8f9f388af8a924f329e77cc20217cb3b3d8fbc495f80628fcc` |
+
+Successful build and signing CI: [38690603865 PASS](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38690603865).
+Focused signed deployment/rollback protection CI: [38691024960 PASS](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38691024960).
+
+**Audited installer:** `scripts/veci-physical-core-022-signed-deploy-20261015.sh`, supporting `--status`, `--verify`, `--install`, `--rollback`. Signed release SHA and sizes are immutable, verified in RAM. Preserves `/etc/config/veci` by comparing its observed physical SHA-256 `95927da8bad40be6ac0eb14d8c92d13fa82ffc1594a8f608d59a06680275caae` before and after upgrade, never exporting the config publicly. Creates an owner-only persistent backup under `/root/veci-core-022-live-backup`, confirms backend status, runs an offline APK dependency plan, prevents unrelated package changes, and invokes rollback on postinstall failure. The update will restart rpcd/uhttpd as part of the VeCI package postinst but does not restart LTE modem/SMS services or flash firmware.
+
+**Current status:** Physical installation of VeCI Core `0.2.2` is **PENDING**. The old signed APK release/tag `veci-physical-core-022-b9f91e84899c` is superseded and **MUST NOT be used**. Run only the new pinned installer from the authorized Windows office laptop against actual WE5927 `192.168.1.1`; do not involve andre-nas. A returned CLI `VECI_022_DEPLOY=pass` would prove the package installed but browser UAT of the native quota panel and existing SMS/USSD visible controls is still required. XL carrier-authenticated balances remain unimplemented/not verified.
