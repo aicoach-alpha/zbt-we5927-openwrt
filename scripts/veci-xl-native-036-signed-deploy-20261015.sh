@@ -46,7 +46,7 @@ target_guard(){
   [ -f "$p" ] && [ ! -L "$p" ] || fail xl_plugin_file_missing
  done
  sh -n /usr/libexec/rpcd/veci.xl || fail xl_rpc_syntax_error
- ubus -S list veci.xl >/dev/null 2>&1 || fail xl_rpc_not_registered
+ ubus -S list veci.xl 2>/dev/null | grep -qx 'veci.xl' || fail xl_rpc_not_registered
  ubus -S call veci.xl status >/dev/null 2>&1 || fail xl_status_failed
 }
 restore(){
