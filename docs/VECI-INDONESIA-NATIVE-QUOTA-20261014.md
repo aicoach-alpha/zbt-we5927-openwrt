@@ -157,3 +157,13 @@ VECI_FLASH_WRITES=none
 - `.apk` has not been installed; package-manager trust/signing and rootfs/LuCI UAT must be validated at the actual router through authorized office-laptop connectivity. Treat a successful SDK package build as build-PASS, not deployment-PASS.
 - An unsigned or independently signed APK should never be installed by bypassing signature policy on a production router just to mark the work LIVE. Coordinate with a trusted firmware/package feed, preserve configs and rollback. Do not restart LTE modem or SMS v1.6.0.
 - Login/account authentication remains unimplemented and operator quota has not been verified. This package is status-view only and will display `not_connected` until a genuinely authorized carrier data source exists.
+
+
+## 2026-10-15 — Standalone quota UI package build
+
+- Package v0.2.1 now depends on rpcd, luci-base and jsonfilter rather than requiring VeCI core. This supports optional installation on existing compatible OpenWrt installations.
+- Native OpenWrt 25.12.5 SDK produced `veci-telco-indonesia-0.2.1-r1.apk` (5567 bytes, sha256 `7ebb290ff5973c52a970f2e78b784254dcbafc3e5256633affaad9644685f8b4`). Release: `veci-indonesia-quota-apk-fb9630bdc1cd`.
+- APK payload and dependency metadata inspection PASS in GitHub Actions run 38672198210. Read-only staging preflight CI PASS in run 38672382680.
+- `scripts/veci-indonesia-quota-apk-preflight-20261015.sh --verify` checks board, OS, disk, exact hash, and uses a non-mutating package-manager simulation. It does not install anything or use a signature-bypass flag.
+- Production router access is via the office laptop only; do not target the similarly addressed ZTE device visible from andre-nas. Physical package trust and deployment have not been proven.
+- Real XL account login and carrier quota still not verified. Do not label this UI-only package as quota LIVE.
