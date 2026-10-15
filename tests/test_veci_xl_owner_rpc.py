@@ -89,7 +89,7 @@ def main():
     assert 'src="./xl-account.js"' in PAGE
     assert 'href="/veci/#/cellular"' in PAGE
     pkg=pathlib.Path("source/veci-telco-xl-native/Makefile").read_text()
-    for expected in ("PKG_VERSION:=0.3.6","veci.xl","veci-xl-owner.json","xl-account.html","xl-account.js"):
+    for expected in ("PKG_VERSION:=0.3.7","veci.xl","veci-xl-owner.json","xl-account.html","xl-account.js"):
         assert expected in pkg,expected
     print("VECI_XL_OWNER_AUTH_AND_UI_FOCUSED=pass")
 
