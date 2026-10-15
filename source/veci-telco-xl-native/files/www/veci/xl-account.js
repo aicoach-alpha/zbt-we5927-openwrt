@@ -54,20 +54,7 @@ async function status() {
     $('xl-refresh').disabled = true;
   }
 }
-async function init() {
-  if (!secure()) {
-    message('Use HTTPS to access VeCI before entering any number or OTP.', true);
-    $('xl-start').disabled = true;
-    $('xl-submit').disabled = true;
-    $('xl-refresh').disabled = true;
-    $('xl-number').disabled = true;
-    $('xl-otp').disabled = true;
-    return;
-  }
-  if (!api.sessionId || !(await api.validateSession())) {
-    message('Sign in to VeCI first, then reopen XL Account in the same tab.', true);
-    return;
-  }
+async function activateAccountActions() {
   $('xl-start').addEventListener('click', async () => {
     const number = $('xl-number').value.trim();
     if (!/^62[0-9]{8,13}$/.test(number)) {
@@ -114,8 +101,57 @@ async function init() {
   });
   await status();
 }
+async function init() {
+  const signin = $('xl-veci-signin');
+  const signinButton = $('xl-veci-signin-button');
+  if (!secure()) {
+    message('Use HTTPS to access VeCI before entering router credentials or an XL OTP.', true);
+    signin.hidden = true;
+    for (const id of ['xl-start', 'xl-submit', 'xl-refresh', 'xl-number', 'xl-otp']) {
+      $(id).disabled = true;
+    }
+    return;
+  }
+
+  // VeCI over HTTPS has a different sessionStorage origin than VeCI over
+  // HTTP. Sign in here rather than asking the user to navigate between tabs.
+  // VeciApi handles the existing /ubus session.login RPC; no new auth scheme.
+  signinButton.addEventListener('click', async () => {
+    const username = $('xl-veci-user').value.trim();
+    const passwordField = $('xl-veci-password');
+    const password = passwordField.value;
+    if (!username || !password || username.length > 64) {
+      message('Enter your router administrator username and password.', true);
+      passwordField.value = '';
+      return;
+    }
+    signinButton.disabled = true;
+    try {
+      await api.login(username, password);
+      if (!(await api.validateSession())) throw new Error('VeCI session validation failed.');
+      signin.hidden = true;
+      $('xl-veci-user').value = '';
+      message('VeCI session confirmed. You can connect your XL account now.');
+      await activateAccountActions();
+    } catch {
+      message('VeCI administrator sign-in failed. Check your router credentials.', true);
+    } finally {
+      passwordField.value = '';
+      signinButton.disabled = false;
+    }
+  });
+
+  if (!api.sessionId || !(await api.validateSession())) {
+    signin.hidden = false;
+    message('Sign in to VeCI securely to continue.', false);
+    return;
+  }
+  signin.hidden = true;
+  await activateAccountActions();
+}
 window.addEventListener('pagehide', () => {
-  $('xl-number').value = '';
-  $('xl-otp').value = '';
+  for (const id of ['xl-number', 'xl-otp', 'xl-veci-user', 'xl-veci-password']) {
+    $(id).value = '';
+  }
 });
 void init();
