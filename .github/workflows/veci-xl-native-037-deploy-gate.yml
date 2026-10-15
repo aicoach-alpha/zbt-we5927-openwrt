@@ -1,0 +1,56 @@
+name: VeCI XL 0.3.7 signed production installer gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-native-037-signed-deploy-20261015.sh'
+      - '.github/workflows/veci-xl-native-037-deploy-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Strict signed optional package and rollback code gate
+        run: |
+          set -eu
+          f=scripts/veci-xl-native-037-signed-deploy-20261015.sh
+          sh -n "$f"
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-xl-native-037-signed-deploy-20261015.sh').read_text()
+          assert 'TAG=veci-xl-native-037-6307ad9f38e1' in s
+          assert 'APK_SHA=045c263790a99ac6aa0856a6167207797d1c19824f8ce59793a6a2351771fde7' in s
+          assert 'KEY_SHA=a01cb8213802ada0a256dfe444bda4011c1ac1dc75dc08c57374730ad8f789ec' in s
+          for x in ('--status','--verify','--install','--rollback',
+                    'apk --keys-dir "$WORK/keys" verify',
+                    'apk --no-network --keys-dir "$WORK/keys" --simulate add',
+                    'apk --no-network --keys-dir "$WORK/keys" add',
+                    'apk --no-network del veci-telco-xl-native',
+                    'core_guard','target_guard','CORE_RPCD_SHA','CORE_CONFIG_SHA',
+                    "grep -qx 'veci.xl'",'VECI_XL_037_LUCI_MODIFIED=false',
+                    'VECI_XL_037_MODEM_SMS_UNCHANGED=true'):
+              assert x in s,x
+          for forbidden in ('sysupgrade','AT+CMGS','AT+CUSD',
+                            '/etc/init.d/network restart','--allow-untrusted',
+                            'apk upgrade','/luci-static/'):
+              assert forbidden not in s,forbidden
+          assert s.index('APPLIED=1') < s.index('apk --no-network --keys-dir "$WORK/keys" add')
+          assert s.index('target_guard\ncore_guard') > s.index('apk --no-network --keys-dir "$WORK/keys" add')
+          print('VECI_XL_037_DEPLOY_SOURCE=pass')
+          PY
+      - name: Verify immutable release asset checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir /tmp/veci-xl-037
+          gh release download veci-xl-native-037-6307ad9f38e1 \
+            -p 'veci-telco-xl-native-0.3.7-r1.apk' \
+            -p 'veci-xl-037.pem' -D /tmp/veci-xl-037
+          echo '045c263790a99ac6aa0856a6167207797d1c19824f8ce59793a6a2351771fde7  /tmp/veci-xl-037/veci-telco-xl-native-0.3.7-r1.apk' | sha256sum -c -
+          echo 'a01cb8213802ada0a256dfe444bda4011c1ac1dc75dc08c57374730ad8f789ec  /tmp/veci-xl-037/veci-xl-037.pem' | sha256sum -c -
+          echo VECI_XL_037_DEPLOY_RELEASE_INTEGRITY=pass
