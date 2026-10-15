@@ -1,0 +1,116 @@
+#!/bin/sh
+# Explicitly initiated XL profile check; no purchase, SMS, USSD, quota writes.
+# Uses only pending OTP tokens; does not enable quota until identity is checked.
+set -eu
+umask 077
+LC_ALL=C
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LC_ALL PATH
+ROOT=/tmp/veci-telco-private
+PENDING="$ROOT/pending-profile"
+WORK=
+PROCESSED=0
+fail(){ printf 'VECI_XL_PROFILE_CHAIN=blocked\nVECI_XL_PROFILE_CHAIN_REASON=%s\n' "$1"; exit 1; }
+dir_ok(){
+  [ -d "$1" ] && [ ! -L "$1" ] &&
+    [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "drwx------ $(id -u)" ]
+}
+file_ok(){
+  [ -f "$1" ] && [ ! -L "$1" ] &&
+    [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "-rw------- $(id -u)" ]
+}
+cleanup(){
+  rm -f "$PENDING/body.json" "$PENDING/signature" "$PENDING/signature_time" "$PENDING/api_key"
+  rm -f "$ROOT/profile-verified-transport.json"
+  [ -z "$WORK" ] || rm -rf "$WORK"
+}
+[ "$#" -eq 1 ] && [ "$1" = --verify-owner ] || fail usage
+[ "$(id -u)" -eq 0 ] || fail root_required
+[ ! -t 1 ] || fail output_must_be_piped
+dir_ok "$ROOT" || fail private_directory_insecure
+dir_ok "$PENDING" || fail pending_directory_insecure
+for name in id_token access_token refresh_token requested_number created_epoch; do
+  file_ok "$PENDING/$name" || fail incomplete_pending_session
+done
+for name in xdata_key api_key signature_secret; do
+  file_ok "$ROOT/$name" || fail operator_credentials_not_configured
+done
+[ "$(wc -c < "$ROOT/xdata_key" | tr -d '[:space:]')" -eq 32 ] ||
+  fail wrong_xdata_key_length
+[ ! -e "$ROOT/profile-verified-transport.json" ] &&
+[ ! -L "$ROOT/profile-verified-transport.json" ] || fail existing_profile_result
+for name in body.json signature signature_time api_key; do
+  [ ! -e "$PENDING/$name" ] && [ ! -L "$PENDING/$name" ] ||
+    fail leftover_request_secrets
+done
+[ -x /usr/libexec/veci-xl-crypto ] || fail crypto_not_installed
+[ -x /usr/libexec/veci-xl-profile-http ] || fail profile_http_not_installed
+[ -x /usr/libexec/veci-xl-profile-identity-check ] || fail identity_gate_not_installed
+[ -x /usr/bin/jsonfilter ] || fail jsonfilter_missing
+created="$(cat "$PENDING/created_epoch")"
+case "$created" in ''|*[!0-9]*) fail invalid_session_time ;; esac
+now="$(date +%s)"
+case "$now" in ''|*[!0-9]*) fail invalid_device_time ;; esac
+[ "$now" -ge "$created" ] && [ $((now-created)) -le 900 ] ||
+  fail pending_session_expired
+WORK="$(mktemp -d /tmp/veci-xl-profile.XXXXXX)" || fail ram_unavailable
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+chmod 700 "$WORK"
+# Tokens may only appear inside root-private files and process memory.
+# Do not put secrets in command arguments, GitHub, syslog or ubus responses.
+access="$(cat "$PENDING/access_token")"
+printf '{"access_token":"%s","app_version":"8.9.0","is_enterprise":false,"lang":"en"}' "$access" > "$WORK/plain.json"
+unset access
+sec="$(date +%s)"
+case "$sec" in ''|*[!0-9]*) fail bad_clock ;; esac
+[ "$(printf '%s' "$sec" | wc -c | tr -d '[:space:]')" -eq 10 ] ||
+  fail invalid_timestamp
+ms="$sec""000"
+/usr/libexec/veci-xl-crypto xdata "$ms" "$ROOT/xdata_key" \
+  < "$WORK/plain.json" > "$WORK/xdata" 2>/dev/null ||
+  fail profile_encryption_failed
+xdata="$(cat "$WORK/xdata")"
+[ "$(printf '%s' "$xdata" | wc -c | tr -d '[:space:]')" -le 4096 ] ||
+  fail encrypted_request_too_large
+printf '{"xdata":"%s","xtime":%s}' "$xdata" "$ms" > "$PENDING/body.json"
+unset xdata
+printf '%s\n' "$sec" > "$PENDING/signature_time"
+cp "$ROOT/api_key" "$PENDING/api_key" || fail api_key_stage_failed
+/usr/libexec/veci-xl-crypto profile-signature "$sec" \
+  "$ROOT/signature_secret" "$PENDING/id_token" \
+  > "$PENDING/signature" 2>/dev/null || fail signature_failed
+chmod 600 "$PENDING/body.json" "$PENDING/signature_time" \
+  "$PENDING/api_key" "$PENDING/signature" || fail file_permissions_failed
+# The profile HTTP binary accepts ONLY its fixed /api/v8/profile route,
+# validates CA/hostname, and refuses redirected / non-JSON responses.
+PROCESSED=1
+/usr/libexec/veci-xl-profile-http profile > "$WORK/envelope.json" 2>/dev/null ||
+  fail profile_https_unavailable
+xtime="$(jsonfilter -i "$WORK/envelope.json" -e '@.xtime' 2>/dev/null)" ||
+  fail encrypted_profile_invalid
+case "$xtime" in
+  ?????????????) ;;
+  *) fail invalid_profile_xtime ;;
+esac
+case "$xtime" in *[!0-9]*) fail invalid_profile_xtime ;; esac
+jsonfilter -i "$WORK/envelope.json" -e '@.xdata' > "$WORK/xdata_reply" 2>/dev/null ||
+  fail encrypted_profile_invalid
+[ "$(wc -c < "$WORK/xdata_reply" | tr -d '[:space:]')" -le 8193 ] ||
+  fail encrypted_profile_too_large
+/usr/libexec/veci-xl-crypto decrypt "$xtime" "$ROOT/xdata_key" \
+  < "$WORK/xdata_reply" > "$WORK/profile.json" 2>/dev/null ||
+  fail profile_decryption_failed
+[ "$(wc -c < "$WORK/profile.json" | tr -d '[:space:]')" -le 16384 ] ||
+  fail decrypted_profile_too_large
+cp "$WORK/profile.json" "$ROOT/profile-verified-transport.json" ||
+  fail profile_stage_failed
+chmod 600 "$ROOT/profile-verified-transport.json" || fail profile_permissions_failed
+/usr/libexec/veci-xl-profile-identity-check --check >/dev/null 2>&1 ||
+  fail account_identity_not_proven
+# No session promotion in this first transport candidate. A future
+# strictly versioned quota chain will consume only verified identity.
+echo VECI_XL_PROFILE_CHAIN=owner_number_matched
+echo VECI_XL_SESSION_PROMOTED=false
+echo VECI_XL_QUOTA_TRUST=not_authenticated
+echo VECI_MODEM_SMS_MODIFIED=false
