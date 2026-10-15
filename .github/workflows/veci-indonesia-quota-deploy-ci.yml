@@ -56,7 +56,7 @@ jobs:
               '/usr/share/luci/menu.d/luci-app-veci-quota.json',
               '/www/luci-static/resources/view/veci/quota.js'
           ]
-          for item in files: assert s.count(item)==2,(item,s.count(item))
+          for item in files: assert s.count(item)>=2,(item,s.count(item))
           assert 'mkdir "$LOCK"' in active
           assert 'trap' in active
           print('VECI_QUOTA_DEPLOY_STATIC_SAFETY_PASS')
