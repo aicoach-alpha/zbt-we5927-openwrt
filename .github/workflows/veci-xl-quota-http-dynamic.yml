@@ -1,0 +1,101 @@
+name: VeCI XL quota HTTP small dynamic MIPS prerelease
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/veci-xl-quota-http.c'
+      - 'tests/veci_xl_quota_http_synthetic.c'
+      - '.github/workflows/veci-xl-quota-http-dynamic.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify host framing and unauthorized-session guard
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd cmake libmbedtls-dev
+          gcc -std=c11 -Os -Wall -Wextra -Werror \
+            -o /tmp/veci-http-fixture tests/veci_xl_quota_http_synthetic.c \
+            -lmbedtls -lmbedx509 -lmbedcrypto
+          /tmp/veci-http-fixture
+          gcc -std=c11 -Os -Wall -Wextra -Werror \
+            -o /tmp/veci-http-host source/veci-telco-indonesia/veci-xl-quota-http.c \
+            -lmbedtls -lmbedx509 -lmbedcrypto
+          if /tmp/veci-http-host quota >/tmp/veci-out 2>/tmp/veci-err; then
+            echo FAIL_OPEN_WITHOUT_SESSION; exit 1
+          fi
+          grep -q 'authorized_session_not_configured' /tmp/veci-err
+          test ! -s /tmp/veci-out
+          echo VECI_XL_HTTP_NO_AUTH_NO_NETWORK_PASS
+      - name: Fetch official SHA-pinned OpenWrt 25.12.5 RAMIPS toolchain
+        run: |
+          set -eu
+          name=openwrt-toolchain-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 240 -o /tmp/toolchain.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$name"
+          echo "5e03963e3b5e2c12f8c1519a07d56a74babcd6147e95c4d50948e50ae465d776  /tmp/toolchain.tar.zst" | sha256sum -c -
+          mkdir -p /tmp/veci-toolchain
+          tar -xf /tmp/toolchain.tar.zst -C /tmp/veci-toolchain
+          curl -fL --retry 3 --max-time 150 -o /tmp/mbedtls.tar.bz2 \
+            https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.6/mbedtls-3.6.6.tar.bz2
+          echo "8fb65fae8dcae5840f793c0a334860a411f884cc537ea290ce1c52bb64ca007a  /tmp/mbedtls.tar.bz2" | sha256sum -c -
+          mkdir -p /tmp/veci-mbed
+          tar -xf /tmp/mbedtls.tar.bz2 -C /tmp/veci-mbed
+      - name: Cross compile against existing router mbedTLS shared ABI
+        run: |
+          set -eu
+          cc="$(find -L /tmp/veci-toolchain -type f -name '*gcc' -executable | grep '/bin/' | head -1)"
+          test -n "$cc"
+          src=/tmp/veci-mbed/mbedtls-3.6.6
+          cmake -S "$src" -B /tmp/veci-mbed/build \
+            -DCMAKE_C_COMPILER="$cc" \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DENABLE_PROGRAMS=OFF -DENABLE_TESTING=OFF \
+            -DUSE_SHARED_MBEDTLS_LIBRARY=ON \
+            -DUSE_STATIC_MBEDTLS_LIBRARY=OFF \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections -Os"
+          cmake --build /tmp/veci-mbed/build --target mbedtls mbedx509 mbedcrypto -j 2
+          mkdir -p release
+          "$cc" -std=c11 -Os -s -ffunction-sections -fdata-sections \
+            -Wall -Wextra -Werror \
+            -I"$src/include" \
+            -o release/veci-xl-quota-http-dynamic-mipsel \
+            source/veci-telco-indonesia/veci-xl-quota-http.c \
+            -L/tmp/veci-mbed/build/library \
+            -Wl,-rpath-link,/tmp/veci-mbed/build/library \
+            -Wl,--gc-sections -lmbedtls -lmbedx509 -lmbedcrypto
+          file release/veci-xl-quota-http-dynamic-mipsel
+          readelf -h release/veci-xl-quota-http-dynamic-mipsel | grep -Eq 'Machine:[ ]*MIPS'
+          readelf -h release/veci-xl-quota-http-dynamic-mipsel | grep -q "2's complement, little endian"
+          readelf -d release/veci-xl-quota-http-dynamic-mipsel | tee /tmp/veci-dynamic-abi.txt
+          grep -q 'libmbedtls.so.21' /tmp/veci-dynamic-abi.txt
+          grep -q 'libmbedx509.so.7' /tmp/veci-dynamic-abi.txt
+          grep -q 'libmbedcrypto.so.16' /tmp/veci-dynamic-abi.txt
+          ! grep -q 'RPATH\|RUNPATH' /tmp/veci-dynamic-abi.txt
+          size="$(stat -c %s release/veci-xl-quota-http-dynamic-mipsel)"
+          test "$size" -gt 0
+          test "$size" -lt 120000
+          sha256sum release/veci-xl-quota-http-dynamic-mipsel > release/SHA256SUMS
+          echo "VECI_XL_DYNAMIC_MIPS_ABI_PASS size=$size"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-xl-http-dynamic-mipsel
+          path: release
+      - name: Publish staged small executable, no automatic device install
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-xl-http-dynamic-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" \
+            release/veci-xl-quota-http-dynamic-mipsel release/SHA256SUMS \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI XL read-only quota HTTP compact dynamic MIPS prerelease" \
+            --notes "Staged only; not LIVE. Uses system libmbedtls.so.21, libmbedx509.so.7 and libmbedcrypto.so.16. Strict TLS and root-owned session policy; rejects missing user authorization before network. No SMS, USSD, tokens, OTP capture or flash install. Physical dynamic ABI execution still unverified."
+          echo "VECI_XL_HTTP_DYNAMIC_STAGED=$tag"
