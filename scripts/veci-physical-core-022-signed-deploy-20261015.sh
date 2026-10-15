@@ -22,6 +22,9 @@ RPCD_SHA=d08edadd38f0d9b992fc54d879eabf9f797bf54df83fa8c8cf7b59e55b9e99ce
 ACL_SHA=d655406fd94214c22cf047bf5fc49e66876365634958be9d25171e6100e6a171
 CSS_SHA=fd3b3540109d815d9b3cb5151298af04ef865e55557d8a8a91d9c30f1548fdb2
 CONFIG_SHA=95927da8bad40be6ac0eb14d8c92d13fa82ffc1594a8f608d59a06680275caae
+# Hash of the default config shipped by the exact signed APK; NEVER a substitute
+# for the active router config, only a narrow post-transaction restore trigger.
+PACKAGED_CONFIG_SHA=63518b50a5cc75eafceea120424e8125194310ac8829f0a5a3e16ab6a172ae54
 PAGE=/www/veci/js/pages/cellular.js
 MODULE=/www/veci/js/lib/native-quota.js
 RPCD=/usr/libexec/rpcd/veci
@@ -151,6 +154,26 @@ create_backup() {
     backup_ok || fail rollback_backup_integrity_failed
     echo VECI_022_PERSISTENT_BACKUP=pass
 }
+reconcile_config_after_upgrade() {
+    # APK can replace an active UCI conffile with its OWN packaged default.
+    # Only that exact, source-pinned default may be automatically restored.
+    # Unrecognized changes fail closed, triggering the existing rollback.
+    backup_ok || fail config_backup_integrity_failed
+    if check "$CONF" "$CONFIG_SHA"; then
+        echo VECI_022_CONFIG_PRESERVATION=unchanged
+        return 0
+    fi
+    [ -f "$CONF" ] && [ ! -L "$CONF" ] || fail postinstall_config_not_regular
+    printf 'VECI_022_CONFIG_AFTER_APK_SHA256=%s\n' "$(sha "$CONF")"
+    check "$CONF" "$PACKAGED_CONFIG_SHA" || fail postinstall_config_unexpected_drift
+    # Atomic same-directory replace. Never publish the private config content.
+    cp "$BACKUP/veci.config" "$CONF.restore.$" || fail config_restore_stage_failed
+    chmod 600 "$CONF.restore.$" || fail config_restore_permissions_failed
+    check "$CONF.restore.$" "$CONFIG_SHA" || fail config_restore_stage_integrity_failed
+    mv -f "$CONF.restore.$" "$CONF" || fail config_restore_commit_failed
+    check "$CONF" "$CONFIG_SHA" || fail config_restore_postcheck_failed
+    echo VECI_022_CONFIG_PRESERVATION=restored_from_verified_backup
+}
 restore_files() {
     backup_ok || return 1
     cp "$BACKUP/veci.config" "$CONF" || return 1
@@ -192,6 +215,7 @@ finish() {
     if [ "$KEEP_WORK" = 0 ] && [ -n "$WORK" ] && [ -d "$WORK" ]; then
         rm -rf "$WORK"
     fi
+    rm -f "$CONF.restore.$"
     rmdir "$LOCK" 2>/dev/null || :
     exit "$rc"
 }
@@ -262,6 +286,7 @@ APPLIED=1
 apk --no-network --keys-dir "$WORK/keys" add "$WORK/$NEW" > "$WORK/upgrade.log" 2>&1 ||
     fail signed_core_install_failed
 installed 0.2.2 || fail target_version_not_registered
+reconcile_config_after_upgrade
 live_checks
 apk list -I > "$WORK/packages-after.txt" || fail inventory_after_failed
 grep -v '^veci-0[.]2[.]' "$WORK/packages-after.txt" | sort > "$WORK/unrelated-after.txt"
