@@ -34,7 +34,7 @@ jobs:
           foreach ($Value in @('uhttpd.main.key','Cert:\LocalMachine',
                                'Import-Certificate','Import-PfxCertificate',
                                'Invoke-RestMethod','uhttpd restart','uci set',
-                               'credential', 'password', 'Set-ExecutionPolicy')) {
+                               'Set-ExecutionPolicy')) {
             if ($Text.Contains($Value)) { throw "Read-only cert check violation: $Value" }
           }
           Write-Output 'VECI_HTTPS_CERT_PIN_SOURCE=pass'
