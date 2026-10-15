@@ -4,8 +4,12 @@ on:
   push:
     paths:
       - 'source/veci-telco-indonesia/**'
+      - 'source/veci-telco-xl-native/**'
+      - 'scripts/prepare-veci.sh'
+      - 'scripts/select-veci-edition.sh'
       - 'tests/test_veci_indonesia_contract.py'
       - 'tests/test_veci_quota_cache.py'
+      - 'tests/test_veci_indonesia_quota_ui.cjs'
       - 'docs/VECI-INDONESIA-EDITION.md'
       - '.github/workflows/veci-indonesia-contract.yml'
 permissions:
@@ -23,6 +27,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_veci_indonesia_contract.py' -v
       - name: Test local quota cache and negative fixtures
         run: python3 -m unittest discover -s tests -p 'test_veci_quota_cache.py' -v
+      - name: Validate read-only LuCI quota view and ACL contract
+        run: |
+          node --check source/veci-telco-indonesia/files/www/luci-static/resources/view/veci/quota.js
+          node tests/test_veci_indonesia_quota_ui.cjs
       - name: Stage General and Indonesia from same pinned source revision
         shell: bash
         run: |
@@ -39,14 +47,21 @@ jobs:
           release=json.loads((root/'package/veci-default-ui/files/etc/veci-release.json').read_text())
           assert release['edition']==edition
           pkg=root/'package/veci-telco-indonesia'
+          native=root/'package/veci-telco-xl-native'
           cfg=(root/'.config').read_text()
           if edition=='general':
               assert not pkg.exists()
+              assert not native.exists()
               assert 'CONFIG_PACKAGE_veci-telco-indonesia=y' not in cfg
           else:
               assert (pkg/'Makefile').exists()
               assert (pkg/'files/usr/libexec/rpcd/veci.quota').exists()
+              assert (pkg/'files/usr/share/luci/menu.d/luci-app-veci-quota.json').exists()
+              assert (pkg/'files/www/luci-static/resources/view/veci/quota.js').exists()
+              assert (native/'Makefile').exists()
               assert 'CONFIG_PACKAGE_veci-telco-indonesia=y' in cfg
+          assert '# CONFIG_PACKAGE_veci-telco-xl-native is not set' in cfg
+          assert 'CONFIG_PACKAGE_veci-telco-xl-native=y' not in cfg
           print('Profile staged:',edition,'Pinned core:',release['veci_commit'][:12])
           PY
           done
