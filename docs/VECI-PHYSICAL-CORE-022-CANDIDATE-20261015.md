@@ -100,3 +100,35 @@ Final installer source commit: `948e376940b093b7381414c633f437e66d369d55`.
 Focused final deployment gate CI: [38691242938 — PASS](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38691242938). VeCI-only UI policy CI: [38691243242 — PASS](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38691243242).
 
 The installer is ready for a single controlled physical deployment through the Windows office laptop. It internally performs the signed-asset/dependency preflight, persistent backup and package install, then verifies sources, config, existing backends and unrelated package inventory. `VECI_022_DEPLOY=pass` is required to claim the physical update. The browser quota/SMS UI must still be visually verified afterwards. The earlier blocked signed release is not eligible for deployment.
+
+## 2026-10-15 — First physical signed install failed on UCI config; automatic rollback PASS
+
+Owner executed the pinned 0.2.2 installer from the **office Windows laptop** against the actual WE5927. The installer output was:
+
+```text
+VECI_022_PAIRED_SIGNATURES=pass
+VECI_022_TRANSACTION_SIMULATION=pass
+VECI_022_PERSISTENT_BACKUP=pass
+VECI_022_DEPLOY=blocked
+VECI_022_REASON=live_uci_config_drift
+VECI_022_ROLLBACK=pass
+```
+
+Interpretation: both signed APKs and transaction planning passed; the installed 0.2.2 package changed `/etc/config/veci` (or another concurrent process did) before the post-install immutable-config check. The existing script **correctly rejected the mismatch and invoked a successful signed rollback** to the 0.2.0 package plus LIVE source/backup. Because the original owner command used shell `&&`, its trailing `--status` step did not execute after install failure. A fresh physical `--status` and browser check remain needed before asserting complete UI recovery.
+
+**Old installer source commit `c59f3d512d9e87acf7473b2e8cc86c759ccfa70b` must not be re-executed** for this upgrade.
+
+### Narrow config-preservation correction (no APK rebuild required)
+
+The new signed installer recognizes **only two** acceptable post-install `/etc/config/veci` states:
+
+1. Original owner-verified active config SHA-256: `95927da8bad40be6ac0eb14d8c92d13fa82ffc1594a8f608d59a06680275caae` — no restore needed.
+2. Exactly the static default configuration bundled with the pinned source package: SHA-256 `63518b50a5cc75eafceea120424e8125194310ac8829f0a5a3e16ab6a172ae54` — atomically replace it with the **private, SHA-verified root-owned backup** at `/root/veci-core-022-live-backup/veci.config`, with mode 0600.
+
+Missing/symlinked config, a missing or modified rollback backup, or **any other config hash** remains a hard failure and triggers the same automatic signed rollback. The installer prints only the post-install hash, never the private config contents. Signed APK hash pins, frontend/source guards, backend checks and unrelated package inventory checks remain unchanged.
+
+GitHub source fix: [`ffa35f7`](https://github.com/aicoach-alpha/zbt-we5927-openwrt/commit/ffa35f7847d395d207580ebc9de27bc92fb37d56). Regression test file: `tests/test_veci_022_config_reconcile.py`.
+
+[CI 38694058037 PASS](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38694058037) proved actual shell-function behaviors for five scenarios (untouched config, signed default restored, unexpected changes refused, corrupted backup refused, symlink refused) and verified the immutable signed release pair. [VeCI-only UI policy 38694058052 PASS](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38694058052).
+
+**Physical status:** 0.2.2 installation is **NOT yet PASS**. Only a new run from the authorized office laptop and fresh `--status` can establish installation success. Existing XL carrier quota authentication is still not configured.
