@@ -46,6 +46,8 @@ cleanup(){
   echo VECI_XL_GUIDE_DIAG_ROLLBACK=attempted
  fi
  [ -n "$TEMP" ] && [ -f "$TEMP" ] && rm -f "$TEMP" || :
+ [ -f "$FILE.next.$" ] && rm -f "$FILE.next.$" || :
+ [ -f "$FILE.rollback.$" ] && rm -f "$FILE.rollback.$" || :
  rmdir "$LOCK" 2>/dev/null || :
  exit "$code"
 }
@@ -84,13 +86,6 @@ if [ "$MODE" = --install ] && same "$FILE" "$NEW_SHA"; then
  exit 0
 fi
 same "$FILE" "$OLD_SHA" || fail original_guide_modified
-if [ -e "$BACKUP" ] || [ -L "$BACKUP" ]; then
- same "$BACKUP" "$OLD_SHA" || fail existing_backup_mismatch
-else
- cp "$FILE" "$BACKUP" || fail backup_copy_failed
- chmod 600 "$BACKUP" || fail backup_chmod_failed
- same "$BACKUP" "$OLD_SHA" || fail backup_integrity_failed
-fi
 TEMP="$(mktemp /tmp/veci-xl-guide-fix.XXXXXX)" || fail temp_file_unavailable
 wget -qO "$TEMP" "$URL" || fail verified_source_unavailable
 same "$TEMP" "$NEW_SHA" || fail verified_source_sha256_mismatch
@@ -99,6 +94,13 @@ if [ "$MODE" = --verify ]; then
  SUCCESS=1
  echo VECI_XL_GUIDE_DIAG_UPDATE=not_installed
  exit 0
+fi
+if [ -e "$BACKUP" ] || [ -L "$BACKUP" ]; then
+ same "$BACKUP" "$OLD_SHA" || fail existing_backup_mismatch
+else
+ cp "$FILE" "$BACKUP" || fail backup_copy_failed
+ chmod 600 "$BACKUP" || fail backup_chmod_failed
+ same "$BACKUP" "$OLD_SHA" || fail backup_integrity_failed
 fi
 cp "$TEMP" "$FILE.next.$$" || fail stage_copy_failed
 chmod 644 "$FILE.next.$$" || fail stage_chmod_failed
