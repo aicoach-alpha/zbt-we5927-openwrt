@@ -75,7 +75,15 @@ jobs:
           tar -xf /tmp/toolchain.tar.zst -C /tmp/sdk --strip-components=1
           apk=/tmp/sdk/staging_dir/host/bin/apk
           test -x "$apk"
-          "$apk" --help | grep -Eq 'apk-tools|apk'
-          "$apk" --no-network --keys-dir /tmp --help >/tmp/apk-help
-          "$apk" --no-network --keys-dir /tmp --simulate --help >/tmp/apk-help-2
+          # apk-tools v3 may return nonzero on --help, even when options parse.
+          "$apk" --help > /tmp/apk-baseline-help 2>&1 || :
+          grep -Eiq 'apk|usage' /tmp/apk-baseline-help
+          "$apk" --no-network --keys-dir /tmp --help > /tmp/apk-help 2>&1 || :
+          "$apk" --no-network --keys-dir /tmp --simulate --help > /tmp/apk-help-2 2>&1 || :
+          for out in /tmp/apk-help /tmp/apk-help-2; do
+            grep -Eiq 'apk|usage' "$out"
+            if grep -Eiq 'unknown option|unrecognized option|invalid argument|invalid option' "$out"; then
+              cat "$out"; exit 1
+            fi
+          done
           echo VECI_APKV3_OFFLINE_OPTION_AND_ISOLATED_KEY_PASS
