@@ -1,0 +1,19 @@
+name: VeCI XL optional USSD guide asset SHA256
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hashes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and print SHA256 of the two static VeCI guide files
+        run: |
+          set -eu
+          f=source/veci-telco-xl-native/files/www/veci
+          test -s "$f/xl-ussd-guide.html"
+          test -s "$f/xl-ussd-guide.js"
+          node --check "$f/xl-ussd-guide.js"
+          sha256sum "$f/xl-ussd-guide.html" "$f/xl-ussd-guide.js"
