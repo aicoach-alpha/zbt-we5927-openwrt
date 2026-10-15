@@ -33,7 +33,7 @@ device_gate() {
 rollback_internal() {
     # Never uninstall other packages or update the firmware.
     if apk info -e "$PKG" >/dev/null 2>&1; then
-        apk --network=false del "$PKG" >/dev/null 2>&1 || return 1
+        apk --no-network del "$PKG" >/dev/null 2>&1 || return 1
     fi
     if [ "$ATTEMPTED" = 1 ]; then
         /etc/init.d/rpcd restart >/dev/null 2>&1 || return 1
@@ -87,7 +87,7 @@ if [ "$mode" = --rollback ]; then
     fi
     [ -x /etc/init.d/rpcd ] || fail rpcd_service_unavailable
     # Explicit rollback only targets the VeCI quota package.
-    apk --network=false del "$PKG" > "$WORK/rollback.log" 2>&1 || fail apk_remove_failed
+    apk --no-network del "$PKG" > "$WORK/rollback.log" 2>&1 || fail apk_remove_failed
     /etc/init.d/rpcd restart >/dev/null 2>&1 || fail rpcd_restart_failed
     [ ! -e /usr/share/luci/menu.d/luci-app-veci-quota.json ] || fail menu_not_removed
     printf 'VECI_QUOTA_ROLLBACK=pass\nVECI_MODEM_AND_SMS_UNCHANGED=true\n'
@@ -122,7 +122,7 @@ for src in /etc/apk/keys/*; do
 done
 apk --keys-dir "$WORK/keys" verify "$pkgfile" > "$WORK/verify.log" 2>&1 ||
     fail apk_signature_rejected
-apk --network=false --keys-dir "$WORK/keys" --simulate add "$pkgfile" > "$WORK/plan.log" 2>&1 ||
+apk --no-network --keys-dir "$WORK/keys" --simulate add "$pkgfile" > "$WORK/plan.log" 2>&1 ||
     fail offline_dependency_plan_failed
 if grep -Eiq '(^|[[:space:]])(Upgrading|Downgrading|Purging|Removing)[[:space:]]' "$WORK/plan.log"; then
     fail unintended_package_transaction
@@ -133,7 +133,7 @@ sort "$WORK/packages-before.txt" > "$WORK/packages-baseline-sorted.txt"
 printf 'VECI_QUOTA_SIGNATURE=pass\nVECI_QUOTA_DEPENDENCIES=pass\nVECI_QUOTA_VOLATILE_BACKUP=pass\n'
 ATTEMPTED=1
 # Only intentional persistent change: locally installed quota status APK.
-apk --network=false --keys-dir "$WORK/keys" add "$pkgfile" > "$WORK/install.log" 2>&1 ||
+apk --no-network --keys-dir "$WORK/keys" add "$pkgfile" > "$WORK/install.log" 2>&1 ||
     fail apk_install_failed
 apk info -e "$PKG" >/dev/null 2>&1 || fail apk_not_registered
 for path in \
