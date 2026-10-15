@@ -1,0 +1,48 @@
+name: VeCI native Indonesia quota pinned source regression
+on:
+  push:
+    paths:
+      - 'source/veci.commit'
+      - '.github/workflows/veci-native-indonesia-quota.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch immutable VeCI source pin
+        run: |
+          set -eu
+          pin="$(tr -d '[:space:]' < source/veci.commit)"
+          git init -q /tmp/veci-pinned
+          git -C /tmp/veci-pinned remote add origin https://github.com/aicoach-alpha/veci.git
+          git -C /tmp/veci-pinned fetch -q --depth 1 origin "$pin"
+          git -C /tmp/veci-pinned checkout -q --detach FETCH_HEAD
+          test "$(git -C /tmp/veci-pinned rev-parse HEAD)" = "$pin"
+          echo VECI_PINNED_QUOTA_COMMIT_PASS
+      - name: Test native Home and Cellular quota
+        run: |
+          set -eu
+          cd /tmp/veci-pinned
+          node --check veci/js/pages/cellular.js
+          node --check veci/js/pages/home.js
+          node --test tests/quota.test.mjs tests/native-cellular-quota.test.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          cellular=Path('veci/js/pages/cellular.js').read_text()
+          home=Path('veci/js/pages/home.js').read_text()
+          m=Path('Makefile').read_text()
+          assert 'PKG_VERSION:=0.2.1' in m
+          assert 'home-carrier-quota-slot' in home
+          assert 'cellular-quota-panel' in cellular
+          assert 'veci.quota' in cellular and 'veci.quota' in home
+          for token in ('cellular-messaging-panel','cellular-imei-live','cellular-switch-sim'):
+            assert token in cellular
+          print('VECI_INDONESIA_CORE_NATIVE_QUOTA_REGRESSION_PASS')
+          PY
