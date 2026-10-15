@@ -23,7 +23,7 @@ device_gate() {
     [ "$(id -u)" = 0 ] || fail root_required
     [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail wrong_board
     grep -q "^DISTRIB_RELEASE='25.12.5'$" /etc/openwrt_release || fail wrong_os
-    for bin in apk wget sha256sum awk mktemp grep wc df ubus jsonfilter tar cp tr sort cmp; do
+    for bin in apk wget sha256sum awk mktemp grep wc df ubus jsonfilter tar cp tr sort cmp sleep; do
         command -v "$bin" >/dev/null 2>&1 || fail required_tool_missing
     done
     free="$(df -k /overlay 2>/dev/null | awk 'NR==2 {print $4}')"
@@ -146,11 +146,49 @@ for path in \
 do
     [ -f "$path" ] && [ ! -L "$path" ] || fail payload_incomplete
 done
-# New rpcd plugin may need one reload; SSH connection remains untouched.
+# Prove the installed executable RPC contract independently of rpcd.
+# A bad executable/response must be distinguishable from delayed registration.
+if [ ! -x /usr/libexec/rpcd/veci.quota ]; then
+    printf 'VECI_QUOTA_RPC_DIAG=plugin_not_executable\n'
+    fail quota_rpc_plugin_not_executable
+fi
+/usr/libexec/rpcd/veci.quota list > "$WORK/plugin-list.json" 2>/dev/null ||
+    fail quota_rpc_plugin_list_error
+if [ "$(jsonfilter -i "$WORK/plugin-list.json" -e '@.status' 2>/dev/null || :)" != "{}" ]; then
+    # jsonfilter formatting of an empty object can differ across builds;
+    # only reject missing advertised methods using a strict substring check.
+    grep -q '"status"' "$WORK/plugin-list.json" || fail quota_rpc_plugin_methods_missing
+fi
+/usr/libexec/rpcd/veci.quota call status > "$WORK/direct-status.json" 2>/dev/null ||
+    fail quota_rpc_direct_call_failed
+state_direct="$(jsonfilter -i "$WORK/direct-status.json" -e '@.state' 2>/dev/null || :)"
+case "$state_direct" in not_connected|stale|unavailable) : ;; *)
+    printf 'VECI_QUOTA_RPC_DIAG=direct_status_invalid\n'
+    fail quota_rpc_direct_status_invalid ;;
+esac
+printf 'VECI_QUOTA_RPC_EXECUTABLE=pass\n'
+# rpcd scans /usr/libexec/rpcd on startup. A procd-managed restart can
+# return before the ubus object is registered, so retry with an upper bound.
 if ! ubus -S call veci.quota status > "$WORK/status.json" 2>/dev/null; then
     /etc/init.d/rpcd restart >/dev/null 2>&1 || fail rpcd_restart_failed
-    ubus -S call veci.quota status > "$WORK/status.json" 2>/dev/null ||
-        fail quota_rpc_missing
+    ready=0
+    rounds=0
+    while [ "$rounds" -lt 12 ]; do
+        if ubus -S call veci.quota status > "$WORK/status.json" 2>/dev/null; then
+            ready=1
+            break
+        fi
+        rounds=$((rounds + 1))
+        sleep 1
+    done
+    if [ "$ready" != 1 ]; then
+        if ubus -S list veci.quota > "$WORK/ubus-list.txt" 2>/dev/null; then
+            printf 'VECI_QUOTA_RPC_DIAG=object_exists_call_failed\n'
+        else
+            printf 'VECI_QUOTA_RPC_DIAG=object_not_registered\n'
+        fi
+        fail quota_rpc_missing_after_retry
+    fi
 fi
 state="$(jsonfilter -i "$WORK/status.json" -e '@.state' 2>/dev/null || :)"
 case "$state" in not_connected|unavailable|stale) : ;; *) fail invalid_quota_state ;; esac
