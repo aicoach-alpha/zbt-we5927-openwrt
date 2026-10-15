@@ -21,6 +21,17 @@
    <div><span>Operator integration</span><strong id="xl-credentials">Checking…</strong></div>
    <div><span>Account session</span><strong id="xl-session">Checking…</strong></div>
   </div>
+  <section id="xl-veci-signin" aria-labelledby="xl-veci-signin-title">
+   <h2 id="xl-veci-signin-title">VeCI administrator sign-in</h2>
+   <p>Sign in securely to VeCI here before connecting your XL account. This is your router account, not your XL account.</p>
+   <label class="field" for="xl-veci-user"><span>Router username</span>
+    <input id="xl-veci-user" type="text" autocomplete="username" maxlength="64">
+   </label>
+   <label class="field" for="xl-veci-password"><span>Router password</span>
+    <input id="xl-veci-password" type="password" autocomplete="current-password">
+   </label>
+   <button class="button button-secondary" type="button" id="xl-veci-signin-button">Sign in to VeCI</button>
+  </section>
   <label class="field" for="xl-number"><span>XL number (62…)</span>
    <input id="xl-number" type="tel" autocomplete="off" inputmode="numeric" pattern="62[0-9]{8,13}" maxlength="15">
   </label>
