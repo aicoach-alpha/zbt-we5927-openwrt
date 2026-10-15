@@ -58,7 +58,7 @@ cleanup(){
  if [ "$DIRTY" = 1 ] && [ "$DONE" = 0 ]; then
   same "$HTML" "$HTML_SHA" && rm -f "$HTML" || :
   same "$JS" "$JS_SHA" && rm -f "$JS" || :
-  rm -f "$HTML.new.$" "$JS.new.$"
+  rm -f "$HTML.new.$$" "$JS.new.$$"
   echo VECI_XL_GUIDE_INSTALL_ROLLBACK=attempted
  fi
  [ -n "$WORK" ] && [ -d "$WORK" ] && rm -rf "$WORK" || :
