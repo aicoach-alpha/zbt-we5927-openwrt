@@ -14,7 +14,7 @@ done
 dir="$(mktemp -d /tmp/veci-xl-compact.XXXXXX)" || fail ram_unavailable
 trap 'rm -rf "$dir"' EXIT
 trap 'exit 130' INT TERM
-base="https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/veci-xl-runtime-compact-4773e7ca0628"
+base="https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/veci-xl-runtime-compact-24653c5bc779"
 crypto="$dir/veci-xl-crypto"
 parser="$dir/veci-xl-parser"
 http="$dir/veci-xl-http"
@@ -23,7 +23,7 @@ wget -qO "$parser" "$base/veci-xl-quota-normalize-dynamic-mipsel" || fail parser
 wget -qO "$http" "$base/veci-xl-quota-http-dynamic-mipsel" || fail http_download
 [ "$(sha256sum "$crypto" | awk '{print $1}')" = "4bb8f2cb62d18aa7da34bf84aba25a2681cc0dc1ef75d5d984dd0fd68b44d931" ] || fail crypto_sha256
 [ "$(sha256sum "$parser" | awk '{print $1}')" = "756daba7b1db1dbede615cf6154ed1ca767e66f42118aee947b515a9cdee1015" ] || fail parser_sha256
-[ "$(sha256sum "$http" | awk '{print $1}')" = "eae118cb412eb173789837e683f51a43c64e9fb07faf0c02c78e46448d742a7e" ] || fail http_sha256
+[ "$(sha256sum "$http" | awk '{print $1}')" = "64c140562ddbc4fd1bb35597ef3a69022e392227a7a89d04ca1bea0c5ca4401b" ] || fail http_sha256
 chmod 700 "$crypto" "$parser" "$http"
 printf 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' > "$dir/key"
 chmod 600 "$dir/key"
