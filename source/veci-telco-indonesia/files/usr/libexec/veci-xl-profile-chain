@@ -108,9 +108,11 @@ cp "$WORK/profile.json" "$ROOT/profile-verified-transport.json" ||
 chmod 600 "$ROOT/profile-verified-transport.json" || fail profile_permissions_failed
 /usr/libexec/veci-xl-profile-identity-check --check >/dev/null 2>&1 ||
   fail account_identity_not_proven
-# No session promotion in this first transport candidate. A future
-# strictly versioned quota chain will consume only verified identity.
+[ -x /usr/libexec/veci-xl-session-activate ] ||
+  fail session_gate_missing
+/usr/libexec/veci-xl-session-activate --activate >/dev/null 2>&1 ||
+  fail session_activation_blocked
 echo VECI_XL_PROFILE_CHAIN=owner_number_matched
-echo VECI_XL_SESSION_PROMOTED=false
+echo VECI_XL_SESSION_PROMOTED=true
 echo VECI_XL_QUOTA_TRUST=not_authenticated
 echo VECI_MODEM_SMS_MODIFIED=false
