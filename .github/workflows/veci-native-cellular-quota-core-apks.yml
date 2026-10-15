@@ -27,6 +27,8 @@ jobs:
           done
           grep -q 'PKG_VERSION:=0.2.0' /tmp/veci/base/Makefile
           grep -q 'PKG_VERSION:=0.2.1' /tmp/veci/quota/Makefile
+          test -s /tmp/veci/quota/files/rpcd-veci
+          test -s /tmp/veci/base/files/rpcd-veci
           ( cd /tmp/veci/quota && node --check veci/js/pages/cellular.js && node --test tests/quota.test.mjs tests/native-cellular-quota.test.mjs )
       - name: Install SDK build requirements
         run: |
@@ -78,7 +80,7 @@ jobs:
           import json,sys
           source,ver=sys.argv[1:]
           content=json.dumps(json.load(open(source)),sort_keys=True).lower()
-          for required in ("veci",ver,"cellular.js","usr/libexec/rpcd/veci","uhttpd-mod-ubus"):
+          for required in ("veci",ver,"cellular.js","jsonfilter","uhttpd-mod-ubus"):
               assert required in content,required
           if ver=="0.2.1": assert "quota.js" in content
           assert "luci-static" not in content and "luci-app-" not in content
