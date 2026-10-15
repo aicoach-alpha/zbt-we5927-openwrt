@@ -1,0 +1,48 @@
+name: VeCI XL browser-side read-only RPC diagnosis
+on:
+  push:
+    paths:
+      - 'source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js'
+      - '.github/workflows/veci-xl-ussd-browser-rpc-diag.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure read-only RPC diagnosis never calls USSD
+        run: |
+          set -eu
+          j=source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js
+          node --check "$j"
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js').read_text()
+          start=s.index('async function diagnoseRpc()')
+          end=s.index('async function guarded(work)')
+          diagnostic=s[start:end]
+          assert "api.call('veci.xl', 'status'" in diagnostic
+          assert "api.call('veci.ussd', 'quotaStatus'" in diagnostic
+          assert "api.call('session', 'access'" in diagnostic
+          assert "object: 'veci.ussd', function: 'start'" in diagnostic
+          assert "result.access === true" in diagnostic
+          assert "result.access === false" in diagnostic
+          assert "addEventListener('click', () => { void diagnoseRpc(); });" in diagnostic
+          assert "output.textContent" in diagnostic
+          assert "appendChild(button)" in diagnostic
+          assert "ubus_rpc_session: api.sessionId" in diagnostic
+          assert "console." not in diagnostic
+          assert "innerHTML" not in diagnostic
+          assert "fetch(" not in diagnostic
+          assert "sessionStorage" not in diagnostic and "localStorage" not in diagnostic
+          for bad in ("call('start'", "call('reply'", "call('cancel'", "requestOtp", "submitOtp", "AT+CUSD","/dev/tty"):
+              assert bad not in diagnostic,bad
+          assert s.count("installRpcCheckButton();")==2
+          assert s.count("window.confirm(")==2
+          assert "answer && typeof answer.reason === 'string'" in s
+          print('VECI_XL_BROWSER_RPC_DIAG_READONLY=pass')
+          PY
+          sha256sum "$j"
