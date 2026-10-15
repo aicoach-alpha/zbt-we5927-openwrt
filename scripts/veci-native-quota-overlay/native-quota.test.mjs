@@ -26,7 +26,7 @@ test('unverified and malformed responses never show quota numbers', () => {
     {...base, schema: 2}, null, {}
   ];
   for (const x of broken) {
-    assert.doesNotMatch(summarizeOperatorQuota(x).value, /[0-9]\\s*(?:GiB|MiB)/);
+    assert.doesNotMatch(summarizeOperatorQuota(x).value, /[0-9]\s*(?:GiB|MiB)/);
   }
 });
 
