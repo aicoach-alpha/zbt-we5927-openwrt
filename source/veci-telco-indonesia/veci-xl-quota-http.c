@@ -246,7 +246,7 @@ static int parse_response(size_t size,size_t *result){
   at=end+2;
  }
  /* Without a declared body length, truncation could appear successful. */
- if(!has_type||(!has_cl&&!chunked)||chunked&&has_cl)return -1;
+ if(!has_type||(!has_cl&&!chunked)||(chunked&&has_cl))return -1;
  if(chunked){
   if(unpack_chunked(wire+headerlen,bodylen,result)!=0)return -1;
  }else{
