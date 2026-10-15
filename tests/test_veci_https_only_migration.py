@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import time
+import signal
 import hashlib
 import os
 
@@ -84,10 +85,14 @@ def test():
     assert r.returncode==0,(r.stdout,r.stderr)
     assert "VECI_HTTPS_SWITCH=pass" in r.stdout
     assert "listen_http '" not in cfg.read_text(),(r.stdout,r.stderr,cfg.read_text())
+    # A detached BusyBox-compatible watchdog must ignore an SSH hangup
+    # without relying on /usr/bin/nohup. Inject HUP and ensure rollback.
+    watchdog=int((backup/"watchdog.pid").read_text().strip())
+    os.kill(watchdog, signal.SIGHUP)
     time.sleep(4)
     assert cfg.read_bytes()==orig,("watchdog did not restore uhttpd",cfg.read_text())
     assert not (backup/"pending").exists()
-    print("VECI_HTTPS_TEST=auto_rollback_pass")
+    print("VECI_HTTPS_TEST=sighup_ignored_and_auto_rollback_pass")
   # Confirming a verified HTTPS path makes HTTPS-only persist, with manual
   # rollback retaining the original exact config.
   with tempfile.TemporaryDirectory(prefix="veci-https-test-") as tmp:
