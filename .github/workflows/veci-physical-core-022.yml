@@ -1,0 +1,140 @@
+name: VeCI physical SMS quota core 0.2.2 signed release candidate
+on:
+  push:
+    paths:
+      - 'scripts/veci-physical-core-stage-20261015.py'
+      - '.github/workflows/veci-physical-core-022.yml'
+      - 'scripts/veci-native-quota-overlay/native-quota.js'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin historical VeCI source without using mutable branches
+        run: |
+          set -eu
+          mkdir -p /tmp/veci-physical
+          git init -q /tmp/veci-physical/repository
+          git -C /tmp/veci-physical/repository remote add origin https://github.com/aicoach-alpha/veci.git
+          for pair in \
+            base:f19603b6172854dfeca3861826017d8f1aa1268c \
+            main:bdf7bcf332c23b625e92fb1e00d1fb30edea88b6 \
+            home:16175a4c62c35a683a220b72e07a2a5d9da4a311; do
+            label="${pair%%:*}"
+            rev="${pair#*:}"
+            git -C /tmp/veci-physical/repository fetch -q --depth 1 origin "$rev"
+            mkdir -p "/tmp/veci-physical/$label"
+            git -C /tmp/veci-physical/repository archive FETCH_HEAD | tar -xf - -C "/tmp/veci-physical/$label"
+          done
+      - name: Reconstruct actual physical 0.2.0 frontend and 0.2.2 successor
+        run: |
+          set -eu
+          for pair in rollback:0.2.0 update:0.2.2; do
+            label="${pair%%:*}"
+            version="${pair#*:}"
+            python3 scripts/veci-physical-core-stage-20261015.py \
+              --base /tmp/veci-physical/base \
+              --main /tmp/veci-physical/main \
+              --home /tmp/veci-physical/home \
+              --repo . \
+              --dest "/tmp/veci-physical/$label" --version "$version"
+          done
+          diff -u /tmp/veci-physical/rollback/files/rpcd-veci /tmp/veci-physical/update/files/rpcd-veci
+          diff -u /tmp/veci-physical/rollback/rpcd-acl.json /tmp/veci-physical/update/rpcd-acl.json
+          diff -u /tmp/veci-physical/rollback/files/veci.config /tmp/veci-physical/update/files/veci.config
+          echo VECI_BACKEND_PACKAGE_PARITY=pass
+          node --check /tmp/veci-physical/rollback/veci/js/pages/cellular.js
+          node --check /tmp/veci-physical/update/veci/js/pages/cellular.js
+          node --check /tmp/veci-physical/update/veci/js/lib/native-quota.js
+          node --test scripts/veci-native-quota-overlay/native-quota.test.mjs
+          ! grep -q 'quotaSummary' /tmp/veci-physical/rollback/veci/js/pages/cellular.js
+          grep -q 'mountOperatorQuota' /tmp/veci-physical/update/veci/js/pages/cellular.js
+          echo VECI_022_SOURCE_AND_JS_TESTS=pass
+      - name: Install toolchain requirements
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd make gcc g++ gawk flex bison gettext libncurses-dev libssl-dev rsync unzip python3 file openssl
+      - name: Download exact OpenWrt 25.12.5 ramips SDK
+        run: |
+          set -eu
+          sdk=openwrt-sdk-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 360 -o /tmp/sdk.tar.zst "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$sdk"
+          echo 'b44636e0a53f0d769cbce64edb9ca3831e1a9ecdc8c53a5caf128884be6c490e  /tmp/sdk.tar.zst' | sha256sum -c -
+          mkdir /tmp/sdk
+          tar -xf /tmp/sdk.tar.zst -C /tmp/sdk --strip-components=1
+      - name: Build actual rollback and target APKs in isolated SDK
+        run: |
+          set -eu
+          mkdir -p release
+          for pair in rollback:0.2.0 update:0.2.2; do
+            label="${pair%%:*}"
+            version="${pair#*:}"
+            cd /tmp/sdk
+            rm -rf package/veci
+            cp -a "/tmp/veci-physical/$label" package/veci
+            printf '\nCONFIG_PACKAGE_veci=m\n' >> .config
+            make defconfig
+            make package/veci/clean
+            make package/veci/compile -j2 V=s
+            built="$(find bin -name "veci-$version-r1.apk" -type f -print -quit)"
+            test -n "$built" && test -s "$built"
+            cp "$built" "$GITHUB_WORKSPACE/release/"
+          done
+          test -s "$GITHUB_WORKSPACE/release/veci-0.2.0-r1.apk"
+          test -s "$GITHUB_WORKSPACE/release/veci-0.2.2-r1.apk"
+      - name: Sign P-256 scoped APKs, verify, and inspect manifests
+        run: |
+          set -eu
+          umask 077
+          tool=/tmp/sdk/staging_dir/host/bin/apk
+          mkdir -p /tmp/veci-sign/keys /tmp/veci-sign/empty
+          openssl ecparam -name prime256v1 -genkey -noout -out /tmp/veci-sign/private.pem
+          openssl pkey -in /tmp/veci-sign/private.pem -pubout -out /tmp/veci-sign/keys/veci-physical-022.pem
+          for ver in 0.2.0 0.2.2; do
+            pkg="release/veci-$ver-r1.apk"
+            "$tool" --allow-untrusted adbsign --reset-signatures --sign-key /tmp/veci-sign/private.pem "$pkg"
+            "$tool" --keys-dir /tmp/veci-sign/keys verify "$pkg"
+            if "$tool" --keys-dir /tmp/veci-sign/empty verify "$pkg" >/dev/null 2>&1; then
+              echo "Unexpected signature acceptance without key" >&2; exit 1
+            fi
+            "$tool" --keys-dir /tmp/veci-sign/keys adbdump --format json "$pkg" > "release/metadata-$ver.json"
+            python3 - "release/metadata-$ver.json" "$ver" <<'PY'
+          import json, sys
+          data=json.dumps(json.load(open(sys.argv[1])), sort_keys=True).lower()
+          version=sys.argv[2]
+          for text in ('veci',version,'cellular.js','sms-center.css'):
+              assert text in data, text
+          if version=='0.2.2':
+              assert 'native-quota.js' in data
+          else:
+              assert 'native-quota.js' not in data
+          assert '/luci-static' not in data
+          print('VECI_SIGNED_PHYSICAL_CORE_CONTENT_PASS',version)
+          PY
+          done
+          cp /tmp/veci-sign/keys/veci-physical-022.pem release/
+          chmod 644 release/veci-physical-022.pem
+          sha256sum release/*.apk release/*.pem > release/SHA256SUMS
+          printf 'base=f19603b6172854dfeca3861826017d8f1aa1268c\nmain=bdf7bcf332c23b625e92fb1e00d1fb30edea88b6\nhome=16175a4c62c35a683a220b72e07a2a5d9da4a311\n' > release/SOURCE_PINS.txt
+          echo 'PHYSICAL_BASE_CELLULAR_SHA256=8f9219c21ca49b44ea5d5a2705fccdde77315249c53c21715974df384d4adef6' > release/PHYSICAL_SHA256.txt
+          echo 'LIVE_QUOTA_PATCHED_CELLULAR_SHA256=b075a4852d3eeb5f717e4db568a0929fc732b225f025a154beb24961a3f85379' >> release/PHYSICAL_SHA256.txt
+          echo 'VECI_NATIVE_MODULE_SHA256=5c1f66b5a5aa292be202897ef538f67ed7933e857ff3e11bcaabb075b75c692d' >> release/PHYSICAL_SHA256.txt
+          echo VECI_PHYSICAL_CORE_SIGNED_PAIR=pass
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-physical-core-022-and-rollback-signed
+          path: release/
+      - name: Publish immutable prerelease candidate (not installed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-physical-core-022-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/* --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI 0.2.2 physical SMS/USSD + native quota signed candidate" \
+            --notes "Unsigned source reconstruction parity and signed APK manifests verified by CI. Physical source hash pins are owner-observed. DOES NOT claim router installed. Installation requires exact live backend/ACL package-source fingerprint checks and transaction simulation, reversible persistent backup, and physical UAT. No modem/SMS command is executed in CI; real XL operator quota authentication is not implemented."
