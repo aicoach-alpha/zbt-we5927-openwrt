@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<title>VeCI · Panduan Cek Kuota XL</title>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<main class="login-shell">
+ <section class="login-card" aria-labelledby="guide-title">
+  <div class="login-heading">
+   <p class="eyebrow">VeCI · CELLULAR · XL</p>
+   <h1 id="guide-title">Cek kuota XL melalui *808#</h1>
+   <p>Panduan menu untuk SIM XL pada router. Dua jalur di bawah berasal dari pengalaman pemilik SIM; urutan menu dapat berubah dan bukan jaminan kode nasional.</p>
+  </div>
+  <section id="guide-signin" aria-labelledby="guide-login-title">
+   <h2 id="guide-login-title">Masuk sebagai administrator VeCI</h2>
+   <label class="field" for="guide-user"><span>Username router</span>
+    <input id="guide-user" type="text" maxlength="64" autocomplete="username">
+   </label>
+   <label class="field" for="guide-password"><span>Password router</span>
+    <input id="guide-password" type="password" autocomplete="current-password">
+   </label>
+   <button id="guide-login" class="button button-secondary" type="button">Masuk ke VeCI</button>
+  </section>
+  <section id="guide-action" hidden>
+   <p>Pilih jalur kuota. Tidak ada permintaan USSD otomatis saat halaman dibuka.</p>
+   <div class="cellular-actions">
+    <button id="guide-route-one" class="button button-secondary" type="button">Jalur 7 → 3 → 2 → 1</button>
+    <button id="guide-route-two" class="button button-secondary" type="button">Jalur 7 → 3 → 2 → 2</button>
+   </div>
+   <section id="guide-menu" hidden>
+    <h2>Balasan menu dari XL</h2>
+    <pre id="guide-response" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+    <p id="guide-next" role="status"></p>
+    <p>Pastikan pilihan yang disarankan memang untuk cek kuota, bukan pembelian atau aktivasi. Setiap pilihan memerlukan persetujuan terpisah.</p>
+    <div class="cellular-actions">
+     <button id="guide-send" class="button button-primary" type="button">Konfirmasi dan kirim pilihan</button>
+     <button id="guide-cancel" class="button button-secondary" type="button">Tutup sesi USSD</button>
+    </div>
+   </section>
+  </section>
+  <p id="guide-feedback" role="status" aria-live="polite">Tidak ada USSD yang dikirim.</p>
+  <p class="login-note">Tidak ada perintah pembelian otomatis, OTP, atau akses API myXL. Balasan operator hanya ditampilkan sementara tanpa penyimpanan.</p>
+  <a class="button button-secondary" href="/veci/#/cellular">Kembali ke Cellular</a>
+ </section>
+</main>
+<script type="module" src="./xl-ussd-guide.js"></script>
+</body>
+</html>
