@@ -1,0 +1,98 @@
+name: VeCI Indonesia quota APK signed one-time trust candidate
+on:
+  push:
+    paths:
+      - '.github/workflows/veci-indonesia-quota-signed-candidate.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  sign-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned unsigned SDK artifact and verify exact bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir -p release
+          gh release download veci-indonesia-quota-apk-fb9630bdc1cd \
+            -p 'veci-telco-indonesia-0.2.1-r1.apk' -D release
+          printf '%s  %s\n' \
+            '7ebb290ff5973c52a970f2e78b784254dcbafc3e5256633affaad9644685f8b4' \
+            'release/veci-telco-indonesia-0.2.1-r1.apk' | sha256sum -c -
+          test "$(wc -c < release/veci-telco-indonesia-0.2.1-r1.apk)" -eq 5567
+          echo 'VECI_ORIGINAL_PKG_INTEGRITY_PASS'
+      - name: Obtain pinned OpenWrt 25.12.5 APKv3 signing tools
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd openssl
+          sdk=openwrt-sdk-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 360 -o /tmp/sdk.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$sdk"
+          printf '%s  %s\n' \
+            b44636e0a53f0d769cbce64edb9ca3831e1a9ecdc8c53a5caf128884be6c490e \
+            /tmp/sdk.tar.zst | sha256sum -c -
+          mkdir -p /tmp/sdk
+          tar -xf /tmp/sdk.tar.zst -C /tmp/sdk --strip-components=1
+          test -x /tmp/sdk/staging_dir/host/bin/apk
+      - name: Sign exact APK with release-only P-256 key and prove signature validity
+        run: |
+          set -eu
+          umask 077
+          tool=/tmp/sdk/staging_dir/host/bin/apk
+          keydir="$RUNNER_TEMP/veci-quota-keys"
+          emptydir="$RUNNER_TEMP/veci-empty-keys"
+          mkdir -p "$keydir" "$emptydir"
+          secret="$RUNNER_TEMP/veci-ephemeral-private.pem"
+          openssl ecparam -name prime256v1 -genkey -noout -out "$secret"
+          openssl pkey -in "$secret" -pubout -out "$keydir/veci-quota-candidate.pem"
+          # The private signing key remains in the ephemeral CI runner only.
+          # This read-only build SIGNING operation is distinct from installation.
+          apkfile=release/veci-telco-indonesia-0.2.1-r1.apk
+          "$tool" --allow-untrusted adbsign --reset-signatures --sign-key "$secret" "$apkfile"
+          "$tool" --keys-dir "$keydir" verify "$apkfile"
+          if "$tool" --keys-dir "$emptydir" verify "$apkfile" >/dev/null 2>&1; then
+            echo 'VECI_UNTRUSTED_PACKAGE_ACCEPTED_WITHOUT_KEY'; exit 1
+          fi
+          "$tool" --keys-dir "$keydir" adbdump --format json "$apkfile" > release/PACKAGE-METADATA.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('release/PACKAGE-METADATA.json'))
+          y=json.dumps(x,sort_keys=True).lower()
+          for word in ('veci-telco-indonesia','0.2.1','luci-base','jsonfilter','rpcd',
+                       'quota.js','veci.quota','luci-app-veci-quota.json'):
+              assert word in y,word
+          assert '"veci"' not in y
+          print('VECI_SIGNED_APK_PAYLOAD_AND_DEPS_PASS')
+          PY
+          cp "$keydir/veci-quota-candidate.pem" release/veci-quota-candidate.pem
+          chmod 644 release/veci-quota-candidate.pem
+          sha256sum release/*.apk release/*.pem > release/SHA256SUMS
+          printf 'KEY_SHA256=' > release/RELEASE_INFO
+          sha256sum release/veci-quota-candidate.pem | awk '{print $1}' >> release/RELEASE_INFO
+          printf 'SOURCE_UNSIGNED_SHA256=7ebb290ff5973c52a970f2e78b784254dcbafc3e5256633affaad9644685f8b4\n' >> release/RELEASE_INFO
+          printf 'SIGNING_KEY_KIND=ephemeral_release_only\n' >> release/RELEASE_INFO
+          printf 'AUTHORIZED_INSTALL=false\n' >> release/RELEASE_INFO
+          echo 'VECI_SIGNED_APK_VERIFY_WITH_KEY_PASS'
+          echo 'VECI_SIGNED_APK_UNTRUSTED_WITHOUT_KEY_PASS'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-indonesia-quota-apk-signed
+          path: release/
+      - name: Publish signed candidate with public key and hashes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-indonesia-quota-signed-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/* \
+            --target "$GITHUB_SHA" --prerelease \
+            --title 'VeCI Indonesia quota 0.2.1 signed APK, one-time trust candidate' \
+            --notes 'Signed with a one-time P-256 CI key; private key destroyed with runner. Public key PEM and its SHA256 shipped as immutable release assets. Tests: SDK apk verify with supplied key PASS; without key rejected. Does NOT install or enroll a key on routers. Only read-only LuCI UI, no carrier login, no SMS or LTE changes. A future stable signing key must be configured separately.'
+          echo "VECI_SIGNED_RELEASE=$tag"
