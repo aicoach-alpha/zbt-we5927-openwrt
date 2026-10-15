@@ -132,27 +132,31 @@ static int make_request(int submit){
  struct timespec ts;
  if(clock_gettime(CLOCK_REALTIME,&ts)!=0)return -1;
  char signed_at[48], requested_at[48];
- if(date_gmt7(ts.tv_sec-(submit?0:0),ts.tv_nsec/1000000,signed_at,sizeof(signed_at))!=0 ||
+ if(date_gmt7(ts.tv_sec,ts.tv_nsec/1000000,signed_at,sizeof(signed_at))!=0 ||
     date_gmt7(ts.tv_sec-(submit?300:0),ts.tv_nsec/1000000,requested_at,sizeof(requested_at))!=0)
   return -1;
- const char *prefix="POST /realms/xl-ciam/protocol/openid-connect/token HTTP/1.1\r\n";
- char uri[200];
- if(submit) {
+ char path[224];
+ if(submit){
   if(signature(signed_at,number,otp)!=0)return -1;
-  int n=snprintf(body,sizeof(body),
+  int bn=snprintf(body,sizeof(body),
     "contactType=SMS&code=%s&grant_type=password&contact=%s&scope=openid",
     otp,number);
-  if(n<=0||(size_t)n>=sizeof(body))return -1;
-  uri[0]=0;
+  if(bn<=0||(size_t)bn>=sizeof(body))return -1;
+  snprintf(path,sizeof(path),"/realms/xl-ciam/protocol/openid-connect/token");
  }else{
-  int n=snprintf(uri,sizeof(uri),
-    "GET /realms/xl-ciam/auth/otp?contact=%s&contactType=SMS&alternateContact=false HTTP/1.1\r\n",number);
-  if(n<=0||(size_t)n>=sizeof(uri))return -1;
+  int pn=snprintf(path,sizeof(path),
+    "/realms/xl-ciam/auth/otp?contact=%s&contactType=SMS&alternateContact=false",number);
+  if(pn<=0||(size_t)pn>=sizeof(path))return -1;
  }
- const char *ctype=submit?"application/x-www-form-urlencoded":"application/json";
- const char *action=submit?prefix:uri;
+ char optional[300]={0};
+ if(submit){
+  int hn=snprintf(optional,sizeof(optional),
+    "Ax-Api-Signature: %s\r\nContent-Length: %zu\r\n",
+    hsignature,strlen(body));
+  if(hn<=0||(size_t)hn>=sizeof(optional))return -1;
+ }
  int n=snprintf(request,sizeof(request),
-  "%s"
+  "%s %s HTTP/1.1\r\n"
   "Host: " HOST "\r\n"
   "Accept: application/json\r\n"
   "Accept-Encoding: identity\r\n"
@@ -166,40 +170,14 @@ static int make_request(int submit){
   "User-Agent: %s\r\n"
   "Content-Type: %s\r\n"
   "%s"
-  "%s"
   "Connection: close\r\n"
   "Cache-Control: no-store\r\n\r\n"
   "%s",
-  action,auth,fingerprint,device,requested_at,ua,ctype,
-  submit?"Ax-Api-Signature: ":"",
-  submit?hsignature:"",
-  submit?body:"");
+  submit?"POST":"GET",path,auth,fingerprint,device,requested_at,ua,
+  submit?"application/x-www-form-urlencoded":"application/json",
+  optional,submit?body:"");
  if(n<0||(size_t)n>=sizeof(request))return -1;
- /* Header framing for HMAC is constructed separately below. */
- if(submit) {
-  char *slot=strstr(request,"Ax-Api-Signature: ");
-  if(!slot)return -1;
-  /* Existing request currently places Connection on same line as signature.
-     Reconstruct with known exact location without ever logging the secret. */
-  char marker[180];
-  int m=snprintf(marker,sizeof(marker),"Ax-Api-Signature: %sConnection:",hsignature);
-  if(m<0||(size_t)m>=sizeof(marker))return -1;
-  char *bad=strstr(request,marker);
-  if(!bad)return -1;
-  size_t after=(size_t)(bad-request)+strlen("Ax-Api-Signature: ")+strlen(hsignature);
-  size_t total=strlen(request);
-  if(total+2>=sizeof(request))return -1;
-  memmove(request+after+2,request+after,total-after+1);
-  request[after]='\r';request[after+1]='\n';
-  /* Strict Content-Length on the fixed form body. */
-  char *end=strstr(request,"\r\nConnection: close");
-  if(!end)return -1;
-  char line[64];int z=snprintf(line,sizeof(line),"Content-Length: %zu\r\n",strlen(body));
-  if(z<0||(size_t)z>=sizeof(line)||strlen(request)+(size_t)z>=sizeof(request))return -1;
-  size_t pos=(size_t)(end-request)+2;total=strlen(request);
-  memmove(request+pos+z,request+pos,total-pos+1);
-  memcpy(request+pos,line,(size_t)z);
- }
+
  wipe(hsignature,sizeof(hsignature));wipe(body,sizeof(body));
  return 0;
 }
@@ -215,29 +193,54 @@ static int parse_reply(int submit,size_t n){
  if(code<200||code>=300)return -1;
  char *headers=strstr(response,"\r\n\r\n");
  if(!headers)return -1;
- size_t length=(size_t)(headers+4-response);
- if(length>8192)return -1;
- if(!strcasestr(response,"Content-Type: application/json"))return -1;
- /* Reject chunked responses until framing is implemented unambiguously. */
- if(strcasestr(response,"Transfer-Encoding:"))return -1;
- char *cl=strcasestr(response,"Content-Length:");
- if(cl && cl<headers){
-  cl+=15;while(*cl==' '||*cl=='\t')cl++;
-  char *stop=NULL;unsigned long declared=strtoul(cl,&stop,10);
-  if(stop==cl || (stop[0]!='\r'&&stop[0]!=' ') ||
-     declared!=(unsigned long)(n-length))return -1;
+ size_t hdr_end=(size_t)(headers-response)+4;
+ if(hdr_end>8192||hdr_end>=n)return -1;
+ /* Header scan is bounded to actual headers. Never match body substrings. */
+ int has_json=0, has_cl=0;size_t declared=0;
+ char *line=strstr(response,"\r\n");
+ if(!line || line>=headers)return -1;
+ line+=2;
+ while(line<headers){
+  char *end=strstr(line,"\r\n");
+  if(!end || end>headers)return -1;
+  if(end==line)break;
+  size_t m=(size_t)(end-line);
+  if(m>256)return -1;
+  if(m>=13 && !strncasecmp(line,"Content-Type:",13)){
+   if(has_json)return -1;
+   const char *v=line+13;
+   while(v<end&&(*v==' '||*v=='\t'))v++;
+   if((size_t)(end-v)<16||strncasecmp(v,"application/json",16))return -1;
+   has_json=1;
+  }
+  if(m>=15 && !strncasecmp(line,"Content-Length:",15)){
+   if(has_cl)return -1;
+   char tmp[18];size_t k=0;
+   const char *v=line+15;
+   while(v<end&&(*v==' '||*v=='\t'))v++;
+   while(v<end&&k<sizeof(tmp)-1&&isdigit((unsigned char)*v))
+    tmp[k++]=*v++;
+   if(!k||v!=end)return -1;
+   tmp[k]=0;declared=(size_t)strtoul(tmp,NULL,10);
+   has_cl=1;
+  }
+  if(m>=18 && !strncasecmp(line,"Transfer-Encoding:",18))return -1;
+  if(m>=17 && !strncasecmp(line,"Content-Encoding:",17))return -1;
+  line=end+2;
  }
- if(n==length||headers[4]!='{')return -1;
- if(submit) {
+ if(!has_json || !has_cl || declared!=n-hdr_end)return -1;
+ const char *payload=response+hdr_end;
+ if(payload[0]!='{'||payload[declared-1]!='}')return -1;
+ if(submit){
   /* Token JSON never leaves the root-owned volatile directory. */
   char path[160],temp[168];struct stat st;
   snprintf(path,sizeof(path),DIR "/token-candidate.json");
   snprintf(temp,sizeof(temp),DIR "/.token.%ld",(long)getpid());
   int fd=open(temp,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
   if(fd<0)return -1;
-  size_t count=n-length,off=0;const char *payload=response+length;
-  while(off<count){
-   ssize_t k=write(fd,payload+off,count-off);
+  size_t off=0;
+  while(off<declared){
+   ssize_t k=write(fd,payload+off,declared-off);
    if(k<=0){close(fd);unlink(temp);return -1;}
    off+=(size_t)k;
   }
@@ -251,6 +254,7 @@ static int parse_reply(int submit,size_t n){
  }else puts("VECI_XL_CIAM=otp_request_accepted");
  return 0;
 }
+
 static int transport(int submit){
  mbedtls_net_context net;mbedtls_ssl_context ssl;mbedtls_ssl_config cfg;
  mbedtls_x509_crt ca;mbedtls_entropy_context entropy;mbedtls_ctr_drbg_context rng;
@@ -309,6 +313,13 @@ int main(int argc,char **argv){
  if(transport(submit)==0)rc=0;
  else puts("VECI_XL_CIAM=operator_response_unavailable");
  alarm(0);
+ /* Never retain a submitted OTP after an attempt. Other session files stay
+    inside the owner's 0700 directory for the next explicit step. */
+ if(submit) {
+  char secret[160];
+  if(snprintf(secret,sizeof(secret),DIR "/otp")<(int)sizeof(secret))
+   unlink(secret);
+ }
 done:
  wipe(auth,sizeof(auth));wipe(ua,sizeof(ua));
  wipe(fingerprint,sizeof(fingerprint));wipe(device,sizeof(device));
