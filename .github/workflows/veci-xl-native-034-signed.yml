@@ -9,7 +9,7 @@ on:
       - 'source/veci-telco-indonesia/veci-xl-quota-normalize.c'
       - 'source/veci-telco-indonesia/files/usr/libexec/veci-xl-*'
       - 'tests/test_veci_xl_quota_refresh.py'
-      - '.github/workflows/veci-xl-native-035-signed.yml'
+      - '.github/workflows/veci-xl-native-034-signed.yml'
   workflow_dispatch:
 permissions:
   contents: write
