@@ -167,3 +167,29 @@ VECI_FLASH_WRITES=none
 - `scripts/veci-indonesia-quota-apk-preflight-20261015.sh --verify` checks board, OS, disk, exact hash, and uses a non-mutating package-manager simulation. It does not install anything or use a signature-bypass flag.
 - Production router access is via the office laptop only; do not target the similarly addressed ZTE device visible from andre-nas. Physical package trust and deployment have not been proven.
 - Real XL account login and carrier quota still not verified. Do not label this UI-only package as quota LIVE.
+
+## 2026-10-15 — On-device APK trust gate blocked; scoped signed candidate prepared
+
+The office-laptop SSH physical run of `scripts/veci-indonesia-quota-apk-preflight-20261015.sh --verify` returned:
+```text
+VECI_INDONESIA_APK_BOARD=pass
+VECI_INDONESIA_APK_OPENWRT_VERSION=pass
+VECI_INDONESIA_APK_OVERLAY_SPACE=pass
+VECI_INDONESIA_APK_SHA256=pass
+VECI_INDONESIA_APK_TRUST_AND_DEPENDENCIES=blocked
+VECI_INDONESIA_APK_REASON=signature_or_dependency_not_verified
+VECI_INDONESIA_APK_INSTALLED=false
+```
+
+That first physical error is **ambiguous** between trust and dependency solving; no raw package-manager stderr was exposed, so do not claim a definitive cause. OpenWrt APKv3 normally rejects unsigned SDK-built third-party package installations unless a trusted signature is provided. Never bypass this gate with `apk add --allow-untrusted` on a production router.
+
+Fix prepared: SHA-pinned original v0.2.1 APK was signed in CI with a short-lived P-256 release-only key. Signed candidate release `veci-indonesia-quota-signed-a0b5b97ff9a2`: https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/tag/veci-indonesia-quota-signed-a0b5b97ff9a2
+
+- Signed APK 5683 bytes, sha256 `da72b09afefcd2bdf99bc501d86bd8e485f6a7156b8ccdaae189449a3b0ce34f`.
+- Public key PEM 178 bytes, sha256 `4d1bae271c4cca9b46ac10404d887c246637795f5b89d271fa38672efe9bdbfa`.
+- CI `apk verify` with that key PASS; without it FAIL (the expected behavior), run 38673239329. Private signing key never published; released candidate uses ephemeral signing key and is NOT a persistent signing identity for future upgrades.
+- Added physical read-only `scripts/veci-indonesia-quota-signed-apk-preflight-20261015.sh --verify`. It obtains only those exact SHA-pinned assets into `/tmp`, copies existing trusted *public* system keys to a local tmp directory, verifies the signed package with `apk --keys-dir /tmp/... verify`, and uses `apk --keys-dir /tmp/... --simulate add` to validate dependencies without changing device keys, package DB, firmware, SIM or SMS.
+- Physical preflight code/asset CI PASS run 38673494322. **No physical execution yet of new signed artifact**, no trusted key permanently enrolled, no APK installed. Do not repeat old compact runtime tests.
+- If signature verification PASS but dependency simulation BLOCKED, report that exact blocker; do not try `--allow-untrusted`, `apk upgrade`, overwrite keys or sysupgrade.
+- After signed preflight PASS on the actual office-attached WE5927, only then undertake narrowly scoped installation with pre-change backup and specific rollback, preserving existing SMS Center v1.6.0 and LTE services.
+- XL login remains not attempted and real operator quota not verified; this milestone addresses only the LuCI status page distribution.
