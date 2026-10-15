@@ -113,7 +113,7 @@ async function init() {
     return;
   }
 
-  // VeCI over HTTPS has a different sessionStorage origin than VeCI over
+  // VeCI over HTTPS has a different per-origin login session than VeCI over
   // HTTP. Sign in here rather than asking the user to navigate between tabs.
   // VeciApi handles the existing /ubus session.login RPC; no new auth scheme.
   signinButton.addEventListener('click', async () => {
