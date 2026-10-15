@@ -50,6 +50,27 @@ jobs:
           test "$(stat -c %s "$apkfile")" -lt 120000
           sha256sum "$apkfile" > "$GITHUB_WORKSPACE/release/SHA256SUMS"
           echo "VECI_INDONESIA_QUOTA_APK_COMPILED_PASS size=$(stat -c %s "$apkfile")"
+          # APK v3 is NOT a tarball. Inspect actual package metadata and
+          # payload with the exact apk-tools shipped in the official SDK.
+          apk_host=staging_dir/host/bin/apk
+          test -x "$apk_host"
+          "$apk_host" adbdump --format json "$apkfile" > "$GITHUB_WORKSPACE/release/PACKAGE-METADATA.json"
+          python3 - "$GITHUB_WORKSPACE/release/PACKAGE-METADATA.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1]))
+          text=json.dumps(data,sort_keys=True).lower()
+          assert 'veci-telco-indonesia' in text
+          assert '0.2.1' in text
+          assert 'luci-base' in text and 'rpcd' in text and 'jsonfilter' in text
+          assert '"veci"' not in text
+          # Real APK must ship the LuCI view and its read-only RPC plugin.
+          assert 'quota.js' in text and 'veci.quota' in text
+          assert 'luci-app-veci-quota.json' in text
+          for forbidden in ('/etc/init.d/', '/etc/config/', 'cmgr', 'sysupgrade'):
+              assert forbidden not in text
+          print('VECI_APK_METADATA_AND_READONLY_PAYLOAD_PASS')
+          PY
+
       - name: Validate archive package contents
         run: |
           set -eu
