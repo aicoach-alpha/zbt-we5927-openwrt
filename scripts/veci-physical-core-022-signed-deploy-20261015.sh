@@ -46,6 +46,32 @@ health() {
     ubus -S call veci.quota status >/dev/null 2>&1 &&
     ubus -S call veci.cellular status >/dev/null 2>&1
 }
+frontend_parity_gate() {
+    # The deployed screenshot was backed by exactly 19 verified web assets.
+    # All unchanged assets must still match; do not overwrite later hotfixes.
+    while read -r expected path; do
+        [ -n "$expected" ] || continue
+        check "/www/veci/$path" "$expected" || fail live_frontend_source_drift
+    done <<'VECI_EXPECTED_FILES'
+b041c36cfa61edbd4ff91cf67b44c1fc8dbd5ca68518dd785ca18a87e8d2bdfd app.css
+77f09bc5ecf4e3122a4226aab940fb4a25cb5e3d0c3a24ad04798ee052d18c97 icons/veci.svg
+1a30386fd46a4401b58e86ab194ca312ea5783e75f9c09e831f3a9b5f9b08009 index.html
+3a7ff6126d03e52c537e9c3e2344e23707eb250c9aa06e316ce4f2ed1e017445 js/app.js
+61f8c5ca16d23ea29281cd98a37bd16cf79d8610eaf762329863a714ce2090be js/lib/api.js
+156862836e04810777bc0fc208721c9105c33afcbca265789a441ba75eca6e35 js/lib/dom.js
+9cb3c0f8693b510520f7cf51a86eaa0f61eabbb6670ed59e85b3631cae65aa7f js/lib/format.js
+3cf9bdf8aa95a23279f4cf5c827a5c2b63f56132cadf9d1e2824bdf98f329ebe js/lib/icons.js
+a3dd92d62b02fe04045d0ac683fc1339272b9d8cf8cf997c9fd4afba72a83fc6 js/pages/apps.js
+3d5e9879a146649ecdc88b6c87cc5c2fc605f4ef51c5da15ee4eccb0e9957064 js/pages/devices.js
+878d82c8ca4fef3b7bfdf4e6de654a42b93f3e34cb4a6525827da841e7163ba4 js/pages/home.js
+8d341519b9ec0fe88ffc8f4851dcc290d6f03aea78c0f7fcfb7752551e8c204e js/pages/internet.js
+055b6f2b57e3031238fbdf70d1bf47aacef70bab7545c3654828eaedee02053a js/pages/network.js
+77c1654761354524897a8fe7a938c9624942c8fc41f7203bbca2088d17f97874 js/pages/security.js
+07e14bde2c12f175b3af79a242e7f1d35c848b37872958f6771cdd74ab9baded js/pages/system.js
+fa63a70a9ce76d0f00800bc5bf0296141bbf4287db624cc08c3c963b01834b03 js/pages/wifi.js
+1bb66be02dc866ebcfdd45410d69caeb7afa0f4a4459c05c057bb4f9f1e29017 manifest.json
+VECI_EXPECTED_FILES
+}
 live_checks() {
     check "$PAGE" "$CELL_SHA" || fail live_cellular_source_drift
     check "$MODULE" "$MODULE_SHA" || fail live_quota_module_drift
@@ -53,6 +79,7 @@ live_checks() {
     check "$ACL" "$ACL_SHA" || fail live_core_acl_drift
     check "$CSS" "$CSS_SHA" || fail live_sms_css_drift
     check "$CONF" "$CONFIG_SHA" || fail live_uci_config_drift
+    frontend_parity_gate
     health || fail existing_backend_unavailable
 }
 board_gate() {
