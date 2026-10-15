@@ -30,6 +30,10 @@ define Package/veci-telco-indonesia/install
 	$(INSTALL_DATA) ./files/usr/share/veci/telco/providers.json $(1)/usr/share/veci/telco/providers.json
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/veci-quota.json $(1)/usr/share/rpcd/acl.d/veci-quota.json
+	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
+	$(INSTALL_DATA) ./files/usr/share/luci/menu.d/luci-app-veci-quota.json $(1)/usr/share/luci/menu.d/luci-app-veci-quota.json
+	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/veci
+	$(INSTALL_DATA) ./files/www/luci-static/resources/view/veci/quota.js $(1)/www/luci-static/resources/view/veci/quota.js
 endef
 
 $(eval $(call BuildPackage,veci-telco-indonesia))
