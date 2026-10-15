@@ -27,7 +27,7 @@ jobs:
              -o /tmp/veci-xl-ciam-test tests/veci_xl_ciam_focused.c \
              -lmbedtls -lmbedx509 -lmbedcrypto
           /tmp/veci-xl-ciam-test
-          if /tmp/veci-xl-ciam request-otp >/tmp/veci-ciam.out 2>/tmp/veci-ciam.err; then
+          if sudo /tmp/veci-xl-ciam request-otp >/tmp/veci-ciam.out 2>/tmp/veci-ciam.err; then
             echo FAIL_OPEN_WITHOUT_CREDENTIALS; exit 1
           fi
           grep -q 'VECI_XL_CIAM=not_configured' /tmp/veci-ciam.out
