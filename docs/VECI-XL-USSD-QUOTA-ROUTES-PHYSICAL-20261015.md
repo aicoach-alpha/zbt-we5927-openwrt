@@ -65,3 +65,23 @@ A genuine guide bug was found: the UI discarded \`result.reason\` on \`ok:false\
 A read-only physical root-cause script, \`scripts/veci-xl-ussd-failure-rootcause-readonly-20261015.sh\`, checks registration, method manifest, executability/dependencies, modem USB path/IDs, and sanitized \`we5927-lte status-fast\` SIM/operator guard. It does not send any USSD or print IMEI, phone number or raw operator text. A checksum-pinned one-JS-file update \`scripts/veci-xl-ussd-guide-diagnostic-update-20261015.sh\` preserves the signed Core and XL 0.3.7, verifies old/new SHA256, and backs up only the optional guide JS for rollback. Overlay CI PASS: https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38726102723.
 
 **Neither follow-up is yet physically executed at time of documentation.** Do not claim real *808# quota PASS without the operator response and verified local cache. If the sanitized preflight flags unexpected USB interface, SIM or operator label, investigate those actual physical guard checks before any next USSD request; do not weaken them speculatively.
+
+
+## Browser RPC status diagnosis (actual screenshot) — 15 Oct 2026
+
+Screenshot from owner's physical VeCI guided page:
+\`VeCI RPC: reachable | USSD status RPC: reachable | Izin start: unknown\`.
+
+These observations establish authenticated read access to \`veci.xl.status\` and \`veci.ussd.quotaStatus\`; they **do not** demonstrate either USSD start permission denial or a carrier failure. The two guided routes share the exact \`veci.ussd.start\` call before any menu choices; their identical failure cannot be attributed to the divergent final 1/2 selection.
+
+Exact signed Core's \`VeciApi\` source: upstream repo \`aicoach-alpha/veci\` commit \`bdf7bcf332c23b625e92fb1e00d1fb30edea88b6\`, path \`veci/js/lib/api.js\`. \`VeciApi.call()\` **throws** for any nonzero ubus numeric status (\`error.ubusStatus = status\`); it also throws a sanitized method-specific timeout. Old optional XL guide swallowed all thrown exceptions as generic "RPC, permission, connection" errors. On the browser's \`session.access\` probe it reported \`unknown\` for any exception or unexpected response, making ACL diagnosis inconclusive.
+
+Focused patch now exposes ONLY finite, safe \`ubus_status_N\`, \`request_timeout\`, \`http_4xx\`, \`http_5xx\`, \`session_not_authenticated\`, \`transport_unknown\` categories, not raw exception contents or session IDs. For permission probe it distinguishes \`allowed\`, \`denied\`, \`no_access_field\`, and categorized errors, including string booleans; no USSD sent by the permission probe. This is a one-file optional UI replacement, not a Core/ACL/modem change.
+
+- Browser classifier tests CI PASS: https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38730634176
+- One-file rollback/pin deploy gate CI PASS: https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38730885663
+- Installer: \`scripts/veci-xl-ussd-ubus-error-update-20261015.sh\`
+- Source file sha256 (new): \`342c54d8519aec3b24ab4c1e7ae5bc1bb18c744297520217da216b5db401701e\`
+- Expected physical installed previous sha256: \`c60d80b33cd3f49e25ff36ca4801c3ba481244ef2f98bf3697ec19ead61e8d83\`
+
+At report time the new patch is **GitHub CI PASS, not yet physically installed**. Install only after its SHA-pinned guard verifies exact previous JS and Core. Next use **read-only access checker** first; then only one explicitly user-approved \`*808#\` if necessary. No change to live Core 0.2.2, XL Native 0.3.7, LuCI or SMS.
