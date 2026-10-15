@@ -79,6 +79,63 @@ function renderMenu(answer) {
 async function call(name, payload) {
   return api.call('veci.ussd', name, payload, { timeout: 37000 });
 }
+// Browser-side checks use read-only cached status and ubus access introspection.
+// No start/reply/cancel call, modem interaction or account data is needed.
+async function diagnoseRpc() {
+  const output = $('guide-rpc-diagnostic');
+  if (!output || !secure() || !api.sessionId) return;
+  const button = $('guide-rpc-check');
+  if (button) button.disabled = true;
+  output.textContent = 'Memeriksa akses VeCI dan RPC USSD tanpa mengirim USSD…';
+  let core = 'unavailable';
+  let cached = 'unavailable';
+  let access = 'unknown';
+  try {
+    const result = await api.call('veci.xl', 'status', {}, { timeout: 7000 });
+    if (result && typeof result.https_only === 'boolean') core = 'reachable';
+  } catch {
+    core = 'unavailable';
+  }
+  try {
+    const result = await api.call('veci.ussd', 'quotaStatus', {}, { timeout: 7000 });
+    if (result && result.ok === true) cached = 'reachable';
+    else if (result && result.ok === false) cached = 'returned_failure';
+  } catch {
+    cached = 'rpc_or_access_failure';
+  }
+  try {
+    const result = await api.call('session', 'access', {
+      ubus_rpc_session: api.sessionId, scope: 'ubus',
+      object: 'veci.ussd', function: 'start'
+    }, { timeout: 7000 });
+    if (result && (result.access === true || result.access === 1)) access = 'allowed';
+    else if (result && (result.access === false || result.access === 0)) access = 'denied';
+  } catch {
+    access = 'unknown';
+  }
+  output.textContent = 'VeCI RPC: ' + core +
+    ' | USSD status RPC: ' + cached +
+    ' | Izin start: ' + access +
+    '. Tidak ada perintah USSD yang dikirim.';
+  if (button) button.disabled = false;
+}
+function installRpcCheckButton() {
+  if ($('guide-rpc-check')) return;
+  const box = $('guide-action');
+  if (!box) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'button button-secondary';
+  button.id = 'guide-rpc-check';
+  button.textContent = 'Periksa akses RPC (tanpa USSD)';
+  const output = document.createElement('p');
+  output.id = 'guide-rpc-diagnostic';
+  output.setAttribute('role', 'status');
+  output.setAttribute('aria-live', 'polite');
+  box.appendChild(button);
+  box.appendChild(output);
+  button.addEventListener('click', () => { void diagnoseRpc(); });
+}
 async function guarded(work) {
   if (busy) return;
   busy = true;
@@ -173,6 +230,7 @@ async function init() {
       if (!(await api.validateSession())) throw new Error('session_invalid');
       signin.hidden = true;
       $('guide-action').hidden = false;
+      installRpcCheckButton();
       $('guide-user').value = '';
       report('VeCI terautentikasi. Pilih salah satu jalur XL.');
     } catch {
@@ -185,6 +243,7 @@ async function init() {
   if (api.sessionId && (await api.validateSession().catch(() => false))) {
     signin.hidden = true;
     $('guide-action').hidden = false;
+    installRpcCheckButton();
     report('VeCI terautentikasi. Pilih jalur XL untuk mulai.');
   } else {
     signin.hidden = false;
