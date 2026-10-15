@@ -34,6 +34,8 @@ BASE = {
 }
 PATCHED = "b075a4852d3eeb5f717e4db568a0929fc732b225f025a154beb24961a3f85379"
 MODULE = "5c1f66b5a5aa292be202897ef538f67ed7933e857ff3e11bcaabb075b75c692d"
+LIVE_RPCD = "d08edadd38f0d9b992fc54d879eabf9f797bf54df83fa8c8cf7b59e55b9e99ce"
+LIVE_ACL = "d655406fd94214c22cf047bf5fc49e66876365634958be9d25171e6100e6a171"
 FIRST_IMPORT = "import { badge, escapeHtml, setBusy } from '../lib/dom.js';\n"
 QUOTA_IMPORT = "import { mountOperatorQuota } from '../lib/native-quota.js?v=20261015';\n"
 ONLINE = "\t\tif (online) {\n"
@@ -79,7 +81,9 @@ def main():
         raise RuntimeError(f"physical web source parity failed: {sorted(failures)}")
     print("VECI_PHYSICAL_WEB_PARITY=pass", len(BASE), "exact files")
 
-    if args.version == "0.2.2":
+    # Both the target and downgrade package MUST restore the actually LIVE
+    # patched operator quota interface, not the older pre-overlay 0.2.0 UI.
+    if args.version in ("0.2.0", "0.2.2"):
         js = root / "js/pages/cellular.js"
         before = js.read_text(encoding="utf-8")
         if before.count(FIRST_IMPORT) != 1 or before.count(ONLINE) != 1:
@@ -99,6 +103,22 @@ def main():
             raise RuntimeError("existing SMS/USSD source modified")
         print("VECI_PHYSICAL_SMS_USSD_PRESERVED=pass")
         print("VECI_PHYSICAL_QUOTA_PATCH_SHA256=" + PATCHED)
+
+    # Do not replace the LIVE core RPCD/ACL with historical, generic sources.
+    # Each file is owner-provided from an exact physical snapshot and must
+    # pass SHA-256 verification before it can enter any public signed APK.
+    live = args.repo / "scripts/veci-physical-core-runtime-20261015"
+    for source, dest, required in (
+        (live / "rpcd-veci", args.dest / "files/rpcd-veci", LIVE_RPCD),
+        (live / "veci-acl.json", args.dest / "rpcd-acl.json", LIVE_ACL),
+    ):
+        if sha(source) != required:
+            raise RuntimeError(f"physical backend source integrity failed: {source}")
+        overlay(source, dest)
+        if sha(dest) != required:
+            raise RuntimeError(f"physical backend staged copy drift: {dest}")
+    print("VECI_PHYSICAL_CORE_RPCD_SHA256=" + LIVE_RPCD)
+    print("VECI_PHYSICAL_CORE_ACL_SHA256=" + LIVE_ACL)
 
     mk = args.dest / "Makefile"
     build = mk.read_text(encoding="utf-8")
