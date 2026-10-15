@@ -1,4 +1,6 @@
-# VeCI Core 0.2.2 physical SMS/USSD + Operator Quota — signed prerelease
+# VeCI Core 0.2.2 physical SMS/USSD + Operator Quota — LIVE release acceptance
+
+**CURRENT STATUS (15 Oct 2026): Core 0.2.2 physical LIVE/PASS; UI visual UAT PASS; authenticated XL quota NOT CONNECTED.** Earlier candidate-build, NO-GO and rollback descriptions below are chronological records and are superseded by the final acceptance section at the end.
 
 **Date:** 15 October 2026
 **Status:** RELEASE CANDIDATE BUILD / CI PASS. Physical `0.2.2` upgrade NOT performed. Router remains on working `veci 0.2.0` + separately installed native quota overlay.
@@ -132,3 +134,44 @@ GitHub source fix: [`ffa35f7`](https://github.com/aicoach-alpha/zbt-we5927-openw
 [CI 38694058037 PASS](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38694058037) proved actual shell-function behaviors for five scenarios (untouched config, signed default restored, unexpected changes refused, corrupted backup refused, symlink refused) and verified the immutable signed release pair. [VeCI-only UI policy 38694058052 PASS](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38694058052).
 
 **Physical status:** 0.2.2 installation is **NOT yet PASS**. Only a new run from the authorized office laptop and fresh `--status` can establish installation success. Existing XL carrier quota authentication is still not configured.
+
+## 2026-10-15 — PHYSICAL VeCI Core 0.2.2 LIVE / PASS (supersedes all earlier pending/NO-GO statuses)
+
+**Final operator evidence:** The owner ran the patched, SHA-pinned signed installer from the authorized Windows office laptop to the physical ZBT-WE5927 at `root@192.168.1.1`, then supplied the full PowerShell output and screenshot of the live VeCI Cellular page. Initial `--status` confirmed version 0.2.0, the exact prior source hashes, both backends PASS and persistent live backup AVAILABLE.
+
+```text
+VECI_022_PAIRED_SIGNATURES=pass
+VECI_022_TRANSACTION_SIMULATION=pass
+VECI_022_CONFIG_PRESERVATION=unchanged
+VECI_022_DEPLOY=pass
+VECI_022_INSTALLED_VERSION=0.2.2
+VECI_022_SMS_USSD_SOURCE_PRESERVED=pass
+VECI_022_LIVE_CORE_RPCD_ACL_PRESERVED=pass
+VECI_022_CONFIG_PRESERVED=pass
+VECI_022_BACKENDS=pass
+VECI_022_ROLLBACK_AVAILABLE=true
+VECI_022_BROWSER_UAT=pending
+VECI_CARRIER_QUOTA=not_verified
+VECI_LUCI_UI_MODIFIED=false
+VECI_MODEM_SMS_UNCHANGED=true
+```
+
+**Independent final `--status` after installation:**
+
+| Artifact | Live SHA-256 |
+|---|---|
+| VeCI package version | `0.2.2` |
+| `/www/veci/js/pages/cellular.js` | `b075a4852d3eeb5f717e4db568a0929fc732b225f025a154beb24961a3f85379` |
+| `/www/veci/js/lib/native-quota.js` | `5c1f66b5a5aa292be202897ef538f67ed7933e857ff3e11bcaabb075b75c692d` |
+| `/usr/libexec/rpcd/veci` | `d08edadd38f0d9b992fc54d879eabf9f797bf54df83fa8c8cf7b59e55b9e99ce` |
+| `/usr/share/rpcd/acl.d/veci.json` | `d655406fd94214c22cf047bf5fc49e66876365634958be9d25171e6100e6a171` |
+| `/www/veci/sms-center.css` | `fd3b3540109d815d9b3cb5151298af04ef865e55557d8a8a91d9c30f1548fdb2` |
+| `/etc/config/veci` | `95927da8bad40be6ac0eb14d8c92d13fa82ffc1594a8f608d59a06680275caae` |
+
+Final status also reported `VECI_022_BACKENDS=pass`, `VECI_022_LIVE_BACKUP=available`, `VECI_022_STATUS=read_only`.
+
+**Visual browser acceptance:** The screenshot supplied with this final CLI shows VeCI (not LuCI) on the Cellular page; LTE on SIM 1, `Internet: Reachable`, and the native Operator Data Quota panel for XL with `Not connected`. SMS Inbox and XL USSD control groups remain visibly present. This establishes **UI visual UAT PASS**, not functional SMS send/receive testing or a fresh USSD transaction. The script's `VECI_022_BROWSER_UAT=pending` label is a pre-browser CLI status, now satisfied by subsequent operator screenshot.
+
+**Milestone disposition:** `VECl_CORE_022_PHYSICAL_DEPLOY=LIVE_PASS`, `VECI_CELLULAR_QUOTA_STATUS_UI=LIVE_PASS`, `SIGNED_ROLLBACK=AVAILABLE`, `OPERATOR_AUTHENTICATED_QUOTA=NOT_CONNECTED`. Signed target: [physical-core-022-c76cb7f13f06](https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/tag/veci-physical-core-022-c76cb7f13f06). Do not reinstall or rerun the failed original installer. Any future changes should have a fresh snapshot-bound build and explicit release gate.
+
+**Remaining separate scope:** Authenticated XL/operator-side data quota retrieval is not implemented, and the numerical remaining quota must not be inferred from router traffic statistics. The current signed core is installed and does not require another migration test. The development branch has this evidence; a separately open draft PR may still require review/merge before the wider firmware integration branch adopts it.
