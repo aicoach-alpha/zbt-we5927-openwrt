@@ -22,7 +22,7 @@ jobs:
           import pathlib
           s=pathlib.Path("scripts/veci-xl-ussd-methods-exact-readonly-20261015.sh").read_text()
           rpc=pathlib.Path("scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd").read_text()
-          assert "'list' action" in s
+          assert 'declarative "list" action' in s
           assert '"$plugin" list' in s
           assert 'for method in start reply cancel quotaStatus' in s
           assert s.index('for method in start reply cancel quotaStatus')<s.index('VECI_XL_USSD_METHODS=pass')
