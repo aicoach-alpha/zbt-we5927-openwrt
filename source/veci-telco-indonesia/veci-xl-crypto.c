@@ -28,6 +28,7 @@
 #define MAX_SECRET 512
 #define MAX_TOKEN 3072
 #define QUOTA_PATH "api/v8/packages/quota-details"
+#define PROFILE_PATH "api/v8/profile"
 
 static void wipe(void *ptr, size_t n) {
  volatile unsigned char *p=(volatile unsigned char *)ptr;
@@ -146,7 +147,7 @@ done:
  return rc;
 }
 
-static int signature(const char *ts,const char *keyfile,const char *tokenfile){
+static int signature(const char *ts,const char *keyfile,const char *tokenfile,const char *api_path){
  unsigned char secret[MAX_SECRET+2]={0},token[MAX_TOKEN+2]={0},mac[64]={0};
  char key[MAX_SECRET+MAX_TOKEN+96]={0},msg[MAX_TOKEN+32]={0};
  size_t slen=0,tlen=0;
@@ -154,7 +155,7 @@ static int signature(const char *ts,const char *keyfile,const char *tokenfile){
  if(!numeric(ts,10)||load(keyfile,secret,MAX_SECRET,&slen)||
     load(tokenfile,token,MAX_TOKEN,&tlen))goto done;
  int k=snprintf(key,sizeof(key),"%.*s;%.*s;POST;%s;%s",
-        (int)slen,secret,(int)tlen,token,QUOTA_PATH,ts);
+        (int)slen,secret,(int)tlen,token,api_path,ts);
  int m=snprintf(msg,sizeof(msg),"%.*s;%s;",(int)tlen,token,ts);
  if(k<=0||m<=0||(size_t)k>=sizeof(key)||(size_t)m>=sizeof(msg))goto done;
  const mbedtls_md_info_t *inf=mbedtls_md_info_from_type(MBEDTLS_MD_SHA512);
@@ -171,7 +172,10 @@ int main(int argc,char **argv){
  int result=1;
  if(argc==4&&!strcmp(argv[1],"xdata"))result=encryption(argv[2],argv[3]);
  else if(argc==4&&!strcmp(argv[1],"decrypt"))result=decryption(argv[2],argv[3]);
- else if(argc==5&&!strcmp(argv[1],"signature"))result=signature(argv[2],argv[3],argv[4]);
+ else if(argc==5&&!strcmp(argv[1],"signature"))
+   result=signature(argv[2],argv[3],argv[4],QUOTA_PATH);
+ else if(argc==5&&!strcmp(argv[1],"profile-signature"))
+   result=signature(argv[2],argv[3],argv[4],PROFILE_PATH);
  else return bad();
  if(result)return bad();
  return 0;
