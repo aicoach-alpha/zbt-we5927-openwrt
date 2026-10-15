@@ -1,0 +1,36 @@
+name: VeCI physical HTTPS-only migration focused
+on:
+  push:
+    paths:
+      - 'scripts/veci-https-only-guarded-migration-20261015.sh'
+      - 'tests/test_veci_https_only_migration.py'
+      - '.github/workflows/veci-https-only-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  guarded-uhttpd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test staged config, watchdog rollback and confirmation, no router
+        run: |
+          set -eu
+          sh -n scripts/veci-https-only-guarded-migration-20261015.sh
+          sudo python3 tests/test_veci_https_only_migration.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('scripts/veci-https-only-guarded-migration-20261015.sh').read_text()
+          assert 'WATCH_SECONDS=180' in src
+          assert src.index('nohup sh "$CONTROL" --watchdog') < src.index('uci -q delete uhttpd.main.listen_http')
+          assert src.index('cp "$UHTTPD" "$BACKUP"') < src.index('uci add_list uhttpd.main.listen_https')
+          for banned in ('sysupgrade','apk add','AT+CUSD','AT+CMGS',
+                         '/etc/config/network','/etc/config/veci',
+                         '/etc/init.d/network restart','/luci-static/',
+                         'uci delete uhttpd.main.listen_https'):
+              assert banned not in src,banned
+          assert 'VECI_HTTPS_HTTP_PRESERVED=true' in src
+          assert 'VECI_HTTPS_ROLLBACK=pass' in src
+          print('VECI_HTTPS_ONLY_SCOPE=pass')
+          PY
