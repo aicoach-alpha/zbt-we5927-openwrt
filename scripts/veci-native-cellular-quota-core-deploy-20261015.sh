@@ -27,6 +27,9 @@ WORK=
 APPLIED=0
 FINISHED=0
 PRESERVE=0
+# Old 0.2.0 installations may lack the optional presentation helper.
+# Track the original state so an automatic rollback can restore absence.
+BASE_HELPER_PRESENT=1
 
 fail() {
     printf 'VECI_CELLULAR_UI_DEPLOY=blocked\n'
@@ -85,15 +88,26 @@ download_signed_pair() {
     printf 'VECI_CELLULAR_UI_PAIRED_SIGNATURES=pass\n'
 }
 do_rollback() {
-    # Exact original signed APK. No removal of VeCI, no mass package changes.
-    if apk --no-network --keys-dir "$WORK/keys" add "$WORK/$OLD" > "$WORK/rollback.log" 2>&1 &&
-       installed 0.2.0 &&
-       check /www/veci/js/pages/cellular.js "$OLD_CELL"; then
-        printf 'VECI_CELLULAR_UI_ROLLBACK=pass\n'
-        return 0
+    # Exact signed 0.2.0 APK; if its optional helper was initially absent,
+    # restore that state only AFTER a verified rollback to 0.2.0.
+    if ! apk --no-network --keys-dir "$WORK/keys" add "$WORK/$OLD" > "$WORK/rollback.log" 2>&1 ||
+       ! installed 0.2.0 ||
+       ! check /www/veci/js/pages/cellular.js "$OLD_CELL" ||
+       ! check /www/veci/js/lib/quota.js "$HELPER_SHA"; then
+        printf 'VECI_CELLULAR_UI_ROLLBACK=needs_attention\n'
+        return 1
     fi
-    printf 'VECI_CELLULAR_UI_ROLLBACK=needs_attention\n'
-    return 1
+    if [ "$BASE_HELPER_PRESENT" = 0 ]; then
+        rm -f /www/veci/js/lib/quota.js || {
+            printf 'VECI_CELLULAR_UI_ROLLBACK=needs_attention\n'; return 1;
+        }
+        [ ! -e /www/veci/js/lib/quota.js ] || {
+            printf 'VECI_CELLULAR_UI_ROLLBACK=needs_attention\n'; return 1;
+        }
+        printf 'VECI_CELLULAR_UI_BASE_HELPER_RESTORED=absent\n'
+    fi
+    printf 'VECI_CELLULAR_UI_ROLLBACK=pass\n'
+    return 0
 }
 finish() {
     rc="$1"
@@ -123,10 +137,17 @@ if [ "$MODE" = --status ]; then
     else
         printf 'VECI_CELLULAR_UI_PACKAGE=unknown\n'
     fi
-    if [ -f /www/veci/js/pages/cellular.js ]; then
+    if [ -f /www/veci/js/pages/cellular.js ] && [ ! -L /www/veci/js/pages/cellular.js ]; then
         printf 'VECI_CELLULAR_UI_CELLULAR_SHA256=%s\n' "$(sha /www/veci/js/pages/cellular.js)"
     else
-        printf 'VECI_CELLULAR_UI_CELLULAR_SHA256=missing\n'
+        printf 'VECI_CELLULAR_UI_CELLULAR_SHA256=missing_or_symlink\n'
+    fi
+    if [ -L /www/veci/js/lib/quota.js ]; then
+        printf 'VECI_CELLULAR_UI_HELPER=symlink\n'
+    elif [ -f /www/veci/js/lib/quota.js ]; then
+        printf 'VECI_CELLULAR_UI_HELPER_SHA256=%s\n' "$(sha /www/veci/js/lib/quota.js)"
+    else
+        printf 'VECI_CELLULAR_UI_HELPER=missing\n'
     fi
     quota_backend_gate
     printf 'VECI_CELLULAR_UI_BACKEND=pass\nVECI_CELLULAR_UI_STATUS=read_only\n'
@@ -136,20 +157,34 @@ fi
 quota_backend_gate
 [ -f /www/veci/js/pages/cellular.js ] && [ ! -L /www/veci/js/pages/cellular.js ] ||
     fail cellular_source_missing
-[ -f /www/veci/js/lib/quota.js ] && [ ! -L /www/veci/js/lib/quota.js ] ||
-    fail quota_helper_missing
-check /www/veci/js/lib/quota.js "$HELPER_SHA" || fail quota_helper_mismatch
-
+# Never waive the pinned Cellular fingerprint. The original package may lack
+# quota.js, but a present, unexpected or symlinked helper must be rejected.
 if [ "$MODE" = --install ]; then
     if installed 0.2.1 && check /www/veci/js/pages/cellular.js "$NEW_CELL"; then
+        [ -f /www/veci/js/lib/quota.js ] && [ ! -L /www/veci/js/lib/quota.js ] &&
+            check /www/veci/js/lib/quota.js "$HELPER_SHA" ||
+            fail installed_target_helper_missing_or_drift
         printf 'VECI_CELLULAR_UI_DEPLOY=already_installed\n'
         exit 0
     fi
     installed 0.2.0 || fail existing_core_version_not_0_2_0
     check /www/veci/js/pages/cellular.js "$OLD_CELL" || fail existing_core_source_drift
+    if [ -L /www/veci/js/lib/quota.js ]; then
+        fail quota_helper_symlink
+    elif [ -f /www/veci/js/lib/quota.js ]; then
+        check /www/veci/js/lib/quota.js "$HELPER_SHA" || fail quota_helper_mismatch
+    elif [ -e /www/veci/js/lib/quota.js ]; then
+        fail quota_helper_not_regular
+    else
+        BASE_HELPER_PRESENT=0
+        printf 'VECI_CELLULAR_UI_BASE_HELPER=absent\n'
+    fi
 else
     installed 0.2.1 || fail rollback_only_from_version_0_2_1
     check /www/veci/js/pages/cellular.js "$NEW_CELL" || fail rollback_source_drift
+    [ -f /www/veci/js/lib/quota.js ] && [ ! -L /www/veci/js/lib/quota.js ] ||
+        fail quota_helper_missing
+    check /www/veci/js/lib/quota.js "$HELPER_SHA" || fail quota_helper_mismatch
 fi
 
 free="$(df -k /overlay 2>/dev/null | awk 'NR==2 {print $4}')"
@@ -171,9 +206,15 @@ if grep -Eiq '(^|[[:space:]])(Installing|Removing|Purging)[[:space:]]' "$WORK/pl
 fi
 apk list -I > "$WORK/packages-before.txt" || fail inventory_failed
 grep -v '^veci-0[.]2[.]' "$WORK/packages-before.txt" | sort > "$WORK/non-veci-before.txt"
-tar -cf "$WORK/config-and-ui-before.tar" -C / \
-    etc/config/veci www/veci/js/pages/cellular.js www/veci/js/lib/quota.js \
-    >/dev/null 2>&1 || fail volatile_backup_failed
+if [ "$BASE_HELPER_PRESENT" = 1 ]; then
+    tar -cf "$WORK/config-and-ui-before.tar" -C / \
+        etc/config/veci www/veci/js/pages/cellular.js www/veci/js/lib/quota.js \
+        >/dev/null 2>&1 || fail volatile_backup_failed
+else
+    tar -cf "$WORK/config-and-ui-before.tar" -C / \
+        etc/config/veci www/veci/js/pages/cellular.js \
+        >/dev/null 2>&1 || fail volatile_backup_failed
+fi
 printf 'VECI_CELLULAR_UI_PREINSTALL_GATES=pass\n'
 APPLIED=1
 if [ "$MODE" = --install ]; then
