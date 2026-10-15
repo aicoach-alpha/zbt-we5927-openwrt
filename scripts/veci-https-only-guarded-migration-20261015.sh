@@ -58,9 +58,12 @@ lock(){
 backup_guard(){
  [ -d "$BASE" ] && [ ! -L "$BASE" ] || fail backup_dir_missing
  regular "$BACKUP" && regular "$CONTROL" && regular "$PREPARED" || fail backup_files_missing
- [ "$(stat -c %u "$BACKUP")" = 0 ] || fail backup_owner_invalid
- [ "$(stat -c %a "$BACKUP")" = 600 ] || fail backup_mode_invalid
- [ "$(stat -c %a "$BASE")" = 700 ] || fail backup_dir_mode_invalid
+ # BusyBox/OpenWrt builds may omit the external "stat" applet.
+ # ls -ldn is included in the target BusyBox image; inspect owner and
+ # permission bits without following symlinks or reading sensitive content.
+ [ "$(ls -ldn "$BACKUP" | awk '{print $3}')" = 0 ] || fail backup_owner_invalid
+ [ "$(ls -ldn "$BACKUP" | awk '{print $1}')" = "-rw-------" ] || fail backup_mode_invalid
+ [ "$(ls -ldn "$BASE" | awk '{print $1 " " $3}')" = "drwx------ 0" ] || fail backup_dir_mode_invalid
  original="$(cat "$BASE/original-uhttpd.sha256" 2>/dev/null || :)"
  valid_hash "$original" && [ "$(hash "$BACKUP")" = "$original" ] || fail backup_integrity_failed
 }
@@ -112,6 +115,34 @@ prepare(){
  echo VECI_HTTPS_HTTP_PRESERVED=true
  echo VECI_HTTPS_VERIFY_BROWSER=https://192.168.1.1/veci/
  echo VECI_HTTPS_NEXT=verify_https_login_before_switch
+}
+# Safely refresh ONLY the watchdog controller after an already successful
+# --prepare. The immutable original uhttpd backup and its SHA256 stay intact.
+# Mandatory when the migration script was upgraded after prepare.
+refresh_controller(){
+ board_guard
+ lock
+ backup_guard
+ [ ! -e "$PENDING" ] && [ ! -L "$PENDING" ] || fail transition_already_pending
+ [ ! -e "$CONFIRMED" ] && [ ! -L "$CONFIRMED" ] || fail already_confirmed
+ ready_hash="$(cat "$PREPARED")"
+ valid_hash "$ready_hash" && [ "$(hash "$UHTTPD")" = "$ready_hash" ] ||
+   fail config_changed_since_prepare
+ has_http && has_https && tls_files || fail both_listeners_not_ready
+ regular "$0" || fail controller_source_not_regular
+ tmp="$BASE/controller-next.$"
+ [ ! -e "$tmp" ] && [ ! -L "$tmp" ] || fail controller_temp_exists
+ cp "$0" "$tmp" || fail controller_copy_failed
+ chmod 700 "$tmp" || { rm -f "$tmp"; fail controller_mode_failed; }
+ sh -n "$tmp" >/dev/null 2>&1 || { rm -f "$tmp"; fail controller_syntax_invalid; }
+ [ "$(hash "$tmp")" = "$(hash "$0")" ] ||
+   { rm -f "$tmp"; fail controller_copy_mismatch; }
+ mv -f "$tmp" "$CONTROL" || fail controller_update_failed
+ [ "$(hash "$CONTROL")" = "$(hash "$0")" ] || fail controller_integrity_changed
+ [ "$(hash "$BACKUP")" = "$original" ] || fail backup_integrity_failed
+ echo VECI_HTTPS_CONTROLLER_REFRESH=pass
+ echo VECI_HTTPS_BACKUP_PRESERVED=true
+ echo VECI_HTTPS_HTTP_PRESERVED=true
 }
 switch(){
  board_guard
@@ -180,6 +211,7 @@ watchdog(){
 case "$1" in
  --status) board_guard; status ;;
  --prepare) prepare ;;
+ --refresh-controller) refresh_controller ;;
  --switch) switch ;;
  --confirm) confirm ;;
  --rollback) board_guard; lock; restore ;;
