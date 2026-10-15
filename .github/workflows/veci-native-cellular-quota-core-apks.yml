@@ -1,0 +1,106 @@
+name: VeCI native quota UI paired signed APK
+on:
+  push:
+    paths: ['.github/workflows/veci-native-cellular-quota-core-apks.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch matching VeCI source commits and test native quota
+        run: |
+          set -eu
+          test "$(tr -d '[:space:]' < source/veci.commit)" = 9bdc072884ffaa32539d221217f1d48e81bb076b
+          mkdir -p /tmp/veci
+          git init -q /tmp/veci/repository
+          git -C /tmp/veci/repository remote add origin https://github.com/aicoach-alpha/veci.git
+          for pair in base:f19603b6172854dfeca3861826017d8f1aa1268c quota:9bdc072884ffaa32539d221217f1d48e81bb076b; do
+            label="$(printf '%s' "$pair" | cut -d: -f1)"
+            rev="$(printf '%s' "$pair" | cut -d: -f2)"
+            git -C /tmp/veci/repository fetch -q --depth 1 origin "$rev"
+            mkdir -p "/tmp/veci/$label"
+            git -C /tmp/veci/repository archive FETCH_HEAD | tar -xf - -C "/tmp/veci/$label"
+          done
+          grep -q 'PKG_VERSION:=0.2.0' /tmp/veci/base/Makefile
+          grep -q 'PKG_VERSION:=0.2.1' /tmp/veci/quota/Makefile
+          ( cd /tmp/veci/quota && node --check veci/js/pages/cellular.js && node --test tests/quota.test.mjs tests/native-cellular-quota.test.mjs )
+      - name: Install SDK build requirements
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd make gcc g++ gawk flex bison gettext libncurses-dev libssl-dev rsync unzip python3 file openssl
+      - name: Extract official SHA-pinned OpenWrt SDK
+        run: |
+          set -eu
+          sdk=openwrt-sdk-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 360 -o /tmp/sdk.tar.zst "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$sdk"
+          echo 'b44636e0a53f0d769cbce64edb9ca3831e1a9ecdc8c53a5caf128884be6c490e  /tmp/sdk.tar.zst' | sha256sum -c -
+          mkdir /tmp/sdk
+          tar -xf /tmp/sdk.tar.zst -C /tmp/sdk --strip-components=1
+      - name: Build base rollback and target update
+        run: |
+          set -eu
+          mkdir -p release
+          for pair in base:0.2.0 quota:0.2.1; do
+            label="$(printf '%s' "$pair" | cut -d: -f1)"
+            version="$(printf '%s' "$pair" | cut -d: -f2)"
+            cd /tmp/sdk
+            rm -rf package/veci
+            cp -a "/tmp/veci/$label" package/veci
+            printf '\nCONFIG_PACKAGE_veci=m\n' >> .config
+            make defconfig
+            make package/veci/clean
+            make package/veci/compile -j2 V=s
+            built="$(find bin -name "veci-$version-r1.apk" -type f -print -quit)"
+            test -n "$built" && test -s "$built"
+            cp "$built" "$GITHUB_WORKSPACE/release/"
+          done
+          test -s "$GITHUB_WORKSPACE/release/veci-0.2.0-r1.apk"
+          test -s "$GITHUB_WORKSPACE/release/veci-0.2.1-r1.apk"
+      - name: Sign and verify both with release-scoped ephemeral P-256 key
+        run: |
+          set -eu
+          umask 077
+          tool=/tmp/sdk/staging_dir/host/bin/apk
+          mkdir -p /tmp/sign/keys /tmp/sign/empty
+          openssl ecparam -name prime256v1 -genkey -noout -out /tmp/sign/private.pem
+          openssl pkey -in /tmp/sign/private.pem -pubout -out /tmp/sign/keys/veci-core.pem
+          for ver in 0.2.0 0.2.1; do
+            pkg="release/veci-$ver-r1.apk"
+            "$tool" --allow-untrusted adbsign --reset-signatures --sign-key /tmp/sign/private.pem "$pkg"
+            "$tool" --keys-dir /tmp/sign/keys verify "$pkg"
+            if "$tool" --keys-dir /tmp/sign/empty verify "$pkg" >/dev/null 2>&1; then exit 1; fi
+            "$tool" --keys-dir /tmp/sign/keys adbdump --format json "$pkg" > "release/METADATA-$ver.json"
+            python3 - "release/METADATA-$ver.json" "$ver" <<'PY'
+          import json,sys
+          source,ver=sys.argv[1:]
+          content=json.dumps(json.load(open(source)),sort_keys=True).lower()
+          for required in ("veci",ver,"cellular.js","rpcd-veci","uhttpd-mod-ubus"):
+              assert required in content,required
+          if ver=="0.2.1": assert "quota.js" in content
+          assert "luci-static" not in content and "luci-app-" not in content
+          print("VECI_SIGNED_APK_METADATA_PASS",ver)
+          PY
+          done
+          cp /tmp/sign/keys/veci-core.pem release/
+          chmod 644 release/veci-core.pem
+          sha256sum release/*.apk release/veci-core.pem > release/SHA256SUMS
+          printf 'base=f19603b6172854dfeca3861826017d8f1aa1268c\nquota=9bdc072884ffaa32539d221217f1d48e81bb076b\n' > release/SOURCE_COMMITS.txt
+          echo VECI_SIGNED_UPDATE_AND_ROLLBACK_PAIR_PASS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-native-cellular-quota-core-update-rollback
+          path: release/
+      - name: Publish immutable prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-native-quota-core-pair-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/* --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI core 0.2.1 Cellular quota update + 0.2.0 rollback" \
+            --notes "Pre-release only; NOT deployed. Both APKv3 packages signed with same ephemeral P-256 key; SHA256 and source pins included. Never modifies LuCI UI. Router upgrade requires physical installed-version match, offline dependency simulation, backup, rollback and VeCI browser UAT. Real carrier quota remains unauthorized/unverified."
