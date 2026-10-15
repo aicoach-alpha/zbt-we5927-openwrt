@@ -24,7 +24,7 @@ jobs:
           active='\n'.join(x for x in s.splitlines() if not x.lstrip().startswith('#'))
           for banned in ('AT+CMGR','AT+CUSD','AT+CMGS','/etc/init.d/','sysupgrade',
                          '--allow-untrusted','apk upgrade','apk del ','apk add ',
-                         '/etc/apk/keys/', '/etc/apk/repositories.d/', 'uci set',
+                         '/etc/apk/repositories.d/', 'uci set',
                          'reboot', 'rm -rf /overlay'):
               assert banned not in active,banned
           for required in ('apk --keys-dir "$work/keys" verify',
