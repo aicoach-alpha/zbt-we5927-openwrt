@@ -205,7 +205,7 @@ static int parse_response(size_t size,size_t *result){
   return -1;
  }
  size_t headerlen=sep+4,bodylen=size-headerlen;
- int chunked=0,has_cl=0;
+ int chunked=0,has_cl=0,has_type=0;
  size_t content_length=0;
  /* Parse complete HTTP headers without ever logging their values. */
  size_t at=0;
@@ -233,12 +233,20 @@ static int parse_response(size_t size,size_t *result){
   }else if(klen==17&&!strncasecmp((const char*)wire+at,"transfer-encoding",17)){
    if(chunked||vlen!=7||strncasecmp((const char*)v,"chunked",7))return -1;
    chunked=1;
+  }else if(klen==12&&!strncasecmp((const char*)wire+at,"content-type",12)){
+   if(has_type)return -1;
+   /* Strict JSON media type only: no HTML disguised as quota JSON. */
+   if(!(vlen==16&&!strncasecmp((const char*)v,"application/json",16))&&
+      !(vlen==30&&!strncasecmp((const char*)v,"application/json;charset=utf-8",30))&&
+      !(vlen==31&&!strncasecmp((const char*)v,"application/json; charset=utf-8",31)))return -1;
+   has_type=1;
   }else if(klen==16&&!strncasecmp((const char*)wire+at,"content-encoding",16)){
    if(vlen!=8||strncasecmp((const char*)v,"identity",8))return -1;
   }
   at=end+2;
  }
- if(chunked&&has_cl)return -1;
+ /* Without a declared body length, truncation could appear successful. */
+ if(!has_type||(!has_cl&&!chunked)||chunked&&has_cl)return -1;
  if(chunked){
   if(unpack_chunked(wire+headerlen,bodylen,result)!=0)return -1;
  }else{
