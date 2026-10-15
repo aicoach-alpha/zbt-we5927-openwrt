@@ -36,6 +36,11 @@ live_guards(){
  apk list -I 2>/dev/null | grep -q '^veci-telco-xl-native-0.3.7-' || fail xl_037_missing
  ubus -S list veci.ussd 2>/dev/null | grep -qx 'veci.ussd' || fail xl_ussd_rpc_missing
  ubus -S list veci.xl 2>/dev/null | grep -qx 'veci.xl' || fail xl_native_rpc_missing
+ [ -x /usr/libexec/rpcd/veci.ussd ] || fail ussd_rpc_exec_missing
+ methods="$(/usr/libexec/rpcd/veci.ussd list 2>/dev/null || :)"
+ for method in start reply cancel; do
+  case "$methods" in *"\"$method\""*) ;; *) fail ussd_rpc_methods_incomplete;; esac
+ done
  [ -z "$(uci -q get uhttpd.main.listen_http 2>/dev/null || :)" ] || fail http_listener_on
  [ -n "$(uci -q get uhttpd.main.listen_https 2>/dev/null || :)" ] || fail https_listener_missing
 }
@@ -53,6 +58,7 @@ cleanup(){
  if [ "$DIRTY" = 1 ] && [ "$DONE" = 0 ]; then
   same "$HTML" "$HTML_SHA" && rm -f "$HTML" || :
   same "$JS" "$JS_SHA" && rm -f "$JS" || :
+  rm -f "$HTML.new.$" "$JS.new.$"
   echo VECI_XL_GUIDE_INSTALL_ROLLBACK=attempted
  fi
  [ -n "$WORK" ] && [ -d "$WORK" ] && rm -rf "$WORK" || :
