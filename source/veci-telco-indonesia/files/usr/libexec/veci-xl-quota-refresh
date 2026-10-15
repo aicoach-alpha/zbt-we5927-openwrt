@@ -1,0 +1,107 @@
+#!/bin/sh
+# Explicit XL subscriber quota refresh, requires validated current profile.
+# Only emits canonical numeric DATA bytes on verified TLS/operator response.
+# No SMS, USSD, purchase calls or modem changes.
+set -eu
+umask 077
+LC_ALL=C
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LC_ALL PATH
+ROOT=/tmp/veci-telco-private
+CACHE=/tmp/veci-telco
+LOCK=/tmp/veci-xl-quota-refresh.lock
+WORK=
+fail(){ printf 'VECI_XL_QUOTA_REFRESH=blocked\nVECI_XL_REASON=%s\n' "$1"; exit 1; }
+dir_ok(){
+ [ -d "$1" ] && [ ! -L "$1" ] &&
+ [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "drwx------ $(id -u)" ]
+}
+file_ok(){
+ [ -f "$1" ] && [ ! -L "$1" ] &&
+ [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "-rw------- $(id -u)" ]
+}
+numeric(){
+ case "$1" in ''|*[!0-9]*) return 1 ;; esac
+ [ "${#1}" -le 13 ]
+}
+cleanup(){
+ rm -f "$ROOT/body.json" "$ROOT/signature" "$ROOT/signature_time"
+ [ -z "$WORK" ] || rm -rf "$WORK"
+ rmdir "$LOCK" 2>/dev/null || :
+}
+[ "$#" -eq 1 ] && [ "$1" = --refresh ] || fail usage
+[ "$(id -u)" = 0 ] || fail root_required
+[ ! -t 1 ] || fail terminal_forbidden
+mkdir "$LOCK" 2>/dev/null || fail refresh_already_running
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+dir_ok "$ROOT" || fail private_session_insecure
+for name in id_token access_token refresh_token verified_number verified_epoch \
+            xdata_key signature_secret api_key; do
+ file_ok "$ROOT/$name" || fail session_or_operator_config_missing
+done
+[ "$(wc -c < "$ROOT/xdata_key" | tr -d '[:space:]')" -eq 32 ] ||
+ fail invalid_crypto_key
+verified="$(cat "$ROOT/verified_epoch")"
+now="$(date +%s)"
+numeric "$verified" && numeric "$now" || fail invalid_session_age
+[ "$now" -ge "$verified" ] && [ $((now-verified)) -le 1800 ] ||
+ fail verified_session_expired
+case "$(cat "$ROOT/verified_number")" in 62[0-9]*) ;; *) fail invalid_account_identity ;; esac
+for name in body.json signature signature_time; do
+ [ ! -e "$ROOT/$name" ] && [ ! -L "$ROOT/$name" ] ||
+ fail existing_request_state
+done
+for executable in veci-xl-crypto veci-xl-quota-chain \
+                  veci-xl-quota-http veci-xl-quota-normalize; do
+ [ -x "/usr/libexec/$executable" ] || fail component_missing
+done
+[ -x /usr/bin/jsonfilter ] || fail json_parser_missing
+WORK="$(mktemp -d /tmp/veci-xl-refresh.XXXXXX)" || fail ram_unavailable
+chmod 700 "$WORK"
+sec="$(date +%s)"
+numeric "$sec" && [ "${#sec}" -eq 10 ] || fail timestamp_invalid
+ms="${sec}000"
+printf '{"is_enterprise":false,"lang":"en","family_member_id":""}' > "$WORK/request.json"
+/usr/libexec/veci-xl-crypto xdata "$ms" "$ROOT/xdata_key" \
+ < "$WORK/request.json" > "$WORK/xdata" 2>/dev/null ||
+ fail quota_request_encrypt_failed
+xdata="$(cat "$WORK/xdata")"
+[ "${#xdata}" -ge 4 ] && [ "${#xdata}" -le 4088 ] || fail encrypted_size_invalid
+printf '{"xdata":"%s","xtime":%s}' "$xdata" "$ms" > "$ROOT/body.json"
+unset xdata
+printf '%s\n' "$sec" > "$ROOT/signature_time"
+/usr/libexec/veci-xl-crypto signature "$sec" \
+ "$ROOT/signature_secret" "$ROOT/id_token" > "$ROOT/signature" 2>/dev/null ||
+ fail quota_signature_failed
+chmod 600 "$ROOT/body.json" "$ROOT/signature_time" "$ROOT/signature"
+# The chain only performs HTTPS POST to the fixed quota-details endpoint,
+# decrypts the response and parses known numeric DATA benefit units.
+/usr/libexec/veci-xl-quota-chain --read-only > "$WORK/parsed.json" 2>/dev/null ||
+ fail carrier_quota_unavailable
+field(){ jsonfilter -i "$WORK/parsed.json" -e "@.$1" 2>/dev/null; }
+[ "$(field ok)" = true ] && [ "$(field parsed_only)" = true ] &&
+ [ "$(field provider)" = xl ] || fail quota_trust_invalid
+remaining="$(field remaining_bytes)" || fail remaining_missing
+total="$(field total_bytes)" || fail total_missing
+numeric "$remaining" && numeric "$total" && [ "$total" -gt 0 ] &&
+ [ "$remaining" -le "$total" ] || fail quota_units_invalid
+stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+case "$stamp" in
+ ????-??-??T??:??:??Z) ;;
+ *) fail clock_invalid ;;
+esac
+[ ! -e "$CACHE" ] || dir_ok "$CACHE" || fail cache_dir_insecure
+if [ ! -e "$CACHE" ]; then mkdir -m 700 "$CACHE" || fail cache_create_failed; fi
+dir_ok "$CACHE" || fail cache_dir_insecure
+[ ! -L "$CACHE/quota-xl.json" ] || fail existing_cache_symlink
+temp="$CACHE/.quota-xl.$$"
+[ ! -e "$temp" ] && [ ! -L "$temp" ] || fail cache_temp_exists
+printf '{"schema":1,"provider":"xl","state":"ready","source":"carrier_authenticated","fetched_epoch":%s,"fetched_at":"%s","remaining_bytes":%s,"total_bytes":%s}\n' \
+ "$now" "$stamp" "$remaining" "$total" > "$temp"
+chmod 600 "$temp"
+file_ok "$temp" || fail cache_temp_insecure
+mv -f "$temp" "$CACHE/quota-xl.json" || fail cache_commit_failed
+echo VECI_XL_QUOTA_REFRESH=pass
+echo VECI_XL_QUOTA_SOURCE=carrier_authenticated
+echo VECI_XL_QUOTA_CACHE=private
