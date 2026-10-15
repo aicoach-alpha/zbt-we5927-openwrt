@@ -78,7 +78,7 @@ jobs:
           import json,sys
           source,ver=sys.argv[1:]
           content=json.dumps(json.load(open(source)),sort_keys=True).lower()
-          for required in ("veci",ver,"cellular.js","rpcd-veci","uhttpd-mod-ubus"):
+          for required in ("veci",ver,"cellular.js","usr/libexec/rpcd/veci","uhttpd-mod-ubus"):
               assert required in content,required
           if ver=="0.2.1": assert "quota.js" in content
           assert "luci-static" not in content and "luci-app-" not in content
@@ -89,6 +89,10 @@ jobs:
           chmod 644 release/veci-core.pem
           sha256sum release/*.apk release/veci-core.pem > release/SHA256SUMS
           printf 'base=f19603b6172854dfeca3861826017d8f1aa1268c\nquota=9bdc072884ffaa32539d221217f1d48e81bb076b\n' > release/SOURCE_COMMITS.txt
+          printf 'BASE_CELLULAR_SHA256=%s\n' "$(sha256sum /tmp/veci/base/veci/js/pages/cellular.js | awk '{print $1}')" > release/SOURCE_FILE_HASHES.txt
+          printf 'TARGET_CELLULAR_SHA256=%s\n' "$(sha256sum /tmp/veci/quota/veci/js/pages/cellular.js | awk '{print $1}')" >> release/SOURCE_FILE_HASHES.txt
+          printf 'BASE_QUOTA_HELPER_SHA256=%s\n' "$(sha256sum /tmp/veci/base/veci/js/lib/quota.js | awk '{print $1}')" >> release/SOURCE_FILE_HASHES.txt
+          printf 'TARGET_QUOTA_HELPER_SHA256=%s\n' "$(sha256sum /tmp/veci/quota/veci/js/lib/quota.js | awk '{print $1}')" >> release/SOURCE_FILE_HASHES.txt
           echo VECI_SIGNED_UPDATE_AND_ROLLBACK_PAIR_PASS
       - uses: actions/upload-artifact@v4
         with:
