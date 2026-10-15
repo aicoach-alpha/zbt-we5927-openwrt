@@ -39,9 +39,19 @@
 #endif
 
 #define HOST "api.myxl.xlaxiata.co.id"
+#ifdef VECI_XL_PROFILE_VARIANT
+/* Profile transport is isolated to pending OTP session. It cannot use the
+ * active quota token directory and cannot call the quota-details route. */
+#define ROUTE "/api/v8/profile"
+#else
 #define ROUTE "/api/v8/packages/quota-details"
+#endif
 #define CA "/etc/ssl/certs/ca-certificates.crt"
+#ifdef VECI_XL_PROFILE_VARIANT
+#define PRIVATE "/tmp/veci-telco-private/pending-profile"
+#else
 #define PRIVATE "/tmp/veci-telco-private"
+#endif
 #define MAX_BODY 4096
 #define MAX_WIRE 73728
 #define MAX_OUT 65536
@@ -309,8 +319,13 @@ finish:
  return success?0:1;
 }
 int main(int argc,char **argv){
- if(argc!=2||strcmp(argv[1],"quota")!=0){
-  fputs("usage: veci-xl-quota-http quota\n",stderr);return 2;
+#ifdef VECI_XL_PROFILE_VARIANT
+ const char *cmd="profile";
+#else
+ const char *cmd="quota";
+#endif
+ if(argc!=2||strcmp(argv[1],cmd)!=0){
+  fputs("VECI_XL_HTTP_ERROR=invalid_operation\n",stderr);return 2;
  }
  if(geteuid()!=0){failure("root_required");return 1;}
  if(isatty(STDOUT_FILENO)){failure("pipe_required");return 1;}
