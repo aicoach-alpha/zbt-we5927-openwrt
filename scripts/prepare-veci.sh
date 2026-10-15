@@ -68,10 +68,13 @@ done
 # One source tree, two clearly separated build profiles. The optional
 # carrier package has no effect on General firmware staging.
 if [ "$VECI_EDITION" = "indonesia" ]; then
-	rm -rf "$OPENWRT_ROOT/package/veci-telco-indonesia"
+	rm -rf "$OPENWRT_ROOT/package/veci-telco-indonesia" "$OPENWRT_ROOT/package/veci-telco-xl-native"
 	cp -a "$SELF_DIR/source/veci-telco-indonesia" "$OPENWRT_ROOT/package/veci-telco-indonesia"
+	# Buildable optional runtime; intentionally NOT selected by default.
+	# Source-only staging never installs anything on the router.
+	cp -a "$SELF_DIR/source/veci-telco-xl-native" "$OPENWRT_ROOT/package/veci-telco-xl-native"
 else
-	rm -rf "$OPENWRT_ROOT/package/veci-telco-indonesia"
+	rm -rf "$OPENWRT_ROOT/package/veci-telco-indonesia" "$OPENWRT_ROOT/package/veci-telco-xl-native"
 fi
 
 BUILD_ID="$(git -C "$SELF_DIR" rev-parse HEAD)"
