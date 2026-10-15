@@ -1,0 +1,21 @@
+name: VeCI XL CIAM token staging focused
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/files/usr/libexec/veci-xl-token-stage'
+      - 'tests/test_veci_xl_token_stage.py'
+      - '.github/workflows/veci-xl-token-stage.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Only test candidate to private pending-profile staging
+        run: |
+          set -eu
+          sh -n source/veci-telco-indonesia/files/usr/libexec/veci-xl-token-stage
+          sudo python3 tests/test_veci_xl_token_stage.py
