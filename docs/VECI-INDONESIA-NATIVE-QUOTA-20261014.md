@@ -96,3 +96,9 @@ Status: SMS v1.6.0 LIVE. USSD XL network rejected and excluded from automatic qu
 - One new physical *dynamic-ABI* verification script: scripts/veci-xl-compact-runtime-physical-20261015.sh --verify; downloads SHA-pinned executables to /tmp and uses only public synthetic fixtures. HTTPS executable is intentionally started with a rejected invalid command to guarantee zero carrier requests, even if an account exists.
 - New dynamic runtime has **CI PASS but physical ABI execution NOT YET PROVEN**. Not installed to flash, not enabled in production and no real operator quota fetched.
 - Genuine production blocker remains operator-authorized account onboarding and verified actual quota API response/units. No app secret embedded or synthesized carrier quota permitted. Do not treat static SSL/HTTP CI or data-only normalization as account authorization.
+
+### 2026-10-15 compact runtime physical gate release verification
+- GitHub Actions run 38668000318 PASS for syntax, forbidden live operations and SHA-256 checks against three public MIPS release assets.
+- Physical stage script `scripts/veci-xl-compact-runtime-physical-20261015.sh` loads all three dynamic executables from RAM, checks their pinned hashes, executes synthetic AES encrypt/decrypt and quota parser, and calls HTTP binary with a deliberately invalid command (only checks linker/ABI; no carrier HTTP).
+- Hardware physical dynamic ABI status PENDING until user supplies one router result. Successful source CI or MIPS cross-build alone does not establish live physical compatibility.
+- Next operator integration cannot truthfully become LIVE without authorized account session and a real XL quota response with validated units; do not infer from synthetic test data or static API candidates.
