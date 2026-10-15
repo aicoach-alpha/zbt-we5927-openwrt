@@ -42,13 +42,22 @@ board_gate() {
         fail wrong_device
     grep -q "^DISTRIB_RELEASE='25.12.5'$" /etc/openwrt_release ||
         fail openwrt_mismatch
-    for cmd in apk wget sha256sum awk grep df wc mktemp tar cp sort cmp ubus; do
+    for cmd in apk wget sha256sum awk grep df wc mktemp tar cp sort cmp ubus id sleep; do
         command -v "$cmd" >/dev/null 2>&1 || fail missing_system_tool
     done
 }
 quota_backend_gate() {
-    ubus -S call veci.quota status > "$WORK/quota-rpc.json" 2>/dev/null ||
-        fail existing_quota_backend_unavailable
+    # VeCI package post-upgrade restarts rpcd. Give ubus object registration
+    # time to complete, rather than triggering a false rollback immediately.
+    attempt=0
+    while [ "$attempt" -lt 12 ]; do
+        if ubus -S call veci.quota status > "$WORK/quota-rpc.json" 2>/dev/null; then
+            return 0
+        fi
+        attempt=$((attempt + 1))
+        sleep 1
+    done
+    fail existing_quota_backend_unavailable
 }
 temporary_keys() {
     mkdir "$WORK/keys"
@@ -161,7 +170,7 @@ if grep -Eiq '(^|[[:space:]])(Installing|Removing|Purging)[[:space:]]' "$WORK/pl
     fail transaction_changes_other_packages
 fi
 apk list -I > "$WORK/packages-before.txt" || fail inventory_failed
-grep -v '^veci-' "$WORK/packages-before.txt" | sort > "$WORK/non-veci-before.txt"
+grep -v '^veci-0[.]2[.]' "$WORK/packages-before.txt" | sort > "$WORK/non-veci-before.txt"
 tar -cf "$WORK/config-and-ui-before.tar" -C / \
     etc/config/veci www/veci/js/pages/cellular.js www/veci/js/lib/quota.js \
     >/dev/null 2>&1 || fail volatile_backup_failed
@@ -179,7 +188,7 @@ fi
 check /www/veci/js/lib/quota.js "$HELPER_SHA" || fail quota_helper_modified
 quota_backend_gate
 apk list -I > "$WORK/packages-after.txt" || fail inventory_after_failed
-grep -v '^veci-' "$WORK/packages-after.txt" | sort > "$WORK/non-veci-after.txt"
+grep -v '^veci-0[.]2[.]' "$WORK/packages-after.txt" | sort > "$WORK/non-veci-after.txt"
 cmp -s "$WORK/non-veci-before.txt" "$WORK/non-veci-after.txt" ||
     fail unrelated_packages_modified
 FINISHED=1
