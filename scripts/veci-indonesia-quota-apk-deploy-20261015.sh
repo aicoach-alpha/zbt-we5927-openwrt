@@ -23,7 +23,7 @@ device_gate() {
     [ "$(id -u)" = 0 ] || fail root_required
     [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail wrong_board
     grep -q "^DISTRIB_RELEASE='25.12.5'$" /etc/openwrt_release || fail wrong_os
-    for bin in apk wget sha256sum awk mktemp grep wc df ubus jsonfilter tar cp tr; do
+    for bin in apk wget sha256sum awk mktemp grep wc df ubus jsonfilter tar cp tr sort cmp; do
         command -v "$bin" >/dev/null 2>&1 || fail required_tool_missing
     done
     free="$(df -k /overlay 2>/dev/null | awk 'NR==2 {print $4}')"
@@ -42,14 +42,19 @@ rollback_internal() {
 finish() {
     rc="$1"
     trap - EXIT INT TERM
+    preserve=0
     if [ "$ATTEMPTED" = 1 ] && [ "$VERIFIED" = 0 ]; then
         if rollback_internal; then
             printf 'VECI_QUOTA_AUTO_ROLLBACK=pass\n'
         else
             printf 'VECI_QUOTA_AUTO_ROLLBACK=needs_attention\n'
+            # Retain root-only volatile backup if package removal failed.
+            preserve=1
         fi
     fi
-    if [ -n "$WORK" ] && [ -d "$WORK" ]; then rm -rf "$WORK"; fi
+    if [ "$preserve" = 0 ] && [ -n "$WORK" ] && [ -d "$WORK" ]; then
+        rm -rf "$WORK"
+    fi
     rmdir "$LOCK" 2>/dev/null || :
     exit "$rc"
 }
@@ -124,6 +129,7 @@ if grep -Eiq '(^|[[:space:]])(Upgrading|Downgrading|Purging|Removing)[[:space:]]
 fi
 tar -cf "$WORK/config-before.tar" -C /etc config 2>/dev/null || fail config_backup_failed
 apk list -I > "$WORK/packages-before.txt" 2>/dev/null || fail inventory_backup_failed
+sort "$WORK/packages-before.txt" > "$WORK/packages-baseline-sorted.txt"
 printf 'VECI_QUOTA_SIGNATURE=pass\nVECI_QUOTA_DEPENDENCIES=pass\nVECI_QUOTA_VOLATILE_BACKUP=pass\n'
 ATTEMPTED=1
 # Only intentional persistent change: locally installed quota status APK.
@@ -152,6 +158,9 @@ ubus -S call veci.quota providers > "$WORK/providers.json" 2>/dev/null ||
     fail registry_rpc_missing
 edition="$(jsonfilter -i "$WORK/providers.json" -e '@.edition' 2>/dev/null || :)"
 [ "$edition" = indonesia ] || fail registry_invalid
+apk list -I > "$WORK/packages-after.txt" 2>/dev/null || fail post_inventory_failed
+grep -v "^veci-telco-indonesia-" "$WORK/packages-after.txt" | sort > "$WORK/packages-other-sorted.txt" || fail post_inventory_check_failed
+cmp -s "$WORK/packages-baseline-sorted.txt" "$WORK/packages-other-sorted.txt" || fail unrelated_packages_changed
 VERIFIED=1
 printf 'VECI_QUOTA_PACKAGE_INSTALL=pass\n'
 printf 'VECI_QUOTA_RPC=pass\n'
