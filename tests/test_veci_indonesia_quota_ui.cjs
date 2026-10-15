@@ -35,7 +35,7 @@ function make(status,providers,fail=false){
   _:s=>s,Promise,String,Array,isFinite:Number.isFinite,
   document:{getElementById:()=>null}
  };
- const app=vm.runInNewContext(src,ctx);
+ const app=vm.runInNewContext('(function(){\n'+src+'\n})()',ctx);
  return {app,calls,async output(){return app.render(await app.load())}};
 }
 function flatten(n,items=[]){
