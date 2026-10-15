@@ -29,6 +29,38 @@ check(){ [ -f "$1" ] && [ ! -L "$1" ] && [ "$(hash "$1")" = "$2" ]; }
 installed(){
  apk list -I 2>/dev/null | grep -q "^$1-"
 }
+safe_dir(){
+ [ -d "$1" ] && [ ! -L "$1" ] &&
+ [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "drwx------ $(id -u)" ]
+}
+safe_file(){
+ [ -f "$1" ] && [ ! -L "$1" ] &&
+ [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "-rw------- $(id -u)" ]
+}
+https_ready(){
+ [ -z "$(uci -q get uhttpd.main.listen_http 2>/dev/null || :)" ] &&
+ [ -n "$(uci -q get uhttpd.main.listen_https 2>/dev/null || :)" ] || return 1
+ cert="$(uci -q get uhttpd.main.cert 2>/dev/null || :)"
+ key="$(uci -q get uhttpd.main.key 2>/dev/null || :)"
+ [ -n "$cert" ] && [ -f "$cert" ] &&
+ [ -n "$key" ] && [ -f "$key" ]
+}
+operator_ready(){
+ safe_dir /tmp/veci-xl-ciam &&
+ safe_dir /tmp/veci-telco-private || return 1
+ for name in basic_auth user_agent fingerprint device_id ax_api_sig_key; do
+  safe_file "/tmp/veci-xl-ciam/$name" || return 1
+ done
+ for name in xdata_key api_key signature_secret; do
+  safe_file "/tmp/veci-telco-private/$name" || return 1
+ done
+}
+readiness(){
+ if https_ready; then echo VECI_XL_036_ROUTER_HTTPS_ONLY=pass
+ else echo VECI_XL_036_ROUTER_HTTPS_ONLY=blocked; fi
+ if operator_ready; then echo VECI_XL_036_OPERATOR_CREDENTIALS=configured
+ else echo VECI_XL_036_OPERATOR_CREDENTIALS=not_configured; fi
+}
 core_guard(){
  installed 'veci-0.2.2' || fail veci_core_version_changed
  check /www/veci/js/pages/cellular.js "$CORE_CELL_SHA" || fail core_cellular_changed
@@ -80,10 +112,11 @@ if [ "$MODE" = --status ]; then
  else
   echo VECI_XL_036_PACKAGE=not_installed
  fi
- if ubus -S list veci.xl >/dev/null 2>&1; then
+ if ubus -S list veci.xl 2>/dev/null | grep -qx 'veci.xl'; then
   echo VECI_XL_036_RPC=registered
   ubus -S call veci.xl status || :
  else echo VECI_XL_036_RPC=not_registered; fi
+ readiness
  echo VECI_XL_036_MODEM_SMS_UNCHANGED=true
  exit 0
 fi
@@ -136,6 +169,7 @@ if grep -Ei '(^|[[:space:]])(Installing|Removing|Purging|Upgrading|Downgrading)[
  fail unrelated_package_transaction
 fi
 echo VECI_XL_036_SIGNED_PREFLIGHT=pass
+readiness
 if [ "$MODE" = --verify ]; then
  echo VECI_XL_036_PACKAGE_INSTALLED=false
  echo VECI_XL_036_SERVICES_RESTARTED=false
@@ -143,6 +177,8 @@ if [ "$MODE" = --verify ]; then
  COMPLETE=1
  exit 0
 fi
+https_ready || fail https_only_configuration_required
+operator_ready || fail authorized_operator_configuration_missing
 apk list -I > "$WORK/before.list"
 grep -v '^veci-telco-xl-native-' "$WORK/before.list" | sort > "$WORK/before.others"
 APPLIED=1
@@ -158,7 +194,7 @@ cmp -s "$WORK/before.others" "$WORK/after.others" ||
  fail other_packages_changed
 COMPLETE=1
 echo VECI_XL_036_INSTALL=pass
-echo VECI_XL_036_HTTPS_GUARD=enabled
+echo VECI_XL_036_HTTPS_POLICY=enforced
 echo VECI_XL_036_CORE_022_PRESERVED=pass
 echo VECI_XL_036_ROLLBACK=available
 echo VECI_XL_036_ACCOUNT_UAT=pending
