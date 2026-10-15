@@ -20,5 +20,5 @@ jobs:
           set -eu
           sh -n source/veci-telco-xl-native/files/usr/libexec/rpcd/veci.xl
           node --check source/veci-telco-xl-native/files/www/veci/xl-account.js
-          python3 tests/test_veci_xl_owner_rpc.py
+          sudo python3 tests/test_veci_xl_owner_rpc.py
           echo VECI_XL_OWNER_LOGIN_FOCUSED=pass
