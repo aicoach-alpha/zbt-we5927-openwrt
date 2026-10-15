@@ -59,6 +59,14 @@ jobs:
           for item in files: assert s.count(item)>=2,(item,s.count(item))
           assert 'mkdir "$LOCK"' in active
           assert 'trap' in active
+          assert '/usr/libexec/rpcd/veci.quota list' in active
+          assert '/usr/libexec/rpcd/veci.quota call status' in active
+          assert "VECI_QUOTA_RPC_EXECUTABLE=pass" in active
+          assert "VECI_QUOTA_RPC_DIAG=object_not_registered" in active
+          assert "VECI_QUOTA_RPC_DIAG=object_exists_call_failed" in active
+          assert 'while [ "$rounds" -lt 12 ]; do' in active
+          assert 'sleep 1' in active
+          assert 'apk --no-network del "$PKG"' in active
           print('VECI_QUOTA_DEPLOY_STATIC_SAFETY_PASS')
           PY
       - name: Ensure offline-only APKv3 option and fail-closed rollback contract
