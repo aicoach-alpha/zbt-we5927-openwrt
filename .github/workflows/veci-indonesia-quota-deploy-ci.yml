@@ -1,0 +1,81 @@
+name: VeCI Indonesia quota signed APK install rollback safety gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-indonesia-quota-apk-deploy-20261015.sh'
+      - '.github/workflows/veci-indonesia-quota-deploy-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit target files, transaction boundaries and rollback
+        run: |
+          set -eu
+          sh -n scripts/veci-indonesia-quota-apk-deploy-20261015.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-indonesia-quota-apk-deploy-20261015.sh').read_text()
+          active='\n'.join(x for x in s.splitlines() if not x.lstrip().startswith('#'))
+          for fragment in (
+              'apk --keys-dir "$WORK/keys" verify "$pkgfile"',
+              'apk --network=false --keys-dir "$WORK/keys" --simulate add "$pkgfile"',
+              'apk --network=false --keys-dir "$WORK/keys" add "$pkgfile"',
+              'apk --network=false del "$PKG"',
+              "ATTEMPTED=1", "VERIFIED=1",
+              "if [ \"$ATTEMPTED\" = 1 ] && [ \"$VERIFIED\" = 0 ]; then",
+              "existing_path_conflict", "registry_invalid", "quota_rpc_missing",
+              "VECI_QUOTA_ROLLBACK_COMMAND_AVAILABLE=true",
+              "VECI_OPERATOR_QUOTA=not_verified",
+              "config-before.tar", "25.12.5", "zbtlink,zbt-we5927",
+              "da72b09afefcd2bdf99bc501d86bd8e485f6a7156b8ccdaae189449a3b0ce34f",
+              "4d1bae271c4cca9b46ac10404d887c246637795f5b89d271fa38672efe9bdbfa"
+          ):
+              assert fragment in active,fragment
+          for fragment in (
+              '--allow-untrusted','apk upgrade','sysupgrade','AT+CMGR',
+              'AT+CUSD','AT+CMGS','reboot','/etc/apk/keys/',
+              'uci set','/etc/init.d/network', '/etc/init.d/we5927', 'opkg',
+              'npm ', 'python ', 'curl '
+          ):
+              if fragment == '/etc/apk/keys/':
+                  # Only READS existing public trust material.
+                  assert 'for src in /etc/apk/keys/*;' in active
+                  assert 'cp "$src" "$WORK/keys/"' in active
+                  continue
+              assert fragment not in active,fragment
+          files=[
+              '/usr/libexec/rpcd/veci.quota',
+              '/usr/libexec/veci-quota-cache',
+              '/usr/share/veci/telco/providers.json',
+              '/usr/share/rpcd/acl.d/veci-quota.json',
+              '/usr/share/luci/menu.d/luci-app-veci-quota.json',
+              '/www/luci-static/resources/view/veci/quota.js'
+          ]
+          for item in files: assert s.count(item)==2,(item,s.count(item))
+          assert 'mkdir "$LOCK"' in active
+          assert 'trap' in active
+          print('VECI_QUOTA_DEPLOY_STATIC_SAFETY_PASS')
+          PY
+      - name: Verify OpenWrt 25.12.5 APK tooling supports offline, isolated trust
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd
+          sdk=openwrt-sdk-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 240 \
+            -o /tmp/toolchain.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$sdk"
+          echo 'b44636e0a53f0d769cbce64edb9ca3831e1a9ecdc8c53a5caf128884be6c490e  /tmp/toolchain.tar.zst' | sha256sum -c -
+          mkdir /tmp/sdk
+          tar -xf /tmp/toolchain.tar.zst -C /tmp/sdk --strip-components=1
+          apk=/tmp/sdk/staging_dir/host/bin/apk
+          test -x "$apk"
+          "$apk" --help | grep -Eq 'apk-tools|apk'
+          "$apk" --network=false --keys-dir /tmp --help >/tmp/apk-help
+          "$apk" --network=false --keys-dir /tmp --simulate --help >/tmp/apk-help-2
+          echo VECI_APKV3_OFFLINE_OPTION_AND_ISOLATED_KEY_PASS
