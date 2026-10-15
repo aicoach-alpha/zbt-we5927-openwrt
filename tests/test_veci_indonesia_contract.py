@@ -61,6 +61,8 @@ class TelcoContract(unittest.TestCase):
         self.assertNotIn("python3",pkg.lower())
         self.assertNotIn("nodejs",pkg.lower())
         self.assertIn("veci-quota-cache",pkg)
+        self.assertIn("luci-app-veci-quota.json",pkg)
+        self.assertIn("view/veci/quota.js",pkg)
     def test_standalone_public_edition_contract(self):
         spec=(ROOT/"docs/VECI-INDONESIA-EDITION.md").read_text()
         pkg=(BASE/"Makefile").read_text()
@@ -92,9 +94,14 @@ class TelcoContract(unittest.TestCase):
             pkg=tree/"package/veci-telco-indonesia"
             pkg.mkdir(parents=True)
             (pkg/"Makefile").write_text("fake staging fixture")
+            native_pkg=tree/"package/veci-telco-xl-native"
+            native_pkg.mkdir(parents=True)
+            (native_pkg/"Makefile").write_text("optional native fixture")
             indonesia=subprocess.run(["sh",str(script),"indonesia",str(config)],capture_output=True,text=True)
             self.assertEqual(indonesia.returncode,0,indonesia.stderr)
             self.assertEqual(config.read_text().count("CONFIG_PACKAGE_veci-telco-indonesia=y"),1)
+            self.assertEqual(config.read_text().count("# CONFIG_PACKAGE_veci-telco-xl-native is not set"),1)
+            self.assertNotIn("CONFIG_PACKAGE_veci-telco-xl-native=y",config.read_text())
             cannot_general=subprocess.run(["sh",str(script),"general",str(config)],capture_output=True,text=True)
             self.assertNotEqual(cannot_general.returncode,0)
             invalid=subprocess.run(["sh",str(script),"unknown",str(config)],capture_output=True,text=True)
