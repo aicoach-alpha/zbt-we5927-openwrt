@@ -23,9 +23,9 @@ jobs:
           active='\n'.join(x for x in s.splitlines() if not x.lstrip().startswith('#'))
           for fragment in (
               'apk --keys-dir "$WORK/keys" verify "$pkgfile"',
-              'apk --network=false --keys-dir "$WORK/keys" --simulate add "$pkgfile"',
-              'apk --network=false --keys-dir "$WORK/keys" add "$pkgfile"',
-              'apk --network=false del "$PKG"',
+              'apk --no-network --keys-dir "$WORK/keys" --simulate add "$pkgfile"',
+              'apk --no-network --keys-dir "$WORK/keys" add "$pkgfile"',
+              'apk --no-network del "$PKG"',
               "ATTEMPTED=1", "VERIFIED=1",
               "if [ \"$ATTEMPTED\" = 1 ] && [ \"$VERIFIED\" = 0 ]; then",
               "existing_path_conflict", "registry_invalid", "quota_rpc_missing",
@@ -76,6 +76,6 @@ jobs:
           apk=/tmp/sdk/staging_dir/host/bin/apk
           test -x "$apk"
           "$apk" --help | grep -Eq 'apk-tools|apk'
-          "$apk" --network=false --keys-dir /tmp --help >/tmp/apk-help
-          "$apk" --network=false --keys-dir /tmp --simulate --help >/tmp/apk-help-2
+          "$apk" --no-network --keys-dir /tmp --help >/tmp/apk-help
+          "$apk" --no-network --keys-dir /tmp --simulate --help >/tmp/apk-help-2
           echo VECI_APKV3_OFFLINE_OPTION_AND_ISOLATED_KEY_PASS
