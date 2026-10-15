@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-telco-indonesia
-PKG_VERSION:=0.2.0
+PKG_VERSION:=0.2.1
 PKG_RELEASE:=1
 PKGARCH:=all
 
@@ -11,11 +11,11 @@ define Package/veci-telco-indonesia
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI Indonesia Edition optional telco quota UI backend
-  DEPENDS:=+veci +jsonfilter
+  DEPENDS:=+rpcd +luci-base +jsonfilter
 endef
 
 define Package/veci-telco-indonesia/description
-  Standalone read-only operator registry and quota contract. Future authorized adapters execute locally and contact carriers directly; no developer-hosted companion. No live carrier login implemented yet.
+  Standalone read-only OpenWrt LuCI operator registry and quota status page. No VeCI core dependency, no developer-hosted companion, no LTE/SMS modifications. Future approved carrier adapter is separate; no live operator login yet.
 endef
 
 define Build/Compile
