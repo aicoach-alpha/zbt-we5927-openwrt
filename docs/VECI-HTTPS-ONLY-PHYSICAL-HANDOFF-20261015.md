@@ -29,3 +29,26 @@ Desktop Commander returned a **monthly usage quota** block for the office laptop
 `/root/veci-https-recovery-20261015/original-uhttpd` and `original-uhttpd.sha256` hold the original config on persistent overlay. The watchdog auto-restore runs at 180 seconds if `--confirm` is absent. SSH access remains the fallback for `--rollback`. A reboot during the watchdog period may stop the watchdog: maintain SSH access and the persistent backup throughout the transition. Do not switch without browser-side HTTPS verification.
 
 **Not done:** physical HTTPS-only switch, verification of valid TLS chain, XL operator credential provisioning, OTP delivery, real quota. Do not report these as PASS.
+
+## Physical attempt and narrow remediation — 15 Oct 2026
+
+Physical `--prepare` from Windows office laptop `25NBCABA13CF` returned
+`VECI_HTTPS_STATUS=blocked`, `VECI_HTTPS_REASON=watchdog_nohup_missing`.
+This preflight blocked **before** recovery directory creation and any uhttpd
+configuration change. Original HTTP access remains the only verified path.
+
+The signed-in owner does **not** need to install `nohup` (router storage is
+scarce). Controller now starts a detached BusyBox-compatible child via
+`sh -c 'trap "" HUP; exec sh "$1" --watchdog'` and verifies the watchdog
+process is alive before removing HTTP. The watchdog auto-restores the backup
+after 180 seconds without `--confirm`. Mock UAT sends SIGHUP directly to
+the watchdog and asserts the original HTTP configuration returns.
+
+Pinned revision: `534e30c7887eac8bce326b93db38e90caf8da81d`.
+Focused CI PASS:
+https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38717254402
+
+Next owner action is **only `--prepare` plus `--status`** using the fixed
+revision. Do not call `--switch` until the owner has demonstrated successful
+VeCI HTTPS administrator login from the office laptop. Never assert the
+physical transition is live merely from the mocked CI gate.
