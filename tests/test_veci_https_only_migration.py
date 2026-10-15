@@ -83,7 +83,7 @@ def test():
     r=invoke(["sh",str(script),"--switch"])
     assert r.returncode==0,(r.stdout,r.stderr)
     assert "VECI_HTTPS_SWITCH=pass" in r.stdout
-    assert "list listen_http" not in cfg.read_text()
+    assert "list listen_http" not in cfg.read_text(),(r.stdout,r.stderr,cfg.read_text())
     time.sleep(4)
     assert cfg.read_bytes()==orig,("watchdog did not restore uhttpd",cfg.read_text())
     assert not (backup/"pending").exists()
