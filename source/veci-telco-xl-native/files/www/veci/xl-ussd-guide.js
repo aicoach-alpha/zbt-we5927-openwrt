@@ -11,6 +11,38 @@ let route = null;
 let index = 0;
 let session = '';
 let busy = false;
+// Only known, non-sensitive RPC reason identifiers are shown in the browser.
+// Never render raw backend/transport errors containing account or modem data.
+const REASONS = Object.freeze({
+  admin_required: 'Hak administrator USSD ditolak.',
+  unavailable: 'Backend USSD tidak tersedia.',
+  ussd_unavailable: 'Backend atau respons operator USSD tidak tersedia.',
+  invalid_request: 'Permintaan USSD ditolak oleh validasi.',
+  invalid_response: 'Respons modem atau RPC tidak sesuai format aman.',
+  modem_busy: 'Modem sedang digunakan oleh proses lain.',
+  modem_unavailable: 'Port serial modem tidak tersedia.',
+  wrong_modem: 'Identitas atau port modem tidak cocok dengan pengaman perangkat.',
+  sim_unverified: 'Identitas SIM aktif tidak dapat diverifikasi.',
+  not_xl_network: 'Operator SIM aktif tidak cocok dengan pemeriksaan XL.',
+  clock_unavailable: 'Jam router belum tersedia.',
+  session_active: 'Masih ada sesi USSD lain yang aktif.',
+  session_expired: 'Sesi USSD sudah kedaluwarsa.',
+  step_limit: 'Batas langkah menu USSD sudah tercapai.',
+  token_unavailable: 'Sistem tidak dapat membuat pengenal sesi aman.',
+  outcome_unknown: 'Hasil perintah USSD tidak pasti. Jangan mencoba ulang otomatis.',
+  network_rejected: 'Operator menolak permintaan USSD.',
+  serial_unavailable: 'Komunikasi serial modem gagal.',
+  state_invalid: 'Status sesi USSD tidak valid.',
+  wrong_router: 'Router tidak cocok dengan target USSD.',
+  wrong_board: 'Model router tidak cocok.',
+  approval_required: 'Konfirmasi pilihan menu belum diberikan.',
+  quota_unavailable: 'Kuota belum tersedia.'
+});
+function failure(answer) {
+  const reason = answer && typeof answer.reason === 'string' && Object.hasOwn(REASONS, answer.reason)
+    ? answer.reason : 'rpc_transport_or_permission';
+  return new Error(reason);
+}
 function report(value) { $('guide-feedback').textContent = value; }
 function invalidate() {
   session = '';
@@ -54,7 +86,13 @@ async function guarded(work) {
     $(id).disabled = true;
   }
   try { await work(); }
-  catch { report('USSD gagal, sesi kedaluwarsa, atau hasilnya tidak pasti. Tidak dilakukan pengulangan otomatis.'); invalidate(); }
+  catch (err) {
+    const reason = err && typeof err.message === 'string' ? err.message : '';
+    const text = Object.hasOwn(REASONS, reason)
+      ? REASONS[reason] : 'RPC USSD tidak merespons, izin ditolak, atau koneksi gagal.';
+    report('USSD gagal: ' + text + ' Tidak dilakukan pengulangan otomatis.');
+    invalidate();
+  }
   finally {
     busy = false;
     for (const id of ['guide-route-one', 'guide-route-two', 'guide-send', 'guide-cancel']) {
@@ -71,7 +109,7 @@ async function begin(which) {
   )) return;
   await guarded(async () => {
     const answer = await call('start', {});
-    if (!answer || answer.ok !== true) throw new Error('ussd_failed');
+    if (!answer || answer.ok !== true) throw failure(answer);
     route = values;
     index = 0;
     renderMenu(answer);
@@ -94,6 +132,7 @@ async function nextChoice() {
     const answer = await call('reply', {
       session: oldSession, choice, approval: 'I_APPROVE_THIS_USSD_CHOICE'
     });
+    if (!answer || answer.ok !== true) throw failure(answer);
     index += 1;
     renderMenu(answer);
     report('Pilihan ' + choice + ' dikirim sekali. Balasan XL harus diperiksa lagi.');
