@@ -1,0 +1,40 @@
+name: VeCI HTTPS cert pin check office (focused)
+on:
+  push:
+    paths:
+      - 'scripts/veci-https-cert-pincheck-office-20261015.ps1'
+      - '.github/workflows/veci-https-cert-pincheck-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  office-readonly:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify PowerShell parser and no private credentials
+        shell: pwsh
+        run: |
+          $File = 'scripts/veci-https-cert-pincheck-office-20261015.ps1'
+          $Tokens = $null
+          $Errors = $null
+          $Ast = [System.Management.Automation.Language.Parser]::ParseFile($File,[ref]$Tokens,[ref]$Errors)
+          if ($Errors.Count -gt 0) {
+            $Errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          $Text = Get-Content -LiteralPath $File -Raw
+          foreach ($Value in @('StrictHostKeyChecking=yes','uhttpd.main.cert',
+                   'RemoteCertificateValidationCallback','Fingerprint $RouterCert',
+                   'Fingerprint $Cert','HTTPS_CERTIFICATE_MISMATCH',
+                   'Tls12','Tls13','HTTPS_CERT_PIN=pass')) {
+            if (-not $Text.Contains($Value)) { throw "Missing cert pin guard: $Value" }
+          }
+          foreach ($Value in @('uhttpd.main.key','Cert:\LocalMachine',
+                               'Import-Certificate','Import-PfxCertificate',
+                               'Invoke-RestMethod','uhttpd restart','uci set',
+                               'credential', 'password', 'Set-ExecutionPolicy')) {
+            if ($Text.Contains($Value)) { throw "Read-only cert check violation: $Value" }
+          }
+          Write-Output 'VECI_HTTPS_CERT_PIN_SOURCE=pass'
