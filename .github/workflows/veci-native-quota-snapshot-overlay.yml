@@ -1,0 +1,58 @@
+name: VeCI native quota snapshot overlay regression
+on:
+  push:
+    paths:
+      - 'scripts/veci-native-quota-overlay-20261015.sh'
+      - 'scripts/veci-native-quota-overlay/**'
+      - '.github/workflows/veci-native-quota-snapshot-overlay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify shell syntax and operator quota behavior
+        run: |
+          set -eu
+          sh -n scripts/veci-native-quota-overlay-20261015.sh
+          node --check scripts/veci-native-quota-overlay/native-quota.js
+          node --test scripts/veci-native-quota-overlay/native-quota.test.mjs
+      - name: Verify hashes, no unsafe commands, and persistent rollback
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          root=Path('scripts/veci-native-quota-overlay')
+          module=(root/'native-quota.js').read_bytes()
+          installer=Path('scripts/veci-native-quota-overlay-20261015.sh').read_text()
+          expected='5c1f66b5a5aa292be202897ef538f67ed7933e857ff3e11bcaabb075b75c692d'
+          assert hashlib.sha256(module).hexdigest()==expected
+          assert ('MODULE_SHA='+expected) in installer
+          assert 'e2f8bc86ef6c214d813a1b3fc021acb8955577bc' in installer
+          assert '8f9219c21ca49b44ea5d5a2705fccdde77315249c53c21715974df384d4adef6' in installer
+          assert 'eef7b3453ebb2ba876b35e34f61fdf36ba1301aeb993d109a24af4cbf005caab' in installer
+          assert 'mountOperatorQuota({ api, root });' in installer
+          assert 'native-quota.js?v=20261015' in installer
+          for requirement in ('existing_core_source_drift','rollback_failed',
+                              'quota_backend_unavailable','insufficient_overlay_space',
+                              'persistent_backup_failed','patch_anchor_mismatch',
+                              'patched_source_hash_mismatch','postinstall_integrity_failed',
+                              'VECI_QUOTA_BROWSER_UAT=pending'):
+              assert requirement in installer,requirement
+          active='\n'.join(line for line in installer.splitlines()
+                           if not line.lstrip().startswith('#'))
+          for forbidden in ('sysupgrade','apk add','apk upgrade','--allow-untrusted',
+                            'AT+CMGS','AT+CUSD','AT+CMGR','uci set',
+                            '/etc/init.d/','/luci-static','/usr/share/luci/'):
+              assert forbidden not in active,forbidden
+          assert 'veci.quota' in module.decode()
+          assert 'veci.sms' not in module.decode()
+          assert 'veci.ussd' not in module.decode()
+          print('VECI_NATIVE_QUOTA_OVERLAY_STATIC_PASS')
+          PY
