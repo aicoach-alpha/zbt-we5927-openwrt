@@ -1,0 +1,48 @@
+name: VeCI XL 0.3.7 RPCD registration retry gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-native-037-dormant-rpc-retry-20261015.sh'
+      - '.github/workflows/veci-xl-native-037-rpc-retry-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify only narrowly scoped registration wait and diagnostics
+        run: |
+          set -eu
+          sh -n scripts/veci-xl-native-037-dormant-rpc-retry-20261015.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          before=Path('scripts/veci-xl-native-037-dormant-deploy-20261015.sh').read_text()
+          after=Path('scripts/veci-xl-native-037-dormant-rpc-retry-20261015.sh').read_text()
+          initial=''' sh -n /usr/libexec/rpcd/veci.xl || fail xl_rpc_syntax_error
+           ubus -S list veci.xl 2>/dev/null | grep -qx 'veci.xl' || fail xl_rpc_not_registered
+           ubus -S call veci.xl status >/dev/null 2>&1 || fail xl_status_failed'''.replace('\n           ','\n')
+          assert initial in before
+          assert after.count('target_guard(){')==1
+          actual=after[after.index(' sh -n /usr/libexec/rpcd/veci.xl || fail xl_rpc_syntax_error'):after.index('\n}',after.index(' sh -n /usr/libexec/rpcd/veci.xl || fail xl_rpc_syntax_error'))]
+          assert after==before.replace(initial,actual),'unexpected changes outside RPC readiness'
+          assert '"$retry" -lt 15' in actual
+          assert 'sleep 1' in actual
+          assert 'VECI_XL_037_RPC_EXECUTABLE' in actual
+          assert 'VECI_XL_037_RPC_LIST' in actual
+          assert 'VECI_XL_037_RPCD_CORE' in actual
+          assert 'VECI_XL_037_RPC_RETRIES' in actual
+          assert 'fail xl_rpc_not_registered' in actual
+          assert "TAG=veci-xl-native-037-6307ad9f38e1" in after
+          assert "APK_SHA=045c263790a99ac6aa0856a6167207797d1c19824f8ce59793a6a2351771fde7" in after
+          assert 'https_ready || fail https_only_configuration_required' in after
+          assert 'apk --keys-dir "$WORK/keys" verify' in after
+          assert 'apk --no-network --keys-dir "$WORK/keys" --simulate add' in after
+          assert 'VECI_XL_037_ROLLBACK=pass' in after
+          assert '/etc/init.d/rpcd restart' in after
+          for forbidden in ('sysupgrade','apk upgrade','AT+CUSD','AT+CMGS','--allow-untrusted'):
+            assert forbidden not in after,forbidden
+          print('VECI_XL_037_RPC_RETRY_SCOPE=pass')
+          PY
