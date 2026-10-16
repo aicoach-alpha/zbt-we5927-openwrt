@@ -23,8 +23,10 @@
       return {state: messages[d.state] ? d.state : 'unavailable', message:messages[d.state] || messages.unavailable,buckets:[]};
     }
     return {state:'ok', message:'Kuota operator', buckets:d.buckets.map(b=>({
-      label:String(b.label), remaining:bytes(b.remaining_bytes), total:bytes(b.total_bytes),
-      expires:new Date(b.expires_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})
+      label:String(b.label), remaining:bytes(b.remaining_bytes),
+      ...(Number.isSafeInteger(b.total_bytes) ? {total:bytes(b.total_bytes)} : {}),
+      ...(typeof b.expires_at === 'string' && Number.isFinite(Date.parse(b.expires_at))
+        ? {expires:new Date(b.expires_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} : {})
     }))};
   }
   function render(element, data) {
@@ -36,7 +38,9 @@
     element.appendChild(heading);
     for (const b of m.buckets) {
       const article = doc.createElement('article');
-      for (const line of [b.label, b.remaining + ' / ' + b.total, 'Berlaku sampai: ' + b.expires]) {
+      const lines = [b.label, b.total ? b.remaining + ' / ' + b.total : 'Sisa: ' + b.remaining];
+      if (b.expires) lines.push('Berlaku sampai: ' + b.expires);
+      for (const line of lines) {
         const p = doc.createElement('p');
         p.textContent = line; // Never use innerHTML for provider-supplied labels.
         article.appendChild(p);
