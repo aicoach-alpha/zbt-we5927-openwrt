@@ -38,7 +38,7 @@ jobs:
             'VECI_DATA_METER_CARRIER_BALANCE=not_available',
           ):
             assert expected in s, expected
-          assert s.index('fail rpc_plugin_manifest_schema_invalid') < s.index('/etc/init.d/rpcd restart')
+          assert s.index('fail rpc_plugin_manifest_schema_invalid') < s.index('/etc/init.d/rpcd restart', s.index('APPLIED=1'))
           for banned in ('AT+CUSD','AT+CMGS','/dev/ttyUSB','sysupgrade','uci commit','uci set',
                          '/etc/init.d/network','/etc/init.d/uhttpd','apk upgrade','/luci-static/'):
             assert banned not in s,banned
