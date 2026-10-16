@@ -1,4 +1,4 @@
-name: VeCI data meter 0.1.0 signed OpenWrt APK
+name: VeCI data meter 0.1.1 signed OpenWrt APK
 on:
   push:
     paths:
@@ -19,6 +19,7 @@ jobs:
           set -eu
           sudo python3 -m unittest discover -s tests -p 'test_veci_data_meter.py' -v
           sh -n source/veci-data-meter/files/usr/libexec/rpcd/veci.meter
+          sudo sh source/veci-data-meter/files/usr/libexec/rpcd/veci.meter list | python3 -c "import json,sys; x=json.load(sys.stdin); assert x['status']=={}; assert x['setBaseline']=={'remaining_mb':'int'}; print('VECI_METER_RPCD_LIST=pass')"
           node --check source/veci-data-meter/files/www/veci/data-meter.js
       - name: Get SHA-pinned OpenWrt 25.12.5 MIPS SDK
         run: |
@@ -46,17 +47,17 @@ jobs:
           test -z "$(find "$root" -iname '*luci*' -print -quit)"
           mkdir -p "$GITHUB_WORKSPACE/release"
           tool=/tmp/sdk/staging_dir/host/bin/apk
-          "$tool" mkpkg --info 'name:veci-data-meter' --info 'version:0.1.0-r1' --info 'arch:mipsel_24kc' --info 'origin:veci-data-meter' --info 'description:VeCI uplink byte measurements, optional manual quota estimate' --info 'depends:jsonfilter rpcd' --files "$root" --output "$GITHUB_WORKSPACE/release/veci-data-meter-0.1.0-r1.apk"
-          test -s "$GITHUB_WORKSPACE/release/veci-data-meter-0.1.0-r1.apk"
+          "$tool" mkpkg --info 'name:veci-data-meter' --info 'version:0.1.1-r1' --info 'arch:mipsel_24kc' --info 'origin:veci-data-meter' --info 'description:VeCI uplink byte measurements, optional manual quota estimate' --info 'depends:jsonfilter rpcd' --files "$root" --output "$GITHUB_WORKSPACE/release/veci-data-meter-0.1.1-r1.apk"
+          test -s "$GITHUB_WORKSPACE/release/veci-data-meter-0.1.1-r1.apk"
       - name: Sign and inspect the optional package
         run: |
           set -eu
-          p=release/veci-data-meter-0.1.0-r1.apk
+          p=release/veci-data-meter-0.1.1-r1.apk
           tool=/tmp/sdk/staging_dir/host/bin/apk
           umask 077
           mkdir -p /tmp/sign/keys /tmp/sign/none
           openssl ecparam -name prime256v1 -genkey -noout -out /tmp/sign/private.pem
-          openssl pkey -in /tmp/sign/private.pem -pubout -out /tmp/sign/keys/veci-data-meter-010.pem
+          openssl pkey -in /tmp/sign/private.pem -pubout -out /tmp/sign/keys/veci-data-meter-011.pem
           "$tool" --allow-untrusted adbsign --reset-signatures --sign-key /tmp/sign/private.pem "$p"
           "$tool" --keys-dir /tmp/sign/keys verify "$p"
           if "$tool" --keys-dir /tmp/sign/none verify "$p" >/dev/null 2>&1; then exit 1; fi
@@ -68,14 +69,14 @@ jobs:
           for name in ('veci-data-meter','veci.meter','data-meter.html','data-meter.js','veci-data-meter.json'):
             assert name in manifest,name
           assert '/luci-static/' not in manifest
-          print('VECI_DATA_METER_010_SIGNED_CONTENT=pass')
+          print('VECI_DATA_METER_011_SIGNED_CONTENT=pass')
           PY
-          cp /tmp/sign/keys/veci-data-meter-010.pem release/
-          chmod 644 release/veci-data-meter-010.pem
-          sha256sum "$p" release/veci-data-meter-010.pem > release/SHA256SUMS
+          cp /tmp/sign/keys/veci-data-meter-011.pem release/
+          chmod 644 release/veci-data-meter-011.pem
+          sha256sum "$p" release/veci-data-meter-011.pem > release/SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
-          name: veci-data-meter-010-signed
+          name: veci-data-meter-011-signed
           path: release/
       - name: Publish signed candidate without deployment
         env:
@@ -83,5 +84,5 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -eu
-          tag="veci-data-meter-010-$(echo "$GITHUB_SHA" | cut -c1-12)"
-          gh release create "$tag" release/* --target "$GITHUB_SHA" --prerelease --title 'VeCI Data Meter 0.1.0 MIPS signed APK' --notes 'Optional data usage estimate only; not authentic carrier remaining balance. No LuCI, Core, XL, SMS or modem changes. Production installation pending.'
+          tag="veci-data-meter-011-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/* --target "$GITHUB_SHA" --prerelease --title 'VeCI Data Meter 0.1.1 MIPS signed APK' --notes 'Optional data usage estimate only; not authentic carrier remaining balance. No LuCI, Core, XL, SMS or modem changes. Production installation pending.'
