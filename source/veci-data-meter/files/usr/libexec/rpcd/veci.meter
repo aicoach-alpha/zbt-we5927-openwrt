@@ -72,7 +72,7 @@ set_baseline(){
  echo '{"ok":true,"state":"estimated","carrier_authenticated":false}'
 }
 [ "$(id -u)" = 0 ] || fail root_required
-case "$1:$2" in
+case "${1:-}:${2:-}" in
  list:) echo '{"status":{},"setBaseline":{"remaining_mb":"int"}}';;
  call:status) status;;
  call:setBaseline) set_baseline;;
