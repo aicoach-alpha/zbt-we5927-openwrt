@@ -122,7 +122,7 @@ function setBusy(value) {
     $(id).disabled = value;
 }
 async function call(method, params) {
-  return api.call('veci.dialer', method, params, { timeout: 37000 });
+  return api.call('veci.dialer', method, params, { timeout: 55000 });
 }
 function readResponse(result) {
   if (!result || result.ok !== true || result.source !== 'operator_ussd') {
@@ -153,6 +153,7 @@ async function perform(work) {
     const label = Object.hasOwn(errorLabels, code) ? errorLabels[code]
       : code === 'ubus_status_6' ? 'Izin RPC ditolak (ubus status 6).'
       : code === 'ubus_status_7' ? 'RPC tidak valid atau timeout (ubus status 7).'
+      : code === 'ubus_status_5' ? 'RPCD tidak menerima JSON dari worker; kemungkinan eksekusi terpotong oleh timeout. Jangan mengulang dial otomatis.'
       : 'Transaksi ditolak atau hasil tidak pasti (' + code + '). Jangan ulangi otomatis.';
     interactionUnknown = true;
     closeLocal();
