@@ -22,15 +22,16 @@ assert.equal(convert({...valid,items:[{...item,remainingBytes:undefined,remainin
 const remainingOnly = {success:true,provider:'XL',items:[{
   name:'XL Internet',type:'MAIN',remainingFormatted:'1.5 GB',validUntil:'-'
 }]};
-const partial = convert(remainingOnly,{...evidence,remaining_units_verified:true});
+const partial = convert(remainingOnly,{...evidence,remaining_units_verified:true,remaining_field_present:true});
 assert.equal(partial.state,'ok');
 assert.equal(partial.quality,'remaining_only');
 assert.equal(partial.buckets[0].remaining_bytes,1610612736);
 assert.equal(Object.hasOwn(partial.buckets[0],'total_bytes'),false);
 assert.equal(Object.hasOwn(partial.buckets[0],'expires_at'),false);
 assert.equal(convert(remainingOnly,evidence).state,'unavailable');
+assert.equal(convert(remainingOnly,{...evidence,remaining_units_verified:true}).state,'unavailable');
 assert.equal(convert({...remainingOnly,items:[{...remainingOnly.items[0],remainingFormatted:'unknown'}]},
-  {...evidence,remaining_units_verified:true}).state,'unavailable');
+  {...evidence,remaining_units_verified:true,remaining_field_present:true}).state,'unavailable');
 assert.equal(convert({...remainingOnly,items:[{...remainingOnly.items[0],remainingFormatted:'0 MB of 10 GB'}]},
-  {...evidence,remaining_units_verified:true}).state,'unavailable');
+  {...evidence,remaining_units_verified:true,remaining_field_present:true}).state,'unavailable');
 console.log('EnQuota-VeCI contract: remaining-only PASS');
