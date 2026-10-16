@@ -57,7 +57,7 @@ endef
 
 define Package/veci-sms-we5927/postinst
 #!/bin/sh
-[ -n "$\${IPKG_INSTROOT}" ] || {
+[ -n "${IPKG_INSTROOT}" ] || {
 	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
 }
 endef
