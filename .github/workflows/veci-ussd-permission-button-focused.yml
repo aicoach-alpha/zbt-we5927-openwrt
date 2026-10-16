@@ -1,0 +1,38 @@
+name: VeCI USSD permission button interaction focused
+on:
+  push:
+    paths:
+      - 'source/veci-ussd-dialer/files/www/veci/ussd-dialer.js'
+      - 'tests/test_veci_ussd_permission_button.cjs'
+      - '.github/workflows/veci-ussd-permission-button-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-button:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate read-only click, visible status, denial and no modem
+        run: |
+          set -eu
+          node --check source/veci-ussd-dialer/files/www/veci/ussd-dialer.js
+          node tests/test_veci_ussd_permission_button.cjs
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path('source/veci-ussd-dialer/files/www/veci/ussd-dialer.js').read_text()
+          b=code[code.index('async function checkDialPermission()'):code.index('function installAccessCheck()')]
+          assert b.index("report.textContent = 'Pemeriksaan #'") < b.index("await api.call('session', 'access'")
+          assert 'button.disabled = true' in b and 'button.disabled = false' in b
+          assert "api.call('session', 'access'" in b
+          assert "object: 'veci.dialer', function: 'start'" in b
+          assert 'ubus_rpc_session' not in b
+          assert "call('start'" not in b and "call('reply'" not in b
+          assert "void checkDialPermission();" in code
+          assert code.count("void checkDialPermission();")==1
+          assert "request_timeout" in code
+          assert code.count("window.confirm(")==2
+          print('VECI_USSD_BROWSER_READ_ONLY_UI_SCOPE=pass')
+          PY
+          sha256sum source/veci-ussd-dialer/files/www/veci/ussd-dialer.js
