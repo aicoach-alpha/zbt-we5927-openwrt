@@ -30,8 +30,13 @@ feed_ready(){
  # Signature enforcement is delegated to apk, never --allow-untrusted.
 }
 status(){
- if feed_ready; then ready=true;reason=ready;else ready=false;reason=matching_signed_feed_unavailable;fi
- printf '{"schema":1,"management_available":true,"feed_ready":%s,"reason":"%s","apps":{' "$ready" "$reason"
+ free="$(df -k /overlay 2>/dev/null | awk 'NR==2 {print $4}')"
+ case "$free" in ''|*[!0-9]*) free=0;; esac
+ if feed_ready; then
+  if [ "$free" -ge 3072 ]; then ready=true;reason=ready
+  else ready=false;reason=insufficient_overlay_space;fi
+ else ready=false;reason=matching_signed_feed_unavailable;fi
+ printf '{"schema":1,"management_available":true,"feed_ready":%s,"reason":"%s","overlay_free_kb":%s,"minimum_overlay_kb":3072,"apps":{' "$ready" "$reason" "$free"
  sep=''
  for app in guest sqm ddns wireguard voucher;do
   if installed "$app";then
