@@ -1,0 +1,19 @@
+{
+  "veci-data-meter": {
+    "description": "Uplink usage only; no operator balance API",
+    "read": {
+      "ubus": {
+        "veci.meter": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.meter": [
+          "setBaseline"
+        ]
+      }
+    }
+  }
+}
