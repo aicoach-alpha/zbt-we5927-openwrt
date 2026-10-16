@@ -1,0 +1,64 @@
+#!/bin/sh
+# VeCI XL: strict local identity check for a future authenticated XL profile
+# response. Does NOT fetch a profile, activate a session or write a quota cache.
+# A positive result is NOT proof of TLS origin by itself: the caller must be
+# the separately verified read-only profile HTTPS/decryption pipeline.
+set -eu
+umask 077
+LC_ALL=C
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LC_ALL PATH
+PENDING=/tmp/veci-telco-private/pending-profile
+PROFILE=/tmp/veci-telco-private/profile-verified-transport.json
+JSONFILTER=/usr/bin/jsonfilter
+fail(){ printf 'VECI_XL_PROFILE=blocked\nVECI_XL_PROFILE_REASON=%s\n' "$1"; exit 1; }
+dir_ok(){
+  [ -d "$1" ] && [ ! -L "$1" ] &&
+  [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "drwx------ $(id -u)" ]
+}
+file_ok(){
+  [ -f "$1" ] && [ ! -L "$1" ] &&
+  [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "-rw------- $(id -u)" ]
+}
+canonical(){
+  value="$1"
+  case "$value" in 08[0-9]*) value="62${value#0}" ;; esac
+  case "$value" in 62[0-9]*) ;; *) return 1 ;; esac
+  [ "${#value}" -ge 10 ] && [ "${#value}" -le 15 ] || return 1
+  case "$value" in *[!0-9]*) return 1 ;; esac
+  printf '%s' "$value"
+}
+[ "$#" -eq 1 ] && [ "$1" = --check ] || fail usage
+[ "$(id -u)" = 0 ] || fail root_required
+[ -x "$JSONFILTER" ] || fail jsonfilter_missing
+dir_ok /tmp/veci-telco-private || fail private_dir_insecure
+dir_ok "$PENDING" || fail pending_session_unavailable
+file_ok "$PENDING/requested_number" || fail number_file_insecure
+file_ok "$PROFILE" || fail profile_file_insecure
+n="$(wc -c < "$PROFILE" | tr -d '[:space:]')"
+case "$n" in ''|*[!0-9]*) fail invalid_profile_size ;; esac
+[ "$n" -ge 30 ] && [ "$n" -le 16384 ] || fail invalid_profile_size
+expected="$(cat "$PENDING/requested_number")"
+expected="$(canonical "$expected")" || fail invalid_requested_number
+status="$("$JSONFILTER" -i "$PROFILE" -e '@.status' 2>/dev/null)" ||
+  fail malformed_profile
+[ "$status" = SUCCESS ] || fail profile_not_success
+# The reverse-engineered reference also exposes subscriber_id, which is
+# NOT automatically an MSISDN. Only explicit mobile-number attributes may
+# be used for account binding; conflicting attributes are rejected.
+identified=
+seen=0
+for path in '@.msisdn' '@.data.msisdn' '@.data.mobile_number' '@.mobile_number'; do
+  value="$("$JSONFILTER" -i "$PROFILE" -e "$path" 2>/dev/null)" || :
+  [ -n "$value" ] && [ "$value" != null ] || continue
+  normalized="$(canonical "$value")" || fail invalid_profile_number
+  if [ "$seen" -eq 0 ]; then identified="$normalized"; fi
+  [ "$normalized" = "$identified" ] || fail conflicting_profile_numbers
+  seen=$((seen+1))
+done
+[ "$seen" -gt 0 ] || fail profile_number_not_present
+[ "$identified" = "$expected" ] || fail account_number_mismatch
+# No tokens, phone numbers, raw JSON or subscriber IDs are printed.
+echo VECI_XL_PROFILE_NUMBER_MATCH=pass
+echo VECI_XL_PROFILE_ACCOUNT_PROMOTED=false
+echo VECI_XL_QUOTA_TRUST=not_authenticated

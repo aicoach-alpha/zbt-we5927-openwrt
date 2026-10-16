@@ -1,0 +1,93 @@
+#!/bin/sh
+# Root-only staging of an XL CIAM token candidate. No operator network calls.
+# This is NOT authenticated quota; profile ownership must be checked separately.
+set -eu
+umask 077
+LC_ALL=C
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LC_ALL PATH
+CIAM=/tmp/veci-xl-ciam
+PRIVATE=/tmp/veci-telco-private
+PENDING="$PRIVATE/pending-profile"
+JSONFILTER=/usr/bin/jsonfilter
+WORK=
+fail() { printf 'VECI_XL_STAGE=blocked\nVECI_XL_STAGE_REASON=%s\n' "$1"; exit 1; }
+dir_ok() {
+  [ -d "$1" ] && [ ! -L "$1" ] &&
+  [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "drwx------ $(id -u)" ]
+}
+file_ok() {
+  [ -f "$1" ] && [ ! -L "$1" ] &&
+  [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "-rw------- $(id -u)" ]
+}
+valid_token() {
+  [ -f "$1" ] || return 1
+  bytes="$(wc -c < "$1" | tr -d '[:space:]')"
+  case "$bytes" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$bytes" -ge "$2" ] && [ "$bytes" -le "$3" ] &&
+  [ "$(wc -l < "$1" | tr -d '[:space:]')" -eq 1 ] &&
+  grep -Eq '^[A-Za-z0-9._~+/=-]+$' "$1" &&
+  ! grep -Eq '^(null|undefined|FAILED|false)$' "$1"
+}
+[ "$#" -eq 1 ] || fail usage
+case "$1" in --status|--stage) MODE="$1" ;; *) fail usage ;; esac
+[ "$(id -u)" = 0 ] || fail root_required
+if [ "$MODE" = --status ]; then
+  if dir_ok "$PENDING" && file_ok "$PENDING/id_token" &&
+     file_ok "$PENDING/access_token" && file_ok "$PENDING/refresh_token" &&
+     file_ok "$PENDING/requested_number" && file_ok "$PENDING/created_epoch"; then
+    echo VECI_XL_STAGE=pending_profile
+  else
+    echo VECI_XL_STAGE=not_staged
+  fi
+  echo VECI_XL_QUOTA_TRUST=not_authenticated
+  exit 0
+fi
+[ -x "$JSONFILTER" ] || fail jsonfilter_missing
+dir_ok "$CIAM" || fail ciam_dir_insecure
+file_ok "$CIAM/token-candidate.json" || fail candidate_insecure
+file_ok "$CIAM/number" || fail number_insecure
+n="$(wc -c < "$CIAM/token-candidate.json" | tr -d '[:space:]')"
+case "$n" in ''|*[!0-9]*) fail candidate_size_invalid ;; esac
+[ "$n" -ge 60 ] && [ "$n" -le 8192 ] || fail candidate_size_invalid
+[ ! -e "$PRIVATE" ] || dir_ok "$PRIVATE" || fail private_dir_insecure
+[ ! -e "$PENDING" ] && [ ! -L "$PENDING" ] || fail pending_exists
+WORK="$(mktemp -d /tmp/veci-xl-stage.XXXXXX)" || fail temp_unavailable
+trap 'if [ -n "$WORK" ] && [ -d "$WORK" ]; then rm -rf "$WORK"; fi' EXIT
+trap 'exit 130' INT TERM
+chmod 700 "$WORK" || fail temp_permissions
+for field in id_token access_token refresh_token expires_in; do
+  "$JSONFILTER" -i "$CIAM/token-candidate.json" -e "@.$field" > "$WORK/$field" 2>/dev/null ||
+    fail candidate_json_invalid
+done
+valid_token "$WORK/id_token" 32 3072 || fail invalid_id_token
+valid_token "$WORK/access_token" 16 3072 || fail invalid_access_token
+valid_token "$WORK/refresh_token" 16 3072 || fail invalid_refresh_token
+grep -Eq '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$' "$WORK/id_token" ||
+  fail malformed_identity_jwt
+ttl="$(cat "$WORK/expires_in")"
+case "$ttl" in ''|*[!0-9]*) fail invalid_ttl ;; esac
+[ "$ttl" -ge 60 ] && [ "$ttl" -le 86400 ] || fail invalid_ttl
+number="$(cat "$CIAM/number")"
+case "$number" in 62[0-9]*) ;; *) fail invalid_number ;; esac
+[ "${#number}" -ge 10 ] && [ "${#number}" -le 15 ] || fail invalid_number
+case "$number" in *[!0-9]*) fail invalid_number ;; esac
+created="$(date +%s)"
+case "$created" in ''|*[!0-9]*) fail clock_invalid ;; esac
+[ "$created" -ge 1700000000 ] || fail clock_invalid
+printf '%s\n' "$number" > "$WORK/requested_number"
+printf '%s\n' "$created" > "$WORK/created_epoch"
+rm "$WORK/expires_in"
+chmod 600 "$WORK/"* || fail staging_permissions
+if [ ! -e "$PRIVATE" ]; then
+  mkdir -m 700 "$PRIVATE" || fail target_create_failed
+fi
+dir_ok "$PRIVATE" || fail target_dir_insecure
+[ ! -e "$PENDING" ] && [ ! -L "$PENDING" ] || fail pending_exists
+mv "$WORK" "$PENDING" || fail pending_commit_failed
+WORK=
+rm -f "$CIAM/token-candidate.json"
+echo VECI_XL_STAGE=pending_profile
+echo VECI_XL_TOKEN_STORAGE=private_0600
+echo VECI_XL_QUOTA_TRUST=not_authenticated
+echo VECI_MODEM_SMS_MODIFIED=false
