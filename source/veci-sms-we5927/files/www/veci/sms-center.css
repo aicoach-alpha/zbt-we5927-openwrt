@@ -1,0 +1,107 @@
+/* VeCI WE5927 SMS Center v1.5.9 – external, CSP-compliant stylesheet.
+   Must be loaded through <link rel="stylesheet" href="/veci/sms-center.css">.
+   No inline <style> or style attributes: index.html requires style-src 'self'.
+   Scoped to the SMS panel to avoid disturbing Internet, Wi-Fi and other pages. */
+#cellular-sms-inbox-controls { min-width: 0; }
+#cellular-sms-inbox-controls button { cursor: pointer; }
+#cellular-sms-compose[hidden],
+#cellular-sms-drafts-panel[hidden],
+#cellular-sms-sent-panel[hidden] { display: none !important; }
+#cellular-sms-compose:not([hidden]) {
+display: flex !important;
+flex-direction: column !important;
+align-items: stretch !important;
+gap: 14px !important;
+width: 100%;
+min-width: 0;
+max-width: 800px;
+box-sizing: border-box;
+padding: 20px !important;
+margin: 16px 0 18px !important;
+border: 1px solid #d8e6f1 !important;
+border-radius: 14px !important;
+background: #f9fcff !important;
+}
+#cellular-sms-compose .sms-compose-title { display: block; font-size: 17px; font-weight: 750; color: #12304a; }
+#cellular-sms-compose .sms-compose-subtitle { margin: 2px 0 0; color: #586e83; font-size: 13px; }
+#cellular-sms-compose .sms-compose-field {
+display: flex !important; flex-direction: column !important;
+gap: 6px; margin: 0 !important; min-width: 0;
+font-size: 13px; font-weight: 650; color: #27445e;
+}
+#cellular-sms-compose #cellular-sms-to,
+#cellular-sms-compose #cellular-sms-text {
+display: block !important; width: 100% !important; min-width: 0; max-width: none;
+box-sizing: border-box; border: 1px solid #c5d6e5;
+border-radius: 9px; padding: 11px 12px;
+margin: 0 !important; background: #fff; color: #102f49;
+font-size: 14px; line-height: 1.5; font-family: inherit;
+}
+#cellular-sms-compose #cellular-sms-text {
+resize: vertical; min-height: 124px; max-height: 300px;
+}
+#cellular-sms-compose :is(input, textarea):focus-visible {
+outline: 2px solid #1b8abc; outline-offset: 2px;
+}
+#cellular-sms-compose #cellular-sms-length {
+margin: -6px 0 0; font-size: 12px; color: #596f82;
+}
+#cellular-sms-compose #cellular-sms-send-status {
+margin: 0; padding: 10px 12px; border-radius: 9px;
+background: #ecf3f9; color: #254764; font-size: 13px;
+}
+#cellular-sms-compose .sms-compose-actions {
+display: flex !important; flex-direction: row !important;
+flex-wrap: wrap; gap: 8px; align-items: center;
+margin: 0 !important;
+}
+#cellular-sms-compose .sms-compose-actions button {
+min-width: 110px; width: auto !important;
+}
+#cellular-sms-drafts-panel { max-width: 900px; }
+#cellular-sms-drafts-list article { background: #fff; }
+#cellular-sms-inbox-controls > .cellular-actions:first-of-type {
+display: flex; flex-wrap: wrap; gap: 8px;
+}
+@media(max-width: 600px) {
+#cellular-sms-compose:not([hidden]) { padding: 14px !important; }
+#cellular-sms-compose .sms-compose-actions button {
+flex: 1 1 130px; min-width: 0;
+}
+}
+#cellular-sms-inbox-controls #cellular-sms-compose .sms-compose-field {
+  display: flex !important;
+  flex-flow: column nowrap !important;
+  width: 100% !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 7px;
+}
+#cellular-sms-inbox-controls #cellular-sms-compose label.sms-compose-field > input,
+#cellular-sms-inbox-controls #cellular-sms-compose label.sms-compose-field > textarea {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  min-height: 45px;
+  box-sizing: border-box !important;
+}
+#cellular-sms-inbox-controls #cellular-sms-compose label.sms-compose-field > textarea {
+  min-height: 136px;
+}
+#cellular-sms-inbox-controls #cellular-sms-compose .sms-compose-actions {
+  width: 100%;
+  align-self: stretch;
+}
+#cellular-sms-inbox-controls .sms-message-card {
+  padding: 14px 16px; border: 1px solid #dce6ef; border-radius: 12px;
+  margin: 12px 0; background: #fff; overflow-wrap: anywhere;
+}
+#cellular-sms-inbox-controls .sms-message-card strong { display: block; margin: 0 0 6px; }
+#cellular-sms-inbox-controls .sms-message-card small { display: block; opacity: .8; margin: 0 0 10px; }
+#cellular-sms-inbox-controls .sms-message-card p { white-space: pre-wrap; line-height: 1.5; overflow-wrap: anywhere; }
+#cellular-sms-inbox-controls .sms-message-card button { margin: 4px 8px 0 0; }
+@media (max-width: 600px) {
+  #cellular-sms-inbox-controls #cellular-sms-compose:not([hidden]) { max-width: 100%; }
+  #cellular-sms-inbox-controls #cellular-sms-compose .sms-compose-actions > button { flex: 1 1 130px; }
+}
