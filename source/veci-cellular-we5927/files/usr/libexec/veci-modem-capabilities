@@ -1,0 +1,81 @@
+#!/bin/sh
+# VeCI WE5927: ONLY 3GPP AT test-commands; NO SMS send/read or USSD execution.
+# This is explicit-on-demand and shares the existing we5927-at.lock.
+set -eu
+umask 077
+LC_ALL=C
+export LC_ALL
+
+unavailable() {
+    case "$1" in
+        modem_port_unavailable|at_tool_unavailable|lock_unavailable|modem_busy) reason="$1" ;;
+        *) reason=unavailable ;;
+    esac
+    printf '{ "ok": false, "state": "unavailable", "reason": "%s", "sms_mode": "not_tested", "sms_storage": "not_tested", "sms_notifications": "not_tested", "ussd": "not_tested" }\n' "$reason"
+}
+
+# Never probe the W907's non-AT 1.5 USB function; doing so can hang I/O.
+# Match the modem manager's USB interface 1.4, with one configured fallback.
+find_at_port() {
+    for entry in /sys/class/tty/ttyUSB*; do
+        [ -e "$entry/device" ] || continue
+        devpath="$(readlink -f "$entry/device" 2>/dev/null || :)"
+        case "$devpath" in
+            */1-1:1.4/*)
+                port="/dev/$(basename "$entry")"
+                [ -c "$port" ] && { printf '%s\n' "$port"; return 0; }
+                ;;
+        esac
+    done
+    configured="$(uci -q get we5927_lte.main.at_port 2>/dev/null || :)"
+    case "$configured" in
+        /dev/ttyUSB3) return 1 ;;
+        /dev/ttyUSB[0-9]|/dev/ttyUSB[0-9][0-9])
+            [ -c "$configured" ] && { printf '%s\n' "$configured"; return 0; }
+            ;;
+    esac
+    return 1
+}
+
+# This internal function accepts NOTHING from ubus/browser. Commands and
+# expected response prefixes are fixed literals in the call sites below.
+test_at() {
+    raw="$(/usr/sbin/we5927-at "$at_port" "$1" 1500 2>/dev/null)" || {
+        printf 'unavailable\n'
+        return
+    }
+    lines="$(printf '%s\n' "$raw" | tr -d '\r')"
+    if printf '%s\n' "$lines" | grep -Fq "$2" &&
+       printf '%s\n' "$lines" | grep -qx 'OK'; then
+        printf 'supported\n'
+    elif printf '%s\n' "$lines" | grep -Eq '^(\+CME ERROR|\+CMS ERROR|ERROR)(:|$)'; then
+        # ERROR can be a temporary refusal, not proof of lack of hardware support.
+        printf 'rejected\n'
+    else
+        printf 'unknown\n'
+    fi
+}
+
+probe_capabilities() {
+    [ -x /usr/sbin/we5927-at ] || { unavailable at_tool_unavailable; return; }
+    command -v flock >/dev/null 2>&1 || { unavailable lock_unavailable; return; }
+    at_port="$(find_at_port)" || { unavailable modem_port_unavailable; return; }
+
+    # One nonblocking exclusive lock over all four probes, shared with
+    # /usr/sbin/we5927-lte. Never wait indefinitely behind watchdog/IMEI.
+    (
+        flock -n -x 9 || { unavailable modem_busy; exit 0; }
+        sms_mode="$(test_at 'AT+CMGF=?' '+CMGF:')"
+        sms_storage="$(test_at 'AT+CPMS=?' '+CPMS:')"
+        sms_notifications="$(test_at 'AT+CNMI=?' '+CNMI:')"
+        ussd="$(test_at 'AT+CUSD=?' '+CUSD:')"
+        printf '{ "ok": true, "state": "probed", "source": "read_only_at_test", "sms_mode": "%s", "sms_storage": "%s", "sms_notifications": "%s", "ussd": "%s" }\n' \
+            "$sms_mode" "$sms_storage" "$sms_notifications" "$ussd"
+    ) 9>/var/lock/we5927-at.lock
+}
+
+[ "$#" -eq 1 ] || { echo 'usage: veci-modem-capabilities probe' >&2; exit 2; }
+case "$1" in
+    probe) probe_capabilities ;;
+    *) echo 'unsupported operation' >&2; exit 2 ;;
+esac

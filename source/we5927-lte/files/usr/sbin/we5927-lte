@@ -411,6 +411,34 @@ maybe_refresh_status_cache() {
 	fi
 }
 
+
+# Deliberately read-only and on demand; never used by the poller.
+# This issues AT+CGSN only through the serialized, bounded AT transport.
+imei_read_json() {
+	local response number
+	response="$(at 'AT+CGSN' 1500 2>/dev/null)" || {
+		printf '{ "ok": false, "error": "modem_at_busy_or_unavailable" }\n'
+		return
+	}
+	number="$(printf '%s\n' "$response" | tr -d '\r' | grep -E '^[[:space:]]*[0-9]{15}[[:space:]]*$' | head -n 1 | tr -dc '0-9')"
+	case "$number" in
+		???????????????) ;;
+		*) number='' ;;
+	esac
+	case "$number" in
+		''|*[!0-9]*)
+			printf '{ "ok": false, "error": "modem_imei_not_returned" }\n'
+			return
+			;;
+	esac
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_boolean ok 1
+	json_add_string imei "$number"
+	json_add_string source 'at_cgsn_live'
+	json_dump
+}
+
 status_fast_json() {
 	. /usr/share/libubox/jshn.sh
 
@@ -796,6 +824,9 @@ case "$1" in
 		;;
 	status-full)
 		status_json
+		;;
+	imei-read)
+		imei_read_json
 		;;
 	refresh-cache)
 		refresh_status_cache
