@@ -49,6 +49,21 @@ print(val if not isinstance(val,bool) else str(val).lower())
             text=True,capture_output=True,timeout=4)
         self.assertEqual(p.returncode,0,p.stderr)
         return json.loads(p.stdout)
+    def test_rpcd_exec_list_one_argument(self):
+        # rpcd registration invokes the file with ONLY 'list'.
+        p = subprocess.run(["sh",str(self.executable),"list"],
+            capture_output=True,text=True,timeout=2)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(p.stderr, "")
+        declared = json.loads(p.stdout)
+        self.assertEqual(declared["status"], {})
+        self.assertEqual(declared["setBaseline"], {"remaining_mb":"int"})
+    def test_rpcd_exec_unknown_one_argument(self):
+        p = subprocess.run(["sh",str(self.executable),"unknown"],
+            capture_output=True,text=True,timeout=2)
+        self.assertEqual(p.returncode, 0)
+        self.assertEqual(json.loads(p.stdout)["reason"], "unknown_method")
+
     def test_empty_status_never_claims_balance(self):
         o=self.invoke("status")
         self.assertEqual(o["state"],"needs_baseline")
