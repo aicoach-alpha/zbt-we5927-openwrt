@@ -50,6 +50,11 @@ echo VECI_OVERLAY_END
 echo VECI_MEMORY_BEGIN
 grep -E '^Mem(Total|Available):' /proc/meminfo 2>/dev/null || :
 echo VECI_MEMORY_END
+echo VECI_LIVE_ASSET_SHA256_BEGIN
+for f in /www/veci/index.html /www/veci/js/pages/cellular.js /www/veci/js/pages/apps.js /www/veci/js/pages/system.js /usr/libexec/rpcd/veci; do
+ if [ -f "$f" ] && [ ! -L "$f" ]; then sha256sum "$f"; else echo "$f unavailable"; fi
+done
+echo VECI_LIVE_ASSET_SHA256_END
 echo VECI_PREFLIGHT_MODEM_CHANGED=false
 echo VECI_PREFLIGHT_PACKAGES_CHANGED=false
 echo VECI_PREFLIGHT_OTA_FLASHED=false
