@@ -70,11 +70,21 @@ verify_feed(){
 status(){
  free="$(df -k /overlay 2>/dev/null | awk 'NR==2 {print $4}')"
  case "$free" in ''|*[!0-9]*) free=0;; esac
- if feed_ready; then
+ configured=false
+ verified=false
+ if feed_configured; then
+  configured=true
+  [ "$(uci -q get veci.main.app_feed_verified_build_id 2>/dev/null || :)" = "$build" ] && verified=true
+ fi
+ if [ "$verified" = true ]; then
   if [ "$free" -ge 3072 ]; then ready=true;reason=ready
   else ready=false;reason=insufficient_overlay_space;fi
- else ready=false;reason=matching_signed_feed_unavailable;fi
- printf '{"schema":1,"management_available":true,"feed_ready":%s,"reason":"%s","overlay_free_kb":%s,"minimum_overlay_kb":3072,"apps":{' "$ready" "$reason" "$free"
+ else
+  ready=false
+  if [ "$configured" = true ]; then reason=feed_not_verified
+  else reason=matching_signed_feed_unavailable;fi
+ fi
+ printf '{"schema":1,"management_available":true,"feed_configured":%s,"feed_verified":%s,"feed_ready":%s,"reason":"%s","overlay_free_kb":%s,"minimum_overlay_kb":3072,"apps":{' "$configured" "$verified" "$ready" "$reason" "$free"
  sep=''
  for app in guest sqm ddns wireguard voucher;do
   if installed "$app";then
