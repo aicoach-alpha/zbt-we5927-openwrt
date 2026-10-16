@@ -1,0 +1,49 @@
+name: VeCI generic USSD signed installer focused gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-generic-ussd-010-signed-deploy-20261016.sh'
+      - '.github/workflows/veci-generic-ussd-install-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check only verified signed add-on and reversible scope
+        run: |
+          set -eu
+          sh -n scripts/veci-generic-ussd-010-signed-deploy-20261016.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-generic-ussd-010-signed-deploy-20261016.sh').read_text()
+          for x in (
+           'TAG=veci-generic-ussd-010-cb737a7734ca',
+           'APK_SHA=afad39bae6fad338b9f82bc4a220faa7cf411ae15d5bf7045735dde535d457a7',
+           'KEY_SHA=e091858653ce1567c3710fa725b9f8f02b46c1d7465e5d685fa4fa5fb8461c89',
+           'APK_BYTES=12938',
+           'check /www/veci/js/pages/cellular.js "$CELL_SHA"',
+           'check /usr/libexec/rpcd/veci "$CORE_SHA"',
+           'check /www/veci/js/lib/native-quota.js "$QUOTA_SHA"',
+           'no_files || fail existing_unknown_files',
+           'apk --keys-dir "$WORK/keys" verify',
+           'apk --no-network --keys-dir "$WORK/keys" --simulate add',
+           'apk --no-network --keys-dir "$WORK/keys" add',
+           'apk --no-network del veci-ussd-dialer',
+           'ubus -S call veci.dialer status',
+           'VECI_GENERIC_USSD_010_NETWORK_USSD_UAT=not_run',
+           'VECI_GENERIC_USSD_010_CORE_PRESERVED=pass',
+           'VECI_GENERIC_USSD_010_LUCI_MODIFIED=false',
+           'VECI_GENERIC_USSD_010_SMS_MODEM_UNCHANGED=true',
+           'VECI_GENERIC_USSD_010_ROLLBACK=available'
+          ): assert x in s,x
+          assert s.index('download') < s.index('if [ "$MODE" = --verify ]')
+          assert s.index('apk --keys-dir "$WORK/keys" verify') < s.index('apk --no-network --keys-dir "$WORK/keys" --simulate add')
+          for bad in ('--allow-untrusted add','apk upgrade','sysupgrade','/etc/config/network','AT+CUSD','AT+CMGS','/dev/ttyUSB','/luci-static/','uci commit','uci set','uci delete'):
+            assert bad not in s,bad
+          print('VECI_GENERIC_USSD_INSTALL_SIGNATURE_SCOPE=pass')
+          print('VECI_GENERIC_USSD_INSTALL_PACKAGE_ONLY_ROLLBACK=pass')
+          PY
