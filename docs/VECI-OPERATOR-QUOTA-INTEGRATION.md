@@ -66,16 +66,16 @@ Do not deploy to the router via andre-nas. The router is reachable from the offi
 
 
 ## Physical router UAT: USSD retirement, 2026-10-16
-- User-supplied terminal output confirmed \`VECI_USSD_RECONCILE=pass\`.
-- \`veci.ussd\` RPC absent; \`veci-ussd-dialer\` APK absent; its RPC executable absent; USSD VeCI page absent.
-- \`veci.sms\`, \`veci.quota\`, and \`veci.xl\` RPCs present and executables present.
+- User-supplied terminal output confirmed `VECI_USSD_RECONCILE=pass`.
+- `veci.ussd` RPC absent; `veci-ussd-dialer` APK absent; its RPC executable absent; USSD VeCI page absent.
+- `veci.sms`, `veci.quota`, and `veci.xl` RPCs present and executables present.
 - Removal/reconcile scripts reported modem unchanged; LTE connectivity after removal was not separately exercised during this acceptance check.
-- Prior script initially reported \`sms_lost\` immediately after restarting rpcd. Later registration confirmed SMS recovered. The source removal script now waits for rpcd registration before checking.
-- Do not restore USSD from older package releases or re-enable any \`veci.ussd\` UI actions. Legacy history is retained in Git only for audit.
+- Prior script initially reported `sms_lost` immediately after restarting rpcd. Later registration confirmed SMS recovered. The source removal script now waits for rpcd registration before checking.
+- Do not restore USSD from older package releases or re-enable any `veci.ussd` UI actions. Legacy history is retained in Git only for audit.
 
 ## EnQuota applicability (source inspected, 2026-10-16)
-- Upstream \`Najihh/EnQuota\` provides login / OTP / quota methods via provider APIs, **not USSD**.
-- Its XL \`getQuota()\` implementation commonly maps operator response values to \`QuotaItem.remainingFormatted\` and \`validUntil\` but does not populate \`totalBytes\` or \`remainingBytes\`. The router must not mislabel formatted-only values as independently verified, complete numeric quota records.
-- Existing \`source/veci-quota/enquota-adapter.js\` intentionally fails closed where verified numeric quota and valid expiry are missing; these tests use sample data, not a LIVE XL result.
-- The native XL CIAM binary still requires locally provisioned operator app configuration. As of UAT, \`basic_auth\`, \`user_agent\`, \`fingerprint\`, \`device_id\`, and \`ax_api_sig_key\` were absent; there is no authenticated XL session.
+- Upstream `Najihh/EnQuota` provides login / OTP / quota methods via provider APIs, **not USSD**.
+- Its XL `getQuota()` implementation commonly maps operator response values to `QuotaItem.remainingFormatted` and `validUntil` but does not populate `totalBytes` or `remainingBytes`. The router must not mislabel formatted-only values as independently verified, complete numeric quota records.
+- Existing `source/veci-quota/enquota-adapter.js` intentionally fails closed where verified numeric quota and valid expiry are missing; these tests use sample data, not a LIVE XL result.
+- The native XL CIAM binary still requires locally provisioned operator app configuration. As of UAT, `basic_auth`, `user_agent`, `fingerprint`, `device_id`, and `ax_api_sig_key` were absent; there is no authenticated XL session.
 - Do not copy EnQuota application secrets into the public image. Prioritize a permitted subscriber-authenticated mechanism before attempting OTP login or claiming quota is LIVE.
