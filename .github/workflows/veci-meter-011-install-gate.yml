@@ -1,0 +1,48 @@
+name: VeCI data meter 0.1.1 fixed-RPC installer gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-data-meter-011-rpcd-listfix-signed-deploy-20261016.sh'
+      - '.github/workflows/veci-meter-011-install-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -eu
+          sh -n scripts/veci-data-meter-011-rpcd-listfix-signed-deploy-20261016.sh
+          sudo sh source/veci-data-meter/files/usr/libexec/rpcd/veci.meter list | python3 -c "import json,sys; j=json.load(sys.stdin); assert j['status']=={}; assert j['setBaseline']=={'remaining_mb':'int'}"
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-data-meter-011-rpcd-listfix-signed-deploy-20261016.sh').read_text()
+          p=Path('source/veci-data-meter/files/usr/libexec/rpcd/veci.meter').read_text()
+          assert 'case "${1:-}:${2:-}" in' in p
+          for expected in (
+            'TAG=veci-data-meter-011-8b7c0db7d070',
+            'APK_SHA=f57aeb609698359782fd6d7973beb996a1bc784d01419e0408ca2f4e32f64949',
+            'KEY_SHA=af7e21df314daeb3d1932ee55389891fb381e6a3abfe9afff4b934bd557756cd',
+            'APK_BYTES=4796',
+            'apk --keys-dir "$TMP/keys" verify',
+            'apk --no-network --keys-dir "$TMP/keys" --simulate add',
+            'apk --no-network --keys-dir "$TMP/keys" add',
+            "grep -q '^veci-data-meter-'",
+            'fail rpc_plugin_manifest_schema_invalid',
+            'VECI_DATA_METER_011_RPCD_LIST=pass',
+            'VECI_DATA_METER_INSTALL=pass',
+            'VECI_DATA_METER_AUTO_ROLLBACK=attempted',
+            'VECI_DATA_METER_CARRIER_BALANCE=not_available',
+          ):
+            assert expected in s, expected
+          assert s.index('fail rpc_plugin_manifest_schema_invalid') < s.index('/etc/init.d/rpcd restart')
+          for banned in ('AT+CUSD','AT+CMGS','/dev/ttyUSB','sysupgrade','uci commit','uci set',
+                         '/etc/init.d/network','/etc/init.d/uhttpd','apk upgrade','/luci-static/'):
+            assert banned not in s,banned
+          print('VECI_METER_011_RPCD_LIST_REGRESSION=pass')
+          print('VECI_METER_011_APK_SIGNED_ONLY=pass')
+          print('VECI_METER_011_MODEM_SMS_CORE_PRESERVED=pass')
+          PY
