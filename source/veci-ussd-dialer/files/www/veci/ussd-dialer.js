@@ -41,8 +41,8 @@ function transportReason(error) {
     return 'ubus_status_' + error.ubusStatus;
   const text = typeof error?.message === 'string' ? error.message : '';
   if (text === 'Not authenticated') return 'session_not_authenticated';
-  if (/^veci\\.dialer\\.(?:start|reply|cancel|status) timed out$/.test(text) ||
-      /^session\\.access timed out$/.test(text)) return 'request_timeout';
+  if (/^veci\.dialer\.(?:start|reply|cancel|status) timed out$/.test(text) ||
+      /^session\.access timed out$/.test(text)) return 'request_timeout';
   if (/^HTTP 4[0-9]{2}$/.test(text)) return 'http_4xx';
   if (/^HTTP 5[0-9]{2}$/.test(text)) return 'http_5xx';
   return 'transport_unknown';
