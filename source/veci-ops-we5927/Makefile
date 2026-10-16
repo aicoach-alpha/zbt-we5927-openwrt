@@ -19,6 +19,7 @@ endef
 define Package/veci-ops-we5927/install
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
 	$(INSTALL_BIN) ./files/usr/libexec/rpcd/veci.apps $(1)/usr/libexec/rpcd/veci.apps
+	$(INSTALL_BIN) ./files/usr/libexec/rpcd/veci.firmware $(1)/usr/libexec/rpcd/veci.firmware
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/veci-ops.json $(1)/usr/share/rpcd/acl.d/veci-ops.json
 endef
