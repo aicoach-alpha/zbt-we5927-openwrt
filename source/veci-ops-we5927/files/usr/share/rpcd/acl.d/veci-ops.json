@@ -18,6 +18,7 @@
     "write": {
       "ubus": {
         "veci.apps": [
+          "verifyFeed",
           "install",
           "remove"
         ]
