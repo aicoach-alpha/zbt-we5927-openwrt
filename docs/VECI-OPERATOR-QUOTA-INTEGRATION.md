@@ -41,7 +41,9 @@ Normalize a successful answer to:
 ```
 This is a **schema example only**; amounts and dates above are fictional test values, not a subscriber's quota.
 
-Other states: `not_supported`, `authentication_required`, `pending_otp`, `rate_limited`, `stale`, `unavailable`. No quota number should be emitted for non-`ok` states. Never describe an emulator, mock, or successful package install as proof that real operator quota was read.
+Other states: `not_supported`, `authentication_required`, `pending_otp`, `rate_limited`, `stale`, `unavailable`. No quota number should be emitted for non-`ok` states.
+
+If an **authenticated, authoritative** operator response contains a verified numeric remaining-data amount but omits total entitlement or expiry, the adapter may set `quality: "remaining_only"` and emit only `remaining_bytes` for the verified bucket. `total_bytes` and `expires_at` MUST be absent, never zero-filled or inferred. EnQuota display strings are accepted only after independently checking the operator's units and proving that the value is present in the response rather than the wrapper's synthetic fallback (including `0 MB`). Missing authentication or evidence still yields `authentication_required` or `unavailable`. This is a prototype data contract; **XL authentication is not LIVE**. Never describe an emulator, mock, or successful package install as proof that real operator quota was read.
 
 ## Privacy and distribution
 - Store any user credentials or refresh tokens only on that user's own device with root-only permissions and atomic writes, excluding backup/export and logs; no secrets in frontend JavaScript or GitHub.
