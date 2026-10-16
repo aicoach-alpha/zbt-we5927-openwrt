@@ -15,7 +15,7 @@ pkg_for(){
  esac
 }
 installed(){ apk list -I 2>/dev/null | grep -q "^$(pkg_for "$1")-[0-9]"; }
-feed_ready(){
+feed_configured(){
  [ "$(uci -q get veci.main.app_feed_enabled 2>/dev/null || :)" = 1 ] || return 1
  [ -r /etc/veci-release.json ] || return 1
  command -v jsonfilter >/dev/null 2>&1 || return 1
@@ -42,6 +42,30 @@ feed_ready(){
  [ -d /etc/apk/keys ] || return 1
  # apk must cryptographically check the signed repository index. Never use
  # --allow-untrusted or implicitly fall through to global release feeds.
+}
+feed_ready(){
+ feed_configured || return 1
+ [ "$(uci -q get veci.main.app_feed_verified_build_id 2>/dev/null || :)" = "$build" ]
+}
+verify_feed(){
+ [ ! -t 0 ] || fail rpc_only
+ feed_configured || fail matching_signed_feed_unavailable
+ [ ! -L /tmp/veci-app-feed-verify.lock ] || fail unsafe_path
+ mkdir /tmp/veci-app-feed-verify.lock 2>/dev/null || fail operation_busy
+ trap 'rmdir /tmp/veci-app-feed-verify.lock 2>/dev/null || :' EXIT
+ available="$(df -Pk /tmp 2>/dev/null | awk 'NR==2 {print $4}')"
+ case "$available" in ''|*[!0-9]*) fail ram_unknown;; esac
+ [ "$available" -ge 8192 ] || fail ram_insufficient
+ # A successful signed-index refresh is the only route to enabling install.
+ # Keep output private to the running process; do not log provider URLs or
+ # display package-index contents to the browser.
+ result="$(apk update --repositories-file /etc/apk/repositories.d/veci-apps.list 2>&1)" || fail index_verification_failed
+ if printf '%s\n' "$result" | grep -iE '(^|[[:space:]])(warning|error):' >/dev/null 2>&1; then
+  fail index_verification_failed
+ fi
+ uci set veci.main.app_feed_verified_build_id="$build"
+ uci commit veci
+ printf '{"ok":true,"verified":true,"build_id":"%s"}\n' "$build"
 }
 status(){
  free="$(df -k /overlay 2>/dev/null | awk 'NR==2 {print $4}')"
@@ -91,10 +115,11 @@ action(){
  fi
 }
 case "$1" in
- list) printf '{"status":{},"install":{"id":"str"},"remove":{"id":"str"}}\n';;
+ list) printf '{"status":{},"verifyFeed":{},"install":{"id":"str"},"remove":{"id":"str"}}\n';;
  call)
   case "$2" in
    status) status;;
+   verifyFeed) verify_feed;;
    install|remove) action "$2";;
    *) fail unknown_method;;
   esac;;
