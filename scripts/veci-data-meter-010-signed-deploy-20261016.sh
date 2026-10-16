@@ -116,13 +116,35 @@ APPLIED=1
 apk --no-network --keys-dir "$TMP/keys" add "$TMP/$APK" >"$TMP/install.log" 2>&1 ||
  fail package_install_failed
 installed || fail package_not_registered
-/etc/init.d/rpcd restart >/dev/null 2>&1 || fail rpcd_restart_failed
-n=0
-while [ "$n" -lt 15 ]; do
- if ubus -S list veci.meter 2>/dev/null | grep -qx veci.meter; then break; fi
- n=$((n+1)); sleep 1
+# Inspect the installed rpcd plugin *before* restarting the production RPC.
+# A missing/broken plugin must not trigger repeated service restarts.
+PLUGIN=/usr/libexec/rpcd/veci.meter
+[ -f "$PLUGIN" ] && [ ! -L "$PLUGIN" ] && [ -x "$PLUGIN" ] ||
+ fail rpc_plugin_missing_or_not_executable
+methods="$("$PLUGIN" list 2>/dev/null || :)"
+printf '%s' "$methods" | grep -Fq '"status"' ||
+ fail rpc_plugin_manifest_invalid
+printf '%s' "$methods" | grep -Fq '"setBaseline"' ||
+ fail rpc_plugin_manifest_invalid
+echo VECI_DATA_METER_PLUGIN_MANIFEST=pass
+# Sometimes rpcd's exec plugin registration lags behind its service restart.
+# Retry only registration/restart, NEVER the package installation.
+attempt=0
+registered=0
+while [ "$attempt" -lt 3 ]; do
+ attempt=$((attempt+1))
+ /etc/init.d/rpcd restart >/dev/null 2>&1 || fail rpcd_restart_failed
+ n=0
+ while [ "$n" -lt 12 ]; do
+  if ubus -S list veci.meter 2>/dev/null | grep -qx veci.meter; then
+   registered=1
+   break
+  fi
+  n=$((n+1)); sleep 1
+ done
+ [ "$registered" = 1 ] && break
 done
-ubus -S list veci.meter 2>/dev/null | grep -qx veci.meter || fail rpc_not_registered
+[ "$registered" = 1 ] || fail rpc_not_registered
 ubus -S call veci.meter status > "$TMP/status.json" 2>/dev/null || fail rpc_status_failed
 [ "$(jsonfilter -i "$TMP/status.json" -e '@.carrier_authenticated' 2>/dev/null || :)" = false ] ||
  fail operator_balance_provenance_guard
