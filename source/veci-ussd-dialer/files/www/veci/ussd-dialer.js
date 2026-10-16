@@ -26,9 +26,66 @@ const errorLabels = Object.freeze({
   serial_unavailable: 'Komunikasi serial tidak tersedia.',
   invalid_response: 'Format respons modem tidak valid.',
   https_only_required: 'Administrasi router harus HTTPS-only.',
-  ussd_unavailable: 'Backend USSD tidak tersedia.'
+  ussd_unavailable: 'Backend USSD tidak tersedia.',
+  admin_required: 'Hak administrator tidak tersedia.',
+  unavailable: 'Layanan USSD belum siap.',
+  wrong_router: 'Router tidak cocok dengan perangkat yang diizinkan.',
+  clock_unavailable: 'Jam router tidak tersedia.',
+  token_unavailable: 'Token sesi aman tidak dapat dibuat.',
+  state_invalid: 'State sesi USSD tidak valid.',
+  state_unavailable: 'State sesi USSD tidak dapat disimpan.',
+  unsafe_path: 'Jalur state modem tidak aman.'
 });
+function transportReason(error) {
+  if (Number.isInteger(error?.ubusStatus) && error.ubusStatus >= 1 && error.ubusStatus <= 20)
+    return 'ubus_status_' + error.ubusStatus;
+  const text = typeof error?.message === 'string' ? error.message : '';
+  if (text === 'Not authenticated') return 'session_not_authenticated';
+  if (/^veci\\.dialer\\.(?:start|reply|cancel|status) timed out$/.test(text) ||
+      /^session\\.access timed out$/.test(text)) return 'request_timeout';
+  if (/^HTTP 4[0-9]{2}$/.test(text)) return 'http_4xx';
+  if (/^HTTP 5[0-9]{2}$/.test(text)) return 'http_5xx';
+  return 'transport_unknown';
+}
 function notice(text) { $('dial-feedback').textContent = text; }
+// Router core 0.2.2's VeciApi.call exposes ubusStatus. Use only sanitized codes.
+// HTTPS ubus binds the session identity itself: do not send session tokens in
+// session.access parameters, and never store or log access responses.
+async function checkDialPermission() {
+  let status = 'unknown';
+  try {
+    const result = await api.call('session', 'access', {
+      scope: 'ubus', object: 'veci.dialer', function: 'start'
+    }, { timeout: 7000 });
+    if (result?.access === true || result?.access === 1) status = 'allowed';
+    else if (result?.access === false || result?.access === 0) status = 'denied';
+    else status = 'no_access_field';
+  } catch (error) {
+    status = transportReason(error);
+  }
+  const report = $('dial-access-result');
+  if (report) report.textContent = 'Izin start: ' + status + ' (pemeriksaan read-only, tanpa USSD).';
+  if (status === 'denied') {
+    $('dial-send').disabled = true;
+    notice('Akun VeCI tidak mendapat izin dial USSD. Masuk kembali agar izin baru dimuat; bila masih ditolak, periksa role write pada login router.');
+  }
+  return status;
+}
+function installAccessCheck() {
+  if ($('dial-access-result')) return;
+  const output = document.createElement('p');
+  output.id = 'dial-access-result';
+  output.setAttribute('role', 'status');
+  output.setAttribute('aria-live', 'polite');
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'button button-secondary';
+  button.id = 'dial-access-check';
+  button.textContent = 'Periksa izin Dial (tanpa USSD)';
+  button.addEventListener('click', () => { void checkDialPermission(); });
+  $('dial-panel').appendChild(button);
+  $('dial-panel').appendChild(output);
+}
 function closeLocal() {
   activeSession = '';
   steps = 0;
@@ -70,9 +127,11 @@ async function perform(work) {
   setBusy(true);
   try { await work(); }
   catch (error) {
-    const label = Object.hasOwn(errorLabels, error?.message)
-      ? errorLabels[error.message]
-      : 'Transaksi gagal atau respons RPC tidak pasti. Tidak ada pengulangan otomatis.';
+    const code = Object.hasOwn(errorLabels, error?.message) ? error.message : transportReason(error);
+    const label = Object.hasOwn(errorLabels, code) ? errorLabels[code]
+      : code === 'ubus_status_6' ? 'Izin RPC ditolak (ubus status 6).'
+      : code === 'ubus_status_7' ? 'RPC tidak valid atau timeout (ubus status 7).'
+      : 'Transaksi ditolak atau hasil tidak pasti (' + code + '). Jangan ulangi otomatis.';
     interactionUnknown = true;
     closeLocal();
     notice('USSD gagal: ' + label + ' Muat ulang halaman sebelum memulai sesi baru.');
@@ -140,6 +199,8 @@ async function init() {
       if (!(await api.validateSession())) throw new Error('invalid_session');
       $('dial-login-panel').hidden = true;
       $('dial-panel').hidden = false;
+      installAccessCheck();
+      void checkDialPermission();
       $('dial-user').value = '';
       notice('Terhubung ke VeCI. Masukkan kode USSD pilihanmu.');
     } catch { notice('Login VeCI gagal. USSD tidak dikirim.'); }
@@ -148,7 +209,9 @@ async function init() {
   if (api.sessionId && await api.validateSession().catch(() => false)) {
     $('dial-login-panel').hidden = true;
     $('dial-panel').hidden = false;
+    installAccessCheck();
     notice('Terhubung ke VeCI. Masukkan kode USSD pilihanmu.');
+    void checkDialPermission();
   }
 }
 window.addEventListener('pagehide', () => {
