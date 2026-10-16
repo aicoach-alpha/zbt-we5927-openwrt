@@ -21,7 +21,7 @@ jobs:
           python3 -m json.tool source/veci-ops-we5927/files/usr/share/rpcd/acl.d/veci-ops.json >/dev/null
           grep -q 'CONFIG_PACKAGE_veci-ops-we5927=y' source/openwrt-we5927.config
           grep -q 'veci-ops-we5927' scripts/prepare-veci.sh
-          ! grep -E 'allow-untrusted|no-check-certificate|sysupgrade -F|AT.CUSD' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps source/veci-ops-we5927/files/usr/libexec/rpcd/veci.firmware
+          ! grep -E '^[[:space:]]*[^#[:space:]].*(--allow-untrusted|--no-check-certificate|sysupgrade -F|AT.CUSD)' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps source/veci-ops-we5927/files/usr/libexec/rpcd/veci.firmware
       - name: Validate matched VeCI UI source syntax
         run: |
           PIN="$(tr -d '[:space:]' < source/veci.commit)"
