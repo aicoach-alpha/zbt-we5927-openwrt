@@ -25,9 +25,23 @@ feed_ready(){
  [ "$(uci -q get veci.main.app_feed_build_id 2>/dev/null || :)" = "$build" ] || return 1
  url="$(uci -q get veci.main.app_feed_base_url 2>/dev/null || :)"
  [ "$url" = "https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/feeds/$build" ] || return 1
- [ -s /etc/apk/repositories.d/veci-apps.list ] || return 1
+ repo_file=/etc/apk/repositories.d/veci-apps.list
+ [ -f "$repo_file" ] && [ ! -L "$repo_file" ] && [ -s "$repo_file" ] || return 1
+ # Reject extra paths (including vendor/global feeds) before any package action.
+ [ "$(wc -l < "$repo_file" | tr -d '[:space:]')" = 7 ] || return 1
+ for entry in \
+  "$url/targets/ramips/mt76x8/packages/packages.adb" \
+  "$url/packages/mipsel_24kc/base/packages.adb" \
+  "$url/packages/mipsel_24kc/luci/packages.adb" \
+  "$url/packages/mipsel_24kc/packages/packages.adb" \
+  "$url/packages/mipsel_24kc/routing/packages.adb" \
+  "$url/packages/mipsel_24kc/telephony/packages.adb" \
+  "$url/packages/mipsel_24kc/video/packages.adb"; do
+  [ "$(grep -Fxc "$entry" "$repo_file" || :)" = 1 ] || return 1
+ done
  [ -d /etc/apk/keys ] || return 1
- # Signature enforcement is delegated to apk, never --allow-untrusted.
+ # apk must cryptographically check the signed repository index. Never use
+ # --allow-untrusted or implicitly fall through to global release feeds.
 }
 status(){
  free="$(df -k /overlay 2>/dev/null | awk 'NR==2 {print $4}')"
@@ -65,7 +79,7 @@ action(){
   free="$(df -k /overlay | awk 'NR==2 {print $4}')"
   case "$free" in ''|*[!0-9]*) fail storage_unknown;; esac
   [ "$free" -ge 3072 ] || fail insufficient_overlay_space
-  apk add "$package" >/dev/null 2>&1 || fail package_install_failed
+  apk -U add --repositories-file /etc/apk/repositories.d/veci-apps.list "$package" >/dev/null 2>&1 || fail package_install_failed
   installed "$app" || fail package_verification_failed
   printf '{"ok":true,"state":"installed"}\n'
  elif [ "$1" = remove ];then
