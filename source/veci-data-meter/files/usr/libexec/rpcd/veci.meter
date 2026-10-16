@@ -8,7 +8,13 @@ STATE=/etc/veci-data-meter/baseline.json
 DIR=/etc/veci-data-meter
 fail(){ printf '{"ok":false,"reason":"%s","carrier_authenticated":false}\n' "$1"; exit 0; }
 num(){ case "$1" in ''|*[!0-9]*) return 1;; esac; [ "$(printf %s "$1" | wc -c)" -le 14 ]; }
-read_num(){ [ -r "$1" ] || fail uplink_unavailable; n="$(cat "$1" 2>/dev/null || :)"; num "$n" || fail bad_counter; [ "$n" -le 90000000000000 ] || fail bad_counter; printf '%s' "$n"; }
+read_num(){
+ [ -r "$1" ] || return 1
+ n="$(cat "$1" 2>/dev/null || :)"
+ num "$n" || return 1
+ [ "$n" -le 90000000000000 ] || return 1
+ printf '%s' "$n"
+}
 field(){ jsonfilter -i "$STATE" -e "@.$1" 2>/dev/null || :; }
 private(){
  [ -d "$DIR" ] && [ ! -L "$DIR" ] && [ -f "$STATE" ] && [ ! -L "$STATE" ] || return 1
@@ -20,9 +26,9 @@ sample(){
  [ -r /proc/sys/kernel/random/boot_id ] || fail boot_id_missing
  boot="$(cat /proc/sys/kernel/random/boot_id)"
  case "$boot" in ????????-????-????-????-????????????) ;; *) fail bad_boot_id;; esac
- ix="$(read_num /sys/class/net/usb0/ifindex)"
- rx="$(read_num /sys/class/net/usb0/statistics/rx_bytes)"
- tx="$(read_num /sys/class/net/usb0/statistics/tx_bytes)"
+ ix="$(read_num /sys/class/net/usb0/ifindex)" || fail uplink_unavailable
+ rx="$(read_num /sys/class/net/usb0/statistics/rx_bytes)" || fail uplink_unavailable
+ tx="$(read_num /sys/class/net/usb0/statistics/tx_bytes)" || fail uplink_unavailable
  now="$(date +%s)"
  num "$now" || fail bad_clock
 }
