@@ -50,7 +50,8 @@
       let remaining = toBytes(item,'remaining');
       const total = toBytes(item,'total');
       // Optional display-only figures must have independently verified units.
-      if (remaining === null && evidence.remaining_units_verified === true)
+      if (remaining === null && evidence.remaining_units_verified === true &&
+          evidence.remaining_field_present === true)
         remaining = displayBytes(item.remainingFormatted);
       if (remaining === null || (total !== null && remaining > total))
         return failure(operator,'unavailable');
