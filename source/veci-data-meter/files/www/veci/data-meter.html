@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>VeCI · Pemakaian Internet</title>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<main class="login-shell">
+<section class="login-card">
+ <p class="eyebrow">VeCI · Cellular · Internet</p>
+ <h1>Pemakaian Data Router</h1>
+ <p>Pemakaian internet diukur dari antarmuka modem usb0. Angka ini <strong>bukan sisa kuota resmi operator</strong>.</p>
+ <section id="meter-signin">
+  <label class="field">Admin VeCI <input id="meter-user" autocomplete="username" maxlength="64"></label>
+  <label class="field">Password <input id="meter-password" type="password" autocomplete="current-password"></label>
+  <button id="meter-login" type="button" class="button button-secondary">Masuk</button>
+ </section>
+ <section id="meter-data" hidden>
+  <p><strong id="meter-state">Memeriksa…</strong></p>
+  <p id="meter-usage">Pemakaian akan muncul setelah tersambung.</p>
+  <p id="meter-remaining">Sisa kuota operator tidak tersedia.</p>
+  <p id="meter-limitation">Perkiraan berlaku hanya selama antarmuka modem dan sesi boot tidak berubah.</p>
+  <button id="meter-refresh" type="button" class="button button-secondary">Perbarui pemakaian</button>
+  <h2>Patokan dari myXL (opsional)</h2>
+  <p>Masukkan sisa kuota yang benar-benar terbaca dari aplikasi resmi myXL. Setelah itu VeCI mengurangkan lalu lintas modem untuk membuat <strong>estimasi</strong>, bukan saldo operator. Satuan MB desimal (1 GB = 1.000 MB).</p>
+  <label class="field" for="meter-baseline">Sisa kuota saat ini (MB)
+   <input id="meter-baseline" type="number" inputmode="numeric" min="1" max="1048576" step="1">
+  </label>
+  <button id="meter-save" type="button" class="button button-secondary">Simpan patokan dan mulai estimasi</button>
+ </section>
+ <p id="meter-feedback" role="status" aria-live="polite">Tidak ada data operator yang diminta.</p>
+ <p class="login-note">Tanpa USSD, SMS, kunci API aplikasi, atau akses server developer. Setelah router restart, estimasi dinonaktifkan sampai patokan diperbarui.</p>
+ <a class="button button-secondary" href="/veci/#/cellular">Kembali ke Cellular</a>
+</section>
+</main>
+<script type="module" src="./data-meter.js"></script>
+</body>
+</html>
