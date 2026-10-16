@@ -41,3 +41,17 @@ Only the **two byte-verified JavaScript versions** are eligible for overlay:
 Installer \`scripts/veci-generic-ussd-browser-acl-diagnostic-20261016.sh\` is a source-SHA-pinned, reversible JS-only overlay, never changes the signed APK, daemon, ACL, original Core, LTE, SMS or HTTPS-only. Focused CI PASS https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38840195175.
 
 **Physical overlay not yet installed as of this note**. After owner installs, inspect \`Izin start\` without dialling any code. If \`denied\`, re-login to refresh session ACL (group permissions are resolved at login), then inspect read-only again; if still denied, inspect effective login \`list write\` roles without broadening access. No speculative chmod, ACL grants, modem restarts, or repeated USSD calls.
+
+
+
+## Physical USSD dial UAT: ubus status 5, 16 October 2026
+
+Owner screenshot after user-confirmed \`*808#\`: \`ubus_status_5\`; permission test on same installation had \`Izin start: allowed\`. This rules out assuming an ACL denial (ubus 6). **No real operator response observed.**
+
+Verified upstream OpenWrt \`rpcd/plugin.c\`: \`rpc_plugin_call_finish_cb()\` uses \`UBUS_STATUS_NO_DATA\` for a successful JSON parser state with no result object. Thus 5 is a backend/exec response condition, not a failed credential check and not proof of modem dial success.
+
+A **fake input, zero-modem-transmission** root-cause script is available:
+\`scripts/veci-generic-ussd-nodata-readonly-diagnosis-20261016.sh\`.
+It first validates SHA256 fingerprints of the exact installed rpcd plugin and shell worker, checks Core and board, and issues only one intentionally impossible dial string \`NOT_A_USSD_DIAL\` to the local direct plugin and to \`ubus\`. The immutable plugin rejects that string before ever invoking the modem worker. Prints only sanitized stage/pass/exit flags, never phone numbers, AT commands or actual modem responses. CI safe-scope PASS https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38842268141. This probe is **not yet physically executed**, and therefore actual NO_DATA root cause still unresolved.
+
+Do not test legitimate USSD again until fake path proves RPC transport or root cause is repaired. Do not reset modem, SMS, LUCI, HTTPS-only, Core, XL 0.3.7, or signed generic dialer based on code 5 alone.
