@@ -1,0 +1,41 @@
+name: VeCI SMS native package gate
+on:
+  push:
+    branches: [feat/operator-apps-firmware-build-20261016]
+    paths:
+      - 'source/veci-sms-we5927/**'
+      - 'source/openwrt-we5927.config'
+      - 'source/veci.commit'
+      - '.github/workflows/veci-sms-package-ci.yml'
+  pull_request:
+    paths:
+      - 'source/veci-sms-we5927/**'
+      - '.github/workflows/veci-sms-package-ci.yml'
+permissions:
+  contents: read
+jobs:
+  sms-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile bounded SMS CMGS transport
+        run: |
+          gcc -std=c11 -D_DEFAULT_SOURCE -Os -Wall -Wextra -Werror -o /tmp/veci-sms-cmgs source/veci-sms-we5927/src/veci-sms-cmgs.c
+          test -x /tmp/veci-sms-cmgs
+      - name: Native shell and ACL isolation
+        run: |
+          set -eu
+          for shell in source/veci-sms-we5927/files/usr/libexec/* source/veci-sms-we5927/files/usr/libexec/rpcd/* source/veci-sms-we5927/files/etc/uci-defaults/*; do sh -n "$shell"; done
+          python3 -m json.tool source/veci-sms-we5927/files/usr/share/rpcd/acl.d/veci-sms-inbox-we5927.json >/dev/null
+          grep -Fq 'veci.sms' source/veci-sms-we5927/files/usr/share/rpcd/acl.d/veci-sms-inbox-we5927.json
+          grep -q '^CONFIG_PACKAGE_veci-sms-we5927=y' source/openwrt-we5927.config
+          for method in getConfig setEnabled listMessages deleteMessage sendMessage getSent getDrafts saveDraft deleteDraft; do
+            grep -Fq "$method" source/veci-sms-we5927/files/usr/libexec/rpcd/veci.sms
+          done
+          ! grep -Ri 'ussd\|AT+CUSD' source/veci-sms-we5927
+          test "$(wc -c < source/veci-sms-we5927/files/usr/libexec/rpcd/veci.sms)" -le 18000
+      - name: Test original bounded SMS sender PTY behavior
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_cmgs_pty.py' -v
+      - name: Confirm source is identical to vetted CMGS transport
+        run: cmp source/veci-sms-we5927/src/veci-sms-cmgs.c source/we5927-lte/src/veci-sms-cmgs.c
