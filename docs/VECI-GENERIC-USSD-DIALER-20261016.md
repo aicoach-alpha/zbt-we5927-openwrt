@@ -18,3 +18,26 @@ USSD is an interactive dial service on the active SIM. It is **not** inherently 
 - **No generic package has been installed on the physical router; operator USSD response remains unverified.**
 - Preserve installed VeCI Core 0.2.2, XL Native 0.3.7, LuCI, SMS, LTE, HTTPS-only, and owner backups.
 - Any production installation must verify signed APK and target platform, simulate the apk transaction, then check `veci.dialer` registration and a browser-to-RPC authenticated read-only method before dialing. On failure, remove only the optional package.
+
+
+## Owner physical UAT update — 16 October 2026
+
+The owner installed 0.1.0 on physical WE5927 and reports:
+- \`VECI_GENERIC_USSD_010_SIGNATURE=pass\`, \`SIMULATION=pass\`, \`INSTALL=pass\`.
+- \`VECI_GENERIC_USSD_010_RPC=registered\`, \`PACKAGE=installed\`, \`CORE_PRESERVED=pass\`, \`ROLLBACK=available\`.
+- Screenshot of \`/veci/ussd-dialer.html\` displays entered \`*808#\` and:
+  "USSD gagal: Transaksi gagal atau respons RPC tidak pasti. Tidak ada pengulangan otomatis."
+- Therefore **APK/RPC/UI are LIVE but real generic USSD operator transaction has NOT PASSED**. The screenshot does not prove the dial reached the modem.
+
+Offline audit of the exact signed VeCI Core 0.2.2 APK confirmed \`/www/veci/js/lib/api.js\` SHA256 \`61f8c5ca16d23ea29281cd98a37bd16cf79d8610eaf762329863a714ce2090be\`.
+The exact API throws \`Error\` with integer \`ubusStatus\` when the JSON-RPC response status is nonzero. The generic USSD frontend originally **swallowed that status**, making permission-denied (code 6), timeout, backend failures indistinguishable. CI source of the exact APK: https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38839621767.
+
+A standalone **read-only** browser probe using \`session.access\` (\`scope=ubus, object=veci.dialer, function=start\`) was added; browser-side HTTP ubus automatically supplies the calling session ID, so do **not** expose or pass explicit \`ubus_rpc_session\` parameter. The UI now displays safe ubus codes and disallows further dial attempts if access explicitly returns false.
+
+Only the **two byte-verified JavaScript versions** are eligible for overlay:
+- Previously signed 0.1.0 JS: SHA256 \`1b30bce5c5a52b1485290622f1342470d5f86bd6baacbfc2e37397118051b8e0\`.
+- New read-only permission/error UI: SHA256 \`26e43698e48f72ba7c8a256c8f6cb469f803116ad1a92aae939a4bec33e2f304\`.
+
+Installer \`scripts/veci-generic-ussd-browser-acl-diagnostic-20261016.sh\` is a source-SHA-pinned, reversible JS-only overlay, never changes the signed APK, daemon, ACL, original Core, LTE, SMS or HTTPS-only. Focused CI PASS https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38840195175.
+
+**Physical overlay not yet installed as of this note**. After owner installs, inspect \`Izin start\` without dialling any code. If \`denied\`, re-login to refresh session ACL (group permissions are resolved at login), then inspect read-only again; if still denied, inspect effective login \`list write\` roles without broadening access. No speculative chmod, ACL grants, modem restarts, or repeated USSD calls.
