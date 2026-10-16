@@ -1,0 +1,36 @@
+name: VeCI Ops staged source checks
+on:
+  push:
+    branches: [feat/operator-apps-firmware-build-20261016]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  safety-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell scripts and ACL
+        run: |
+          sh -n source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps
+          sh -n source/veci-ops-we5927/files/usr/libexec/rpcd/veci.firmware
+          sh -n scripts/prepare-veci.sh
+          sh -n scripts/build-veci-firmware.sh
+          python3 -m json.tool source/veci-ops-we5927/files/usr/share/rpcd/acl.d/veci-ops.json >/dev/null
+          grep -q 'CONFIG_PACKAGE_veci-ops-we5927=y' source/openwrt-we5927.config
+          grep -q 'veci-ops-we5927' scripts/prepare-veci.sh
+          ! grep -E 'allow-untrusted|no-check-certificate|sysupgrade -F|AT.CUSD' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps source/veci-ops-we5927/files/usr/libexec/rpcd/veci.firmware
+      - name: Validate matched VeCI UI source syntax
+        run: |
+          PIN="$(tr -d '[:space:]' < source/veci.commit)"
+          git init -q /tmp/veci-ui
+          git -C /tmp/veci-ui remote add origin https://github.com/aicoach-alpha/veci.git
+          git -C /tmp/veci-ui fetch -q --depth 1 origin "$PIN"
+          git -C /tmp/veci-ui checkout -q --detach FETCH_HEAD
+          node --input-type=module --check < /tmp/veci-ui/veci/js/pages/apps.js
+          node --input-type=module --check < /tmp/veci-ui/veci/js/pages/system.js
+          grep -q "api.call('veci.apps', 'status'" /tmp/veci-ui/veci/js/pages/apps.js
+          grep -q "api.call('veci.firmware', 'check'" /tmp/veci-ui/veci/js/pages/system.js
+          echo VECI_OPS_STATIC_TEST=pass
