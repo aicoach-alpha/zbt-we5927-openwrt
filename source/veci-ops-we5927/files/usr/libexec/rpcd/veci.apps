@@ -1,0 +1,83 @@
+#!/bin/sh
+# VeCI Apps: signed-feed-only optional package manager for WE5927.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+LC_ALL=C
+export LC_ALL
+fail(){ printf '{"ok":false,"reason":"%s"}\n' "$1"; exit 0; }
+[ "$(id -u)" -eq 0 ] || fail root_required
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail wrong_board
+pkg_for(){
+ case "$1" in
+  guest|sqm|ddns|wireguard|voucher) printf 'veci-app-%s' "$1";;
+  *) return 1;;
+ esac
+}
+installed(){ apk list -I 2>/dev/null | grep -q "^$(pkg_for "$1")-[0-9]"; }
+feed_ready(){
+ [ "$(uci -q get veci.main.app_feed_enabled 2>/dev/null || :)" = 1 ] || return 1
+ [ -r /etc/veci-release.json ] || return 1
+ command -v jsonfilter >/dev/null 2>&1 || return 1
+ build="$(jsonfilter -i /etc/veci-release.json -e '@.build_id' 2>/dev/null || :)"
+ [ "$(printf %s "$build" | wc -c)" -eq 40 ] || return 1
+ case "$build" in *[!0-9a-f]*) return 1;; esac
+ [ "$(uci -q get veci.main.app_feed_build_id 2>/dev/null || :)" = "$build" ] || return 1
+ url="$(uci -q get veci.main.app_feed_base_url 2>/dev/null || :)"
+ [ "$url" = "https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/feeds/$build" ] || return 1
+ [ -s /etc/apk/repositories.d/veci-apps.list ] || return 1
+ [ -d /etc/apk/keys ] || return 1
+ # Signature enforcement is delegated to apk, never --allow-untrusted.
+}
+status(){
+ if feed_ready; then ready=true;reason=ready;else ready=false;reason=matching_signed_feed_unavailable;fi
+ printf '{"schema":1,"management_available":true,"feed_ready":%s,"reason":"%s","apps":{' "$ready" "$reason"
+ sep=''
+ for app in guest sqm ddns wireguard voucher;do
+  if installed "$app";then
+   printf '%s"%s":{"installed":true,"managed":true,"available":true}' "$sep" "$app"
+  else
+   printf '%s"%s":{"installed":false,"managed":false,"available":%s}' "$sep" "$app" "$ready"
+  fi
+  sep=,
+ done
+ printf '}}\n'
+}
+action(){
+ [ "$#" -eq 1 ] || fail usage
+ [ ! -t 0 ] || fail json_required
+ command -v jsonfilter >/dev/null 2>&1 || fail jsonfilter_missing
+ data="$(head -c 128)"
+ [ "$(printf %s "$data" | wc -c)" -le 127 ] || fail input_too_large
+ app="$(printf '%s\n' "$data" | jsonfilter -e '@.id' 2>/dev/null || :)"
+ package="$(pkg_for "$app")" || fail invalid_app
+ [ ! -L /tmp/veci-app-operation.lock ] || fail lock_invalid
+ mkdir /tmp/veci-app-operation.lock 2>/dev/null || fail operation_busy
+ trap 'rmdir /tmp/veci-app-operation.lock 2>/dev/null || :' EXIT
+ if [ "$1" = install ];then
+  feed_ready || fail matching_signed_feed_unavailable
+  if installed "$app";then printf '{"ok":true,"state":"already_installed"}\n';exit 0;fi
+  free="$(df -k /overlay | awk 'NR==2 {print $4}')"
+  case "$free" in ''|*[!0-9]*) fail storage_unknown;; esac
+  [ "$free" -ge 3072 ] || fail insufficient_overlay_space
+  apk add "$package" >/dev/null 2>&1 || fail package_install_failed
+  installed "$app" || fail package_verification_failed
+  printf '{"ok":true,"state":"installed"}\n'
+ elif [ "$1" = remove ];then
+  if ! installed "$app";then printf '{"ok":true,"state":"already_absent"}\n';exit 0;fi
+  apk del "$package" >/dev/null 2>&1 || fail package_remove_failed
+  ! installed "$app" || fail package_remains
+  printf '{"ok":true,"state":"removed"}\n'
+ else fail unknown_action
+ fi
+}
+case "$1" in
+ list) printf '{"status":{},"install":{"id":"str"},"remove":{"id":"str"}}\n';;
+ call)
+  case "$2" in
+   status) status;;
+   install|remove) action "$2";;
+   *) fail unknown_method;;
+  esac;;
+ *) fail invalid_rpc_call;;
+esac
