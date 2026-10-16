@@ -18,6 +18,14 @@ jobs:
           sh -n source/veci-ops-we5927/files/usr/libexec/rpcd/veci.firmware
           sh -n scripts/prepare-veci.sh
           sh -n scripts/build-veci-firmware.sh
+          sh -n source/veci-sms-we5927/files/usr/libexec/rpcd/veci.sms
+          sh -n source/veci-sms-we5927/files/etc/uci-defaults/95-veci-sms-files
+          python3 -m json.tool source/veci-sms-we5927/files/usr/share/rpcd/acl.d/veci-sms-inbox-we5927.json >/dev/null
+          grep -q '^CONFIG_PACKAGE_veci-sms-we5927=y' source/openwrt-we5927.config
+          grep -q '^CONFIG_PACKAGE_veci-telco-indonesia=y' source/openwrt-we5927.config
+          grep -q '^CONFIG_PACKAGE_veci-telco-xl-native=y' source/openwrt-we5927.config
+          grep -Fq 'veci-sms-we5927' scripts/prepare-veci.sh
+          ! find source/veci-sms-we5927 -type f -iname '*ussd*' | grep -q .
           python3 -m json.tool source/veci-ops-we5927/files/usr/share/rpcd/acl.d/veci-ops.json >/dev/null
           grep -q 'CONFIG_PACKAGE_veci-ops-we5927=y' source/openwrt-we5927.config
           grep -q 'veci-ops-we5927' scripts/prepare-veci.sh
@@ -51,6 +59,12 @@ jobs:
           git -C /tmp/veci-ui checkout -q --detach FETCH_HEAD
           node --input-type=module --check < /tmp/veci-ui/veci/js/pages/apps.js
           node --input-type=module --check < /tmp/veci-ui/veci/js/pages/system.js
+          node --input-type=module --check < /tmp/veci-ui/veci/js/pages/cellular.js
+          for sms in getConfig listMessages deleteMessage sendMessage getSent getDrafts saveDraft deleteDraft; do
+            grep -Fq "sms','\$sms" /tmp/veci-ui/veci/js/pages/cellular.js || grep -Fq "'veci.sms', '\$sms'" /tmp/veci-ui/veci/js/pages/cellular.js
+          done
+          ! grep -qi 'ussd' /tmp/veci-ui/veci/js/pages/cellular.js
+          grep -Fq "api.call('veci.quota', 'status'" /tmp/veci-ui/veci/js/pages/cellular.js
           grep -q "api.call('veci.apps', 'status'" /tmp/veci-ui/veci/js/pages/apps.js
           grep -q "api.call('veci.firmware', 'check'" /tmp/veci-ui/veci/js/pages/system.js
           echo VECI_OPS_STATIC_TEST=pass
