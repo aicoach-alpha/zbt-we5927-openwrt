@@ -31,7 +31,7 @@ jobs:
           assert "error.ubusStatus" in s
           assert "ubus_status_6" in s
           assert "ubus_status_7" in s
-          assert "read-only, tanpa USSD" in s
+          assert "read-only; tidak ada USSD yang dikirim" in s
           assert s.count('window.confirm(') == 2
           assert 'innerHTML' not in s and 'console.log' not in s
           assert 'AT+CUSD' not in s and 'fetch(' not in s
