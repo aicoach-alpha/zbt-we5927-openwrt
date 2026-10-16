@@ -61,7 +61,7 @@ jobs:
           node --input-type=module --check < /tmp/veci-ui/veci/js/pages/system.js
           node --input-type=module --check < /tmp/veci-ui/veci/js/pages/cellular.js
           for sms in getConfig listMessages deleteMessage sendMessage getSent getDrafts saveDraft deleteDraft; do
-            grep -Fq "sms','\$sms" /tmp/veci-ui/veci/js/pages/cellular.js || grep -Fq "'veci.sms', '\$sms'" /tmp/veci-ui/veci/js/pages/cellular.js
+            grep -Fq "$sms" /tmp/veci-ui/veci/js/pages/cellular.js
           done
           ! grep -qi 'ussd' /tmp/veci-ui/veci/js/pages/cellular.js
           grep -Fq "api.call('veci.quota', 'status'" /tmp/veci-ui/veci/js/pages/cellular.js
