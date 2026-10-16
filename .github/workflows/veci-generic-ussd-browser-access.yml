@@ -1,0 +1,42 @@
+name: VeCI generic dialer browser RPC error gate
+on:
+  push:
+    paths:
+      - 'source/veci-ussd-dialer/files/www/veci/ussd-dialer.js'
+      - '.github/workflows/veci-generic-ussd-browser-access.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check read-only access probe and immutable core error handling
+        run: |
+          set -eu
+          p=source/veci-ussd-dialer/files/www/veci/ussd-dialer.js
+          node --check "$p"
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('source/veci-ussd-dialer/files/www/veci/ussd-dialer.js').read_text()
+          p=s[s.index('async function checkDialPermission()'):s.index('function installAccessCheck()')]
+          assert "api.call('session', 'access'" in p
+          assert "object: 'veci.dialer', function: 'start'" in p
+          assert 'ubus_rpc_session' not in p
+          assert 'start' not in p.split('api.call(',1)[-1].split(')',1)[0] or "session" in p
+          assert 'status === \'denied\'' in p
+          assert 'VECI' not in p or 'VECI' in p
+          assert "error.ubusStatus" in s
+          assert "ubus_status_6" in s
+          assert "ubus_status_7" in s
+          assert "read-only, tanpa USSD" in s
+          assert s.count('window.confirm(') == 2
+          assert 'innerHTML' not in s and 'console.log' not in s
+          assert 'AT+CUSD' not in s and 'fetch(' not in s
+          assert 'setInterval(' not in s and 'localStorage' not in s
+          print('VECI_GENERIC_DIALER_READONLY_PERMISSION=pass')
+          print('VECI_GENERIC_DIALER_EXACT_UBUS_CODES=pass')
+          PY
+          sha256sum "$p"
