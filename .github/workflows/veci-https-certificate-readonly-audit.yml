@@ -1,0 +1,39 @@
+name: VeCI HTTPS certificate read-only audit
+on:
+  push:
+    paths:
+      - 'scripts/veci-https-certificate-readonly-audit-20261016.sh'
+      - '.github/workflows/veci-https-certificate-readonly-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify certificate-only read and no key exposure
+        run: |
+          set -eu
+          sh -n scripts/veci-https-certificate-readonly-audit-20261016.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          x=Path('scripts/veci-https-certificate-readonly-audit-20261016.sh').read_text()
+          for required in ('VECI_HTTPS_LISTENER=https_only','VECI_HTTPS_CERT_SAN_PRIVATE_IP=',
+                           'VECI_HTTPS_CERT_DATE=','VECI_HTTPS_CERT_ISSUER=',
+                           'VECI_HTTPS_BROWSER_TRUST=not_checked_from_router',
+                           'VECI_HTTPS_PRIVATE_KEY_EXPORTED=false',
+                           'VECI_HTTPS_CHANGES_MADE=false'):
+            assert required in x,required
+          for forbidden in ('openssl req','openssl gen','openssl pkey','openssl rsa',
+                            'openssl x509 -req','/etc/init.d/','uci set','uci commit',
+                            'uci delete','uci add','sysupgrade','apk add',
+                            'rm -f "$key"','cat "$key"','scp','AT+CUSD','AT+CMGS'):
+            assert forbidden not in x,forbidden
+          assert 'openssl x509' in x
+          assert 'grep -Eq' in x
+          assert '[ -z "$(uci -q get uhttpd.main.listen_http' in x
+          print('VECI_HTTPS_CERT_AUDIT_READONLY=pass')
+          print('VECI_HTTPS_NO_PRIVATE_KEYS_OR_LIVE_CHANGES=pass')
+          PY
