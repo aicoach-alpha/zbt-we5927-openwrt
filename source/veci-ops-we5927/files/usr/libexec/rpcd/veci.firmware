@@ -1,0 +1,57 @@
+#!/bin/sh
+# VeCI WE5927 firmware status and OTA discovery (no flashing).
+# Only published, compatible, verified image metadata can enable downloads.
+set -eu
+umask 077
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+LC_ALL=C
+export LC_ALL
+fail(){ printf '{"ok":false,"reason":"%s"}\n' "$1"; exit 0; }
+[ "$(id -u)" -eq 0 ] || fail root_required
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail wrong_board
+BASE=https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed
+channel(){
+ case "$(uci -q get veci.update.channel 2>/dev/null || :)" in
+  stable|'') echo stable ;;
+  prerelease) echo prerelease ;;
+  *) echo invalid ;;
+ esac
+}
+status(){
+ if [ -r /etc/veci-release.json ]; then metadata=true; else metadata=false; fi
+ if [ -x /sbin/sysupgrade ]; then upgrade=true; else upgrade=false; fi
+ if command -v uclient-fetch >/dev/null 2>&1; then client=true; else client=false; fi
+ printf '{"schema":1,"board":"zbtlink,zbt-we5927","release_metadata":%s,"sysupgrade":%s,"tls_client":%s,"channel":"%s","ota_install_enabled":false,"manual_install_enabled":false}\n' "$metadata" "$upgrade" "$client" "$(channel)"
+}
+check(){
+ c="$(channel)"
+ [ "$c" != invalid ] || fail invalid_channel
+ command -v uclient-fetch >/dev/null 2>&1 || fail fetch_client_missing
+ command -v jsonfilter >/dev/null 2>&1 || fail parser_missing
+ if [ "$c" = stable ]; then url="$BASE/releases/channel-stable.json"
+ else url="$BASE/channel-prerelease.json"; fi
+ work="$(mktemp /tmp/veci-ota-channel.XXXXXX)" || fail temporary_storage_unavailable
+ trap 'rm -f "$work"' EXIT
+ chmod 600 "$work"
+ # TLS must be verified; no --no-check-certificate.
+ uclient-fetch -q -T 12 -O "$work" "$url" >/dev/null 2>&1 || fail channel_fetch_failed
+ [ "$(wc -c < "$work")" -le 4096 ] || fail oversized_manifest
+ schema="$(jsonfilter -i "$work" -e '@.schema' 2>/dev/null || :)"
+ listed="$(jsonfilter -i "$work" -e '@.channel' 2>/dev/null || :)"
+ available="$(jsonfilter -i "$work" -e '@.available' 2>/dev/null || :)"
+ [ "$schema" = 1 ] && [ "$listed" = "$c" ] || fail invalid_release_schema
+ case "$available" in
+ false|0) printf '{"ok":true,"channel":"%s","state":"no_release","update_available":false}\n' "$c";;
+ true|1)
+  # An unsigned upstream JSON file must never authorize a flash.
+  printf '{"ok":true,"channel":"%s","state":"unverified_release","update_available":false}\n' "$c";;
+ *) fail invalid_release_availability;;
+ esac
+}
+case "$1" in
+ list) printf '{"status":{},"check":{}}\n';;
+ call)
+  case "$2" in status) status;;check) check;;*)fail unknown_method;;esac;;
+ *)fail invalid_method;;
+esac
