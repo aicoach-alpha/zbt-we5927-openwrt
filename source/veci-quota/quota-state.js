@@ -20,18 +20,27 @@
       return base;
     }
     if (!Array.isArray(obj.buckets) || !obj.buckets.length || obj.buckets.length > 64) return base;
+    const partial = obj.quality === 'remaining_only';
     const buckets = [];
     for (const b of obj.buckets) {
       if (!b || typeof b !== 'object') return base;
       if (typeof b.label !== 'string' || !b.label.trim() || b.label.length > 100) return base;
       if (!Number.isSafeInteger(b.remaining_bytes) || b.remaining_bytes < 0) return base;
-      if (!Number.isSafeInteger(b.total_bytes) || b.total_bytes < b.remaining_bytes) return base;
-      const expiry = Date.parse(b.expires_at);
-      if (!Number.isFinite(expiry)) return base;
-      buckets.push({label: b.label, remaining_bytes: b.remaining_bytes,
-        total_bytes: b.total_bytes, expires_at: new Date(expiry).toISOString()});
+      const hasTotal = Object.hasOwn(b,'total_bytes');
+      const hasExpiry = Object.hasOwn(b,'expires_at');
+      // A verified remaining-only reading must never produce implied totals.
+      if (!partial && (!hasTotal || !hasExpiry)) return base;
+      if (hasTotal && (!Number.isSafeInteger(b.total_bytes) ||
+          b.total_bytes < b.remaining_bytes)) return base;
+      if (hasExpiry && (typeof b.expires_at !== 'string' ||
+          !Number.isFinite(Date.parse(b.expires_at)))) return base;
+      const bucket = {label:b.label,remaining_bytes:b.remaining_bytes};
+      if (hasTotal) bucket.total_bytes = b.total_bytes;
+      if (hasExpiry) bucket.expires_at = new Date(Date.parse(b.expires_at)).toISOString();
+      buckets.push(bucket);
     }
     return {operator, state: 'ok', source: 'operator',
+      ...(partial ? {quality:'remaining_only'} : {}),
       fetched_at: new Date(fetched).toISOString(), buckets};
   }
   return { normalize };
