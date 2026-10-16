@@ -49,6 +49,7 @@ grep -q '^CONFIG_PACKAGE_veci=y' .config
 grep -q '^CONFIG_PACKAGE_veci-default-ui=y' .config
 grep -q '^CONFIG_PACKAGE_veci-cellular-we5927=y' .config
 grep -q '^CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
+grep -q '^CONFIG_PACKAGE_veci-ops-we5927=y' .config
 grep -q '^CONFIG_PACKAGE_veci-app-guest=m' .config
 grep -q '^CONFIG_PACKAGE_veci-app-sqm=m' .config
 grep -q '^CONFIG_PACKAGE_veci-app-ddns=m' .config
