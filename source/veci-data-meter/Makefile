@@ -1,7 +1,7 @@
 # Optional VeCI router data meter. No operator API access or LuCI dependency.
 include $(TOPDIR)/rules.mk
 PKG_NAME:=veci-data-meter
-PKG_VERSION:=0.1.0
+PKG_VERSION:=0.1.1
 PKG_RELEASE:=1
 include $(INCLUDE_DIR)/package.mk
 define Package/veci-data-meter
