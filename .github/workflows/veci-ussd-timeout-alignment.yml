@@ -1,0 +1,66 @@
+name: VeCI USSD timeout alignment focused gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-ussd-rpcd-browser-timeout-alignment-20261016.sh'
+      - '.github/workflows/veci-ussd-timeout-alignment.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify SHA-pinned UI, timeout layering and exact rollback
+        run: |
+          set -eu
+          sh -n scripts/veci-ussd-rpcd-browser-timeout-alignment-20261016.sh
+          node --check source/veci-ussd-dialer/files/www/veci/ussd-dialer.js
+          node tests/test_veci_ussd_permission_button.cjs
+          echo '9d55f6cbf31ae1da32ccb27524ba84d5074d61b7e404164f1daaa557477f70ed  source/veci-ussd-dialer/files/www/veci/ussd-dialer.js' | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-ussd-rpcd-browser-timeout-alignment-20261016.sh').read_text()
+          ui=Path('source/veci-ussd-dialer/files/www/veci/ussd-dialer.js').read_text()
+          for marker in (
+            'OLD_UI=8824597e1892f43845d5bac27d88b90f9bbb66ce204f83d5695a398d2868acd6',
+            'NEW_UI=9d55f6cbf31ae1da32ccb27524ba84d5074d61b7e404164f1daaa557477f70ed',
+            'cf61015bb1827514bbf60301eeb1e5af075d5736',
+            '[ "$(uci_timeout)" = 30 ] && [ "$(process_timeout)" = 30 ]',
+            "uci set 'rpcd.@rpcd[0].timeout=50'",
+            'uci commit rpcd',
+            '[ "$web" -ge 60 ]',
+            '[ "$free" -ge 64 ]',
+            'same "$UI" "$OLD_UI"',
+            'same "$TMP/next.js" "$NEW_UI"',
+            'same "$UI" "$NEW_UI"',
+            'cp "$CONF" "$BACKUP/rpcd.before"',
+            'cp "$UI" "$BACKUP/ui.before"',
+            'same "$BACKUP/ui.before" "$OLD_UI"',
+            'hash "$CONF" > "$BACKUP/rpcd.after.sha"',
+            'ready 50',
+            'ready 30',
+            'VECI_USSD_TIMEOUT_AUTO_ROLLBACK=pass',
+            'VECI_USSD_TIMEOUT_ROLLBACK=available',
+            'VECI_USSD_UHTTPD_UNCHANGED=true',
+            'VECI_USSD_CORE_AND_LUCI_UNCHANGED=true',
+            'VECI_USSD_LTE_SMS_UNCHANGED=true',
+            'VECI_USSD_REAL_DIAL_SENT=false'
+          ):
+            assert marker in s,marker
+          assert "{ timeout: 55000 }" in ui
+          assert 'ubus_status_5' in ui
+          assert s.index('same "$UI" "$NEW_UI" || fail active_js_hash') < s.index('/etc/init.d/rpcd restart >/dev/null 2>&1 || fail restart_rpcd')
+          assert s.index('uci commit rpcd') < s.index('/etc/init.d/rpcd restart >/dev/null 2>&1 || fail restart_rpcd')
+          assert s.index('VECI_USSD_TIMEOUT_CONFIG_CHANGED=false') < s.index('uci set')
+          for banned in ('AT+CUSD','AT+CMGS','/dev/ttyUSB','sysupgrade','apk add','apk del',
+                         'uci set uhttpd','uci commit uhttpd','uci set network',
+                         '/etc/init.d/uhttpd','/etc/init.d/network','/luci-static/',
+                         'ubus -S call veci.dialer start','ubus -S call veci.dialer reply'):
+            assert banned not in s,banned
+          print('VECI_USSD_RPCD_50_BROWSER_55_UHTTPD_MIN_60=pass')
+          print('VECI_USSD_BACKUP_AND_AUTOROLLBACK=pass')
+          print('VECI_USSD_NO_DIAL_OR_MODEM_CHANGES=pass')
+          PY
