@@ -1,0 +1,10 @@
+{
+  "veci-ops-read": {
+    "description": "VeCI Apps read-only status",
+    "read": { "ubus": { "veci.apps": ["status"] } }
+  },
+  "veci-ops-admin": {
+    "description": "Explicit administrator package changes",
+    "write": { "ubus": { "veci.apps": ["install", "remove"] } }
+  }
+}
