@@ -14,4 +14,11 @@ assert.equal(item.buckets[0].remaining,'1.00 GB');
 assert.equal(item.buckets[0].total,'2.00 GB');
 assert.equal(item.buckets[0].label,'Paket utama');
 assert.equal(item.buckets.length,1);
-console.log('VeCI quota view: 9 tests PASS');
+
+const partial = model({state:'ok',source:'operator',quality:'remaining_only',
+  buckets:[{label:'XL Internet',remaining_bytes:1610612736}]});
+assert.equal(partial.state,'ok');
+assert.equal(partial.buckets[0].remaining,'1.50 GB');
+assert.equal(Object.hasOwn(partial.buckets[0],'total'),false);
+assert.equal(Object.hasOwn(partial.buckets[0],'expires'),false);
+console.log('VeCI quota regression PASS');
