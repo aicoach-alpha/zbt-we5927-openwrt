@@ -1,0 +1,48 @@
+name: VeCI signed data meter installer gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-data-meter-010-signed-deploy-20261016.sh'
+      - '.github/workflows/veci-data-meter-install-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Signed APK digest and narrow fail-closed installation
+        run: |
+          set -eu
+          sh -n scripts/veci-data-meter-010-signed-deploy-20261016.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-data-meter-010-signed-deploy-20261016.sh').read_text()
+          for text in (
+            'TAG=veci-data-meter-010-d17a99183575',
+            'APK_SHA=4578b170e4651ca0f1d3783610d3b5efd3c0eecf8a7d354b9638ce0ec186b850',
+            'KEY_SHA=9db0fd998e2157cb8e7284931376ab6f00014d6a85690da069836d03ee92d7ca',
+            'APK_BYTES=4788',
+            'apk --keys-dir "$TMP/keys" verify',
+            'apk --no-network --keys-dir "$TMP/keys" --simulate add',
+            'apk --no-network --keys-dir "$TMP/keys" add',
+            'apk --no-network del veci-data-meter',
+            'fresh || fail unknown_target_file',
+            'jsonfilter -i "$TMP/status.json" -e',
+            'fail operator_balance_provenance_guard',
+            'VECI_DATA_METER_CORE_PRESERVED=pass',
+            'VECI_DATA_METER_CARRIER_BALANCE=not_available',
+            'VECI_DATA_METER_MODEM_SMS_UNCHANGED=true',
+            'VECI_DATA_METER_ROLLBACK=available'
+          ):
+            assert text in s,text
+          assert s.index('download\nif [ "$MODE" = --verify ]') < s.index('APPLIED=1')
+          for bad in ("AT+CUSD","AT+CMGS","/dev/ttyUSB2","sysupgrade",
+                      "uci set","uci commit","/luci-static/","apk upgrade",
+                      "/etc/init.d/uhttpd","/etc/init.d/network"):
+            assert bad not in s,bad
+          print('VECI_DATA_METER_SIGNED_SHA256_AND_TRANSACTION=pass')
+          print('VECI_DATA_METER_CORE_SMS_AND_MODEM_UNCHANGED=pass')
+          PY
