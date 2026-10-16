@@ -55,3 +55,21 @@ A **fake input, zero-modem-transmission** root-cause script is available:
 It first validates SHA256 fingerprints of the exact installed rpcd plugin and shell worker, checks Core and board, and issues only one intentionally impossible dial string \`NOT_A_USSD_DIAL\` to the local direct plugin and to \`ubus\`. The immutable plugin rejects that string before ever invoking the modem worker. Prints only sanitized stage/pass/exit flags, never phone numbers, AT commands or actual modem responses. CI safe-scope PASS https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38842268141. This probe is **not yet physically executed**, and therefore actual NO_DATA root cause still unresolved.
 
 Do not test legitimate USSD again until fake path proves RPC transport or root cause is repaired. Do not reset modem, SMS, LUCI, HTTPS-only, Core, XL 0.3.7, or signed generic dialer based on code 5 alone.
+
+## RPCD execution deadline diagnosis and guarded fix — October 16, 2026
+
+Physical owner-provided output (read-only):
+
+- `VECI_USSD_RUNTIME_RPCD_TIMEOUT_SECONDS=30`
+- `VECI_USSD_RUNTIME_MEMAVAILABLE_KB=18332`
+- `VECI_USSD_RUNTIME_KERNEL_OOM_EVENTS=not_detected`
+- `VECI_USSD_RUNTIME_INTERACTIVE_SESSION=absent`
+- `VECI_USSD_RUNTIME_RPC=registered`
+- Physical invalid-code test: direct plugin `invalid_dial_guard_pass`, `ubus` fake start `guard_pass`. Browser session `Izin start: allowed`.
+- Real dial produced `ubus_status_5` NO_DATA; worker did not return usable JSON within RPCD boundary (precise elapsed time for that attempt not recorded).
+
+Confirmed upstream OpenWrt 25.12.5 `/etc/init.d/rpcd` uses `rpcd.@rpcd[0].timeout` for the `rpcd -t` process argument, shipped config defaults to **30 seconds**. Native one-shot binary writes with a deadline up to 5 seconds then waits up to **30 seconds** for the asynchronous operator USSD reply, *plus* the shell and modem preflight. Thus the original RPCD deadline can interrupt a valid transaction. `uhttpd` has a separate script/ubus timeout (default 60 seconds) and the VeCI browser JS previously had 37 seconds.
+
+A scoped reversible fix changes only **`rpcd.@rpcd[0].timeout` from 30 to 50 seconds** and the optional page `/www/veci/ussd-dialer.js` to **55 seconds**. It checks that uhttpd script timeout is **at least 60 seconds** without modifying it. Old/new SHA256 are fixed, /root/ backup is restricted, only RPCD is restarted, Core and LuCI remain untouched, and an automatic rollback restores the previous config + JS if RPCD or other native RPC registrations fail. The RPCD exec timeout applies globally to RPCD plugins; this limited increase is an intentional stability tradeoff, not an unrestricted execution policy.
+
+Script: `scripts/veci-ussd-rpcd-browser-timeout-alignment-20261016.sh`. Focused CI PASS: https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38843828478. Physical execution NOT yet confirmed; do not mark real carrier USSD as PASS until a single user-confirmed dial produces an actual operator response. Restarting RPCD may require user to log back into VeCI; no modem/SMS commands are executed by the installer.
