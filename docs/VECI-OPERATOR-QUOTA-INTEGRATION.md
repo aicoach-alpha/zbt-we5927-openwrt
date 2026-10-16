@@ -1,9 +1,9 @@
 # VeCI operator quota integration (public firmware)
 
-Status: engineering contract; no operator integration is verified LIVE as of 2026-10-16.
+Status: engineering contract; no operator integration is verified LIVE as of 2026-10-16. Router UAT on the office-connected WE5927 confirmed removal of VeCI USSD (`VECI_USSD_RECONCILE=pass`).
 
 ## Scope
-The interface is **VeCI**, never LuCI. Target: ZBT WE5927 with 8 MB NOR and limited RAM. Do not change LTE control, modem commands, SMS, USSD, LuCI, network configuration, or production deployment to implement this contract.
+The interface is **VeCI**, never LuCI. Target: ZBT WE5927 with 8 MB NOR and limited RAM. Do not change LTE control, modem commands, SMS, LuCI, network configuration, or production deployment to implement this contract. USSD support is retired and must not be reintroduced.
 
 ## Important distinction
 - Operator quota: authoritative remaining entitlement from the mobile operator, with units, bucket, and expiry.
@@ -59,7 +59,23 @@ Other states: `not_supported`, `authentication_required`, `pending_otp`, `rate_l
 1. Verify provider's currently valid user-authorized access mechanism, without bundled secrets.
 2. Implement the adapter, root-only session store, normalized response, and native VeCI screen.
 3. Test authentication, expired token, invalid OTP, rate limit, offline mode, non-XL SIM and simultaneous sessions.
-4. On the office-connected router, prove an actual operator-sourced balance and expiry against the user's own operator app.
-5. Confirm unchanged LTE/SMS/USSD/core behavior, memory/flash headroom, and clean rollback.
+4. On the office-connected router, prove actual operator-sourced balances and any available expiry against the user's own operator app; never manufacture an unavailable expiry or total.
+5. Confirm unchanged LTE/SMS/core behavior, USSD remains absent, memory/flash headroom, and clean rollback.
 
 Do not deploy to the router via andre-nas. The router is reachable from the office laptop only.
+
+
+## Physical router UAT: USSD retirement, 2026-10-16
+- User-supplied terminal output confirmed \`VECI_USSD_RECONCILE=pass\`.
+- \`veci.ussd\` RPC absent; \`veci-ussd-dialer\` APK absent; its RPC executable absent; USSD VeCI page absent.
+- \`veci.sms\`, \`veci.quota\`, and \`veci.xl\` RPCs present and executables present.
+- Removal/reconcile scripts reported modem unchanged; LTE connectivity after removal was not separately exercised during this acceptance check.
+- Prior script initially reported \`sms_lost\` immediately after restarting rpcd. Later registration confirmed SMS recovered. The source removal script now waits for rpcd registration before checking.
+- Do not restore USSD from older package releases or re-enable any \`veci.ussd\` UI actions. Legacy history is retained in Git only for audit.
+
+## EnQuota applicability (source inspected, 2026-10-16)
+- Upstream \`Najihh/EnQuota\` provides login / OTP / quota methods via provider APIs, **not USSD**.
+- Its XL \`getQuota()\` implementation commonly maps operator response values to \`QuotaItem.remainingFormatted\` and \`validUntil\` but does not populate \`totalBytes\` or \`remainingBytes\`. The router must not mislabel formatted-only values as independently verified, complete numeric quota records.
+- Existing \`source/veci-quota/enquota-adapter.js\` intentionally fails closed where verified numeric quota and valid expiry are missing; these tests use sample data, not a LIVE XL result.
+- The native XL CIAM binary still requires locally provisioned operator app configuration. As of UAT, \`basic_auth\`, \`user_agent\`, \`fingerprint\`, \`device_id\`, and \`ax_api_sig_key\` were absent; there is no authenticated XL session.
+- Do not copy EnQuota application secrets into the public image. Prioritize a permitted subscriber-authenticated mechanism before attempting OTP login or claiming quota is LIVE.
