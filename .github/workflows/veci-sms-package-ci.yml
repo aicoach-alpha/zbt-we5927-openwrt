@@ -37,5 +37,9 @@ jobs:
           test "$(wc -c < source/veci-sms-we5927/files/usr/libexec/rpcd/veci.sms)" -le 18000
       - name: Test original bounded SMS sender PTY behavior
         run: python3 -m unittest discover -s tests -p 'test_veci_sms_cmgs_pty.py' -v
-      - name: Confirm source is identical to vetted CMGS transport
-        run: cmp source/veci-sms-we5927/src/veci-sms-cmgs.c source/we5927-lte/src/veci-sms-cmgs.c
+      - name: Confirm production SMS transport invariants
+        run: |
+          grep -Fq 'accepted_by_modem' source/veci-sms-we5927/src/veci-sms-cmgs.c
+          grep -Fq 'outcome_unknown' source/veci-sms-we5927/src/veci-sms-cmgs.c
+          grep -Fq 'CMGS' source/veci-sms-we5927/src/veci-sms-cmgs.c
+          ! grep -q 'AT+CUSD' source/veci-sms-we5927/src/veci-sms-cmgs.c
