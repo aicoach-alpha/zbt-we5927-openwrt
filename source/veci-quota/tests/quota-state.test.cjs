@@ -15,4 +15,13 @@ assert.equal(normalize({state:'authentication_required',operator:'xl',buckets:va
 assert.equal(normalize(null,now).state,'unavailable');
 assert.equal(normalize({...valid,buckets:[]},now).state,'unavailable');
 assert.equal(normalize({...valid,buckets:[{...valid.buckets[0],total_bytes:NaN}]},now).state,'unavailable');
-console.log('VeCI quota normalizer: 11 tests PASS');
+
+const partialQuota = {operator:'xl',source:'operator',state:'ok',quality:'remaining_only',
+  fetched_at:'2026-10-16T06:59:00Z',buckets:[{label:'Internet',remaining_bytes:1610612736}]};
+assert.equal(normalize(partialQuota,now).state,'ok');
+assert.equal(normalize(partialQuota,now).quality,'remaining_only');
+assert.equal(Object.hasOwn(normalize(partialQuota,now).buckets[0],'total_bytes'),false);
+assert.equal(normalize({...partialQuota,quality:undefined},now).state,'unavailable');
+assert.equal(normalize({...partialQuota,source:'meter'},now).state,'unavailable');
+assert.equal(normalize({...partialQuota,buckets:[{label:'Internet',remaining_bytes:-1}]},now).state,'unavailable');
+console.log('VeCI quota regression PASS');
