@@ -20,7 +20,7 @@ define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
 endef
 define Build/Compile
-	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -std=c11 -D_DEFAULT_SOURCE \
+	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -std=c11 \
 	  -Os -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 	  -o $(PKG_BUILD_DIR)/veci-ussd-dialer-once \
 	  $(CURDIR)/veci-ussd-once.c $(TARGET_LDFLAGS) -Wl,--gc-sections
