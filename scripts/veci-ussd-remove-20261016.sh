@@ -85,6 +85,16 @@ ussd_files | while IFS= read -r p; do rm -f "$p" || exit 1; done
 if pkg; then apk del veci-ussd-dialer || fail package_removal_failed; fi
 rm -f /tmp/veci-xl-ussd.session
 /etc/init.d/rpcd restart >/dev/null 2>&1 || fail rpcd_restart_failed
+# Registration after a service restart is not synchronous. Wait for both
+# preserved exec RPCs before interpreting absence as a real regression.
+n=0
+while [ "$n" -lt 20 ]; do
+ if ubus -S list veci.sms 2>/dev/null | grep -qx veci.sms; then
+  if ubus -S list veci.quota 2>/dev/null | grep -qx veci.quota; then break; fi
+ fi
+ sleep 1
+ n=$((n+1))
+done
 [ ! -e /usr/libexec/rpcd/veci.ussd ] || fail rpc_file_remaining
 if ubus -S list veci.ussd 2>/dev/null | grep -qx veci.ussd; then fail rpc_still_registered; fi
 ubus -S list veci.sms | grep -qx veci.sms || fail sms_lost
