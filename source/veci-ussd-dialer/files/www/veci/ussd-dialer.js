@@ -51,7 +51,21 @@ function notice(text) { $('dial-feedback').textContent = text; }
 // Router core 0.2.2's VeciApi.call exposes ubusStatus. Use only sanitized codes.
 // HTTPS ubus binds the session identity itself: do not send session tokens in
 // session.access parameters, and never store or log access responses.
+let accessCheckInFlight = false;
+let accessChecks = 0;
 async function checkDialPermission() {
+  // Important: visible feedback is set synchronously BEFORE the first await.
+  // The read-only check never triggers start/reply/cancel or a modem command.
+  const report = $('dial-access-result');
+  const button = $('dial-access-check');
+  if (!report || !button || accessCheckInFlight) return;
+  accessCheckInFlight = true;
+  accessChecks += 1;
+  const sequence = accessChecks;
+  button.disabled = true;
+  button.textContent = 'Sedang memeriksa…';
+  report.textContent = 'Pemeriksaan #' + sequence + ': menghubungi izin sesi router…';
+  notice('Memeriksa izin RPC VeCI (tanpa mengirim USSD).');
   let status = 'unknown';
   try {
     const result = await api.call('session', 'access', {
@@ -62,12 +76,17 @@ async function checkDialPermission() {
     else status = 'no_access_field';
   } catch (error) {
     status = transportReason(error);
+  } finally {
+    report.textContent = 'Pemeriksaan #' + sequence + ' — Izin start: ' + status +
+      ' (read-only; tidak ada USSD yang dikirim).';
+    notice('Pemeriksaan izin selesai: ' + status + '.');
+    button.textContent = 'Periksa izin Dial (tanpa USSD)';
+    button.disabled = false;
+    accessCheckInFlight = false;
   }
-  const report = $('dial-access-result');
-  if (report) report.textContent = 'Izin start: ' + status + ' (pemeriksaan read-only, tanpa USSD).';
   if (status === 'denied') {
     $('dial-send').disabled = true;
-    notice('Akun VeCI tidak mendapat izin dial USSD. Masuk kembali agar izin baru dimuat; bila masih ditolak, periksa role write pada login router.');
+    notice('Akses USSD ditolak untuk sesi ini. Login ulang untuk memuat izin terbaru.');
   }
   return status;
 }
@@ -77,14 +96,17 @@ function installAccessCheck() {
   output.id = 'dial-access-result';
   output.setAttribute('role', 'status');
   output.setAttribute('aria-live', 'polite');
+  output.textContent = 'Izin dial belum diperiksa. Klik tombol di bawah untuk memeriksa tanpa USSD.';
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'button button-secondary';
   button.id = 'dial-access-check';
   button.textContent = 'Periksa izin Dial (tanpa USSD)';
   button.addEventListener('click', () => { void checkDialPermission(); });
-  $('dial-panel').appendChild(button);
-  $('dial-panel').appendChild(output);
+  // Place the result next to the button, not at the bottom of a large panel.
+  const panel = $('dial-panel');
+  panel.appendChild(button);
+  panel.appendChild(output);
 }
 function closeLocal() {
   activeSession = '';
@@ -200,7 +222,6 @@ async function init() {
       $('dial-login-panel').hidden = true;
       $('dial-panel').hidden = false;
       installAccessCheck();
-      void checkDialPermission();
       $('dial-user').value = '';
       notice('Terhubung ke VeCI. Masukkan kode USSD pilihanmu.');
     } catch { notice('Login VeCI gagal. USSD tidak dikirim.'); }
@@ -211,7 +232,6 @@ async function init() {
     $('dial-panel').hidden = false;
     installAccessCheck();
     notice('Terhubung ke VeCI. Masukkan kode USSD pilihanmu.');
-    void checkDialPermission();
   }
 }
 window.addEventListener('pagehide', () => {
