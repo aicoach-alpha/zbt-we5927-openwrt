@@ -21,6 +21,20 @@
       Number.isFinite(gb) ? gb * 1073741824 : NaN;
     return Number.isSafeInteger(n) && n >= 0 ? n : null;
   }
+  // Formatted values are accepted only when the authenticated backend has
+  // independently verified the operator's byte-unit convention. EnQuota's
+  // XL fallback can synthesize "0 MB" for an absent field, so never parse
+  // display strings on a caller's success flag alone.
+  function displayBytes(value) {
+    const match = typeof value === 'string' &&
+      /^(0|[1-9][0-9]{0,11})(?:[.,]([0-9]{1,3}))? (B|KB|MB|GB)$/i.exec(value.trim());
+    if (!match) return null;
+    const scale = {B:1,KB:1024,MB:1048576,GB:1073741824}[match[3].toUpperCase()];
+    const decimals = match[2] || '';
+    const numerator = Number(match[1]) * 10 ** decimals.length + Number(decimals || 0);
+    const bytes = numerator * scale / 10 ** decimals.length;
+    return Number.isSafeInteger(bytes) && bytes >= 0 ? bytes : null;
+  }
   function convert(result, evidence) {
     const operator = names[String(result && result.provider || '').toUpperCase()] || 'unknown';
     // EnQuota can return formatted text such as '1 GB' without numerical balance.
@@ -33,18 +47,25 @@
     const buckets = [];
     for (const item of result.items) {
       if (!item || typeof item.name !== 'string' || !item.name.trim()) return failure(operator,'unavailable');
-      const remaining = toBytes(item,'remaining');
+      let remaining = toBytes(item,'remaining');
       const total = toBytes(item,'total');
-      // EnQuota QuotaItem defines totalBytes but it is optional.
-      // No fabricated total or default expiration is permitted.
-      const expiry = item.validUntil;
-      if (remaining === null || total === null || remaining > total ||
-          typeof expiry !== 'string' || !Number.isFinite(Date.parse(expiry)))
+      // Optional display-only figures must have independently verified units.
+      if (remaining === null && evidence.remaining_units_verified === true)
+        remaining = displayBytes(item.remainingFormatted);
+      if (remaining === null || (total !== null && remaining > total))
         return failure(operator,'unavailable');
-      buckets.push({label:item.name, remaining_bytes:remaining, total_bytes:total,
-        expires_at:new Date(expiry).toISOString()});
+      const expiry = item.validUntil;
+      const expiryKnown = typeof expiry === 'string' && expiry !== '-';
+      if (expiryKnown && !Number.isFinite(Date.parse(expiry)))
+        return failure(operator,'unavailable');
+      const bucket = {label:item.name, remaining_bytes:remaining};
+      if (total !== null) bucket.total_bytes = total;
+      if (expiryKnown) bucket.expires_at = new Date(expiry).toISOString();
+      buckets.push(bucket);
     }
+    const partial = buckets.some(b => !Object.hasOwn(b,'total_bytes') || !Object.hasOwn(b,'expires_at'));
     return {operator, state:'ok',source:'operator',
+      ...(partial ? {quality:'remaining_only'} : {}),
       fetched_at:new Date(evidence.fetched_at).toISOString(), buckets};
   }
   return {convert};
