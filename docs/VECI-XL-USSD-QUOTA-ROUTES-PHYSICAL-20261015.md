@@ -85,3 +85,28 @@ Focused patch now exposes ONLY finite, safe \`ubus_status_N\`, \`request_timeout
 - Expected physical installed previous sha256: \`c60d80b33cd3f49e25ff36ca4801c3ba481244ef2f98bf3697ec19ead61e8d83\`
 
 At report time the new patch is **GitHub CI PASS, not yet physically installed**. Install only after its SHA-pinned guard verifies exact previous JS and Core. Next use **read-only access checker** first; then only one explicitly user-approved \`*808#\` if necessary. No change to live Core 0.2.2, XL Native 0.3.7, LuCI or SMS.
+
+
+## Owner production ACL check — 16 Oct 2026
+
+Read-only physical WE5927 output confirms:
+\`VECI_USSD_ACL_FILE=present\`,
+\`VECI_USSD_ACL_START_DECLARED=yes\`,
+\`VECI_USSD_ACL_QUOTA_DECLARED=yes\`,
+\`VECI_USSD_ACL_SOURCE=veci-xl-ussd.json\`,
+\`VECI_UBUS_SESSION_OBJECT=registered\`,
+\`VECI_USSD_RPC=registered\`,
+\`VECI_USSD_REQUEST_SENT=false\`, and
+\`VECI_USSD_ACL_READONLY=pass\`.
+
+The browser's \`Izin start: unknown\` does not prove access denied; ACL file *declaration* does not confirm the live browser session's effective permissions. The native \`veci.xl.status\` and \`veci.ussd.quotaStatus\` are reachable via authenticated browser, but the actual \`veci.ussd.start\` outcome is not yet established. Do not change ACL or repeat USSD as a guess.
+
+A narrow, checksum-pinned JavaScript-only UI update is staged at
+\`scripts/veci-xl-ussd-ubus-error-update-20261015.sh\` pinned to
+\`80fb1e20b1f5172c299dfa4bc3800b0566b8dc7e\`.
+It should surface safe \`ubus_status_N\`, \`request_timeout\`, \`http_4xx\`,
+\`session_not_authenticated\`, or \`no_access_field\` outputs
+on the existing *read-only* browser RPC diagnostic. It does not
+send USSD automatically. CI PASS:
+https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/38730885663.
+Physical application of that UI update is **pending owner verification**.
