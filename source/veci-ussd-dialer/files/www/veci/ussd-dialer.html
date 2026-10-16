@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<title>VeCI · USSD Dialer</title>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<main class="login-shell">
+<section class="login-card" aria-labelledby="dial-title">
+ <p class="eyebrow">VeCI · CELLULAR · USSD</p>
+ <h1 id="dial-title">USSD Dialer</h1>
+ <p>Dial kode USSD pilihanmu melalui SIM aktif, seperti saat mengetik kode di aplikasi telepon. Bukan khusus XL atau cek kuota.</p>
+ <section id="dial-login-panel">
+  <label class="field" for="dial-user"><span>Administrator VeCI</span><input id="dial-user" autocomplete="username" maxlength="64"></label>
+  <label class="field" for="dial-password"><span>Password router</span><input id="dial-password" type="password" autocomplete="current-password"></label>
+  <button id="dial-login" class="button button-secondary" type="button">Masuk ke VeCI</button>
+ </section>
+ <section id="dial-panel" hidden>
+  <label class="field" for="dial-code"><span>Kode USSD</span>
+   <input id="dial-code" type="tel" inputmode="tel" maxlength="32" placeholder="Contoh: *123# atau #21#" autocomplete="off">
+  </label>
+  <p class="login-note">Masukkan kode secara lengkap. Beberapa layanan USSD dapat mengubah pengaturan atau dikenai biaya.</p>
+  <button id="dial-send" class="button button-primary" type="button">Dial USSD</button>
+  <section id="dial-result" hidden aria-labelledby="dial-response-title">
+   <h2 id="dial-response-title">Respons operator</h2>
+   <pre id="dial-response" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+   <label class="field" for="dial-choice" id="dial-choice-wrap" hidden><span>Balas pilihan menu</span>
+    <input id="dial-choice" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="Nomor pilihan">
+   </label>
+   <button id="dial-reply" type="button" class="button button-primary" hidden>Konfirmasi & kirim balasan</button>
+   <button id="dial-cancel" type="button" class="button button-secondary" hidden>Tutup sesi</button>
+  </section>
+ </section>
+ <p id="dial-feedback" role="status" aria-live="polite">Belum ada permintaan USSD.</p>
+ <p class="login-note">Tidak mengirim perintah otomatis, tidak menampilkan AT mentah, dan tidak menyimpan respons operator ke log atau cache.</p>
+ <a class="button button-secondary" href="/veci/#/cellular">Kembali ke Cellular</a>
+</section>
+</main>
+<script type="module" src="./ussd-dialer.js"></script>
+</body>
+</html>
