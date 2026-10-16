@@ -1,0 +1,67 @@
+name: VeCI SMS v1.6.1 reversible staging bundle
+on:
+  push:
+    paths:
+      - '.github/workflows/veci-sms-v161-stage-bundle.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  stage-bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate offline delivery and send contracts
+        run: |
+          set -eu
+          python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_reports.py' -q
+          python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_map.py' -q
+          python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_sent_view.py' -q
+          python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_rpc.py' -q
+          python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_ingest.py' -q
+          python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_send_bridge.py' -q
+          node tests/test_veci_sms_delivery_ui.cjs
+      - name: Build immutable payload without modem access or production writes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir -p /tmp/veci-mips release/veci-v161
+          gh release download veci-sms-delivery-v161-4339d99ce82d \
+            -p veci-sms-cmgs-mipsel -p veci-sms-status-report-mipsel \
+            -D /tmp/veci-mips
+          echo "574328f961a880b66a3dc5c0ebfdb8ff44d242aea5100640d72200deda701c8f  /tmp/veci-mips/veci-sms-cmgs-mipsel" | sha256sum -c -
+          echo "9e5e343852b3cdeef1a90da4cea65b9b2ea0c793a06c86629f54925ccfdac0ef  /tmp/veci-mips/veci-sms-status-report-mipsel" | sha256sum -c -
+          install -m 0700 /tmp/veci-mips/veci-sms-cmgs-mipsel release/veci-v161/veci-sms-cmgs
+          install -m 0700 /tmp/veci-mips/veci-sms-status-report-mipsel release/veci-v161/veci-sms-status-report
+          for f in veci-sms-send-one veci-sms-delivery-map veci-sms-sent-delivery-view veci-sms-report-ingest rpcd-veci.sms; do
+            install -m 0700 "scripts/veci-sms-delivery-v161-staged/$f" "release/veci-v161/$f"
+          done
+          install -m 0600 scripts/veci-sms-delivery-v161-staged/cellular.js release/veci-v161/cellular.js
+          (
+            cd release/veci-v161
+            sha256sum cellular.js rpcd-veci.sms veci-sms-* > SHA256SUMS
+            printf 'STAGE_ONLY=1\nNO_MODEM_COMMANDS=1\nNO_AUTO_ACTIVATION=1\nSOURCE_COMMIT=%s\n' "$GITHUB_SHA" > RELEASE_INFO
+          )
+          tar --sort=name --mtime='@0' --owner=0 --group=0 \
+              --numeric-owner -C release -czf release/veci-v161-stage.tar.gz veci-v161
+          tar -tzf release/veci-v161-stage.tar.gz
+          sha256sum release/veci-v161-stage.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-v161-stage-only
+          path: release/veci-v161-stage.tar.gz
+      - name: Publish immutable stage-only prerelease, not router deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-sms-v161-stage-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/veci-v161-stage.tar.gz \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI v1.6.1 stage-only package" \
+            --notes "Inactive package only: no AT+CNMI changes, SMS transmissions, daemon, or live router writes. Delivery receipt collection is gated on validated single-owner serial architecture."
+          echo "STAGING_BUNDLE_PUBLISHED=$tag"

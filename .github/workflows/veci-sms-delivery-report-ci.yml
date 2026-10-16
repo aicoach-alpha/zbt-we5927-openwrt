@@ -1,0 +1,52 @@
+name: VeCI SMS Delivery Report offline gate
+on:
+  push:
+    paths:
+      - 'source/we5927-lte/src/veci-sms-status-report.c'
+      - 'source/we5927-lte/src/veci-sms-cmgs.c'
+      - 'scripts/veci-sms-delivery-report-readonly-preflight.sh'
+      - 'scripts/veci-sms-delivery-routing-capability-v161.sh'
+      - 'scripts/veci-sms-delivery-v161-staged/**'
+      - 'scripts/veci-sms-v161-inactive-stage-install.sh'
+      - 'tests/test_veci_sms_delivery_map.py'
+      - 'tests/test_veci_sms_delivery_sent_view.py'
+      - 'tests/test_veci_sms_delivery_rpc.py'
+      - 'tests/test_veci_sms_delivery_ingest.py'
+      - 'tests/test_veci_sms_delivery_send_bridge.py'
+      - 'tests/test_veci_sms_v161_stage_installer.py'
+      - 'tests/test_veci_sms_delivery_ui.cjs'
+      - 'tests/test_veci_sms_delivery_reports.py'
+      - '.github/workflows/veci-sms-delivery-report-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  report-parser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode 3GPP status report with no modem commands
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_reports.py' -v
+      - name: Correlate TP-MR and hashed destination, deny ambiguous receipt
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_map.py' -v
+      - name: Verify read-only Sent History / Delivery Report join
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_sent_view.py' -v
+      - name: Test staged authenticated send/getSent RPC with mock native transport
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_rpc.py' -v
+      - name: Verify TP-SRR native bridge accepts exact reference without false modem success
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_send_bridge.py' -v
+      - name: Test private +CDS direct-report ingestion and rejection of false matches
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_ingest.py' -v
+      - name: Test delivery-report PDU encoding, multipart decode, and UI syntax
+        run: node tests/test_veci_sms_delivery_ui.cjs
+      - name: Verify inactive stage, atomic rollback, and preserved LIVE files
+        run: |
+          sh -n scripts/veci-sms-v161-inactive-stage-install.sh
+          python3 -m unittest discover -s tests -p 'test_veci_sms_v161_stage_installer.py' -v
+      - name: Require original live v1.6.0 still selected
+        run: |
+          grep -Fq 'v1.6.0' scripts/veci-sms-mifi-v160-multipart-install.sh
+          test ! -e source/we5927-lte/src/veci-sms-delivery-live-enable.flag
+          ! grep -Fq 'veci-sms-status-report.c' source/we5927-lte/Makefile
+          echo VECI_DELIVERY_REPORT_SOURCE_ONLY_PASS

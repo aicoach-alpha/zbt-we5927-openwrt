@@ -1,0 +1,8 @@
+{
+  "admin/network/veci_indonesia_quota": {
+    "title": "Kuota Operator (Indonesia)",
+    "order": 57,
+    "action": { "type": "view", "path": "veci/quota" },
+    "depends": { "acl": [ "veci-quota" ] }
+  }
+}

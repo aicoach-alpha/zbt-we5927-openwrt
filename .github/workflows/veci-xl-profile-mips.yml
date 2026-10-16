@@ -1,0 +1,96 @@
+name: VeCI XL profile native MIPS release candidate
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/veci-xl-quota-http.c'
+      - 'source/veci-telco-indonesia/veci-xl-crypto.c'
+      - 'source/veci-telco-indonesia/files/usr/libexec/veci-xl-profile-*'
+      - '.github/workflows/veci-xl-profile-mips.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build requirements
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd cmake
+      - name: Fetch official SHA-pinned OpenWrt 25.12.5 RAMIPS toolchain
+        run: |
+          set -eu
+          name=openwrt-toolchain-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 240 -o /tmp/toolchain.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$name"
+          echo "5e03963e3b5e2c12f8c1519a07d56a74babcd6147e95c4d50948e50ae465d776  /tmp/toolchain.tar.zst" | sha256sum -c -
+          mkdir -p /tmp/veci-toolchain
+          tar -xf /tmp/toolchain.tar.zst -C /tmp/veci-toolchain
+          curl -fL --retry 3 --max-time 150 -o /tmp/mbedtls.tar.bz2 \
+            https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.6/mbedtls-3.6.6.tar.bz2
+          echo "8fb65fae8dcae5840f793c0a334860a411f884cc537ea290ce1c52bb64ca007a  /tmp/mbedtls.tar.bz2" | sha256sum -c -
+          mkdir -p /tmp/veci-mbed
+          tar -xf /tmp/mbedtls.tar.bz2 -C /tmp/veci-mbed
+      - name: Build only read-only profile transport and crypto for MIPS
+        run: |
+          set -eu
+          cc="$(find -L /tmp/veci-toolchain -type f -name '*gcc' -executable | grep '/bin/' | head -1)"
+          test -n "$cc"
+          src=/tmp/veci-mbed/mbedtls-3.6.6
+          cmake -S "$src" -B /tmp/veci-mbed/build \
+            -DCMAKE_C_COMPILER="$cc" -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DENABLE_PROGRAMS=OFF -DENABLE_TESTING=OFF \
+            -DUSE_SHARED_MBEDTLS_LIBRARY=ON \
+            -DUSE_STATIC_MBEDTLS_LIBRARY=OFF \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections -Os"
+          cmake --build /tmp/veci-mbed/build --target mbedtls mbedx509 mbedcrypto -j2
+          mkdir -p release
+          "$cc" -std=c11 -Os -s -ffunction-sections -fdata-sections \
+            -Wall -Wextra -Werror -DVECI_XL_PROFILE_VARIANT \
+            -I"$src/include" \
+            -o release/veci-xl-profile-http-mipsel \
+            source/veci-telco-indonesia/veci-xl-quota-http.c \
+            -L/tmp/veci-mbed/build/library \
+            -Wl,-rpath-link,/tmp/veci-mbed/build/library \
+            -Wl,--gc-sections -lmbedtls -lmbedx509 -lmbedcrypto
+          "$cc" -std=c11 -D_DEFAULT_SOURCE -Os -s \
+            -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+            -I"$src/include" \
+            -o release/veci-xl-crypto-profile-mipsel \
+            source/veci-telco-indonesia/veci-xl-crypto.c \
+            -L/tmp/veci-mbed/build/library \
+            -Wl,-rpath-link,/tmp/veci-mbed/build/library \
+            -Wl,--gc-sections -lmbedcrypto
+          for f in release/*-mipsel; do
+            readelf -h "$f" | grep -Eq 'Machine:[ ]*MIPS'
+            readelf -h "$f" | grep -q "2's complement, little endian"
+            test "$(stat -c %s "$f")" -lt 120000
+            ! readelf -d "$f" | grep -Eq 'RPATH|RUNPATH'
+          done
+          readelf -d release/veci-xl-profile-http-mipsel | grep -q 'libmbedtls.so.21'
+          readelf -d release/veci-xl-profile-http-mipsel | grep -q 'libmbedx509.so.7'
+          readelf -d release/veci-xl-profile-http-mipsel | grep -q 'libmbedcrypto.so.16'
+          readelf -d release/veci-xl-crypto-profile-mipsel | grep -q 'libmbedcrypto.so.16'
+          cp source/veci-telco-indonesia/files/usr/libexec/veci-xl-profile-chain release/
+          cp source/veci-telco-indonesia/files/usr/libexec/veci-xl-profile-identity-check release/
+          sh -n release/veci-xl-profile-chain
+          sh -n release/veci-xl-profile-identity-check
+          (cd release && sha256sum * > SHA256SUMS)
+          echo VECI_XL_PROFILE_MIPS_ABI=pass
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-xl-native-profile-mips
+          path: release/
+      - name: Publish prerelease staged ONLY, no router deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-xl-profile-mips-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/* --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI XL profile MIPS read-only candidate" \
+            --notes "Only profile HTTPS, crypto, and number-match gate. Native MIPS ABI checked. NOT installed; authenticated account/real operator quota NOT verified. No changes to VeCI Core, LuCI, LTE or SMS."
+          echo VECI_XL_PROFILE_MIPS_STAGE=pass

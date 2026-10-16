@@ -1,0 +1,24 @@
+name: VeCI generic dialer installed JS baseline hash
+on:
+  push:
+    paths:
+      - '.github/workflows/veci-generic-ussd-baseline-sha.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original signed 0.1.0 source JS fingerprint
+        run: |
+          set -eu
+          url=https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/cb737a7734caf0e6a0c2859681673bc196e8b3d0/source/veci-ussd-dialer/files/www/veci/ussd-dialer.js
+          curl -fL --retry 2 --max-time 30 -o /tmp/original-dialer.js "$url"
+          node --check /tmp/original-dialer.js
+          echo VECI_GENERIC_ORIGINAL_DIALER_SHA256_START
+          sha256sum /tmp/original-dialer.js
+          echo VECI_GENERIC_ORIGINAL_DIALER_SHA256_END
+          echo '26e43698e48f72ba7c8a256c8f6cb469f803116ad1a92aae939a4bec33e2f304  source/veci-ussd-dialer/files/www/veci/ussd-dialer.js' | sha256sum -c -

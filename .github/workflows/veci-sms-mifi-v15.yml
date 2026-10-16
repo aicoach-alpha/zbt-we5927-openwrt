@@ -1,0 +1,158 @@
+name: VeCI MiFi SMS v1.5 release gate
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/veci-sms-mifi-v15-staged/**'
+      - '.github/workflows/veci-sms-mifi-v15.yml'
+      - 'scripts/veci-sms-mifi-v15-install.sh'
+      - 'scripts/veci-sms-mifi-v15-decoder-hotfix.sh'
+      - 'scripts/veci-sms-mifi-v153-staged/**'
+      - 'scripts/veci-sms-mifi-v153-delete-install.sh'
+      - 'scripts/veci-sms-mifi-v1531-inbox-hotfix.sh'
+      - 'scripts/veci-sms-mifi-v154-ui-install.sh'
+      - 'scripts/veci-sms-mifi-v1541-delete-copy-hotfix.sh'
+      - 'scripts/veci-sms-mifi-v155-staged/**'
+      - 'scripts/veci-sms-mifi-v155-send-install.sh'
+      - 'scripts/veci-sms-mifi-v156-sent-install.sh'
+      - 'tests/veci_sms_mifi_decoder_smoke.cjs'
+      - 'tests/veci_sms_mifi_send_smoke.cjs'
+      - 'tests/veci_sms_multipart_smoke.cjs'
+      - 'tests/veci_sms_mifi_sent_smoke.cjs'
+      - 'scripts/veci-sms-mifi-v156-staged/**'
+      - 'scripts/veci-sms-mifi-v157-staged/**'
+      - 'scripts/veci-sms-mifi-v157-drafts-install.sh'
+      - 'scripts/veci-sms-mifi-v158-compose-layout-install.sh'
+      - 'scripts/veci-sms-mifi-v159-staged/**'
+      - 'scripts/veci-sms-mifi-v159-csp-css-install.sh'
+      - 'scripts/veci-sms-mifi-v160-multipart-install.sh'
+      - 'tests/veci_sms_css_csp_smoke.cjs'
+      - 'tests/test_veci_sms_drafts.py'
+      - 'scripts/veci-sms-mifi-v156-sent-install.sh'
+      - 'tests/test_veci_sms_delete_awk_smoke.py'
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backend, page, ACL and rollback script syntax
+        shell: bash
+        run: |
+          set -eu
+          sh -n scripts/veci-sms-mifi-v15-staged/rpcd-veci.sms
+          sh -n scripts/veci-sms-mifi-v15-staged/veci-sms-mifi-inbox
+          sh -n scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one
+          sh -n scripts/veci-sms-mifi-v155-staged/veci-sms-send-one
+          sh -n scripts/veci-sms-mifi-v156-staged/veci-sms-sent-history
+          sh -n scripts/veci-sms-mifi-v157-staged/veci-sms-drafts
+          if [ -f scripts/veci-sms-mifi-v157-drafts-install.sh ];then
+            sh -n scripts/veci-sms-mifi-v157-drafts-install.sh
+          fi
+          if [ -f scripts/veci-sms-mifi-v158-compose-layout-install.sh ];then
+            sh -n scripts/veci-sms-mifi-v158-compose-layout-install.sh
+          fi
+          if [ -f scripts/veci-sms-mifi-v156-sent-install.sh ]; then
+            sh -n scripts/veci-sms-mifi-v156-sent-install.sh
+          fi
+          sh -n scripts/veci-sms-mifi-v155-send-install.sh
+          sh -n scripts/veci-sms-mifi-v156-sent-install.sh
+          sh -n scripts/veci-sms-mifi-v1531-inbox-hotfix.sh
+          sh -n scripts/veci-sms-mifi-v154-ui-install.sh
+          sh -n scripts/veci-sms-mifi-v1541-delete-copy-hotfix.sh
+          if [ -f scripts/veci-sms-mifi-v160-multipart-install.sh ];then
+            sh -n scripts/veci-sms-mifi-v160-multipart-install.sh
+          fi
+          if [ -f scripts/veci-sms-mifi-v159-csp-css-install.sh ];then
+            sh -n scripts/veci-sms-mifi-v159-csp-css-install.sh
+          fi
+          if [ -f scripts/veci-sms-mifi-v153-delete-install.sh ]; then
+            sh -n scripts/veci-sms-mifi-v153-delete-install.sh
+          fi
+          if [ -f scripts/veci-sms-mifi-v15-install.sh ]; then
+            sh -n scripts/veci-sms-mifi-v15-install.sh
+          fi
+          node --check scripts/veci-sms-mifi-v15-staged/cellular.js
+          python3 -m json.tool scripts/veci-sms-mifi-v15-staged/acl.json >/dev/null
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          d=Path('scripts/veci-sms-mifi-v15-staged')
+          rpc=(d/'rpcd-veci.sms').read_text()
+          worker=(d/'veci-sms-mifi-inbox').read_text()
+          ui=(d/'cellular.js').read_text()
+          acl=json.loads((d/'acl.json').read_text())
+          assert acl['veci-sms-inbox-we5927']['read']['ubus']=={}
+          assert acl['veci-sms-inbox-we5927']['write']['ubus']['veci.sms']==[
+              'listIndex','getConfig','setEnabled','listMessages','deleteMessage','sendMessage','getSent','getDrafts','saveDraft','deleteDraft']
+          assert 'sms_state || { deny sms_disabled; return; }' in rpc
+          assert 'sms_state || { unset result; deny sms_disabled; exit 0; }' in rpc
+          assert 'smsState.textContent' in ui and 'clearSms()' in ui
+          assert "api.call('veci.sms', 'listMessages'" in ui
+          assert "api.call('veci.sms', 'setEnabled'" in ui
+          assert "api.call('veci.sms.private'" not in ui
+          assert 'on_demand_cmgl_pdu' in worker
+          assert "flock -n -x 9" in worker
+          assert 'pdu[count]=toupper($0)' in worker
+          assert "'AT+CPMS?'" in worker
+          assert 'delete_message()' in rpc
+          assert 'send_message()' in rpc
+          assert 'get_sent()' in rpc
+          assert 'draft_request()' in rpc
+          assert 'getDrafts' in rpc and 'saveDraft' in rpc and 'deleteDraft' in rpc
+          assert "api.call('veci.sms','saveDraft'" in ui
+          assert 'history_saved' in rpc
+          assert "api.call('veci.sms','getSent'" in ui
+          assert "api.call('veci.sms','sendMessage'" in ui
+          # v1.5.3 adds storage before count; exact old v1.5.2 pattern
+          # silently rejected ALL valid full-SMS lists after upgrade.
+          assert all(('"storage":"'+v+'","count":') in rpc for v in ('SM','ME','MT'))
+
+          delete=Path('scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one').read_text()
+          assert 'AT+CMGD=$slot,0' in delete
+          assert '[ "$current" = "$expected" ] || fail' in delete
+          assert 'SMS feature ON' not in delete or 'flock -n -x 9' in delete
+          print('VECI_MIFI_SMS_V15_MINIMAL_RELEASE_GATE_PASS')
+          PY
+      - name: SMS Delete guarded AT response parser / no hardware
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_delete_awk_smoke.py' -v
+      - name: CSP-compliant real CSS asset and external link
+        run: node tests/veci_sms_css_csp_smoke.cjs
+      - name: Responsive SMS Compose markup with unchanged control IDs
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'),assert=require('assert');
+          const s=fs.readFileSync('scripts/veci-sms-mifi-v15-staged/cellular.js','utf8');
+          for(const id of ['cellular-sms-compose','cellular-sms-to','cellular-sms-text','cellular-sms-send','cellular-sms-draft-save','cellular-sms-compose-close']){
+            assert.strictEqual(s.split('id="'+id+'"').length-1,1,id);
+          }
+          assert(s.includes('veci-sms-center-v159-css'));
+          assert(s.includes("link.href = '/veci/sms-center.css?v=159'"));
+          assert(s.includes("api.call('veci.sms','sendMessage'"));
+          assert(s.includes("api.call('veci.sms','saveDraft'"));
+          console.log('VECI_SMS_V158_RESPONSIVE_MARKUP_SMOKE_PASS');
+          NODE
+      - name: Multipart GSM7/UCS2 PDU and Sent decoder round-trip
+        run: node tests/veci_sms_multipart_smoke.cjs
+      - name: Single-SMS Compose GSM7/UCS2 PDU smoke
+        run: node tests/veci_sms_mifi_send_smoke.cjs
+      - name: SMS Drafts create/edit/list/delete isolated store
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_drafts.py' -v
+      - name: Saved Sent SMS PDU decoder and privacy smoke
+        run: node tests/veci_sms_mifi_sent_smoke.cjs
+      - name: Operator sender and DCS PDU smoke
+        run: node tests/veci_sms_mifi_decoder_smoke.cjs
+      - name: Immutable deployment asset SHA256
+        run: |
+          echo VECI_MIFI_SMS_V15_SHA_BEGIN
+          sha256sum scripts/veci-sms-mifi-v15-staged/rpcd-veci.sms \
+                    scripts/veci-sms-mifi-v15-staged/veci-sms-mifi-inbox \
+                    scripts/veci-sms-mifi-v15-staged/cellular.js \
+                    scripts/veci-sms-mifi-v159-staged/sms-center.css \
+                    scripts/veci-sms-mifi-v15-staged/acl.json \
+                    scripts/veci-sms-mifi-v153-staged/veci-sms-delete-one \
+                    scripts/veci-sms-mifi-v156-staged/veci-sms-sent-history \
+                    scripts/veci-sms-mifi-v157-staged/veci-sms-drafts
+          echo VECI_MIFI_SMS_V15_SHA_END

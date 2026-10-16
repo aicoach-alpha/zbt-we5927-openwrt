@@ -1,0 +1,82 @@
+name: VeCI XL USSD rpcd single-response hotfix check
+on:
+  push:
+    paths:
+      - '.github/workflows/veci-xl-ussd-rpc-hotfix.yml'
+      - 'scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd'
+      - 'tests/test_veci_xl_ussd_rpc_single_json.py'
+      - 'scripts/veci-xl-v171-response-hotfix.sh'
+      - 'tests/test_veci_xl_response_hotfix.py'
+      - 'scripts/veci-xl-ussd-v17-staged/veci-xl-ussd'
+      - 'tests/test_veci_xl_ussd_no_od.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test one-response RPC contract
+        run: |
+          set -eu
+          python3 -m unittest discover -s tests -p test_veci_xl_ussd_rpc_single_json.py -v
+          sh -n scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd
+      - name: Pin checksums to already installed v1.7.1 archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir -p /tmp/veci-rpc-release
+          gh release download veci-xl-v17-fbf0fc346a1b -p veci-xl-v17.tar.gz -D /tmp/veci-rpc-release
+          echo "f59f566c964f5dee70ce246c37a78e0a9eca01a16d1c530588adc6aebd23900c  /tmp/veci-rpc-release/veci-xl-v17.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/veci-rpc-release/veci-xl-v17.tar.gz -C /tmp/veci-rpc-release
+          previous=/tmp/veci-rpc-release/veci-xl-v17/veci.ussd
+          next=scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd
+          python3 - "$previous" "$next" <<'PY'
+          import sys,difflib,pathlib
+          old=pathlib.Path(sys.argv[1]).read_text()
+          new=pathlib.Path(sys.argv[2]).read_text()
+          assert old!=new
+          assert 'start) "$RUN" --start || fail ussd_unavailable;;' in old
+          assert 'start) emit "$RUN" --start;;' in new
+          assert "quotaStatus" in old and "quotaStatus" in new
+          assert "emit(){" in new and "jsonfilter" in new
+          assert "exit 0; }" in new
+          delta=list(difflib.unified_diff(old.splitlines(),new.splitlines(),lineterm=''))
+          assert len(delta)<90, "unexpected wide plugin changes"
+          print("VECI_XL_RPC_DIFF_LINES="+str(len(delta)))
+          PY
+          echo "VECI_XL_RPC_ORIGINAL_SHA256=$(sha256sum "$previous" | cut -d' ' -f1)"
+          echo "VECI_XL_RPC_HOTFIX_SHA256=$(sha256sum "$next" | cut -d' ' -f1)"
+          echo VECI_XL_RPC_SINGLE_RESPONSE_SCOPE_PASS
+      - name: Pin safe modem-error forwarding to installed od-fixed worker
+        run: |
+          set -eu
+          curl -fLsS --retry 3 -o /tmp/veci-xl-old-worker \
+            "https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/e117318a66a44a9af069dd41faa87678b4ac1964/scripts/veci-xl-ussd-v17-staged/veci-xl-ussd"
+          echo "a15f922315e28c5d17fe165b10aed7d100ff87ad392c11f72a52a07b87c6a886  /tmp/veci-xl-old-worker" | sha256sum -c -
+          python3 - /tmp/veci-xl-old-worker scripts/veci-xl-ussd-v17-staged/veci-xl-ussd <<'PY'
+          import pathlib,sys
+          old=pathlib.Path(sys.argv[1]).read_text()
+          new=pathlib.Path(sys.argv[2]).read_text()
+          fromline=' result="$("$BIN" /dev/ttyUSB2 "$value" 2>/dev/null)" || fail ussd_unavailable'
+          assert fromline in old
+          start=new.index(' # Native may have already sent AT+CUSD;')
+          end=new.index('\n [ "$(printf %s "$result"|wc -c)"',start)
+          assert old.replace(fromline,new[start:end])==new, "worker changed outside error forwarding"
+          print("VECI_XL_WORKER_HOTFIX_SCOPE=only_native_error_forwarding")
+          PY
+          echo "VECI_XL_WORKER_CURRENT_SHA256=$(sha256sum /tmp/veci-xl-old-worker | cut -d' ' -f1)"
+          echo "VECI_XL_WORKER_NEW_SHA256=$(sha256sum scripts/veci-xl-ussd-v17-staged/veci-xl-ussd | cut -d' ' -f1)"
+          echo "VECI_XL_USSD_RECOVERY_PAIR_PASS"
+      - name: Verify SHA-pinned two-file hotfix apply rollback and fail closed
+        run: |
+          set -eu
+          sh -n scripts/veci-xl-v171-response-hotfix.sh
+          VECI_TEST_OLD_RPC=/tmp/veci-rpc-release/veci-xl-v17/veci.ussd \
+          VECI_TEST_OLD_WORKER=/tmp/veci-xl-old-worker \
+            python3 -m unittest discover -s tests -p test_veci_xl_response_hotfix.py -v
+          echo "VECI_XL_USSD_RESPONSE_PAIR_ATOMIC_ROLLBACK_PASS"

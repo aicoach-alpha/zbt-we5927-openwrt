@@ -1,0 +1,46 @@
+name: VeCI XL quota native RAMIPS ABI preflight
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/veci-xl-crypto.c'
+      - '.github/workflows/veci-xl-native-mips-abi.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain extraction and reference crypto headers
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd libmbedtls-dev
+      - name: Verify exact OpenWrt 25.12.5 RAMIPS compiler
+        run: |
+          set -eu
+          file=openwrt-toolchain-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 240 -o /tmp/t.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$file"
+          echo "5e03963e3b5e2c12f8c1519a07d56a74babcd6147e95c4d50948e50ae465d776  /tmp/t.tar.zst" | sha256sum -c -
+          mkdir -p /tmp/veci-toolchain
+          tar -xf /tmp/t.tar.zst -C /tmp/veci-toolchain
+      - name: Compile RAMIPS MIPS little-endian ABI object without installing software
+        run: |
+          set -eu
+          compiler="$(find -L /tmp/veci-toolchain -type f -name '*gcc' -executable | grep '/bin/' | head -1)"
+          [ -n "$compiler" ]
+          mkdir -p release
+          "$compiler" -std=c11 -Os -Wall -Wextra -Werror -D_DEFAULT_SOURCE \
+            -I/usr/include -c source/veci-telco-indonesia/veci-xl-crypto.c \
+            -o release/veci-xl-crypto-mipsel.o
+          file release/veci-xl-crypto-mipsel.o
+          readelf -h release/veci-xl-crypto-mipsel.o | grep -Eq 'Machine:[ ]*MIPS'
+          readelf -h release/veci-xl-crypto-mipsel.o | grep -q "2's complement, little endian"
+          echo VECI_XL_CRYPTO_MIPS_ABI_OBJECT_PASS
+          sha256sum release/veci-xl-crypto-mipsel.o
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-xl-crypto-mips-abi-object-not-executable
+          path: release/veci-xl-crypto-mipsel.o

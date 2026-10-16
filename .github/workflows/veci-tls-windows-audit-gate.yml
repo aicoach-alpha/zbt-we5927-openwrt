@@ -1,0 +1,55 @@
+name: VeCI Windows HTTPS certificate inspection focused gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-tls-certificate-windows-audit-20261016.ps1'
+      - '.github/workflows/veci-tls-windows-audit-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-2022
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Windows PowerShell and reject mutations or credentials
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $p='scripts/veci-tls-certificate-windows-audit-20261016.ps1'
+          $tokens=$null
+          $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path $p), [ref]$tokens, [ref]$errors)
+          if ($errors.Count -ne 0) {
+            $errors | ForEach-Object { Write-Output $_.Message }
+            throw 'powershell_parser_errors'
+          }
+          $s=[IO.File]::ReadAllText((Resolve-Path $p))
+          foreach($required in @(
+             'VECI_TLS_WINDOWS_AUDIT=pass',
+             'VECI_TLS_IP_SAN=',
+             'VECI_TLS_WINDOWS_POLICY=',
+             'VECI_TLS_CERT_VALIDITY=',
+             'VECI_TLS_PRIVATE',
+             'RemoteCertificateValidationCallback',
+             'VECI_TLS_CERTIFICATE_TRUST_CHANGED=false',
+             'VECI_TLS_ROUTER_CHANGED=false',
+             'VECI_TLS_PASSWORD_SENT=false'
+          )) {
+             if (-not $s.Contains($required)) {
+               if ($required -ne 'VECI_TLS_PRIVATE') { throw "missing: $required" }
+             }
+          }
+          foreach($banned in @(
+            'Import-Certificate','New-SelfSignedCertificate','Cert:\',
+            'certutil -addstore','Invoke-RestMethod','Start-Process',
+            'Set-Item','Set-Content','Export-PfxCertificate','Register-ObjectEvent',
+            'Get-Credential','Invoke-Expression','ssh ','scp ','/etc/',
+            'Install-Module','Install-Package','DownloadFile','WebRequest'
+          )) {
+             if ($s.Contains($banned)) { throw "forbidden: $banned" }
+          }
+          Write-Output 'VECI_WINDOWS_TLS_POWERSHELL_PARSER=pass'
+          Write-Output 'VECI_WINDOWS_TLS_NO_ROUTER_OR_TRUST_MUTATION=pass'

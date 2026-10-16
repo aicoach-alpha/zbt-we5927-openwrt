@@ -1,0 +1,50 @@
+name: VeCI USSD permission-button overlay integrity
+on:
+  push:
+    paths:
+      - 'scripts/veci-generic-ussd-button-responsive-update-20261016.sh'
+      - '.github/workflows/veci-ussd-button-overlay-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check pinned one-file update, backup and rollback
+        run: |
+          set -eu
+          sh -n scripts/veci-generic-ussd-button-responsive-update-20261016.sh
+          node --check source/veci-ussd-dialer/files/www/veci/ussd-dialer.js
+          echo '8824597e1892f43845d5bac27d88b90f9bbb66ce204f83d5695a398d2868acd6  source/veci-ussd-dialer/files/www/veci/ussd-dialer.js' | sha256sum -c -
+          node tests/test_veci_ussd_permission_button.cjs
+          python3 - <<'PY'
+          from pathlib import Path
+          old=Path('scripts/veci-generic-ussd-browser-acl-diagnostic-20261016.sh').read_text()
+          new=Path('scripts/veci-generic-ussd-button-responsive-update-20261016.sh').read_text()
+          pairs=[
+            ('REV=51ce9935ef2f4d63eeb3bb80e7d774cff107d44f','REV=3b4f9e6bb957ab878369c34a85b7517b60bb77d9'),
+            ('OLD_SHA=1b30bce5c5a52b1485290622f1342470d5f86bd6baacbfc2e37397118051b8e0','OLD_SHA=26e43698e48f72ba7c8a256c8f6cb469f803116ad1a92aae939a4bec33e2f304'),
+            ('NEW_SHA=26e43698e48f72ba7c8a256c8f6cb469f803116ad1a92aae939a4bec33e2f304','NEW_SHA=8824597e1892f43845d5bac27d88b90f9bbb66ce204f83d5695a398d2868acd6'),
+            ('BACKUP=/root/veci-generic-ussd-browser-acl-rollback-20261016.js','BACKUP=/root/veci-generic-ussd-button-rollback-20261016.js'),
+            ('LOCK=/tmp/veci-generic-ussd-ui-update.lock','LOCK=/tmp/veci-generic-ussd-button-update.lock'),
+            ('VECI_GENERIC_USSD_UI_','VECI_USSD_BUTTON_FIX_'),
+            ('Optional diagnostic-only JS overlay for signed generic USSD 0.1.0.','One-file USSD permission button responsiveness fix for signed 0.1.0.')
+          ]
+          for before,after in pairs:
+            assert before in old,before
+            old=old.replace(before,after)
+          assert new==old,'Unexpected change to previously verified installer'
+          assert new.index('if [ "$MODE" = --verify ]')<new.index('cp "$FILE" "$BACKUP"')
+          for text in ('VECI_USSD_BUTTON_FIX_UPDATE=pass','VECI_USSD_BUTTON_FIX_ROLLBACK=available',
+                       'VECI_GENERIC_USSD_CORE_PRESERVED=pass', 'same "$FILE" "$OLD_SHA"',
+                       'same "$FILE" "$NEW_SHA"'):
+            assert text in new,text
+          for forbidden in ('AT+CUSD','AT+CMGS','ubus call','ubus -S call','sysupgrade',
+                            'apk add','apk upgrade','/etc/init.d/','uci set','uci commit',
+                            'uci delete','/luci-static/'):
+            assert forbidden not in new,forbidden
+          print('VECI_USSD_BUTTON_ONE_FILE_ROLLBACK=pass')
+          PY

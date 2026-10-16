@@ -1,0 +1,60 @@
+#!/bin/sh
+# Native VeCI generic USSD JSON-RPC exec. No raw AT/number logging.
+set -eu
+umask 077
+RUN=/usr/libexec/veci-ussd-dialer
+fail(){ printf '{"ok":false,"reason":"%s"}\n' "$1"; exit 0; }
+[ "$(id -u)" = 0 ] || fail admin_required
+case "$1" in
+ list)
+  printf '{"status":{},"start":{"code":"str","approval":"str"},"reply":{"session":"str","choice":"str","approval":"str"},"cancel":{"session":"str"}}\n';;
+ call)
+  method="$2"
+  [ "$method" = status ] && { printf '{"ok":true,"ready":true}\n'; exit 0; }
+  [ -x "$RUN" ] || fail unavailable
+  [ -z "$(uci -q get uhttpd.main.listen_http 2>/dev/null || :)" ] ||
+     fail https_only_required
+  command -v jsonfilter >/dev/null 2>&1 || fail unavailable
+  payload="$(head -c 257)" || fail invalid_request
+  [ "$(printf %s "$payload" | wc -c)" -le 256 ] || fail invalid_request
+  emit(){
+   result="$("$@" 2>/dev/null)" || :
+   [ -n "$result" ] || fail ussd_unavailable
+   [ "$(printf %s "$result" | wc -c)" -le 1450 ] || fail invalid_response
+   ok="$(jsonfilter -s "$result" -e '@.ok' 2>/dev/null || :)"
+   case "$ok" in
+    true|1)
+     case "$result" in '{"ok":true,'*'}') printf '%s\n' "$result";; *) fail invalid_response;; esac;;
+    false|0)
+     reason="$(jsonfilter -s "$result" -e '@.reason' 2>/dev/null || :)"
+     case "$reason" in ''|*[!a-z_]*) fail invalid_response;; esac
+     [ "$(printf %s "$reason" | wc -c)" -le 40 ] || fail invalid_response
+     [ "$result" = "{\"ok\":false,\"reason\":\"$reason\"}" ] || fail invalid_response
+     printf '%s\n' "$result";;
+    *) fail invalid_response;;
+   esac
+  }
+  case "$method" in
+   start)
+    code="$(jsonfilter -s "$payload" -e '@.code' 2>/dev/null || :)"
+    approval="$(jsonfilter -s "$payload" -e '@.approval' 2>/dev/null || :)"
+    [ "$approval" = I_APPROVE_THIS_USSD_DIAL ] || fail approval_required
+    [ "$(printf %s "$code" | wc -c)" -ge 3 ] && [ "$(printf %s "$code" | wc -c)" -le 32 ] || fail invalid_dial
+    printf '%s' "$code" | grep -Eq '^[*#][0-9*#]{1,30}#$' || fail invalid_dial
+    emit "$RUN" --start "$code";;
+   reply|cancel)
+    session="$(jsonfilter -s "$payload" -e '@.session' 2>/dev/null || :)"
+    [ "$(printf %s "$session" | wc -c)" -eq 24 ] || fail invalid_request
+    case "$session" in *[!0-9a-f]*) fail invalid_request;; esac
+    if [ "$method" = cancel ]; then emit "$RUN" --cancel "$session"
+    else
+     choice="$(jsonfilter -s "$payload" -e '@.choice' 2>/dev/null || :)"
+     approval="$(jsonfilter -s "$payload" -e '@.approval' 2>/dev/null || :)"
+     [ "$approval" = I_APPROVE_THIS_USSD_CHOICE ] || fail approval_required
+     case "$choice" in 0|[1-9]|[1-9][0-9]);; *) fail invalid_choice;; esac
+     emit "$RUN" --reply "$session" "$choice"
+    fi;;
+   *) fail invalid_request;;
+  esac;;
+ *) fail invalid_request;;
+esac

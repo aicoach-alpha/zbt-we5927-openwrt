@@ -1,0 +1,24 @@
+name: VeCI XL native quota-only response parser
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/veci-xl-quota-normalize.c'
+      - 'tests/test_veci_xl_quota_normalize.py'
+      - '.github/workflows/veci-xl-quota-normalize-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run offline native parser
+        run: |
+          set -eu
+          gcc -std=c11 -Os -Wall -Wextra -Werror -fstack-protector-strong \
+            -o /tmp/veci-xl-quota-normalize-test \
+            source/veci-telco-indonesia/veci-xl-quota-normalize.c
+          python3 -m unittest discover -s tests -p 'test_veci_xl_quota_normalize.py' -v
+          echo VECI_XL_QUOTA_NATIVE_PARSER_PASS

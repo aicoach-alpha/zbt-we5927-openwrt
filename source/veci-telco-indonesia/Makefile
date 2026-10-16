@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-telco-indonesia
-PKG_VERSION:=0.1
+PKG_VERSION:=0.2.1
 PKG_RELEASE:=1
 PKGARCH:=all
 
@@ -11,11 +11,11 @@ define Package/veci-telco-indonesia
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI Indonesia Edition optional telco quota UI backend
-  DEPENDS:=+veci +jsonfilter
+  DEPENDS:=+rpcd +luci-base +jsonfilter
 endef
 
 define Package/veci-telco-indonesia/description
-  Standalone read-only operator registry and quota contract. Future authorized adapters execute locally and contact carriers directly; no developer-hosted companion. No live carrier login implemented yet.
+  Standalone read-only OpenWrt LuCI operator registry and quota status page. No VeCI core dependency, no developer-hosted companion, no LTE/SMS modifications. Future approved carrier adapter is separate; no live operator login yet.
 endef
 
 define Build/Compile
@@ -30,6 +30,10 @@ define Package/veci-telco-indonesia/install
 	$(INSTALL_DATA) ./files/usr/share/veci/telco/providers.json $(1)/usr/share/veci/telco/providers.json
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/veci-quota.json $(1)/usr/share/rpcd/acl.d/veci-quota.json
+	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
+	$(INSTALL_DATA) ./files/usr/share/luci/menu.d/luci-app-veci-quota.json $(1)/usr/share/luci/menu.d/luci-app-veci-quota.json
+	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/veci
+	$(INSTALL_DATA) ./files/www/luci-static/resources/view/veci/quota.js $(1)/www/luci-static/resources/view/veci/quota.js
 endef
 
 $(eval $(call BuildPackage,veci-telco-indonesia))

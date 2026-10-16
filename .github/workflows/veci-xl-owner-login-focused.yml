@@ -1,0 +1,24 @@
+name: VeCI XL owner HTTPS login focused
+on:
+  push:
+    paths:
+      - 'source/veci-telco-xl-native/files/**'
+      - 'source/veci-telco-xl-native/Makefile'
+      - 'tests/test_veci_xl_owner_rpc.py'
+      - '.github/workflows/veci-xl-owner-login-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  owner-login:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: HTTPS-only opt-in VeCI login gate and UI, no operator calls
+        run: |
+          set -eu
+          sh -n source/veci-telco-xl-native/files/usr/libexec/rpcd/veci.xl
+          node --check source/veci-telco-xl-native/files/www/veci/xl-account.js
+          sudo python3 tests/test_veci_xl_owner_rpc.py
+          echo VECI_XL_OWNER_LOGIN_FOCUSED=pass

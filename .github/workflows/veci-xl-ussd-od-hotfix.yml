@@ -1,0 +1,58 @@
+name: VeCI XL 1.7.1 missing od hotfix checksum
+on:
+  push:
+    paths:
+      - '.github/workflows/veci-xl-ussd-od-hotfix.yml'
+      - 'scripts/veci-xl-v171-nood-hotfix.sh'
+      - 'tests/test_veci_xl_nood_hotfix.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate real firmware od-free session tests
+        run: |
+          set -eu
+          python3 -m unittest discover -s tests -p test_veci_xl_ussd_no_od.py -v
+          sh -n scripts/veci-xl-ussd-v17-staged/veci-xl-ussd
+      - name: Pin byte-exact existing live and fixed worker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir -p /tmp/veci-hotfix
+          gh release download veci-xl-v17-fbf0fc346a1b \
+             -p veci-xl-v17.tar.gz -D /tmp/veci-hotfix
+          echo "f59f566c964f5dee70ce246c37a78e0a9eca01a16d1c530588adc6aebd23900c  /tmp/veci-hotfix/veci-xl-v17.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/veci-hotfix/veci-xl-v17.tar.gz -C /tmp/veci-hotfix
+          old=/tmp/veci-hotfix/veci-xl-v17/veci-xl-ussd
+          new=scripts/veci-xl-ussd-v17-staged/veci-xl-ussd
+          python3 - "$old" "$new" <<'PY'
+          import pathlib,sys
+          old=pathlib.Path(sys.argv[1]).read_text()
+          new=pathlib.Path(sys.argv[2]).read_text()
+          original='for x in flock jsonfilter od tr date;do command -v "$x" >/dev/null 2>&1 || fail unavailable;done'
+          replacement='for x in flock jsonfilter sha256sum head awk date;do command -v "$x" >/dev/null 2>&1 || fail unavailable;done'
+          assert original in old
+          old=old.replace(original,replacement)
+          block_start=old.index('   token="$(od ')
+          block_end=old.index('\n  --reply)',block_start)
+          new_start=new.index('   # /usr/bin/od is NOT present')
+          new_end=new.index('\n  --reply)',new_start)
+          new_segment=new[new_start:new_end]
+          expected=old[:block_start]+new_segment+old[block_end:]
+          assert expected==new, "Hotfix modified unrelated operations"
+          print("VECI_XL_OD_PATCH_SCOPE=only_dependency_and_token")
+          PY
+          echo "VECI_XL_USSD_ORIGINAL_SHA256=$(sha256sum "$old" | cut -d' ' -f1)"
+          echo "VECI_XL_USSD_HOTFIX_SHA256=$(sha256sum "$new" | cut -d' ' -f1)"
+          echo "VECI_XL_USSD_NO_OD_HOTFIX_PASS"
+          sh -n scripts/veci-xl-v171-nood-hotfix.sh
+          VECI_TEST_OLD="$old" VECI_TEST_NEW="$new" \
+            python3 -m unittest discover -s tests -p test_veci_xl_nood_hotfix.py -v
+          echo "VECI_XL_USSD_ATOMIC_HOTFIX_AND_ROLLBACK_PASS"

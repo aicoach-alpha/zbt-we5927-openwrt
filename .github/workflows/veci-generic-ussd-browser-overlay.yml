@@ -1,0 +1,41 @@
+name: VeCI generic USSD browser ACL diagnostic overlay
+on:
+  push:
+    paths:
+      - 'scripts/veci-generic-ussd-browser-acl-diagnostic-20261016.sh'
+      - '.github/workflows/veci-generic-ussd-browser-overlay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify one-file bounded update and recoverability
+        run: |
+          set -eu
+          sh -n scripts/veci-generic-ussd-browser-acl-diagnostic-20261016.sh
+          node --check source/veci-ussd-dialer/files/www/veci/ussd-dialer.js
+          echo '26e43698e48f72ba7c8a256c8f6cb469f803116ad1a92aae939a4bec33e2f304  source/veci-ussd-dialer/files/www/veci/ussd-dialer.js' | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-generic-ussd-browser-acl-diagnostic-20261016.sh').read_text()
+          for text in (
+            'REV=51ce9935ef2f4d63eeb3bb80e7d774cff107d44f',
+            'OLD_SHA=1b30bce5c5a52b1485290622f1342470d5f86bd6baacbfc2e37397118051b8e0',
+            'NEW_SHA=26e43698e48f72ba7c8a256c8f6cb469f803116ad1a92aae939a4bec33e2f304',
+            'same "$FILE" "$OLD_SHA"',
+            'same "$FILE" "$NEW_SHA"',
+            'same "$BACKUP" "$OLD_SHA"',
+            'VECI_GENERIC_USSD_UI_ROLLBACK=available',
+            'VECI_GENERIC_USSD_CORE_PRESERVED=pass',
+            'VECI_GENERIC_USSD_UI_MODEM_CALLS=false'
+          ): assert text in s,text
+          assert s.index('if [ "$MODE" = --verify ]') < s.index('cp "$FILE" "$BACKUP"')
+          for forbidden in ('sysupgrade','apk add','apk upgrade','ubus -S call','ubus call','AT+CUSD','AT+CMGS','uci commit','uci set','uci delete','/etc/init.d/','/luci-static/'):
+            assert forbidden not in s,forbidden
+          print('VECI_GENERIC_USSD_ONE_FILE_OVERLAY=pass')
+          print('VECI_GENERIC_USSD_BACKUP_AND_ROLLBACK=pass')
+          PY

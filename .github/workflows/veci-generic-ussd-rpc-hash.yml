@@ -1,0 +1,17 @@
+name: VeCI generic USSD rpcd binary source digest
+on:
+  push:
+    paths:
+      - '.github/workflows/veci-generic-ussd-rpc-hash.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checksum:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print exact installed source RPC SHA256
+        run: |
+          sha256sum source/veci-ussd-dialer/files/usr/libexec/rpcd/veci.dialer
+          sha256sum source/veci-ussd-dialer/files/usr/libexec/veci-ussd-dialer

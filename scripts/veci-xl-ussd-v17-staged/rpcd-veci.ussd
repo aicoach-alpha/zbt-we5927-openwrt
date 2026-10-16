@@ -1,0 +1,56 @@
+#!/bin/sh
+# Authenticated rpcd exec object. ACL must provide WRITE access only.
+set -eu
+umask 077
+RUN=/usr/libexec/veci-xl-ussd
+fail(){ printf '{"ok":false,"reason":"%s"}\n' "$1";exit 0; }
+[ "$(id -u)" = 0 ] || fail admin_required
+[ -x "$RUN" ] || fail unavailable
+# rpcd expects exactly one JSON object; do not concatenate the worker
+# error and a wrapper error. Preserve allowlisted reasons, suppress raw logs.
+emit(){
+  result="$("$@" 2>/dev/null)" || :
+  [ -n "$result" ] || fail ussd_unavailable
+  [ "$(printf %s "$result"|wc -c)" -le 1450 ] || fail invalid_response
+  ok="$(jsonfilter -s "$result" -e '@.ok' 2>/dev/null || :)"
+  case "$ok" in
+   true|1)
+    case "$result" in '{"ok":true,'*'}') printf '%s\n' "$result";; *)fail invalid_response;;esac;;
+   false|0)
+    reason="$(jsonfilter -s "$result" -e '@.reason' 2>/dev/null || :)"
+    [ -n "$reason" ] && [ "$(printf %s "$reason"|wc -c)" -le 40 ] || fail invalid_response
+    case "$reason" in *[!a-z_]*)fail invalid_response;;esac
+    [ "$result" = "{\"ok\":false,\"reason\":\"$reason\"}" ] || fail invalid_response
+    printf '%s\n' "$result";;
+   *)fail invalid_response;;
+  esac
+}
+case "$1" in
+ list)
+  printf '{"start":{},"reply":{"session":"str","choice":"str","approval":"str"},"cancel":{"session":"str"},"quotaStatus":{}}\n';;
+ call)
+  case "$2" in
+   start) emit "$RUN" --start;;
+   quotaStatus)
+    [ -x /usr/libexec/veci-xl-quota-cache ] || fail quota_unavailable
+    emit /usr/libexec/veci-xl-quota-cache --status;;
+   reply|cancel)
+    command -v jsonfilter >/dev/null 2>&1 || fail unavailable
+    payload="$(head -c 257)" || fail invalid_request
+    [ "$(printf %s "$payload"|wc -c)" -le 256 ] || fail invalid_request
+    session="$(jsonfilter -s "$payload" -e '@.session' 2>/dev/null || :)"
+    [ "$(printf %s "$session"|wc -c)" -eq 24 ] || fail invalid_request
+    case "$session" in *[!0-9a-f]*)fail invalid_request;;esac
+    if [ "$2" = cancel ];then
+     emit "$RUN" --cancel "$session"
+    else
+     choice="$(jsonfilter -s "$payload" -e '@.choice' 2>/dev/null || :)"
+     approval="$(jsonfilter -s "$payload" -e '@.approval' 2>/dev/null || :)"
+     [ "$approval" = I_APPROVE_THIS_USSD_CHOICE ] || fail approval_required
+     case "$choice" in 0|[1-9]|[1-9][0-9]);;*)fail invalid_request;;esac
+     emit "$RUN" --reply "$session" "$choice"
+    fi;;
+   *)fail invalid_request;;
+  esac;;
+ *)fail invalid_request;;
+esac

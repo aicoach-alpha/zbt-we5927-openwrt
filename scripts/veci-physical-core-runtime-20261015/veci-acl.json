@@ -1,0 +1,27 @@
+{
+	"veci": {
+		"description": "VeCI OpenWrt administration access",
+		"read": {
+			"ubus": {
+				"system": ["board", "info"],
+				"network.interface": ["dump"],
+				"network.interface.*": ["status"],
+				"network.wireless": ["status"],
+				"uci": ["get"],
+				"veci": ["capabilities", "clients", "networkInventory", "health", "internetStatus", "securityStatus", "diagnostic"],
+				"veci.cellular": ["status"]
+			},
+			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
+		},
+		"write": {
+			"ubus": {
+				"system": ["reboot"],
+				"network.interface.*": ["up", "down"],
+				"uci": ["set", "add", "delete", "commit"],
+				"veci": ["serviceAction", "wifiReload", "setAdminPassword"],
+				"veci.cellular": ["reconnect", "switchSim"]
+			},
+			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
+		}
+	}
+}

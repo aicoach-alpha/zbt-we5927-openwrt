@@ -59,7 +59,12 @@ read_cache() {
     if ! canonical_number "$now"; then empty_status unavailable; return; fi
     if [ "$timestamp" -gt "$now" ]; then empty_status unavailable; return; fi
     if [ $((now - timestamp)) -gt 1800 ]; then empty_status stale; return; fi
-    if ! canonical_number "$total"; then total=null; fi
+    # A trusted quota snapshot must contain a finite consistent total.
+    # Never display bogus remaining>total or missing total as real quota.
+    if ! canonical_number "$total" || [ "$total" -eq 0 ] ||
+       [ "$remaining" -gt "$total" ]; then
+        empty_status unavailable; return
+    fi
     if ! printf '%s\n' "$fetched_at" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'; then
         fetched_json=null
     else

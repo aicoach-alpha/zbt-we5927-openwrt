@@ -1,0 +1,44 @@
+name: VeCI generic USSD NO_DATA safe preflight
+on:
+  push:
+    paths:
+      - 'scripts/veci-generic-ussd-nodata-readonly-diagnosis-20261016.sh'
+      - '.github/workflows/veci-generic-ussd-nodata-diagnosis.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce invalid-dial-only probe and pinned backend guards
+        run: |
+          set -eu
+          s=scripts/veci-generic-ussd-nodata-readonly-diagnosis-20261016.sh
+          sh -n "$s"
+          echo 'ca1aa890fc64f7caaf72f577cb8f04b3dcd12527389eb7df464c2fc632c2e251  source/veci-ussd-dialer/files/usr/libexec/rpcd/veci.dialer' | sha256sum -c -
+          echo '37b3f3c0d50179f8d4dc11d8dec8f3c123acc52f29ac614745c75abbef44e0f5  source/veci-ussd-dialer/files/usr/libexec/veci-ussd-dialer' | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-generic-ussd-nodata-readonly-diagnosis-20261016.sh').read_text()
+          rpc=Path('source/veci-ussd-dialer/files/usr/libexec/rpcd/veci.dialer').read_text()
+          assert 'BAD_CODE=NOT_A_USSD_DIAL' in s
+          assert 'BODY=\'{"code":"NOT_A_USSD_DIAL","approval":"I_APPROVE_THIS_USSD_DIAL"}\'' in s
+          assert 'printf \'%s\' "$code" | grep -Eq' in rpc
+          assert ' || fail invalid_dial' in rpc
+          assert rpc.index('|| fail invalid_dial') < rpc.index('emit "$RUN" --start "$code"')
+          assert 'safe "$PLUGIN" "$RPC_SHA"' in s and 'safe "$WORKER" "$WORKER_SHA"' in s
+          assert 'fake_input_safety_not_confirmed' in s
+          assert s.index('fake_input_safety_not_confirmed') < s.index('ubus -S call veci.dialer start "$BODY"')
+          assert s.count('ubus -S call veci.dialer start') == 1
+          assert s.count('"$PLUGIN" call start') == 1
+          assert 'VECI_USSD_NODATA_REAL_USSD_SENT=false' in s
+          for prohibited in ['AT+CUSD','AT+CMGS','/dev/ttyUSB','/usr/libexec/veci-ussd-dialer-once',
+                             'apk add','sysupgrade','uci set','uci commit','/etc/init.d/',
+                             'we5927-lte','--start "$BAD_CODE"','requestOtp','submitOtp']:
+            assert prohibited not in s, prohibited
+          print('VECI_USSD_NODATA_FAKE_DIAL_CANNOT_REACH_MODEM=pass')
+          print('VECI_USSD_NODATA_SHA256_PLUGIN_GUARD=pass')
+          PY

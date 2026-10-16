@@ -1,0 +1,70 @@
+name: VeCI WE5927 SMS Delivery v1.6.1 native prerelease
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/we5927-lte/src/veci-sms-status-report.c'
+      - 'source/we5927-lte/src/veci-sms-cmgs.c'
+      - '.github/workflows/veci-sms-v161-native-release.yml'
+permissions:
+  contents: write
+jobs:
+  compile-prerelease:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate status report decoder and native CMGS offline
+        run: |
+          set -eu
+          python3 -m unittest discover -s tests -p 'test_veci_sms_delivery_reports.py' -v
+          python3 -m unittest discover -s tests -p 'test_veci_sms_cmgs_pty.py' -v
+      - name: Fetch and integrity-check OpenWrt 25.12.5 mt76x8 compiler
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd
+          file=openwrt-toolchain-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 240 -o /tmp/toolchain.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$file"
+          echo "5e03963e3b5e2c12f8c1519a07d56a74babcd6147e95c4d50948e50ae465d776  /tmp/toolchain.tar.zst" | sha256sum -c -
+          mkdir -p /tmp/veci-owrt
+          tar -xf /tmp/toolchain.tar.zst -C /tmp/veci-owrt
+      - name: Cross-build tiny standalone SMS send and report parser binaries
+        run: |
+          set -eu
+          gcc="$(find -L /tmp/veci-owrt -type f -name '*gcc' -executable | grep '/bin/' | head -1)"
+          [ -n "$gcc" ]
+          mkdir -p release
+          "$gcc" -static -std=c11 -Os -s -fno-ident -Wall -Wextra -Werror \
+            -o release/veci-sms-cmgs-mipsel source/we5927-lte/src/veci-sms-cmgs.c
+          "$gcc" -static -std=c11 -Os -s -fno-ident -Wall -Wextra -Werror \
+            -o release/veci-sms-status-report-mipsel source/we5927-lte/src/veci-sms-status-report.c
+          for bin in release/veci-sms-cmgs-mipsel release/veci-sms-status-report-mipsel; do
+            file "$bin"
+            readelf -h "$bin" | grep -Eq 'Machine:[ ]*MIPS'
+            readelf -h "$bin" | grep -q "2's complement, little endian"
+            ! readelf -l "$bin" | grep -q INTERP
+            [ "$(stat -c %s "$bin")" -lt 350000 ]
+          done
+          (cd release && sha256sum veci-sms-cmgs-mipsel veci-sms-status-report-mipsel > SHA256SUMS)
+          echo VECI_SMS_DELIVERY_V161_NATIVE_MIPS_PRE_RELEASE_PASS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-sms-delivery-v161-mipsel
+          path: release/
+      - name: Publish SHA-pinned prerelease binaries (NOT router deployment)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-sms-delivery-v161-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" \
+            release/veci-sms-cmgs-mipsel \
+            release/veci-sms-status-report-mipsel \
+            release/SHA256SUMS \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI SMS Delivery v1.6.1 MIPS candidate" \
+            --notes "Source and cross-build candidate only; NO router installation, AT+CNMI changes, SMS sending, or network delivery-report validation. Requires atomic reversible deployment and physical XL UAT."
+          echo "VECI_SMS_DELIVERY_V161_PRERELEASE=$tag"

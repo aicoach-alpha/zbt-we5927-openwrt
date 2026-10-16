@@ -1,0 +1,49 @@
+name: VeCI XL guided USSD static deploy gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-ussd-guided-static-deploy-20261015.sh'
+      - '.github/workflows/veci-xl-ussd-guided-deploy-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin static guide and enforce narrow rollback/no-modem scope
+        run: |
+          set -eu
+          sh -n scripts/veci-xl-ussd-guided-static-deploy-20261015.sh
+          sha256sum -c - <<'SHAS'
+          7878226966d40fbdeea0daab66088660a29c0f5a396b61a5675681594cb84023  source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.html
+          7fe4df1ee56cf64fdc1d04239ee59ffc29b09db3deb51a0b2b657049201874b4  source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js
+          SHAS
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-xl-ussd-guided-static-deploy-20261015.sh').read_text()
+          assert 'REV=b412695a088d8cd625b3231f60b8d1fd49d9483c' in s
+          assert 'HTML_SHA=7878226966d40fbdeea0daab66088660a29c0f5a396b61a5675681594cb84023' in s
+          assert 'JS_SHA=7fe4df1ee56cf64fdc1d04239ee59ffc29b09db3deb51a0b2b657049201874b4' in s
+          for token in ('--status','--verify','--install','--rollback',
+                        'same "$HTML" "$HTML_SHA"','same "$JS" "$JS_SHA"',
+                        'absent "$HTML" && absent "$JS"',
+                        'live_guards','VECI_XL_GUIDE_CORE_PRESERVED=pass',
+                        'VECI_XL_GUIDE_ROLLBACK=available',
+                        'VECI_XL_GUIDE_MODEM_CALLS=false',
+                        'xl_037_missing','xl_ussd_rpc_missing',
+                        'ussd_rpc_methods_incomplete',
+                        'rm -f "$HTML.new.$$" "$JS.new.$$"'):
+              assert token in s,token
+          for bad in ('AT+CUSD','AT+CMGS','sysupgrade','apk add','apk del',
+                      '/etc/init.d', 'ubus call', 'ubus -S call',
+                      'uci commit', 'uci set', 'uci delete','uci add',
+                      '/luci-static/','/etc/config/network'):
+              assert bad not in s,bad
+          assert s.count('mv -f "$HTML.new.$$" "$HTML"')==1
+          assert s.count('mv -f "$JS.new.$$" "$JS"')==1
+          print('VECI_XL_GUIDED_DEPLOY_SHA256=pass')
+          print('VECI_XL_GUIDED_DEPLOY_SCOPE_AND_ROLLBACK=pass')
+          PY

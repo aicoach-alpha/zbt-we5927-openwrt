@@ -1,0 +1,40 @@
+name: VeCI-only UI policy gate
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  no-luci-ui-development:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Test fail-closed LuCI path classification
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p=Path('scripts/check-veci-only-ui.py')
+          spec=importlib.util.spec_from_file_location('veci_policy',p)
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          assert not mod.enforce([
+              ('A','source/veci/js/pages/cellular.js'),
+              ('M','source/veci-telco-indonesia/files/usr/libexec/rpcd/veci.quota'),
+              ('D','source/veci-telco-indonesia/files/usr/share/luci/menu.d/luci-app-veci-quota.json'),
+          ])
+          for path in [
+              'source/veci-telco-indonesia/files/www/luci-static/resources/view/veci/quota.js',
+              'source/we5927-lte/files/usr/share/luci/menu.d/luci-app-we5927-lte.json',
+              'source/we5927-lte/files/usr/share/rpcd/acl.d/luci-app-we5927-lte.json',
+              'source/foo/files/usr/lib/lua/luci/controller/new.lua',
+          ]:
+              assert mod.enforce([('A',path)]) and mod.enforce([('M',path)]),path
+          print('VECI_ONLY_UI_GUARD_NEGATIVE_TESTS_PASS')
+          PY
+      - name: Require VeCI for user-facing UI changes
+        run: python3 scripts/check-veci-only-ui.py

@@ -1,0 +1,72 @@
+#!/bin/sh
+# v1.6.1 CANDIDATE; never installed by v1.6.0. One-shot SMS Submit.
+# Must not be invoked automatically. Never log PDU, destination, or content.
+set -eu
+umask 077
+LC_ALL=C; export LC_ALL
+fail(){ printf '{"ok":false,"reason":"send_unavailable"}\n';exit 1; }
+[ "$#" -eq 0 ] || fail
+[ "$(id -u)" -eq 0 ] || fail
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail
+[ -x /usr/libexec/veci-sms-cmgs ] && [ -x /usr/sbin/we5927-at ] || fail
+command -v jsonfilter >/dev/null 2>&1 || fail
+[ -f /etc/veci-sms-feature ] && [ ! -L /etc/veci-sms-feature ] || fail
+[ "$(cat /etc/veci-sms-feature 2>/dev/null || :)" = 1 ] || fail
+command -v flock >/dev/null 2>&1 || fail
+# Uppercase hex, no CR/LF AT injection, max single-part TPDU.
+pdu="$(head -c 385)" || fail
+length="$(printf %s "$pdu"|wc -c)" || fail
+[ "$length" -ge 22 ] && [ "$length" -le 384 ] && [ "$((length % 2))" -eq 0 ] || fail
+case "$pdu" in *[!0-9A-F]*)fail;;esac
+(
+  flock -n -x 9 || fail
+  [ "$(cat /etc/veci-sms-feature 2>/dev/null || :)" = 1 ] || fail
+  [ -c /dev/ttyUSB2 ] || fail
+  target="$(readlink -f /sys/class/tty/ttyUSB2/device 2>/dev/null || :)"
+  case "$target" in /sys/devices/*:1.4/ttyUSB2);;*)fail;;esac
+  parent="$(dirname "$(dirname "$target")")"
+  [ "$(cat "$parent/idVendor" 2>/dev/null || :)" = 05c6 ] || fail
+  [ "$(cat "$parent/idProduct" 2>/dev/null || :)" = 902e ] || fail
+  # Existing modem state must already be PDU mode; do not switch it.
+  mode="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF?' 1500 2>/dev/null)" || fail
+  printf '%s\n' "$mode" | awk '
+    {gsub(/\r/,"",$0);if($0=="")next}
+    $0=="AT+CMGF?"&&!seen{next}
+    /^\+CMGF:[ ]*0[ ]*$/&&!seen{seen=1;next}
+    $0=="OK"&&seen&&!done{done=1;next}
+    {bad=1}
+    END{exit !(done&&!bad)}
+  ' || fail
+  unset mode
+  # CMGS transaction holds the lock until the final modem disposition.
+  # A timeout after Ctrl-Z means unknown, not safe to auto-retry.
+  result="$(printf '%s\n' "$pdu" | /usr/libexec/veci-sms-cmgs /dev/ttyUSB2 2>/dev/null)" ||
+      {
+        case "$result" in
+          '{"ok":false,"reason":"network_rejected"}'|\
+          '{"ok":false,"reason":"outcome_unknown"}'|\
+          '{"ok":false,"reason":"prompt_unavailable"}')
+            printf '%s\n' "$result";exit 0;;
+          *) fail;;
+        esac
+      }
+  # TP-SRR is bit 5 in the SMS-SUBMIT first octet; only TP-SRR
+  # submissions are eligible for a modem reference and operator report.
+  first="$(printf %s "$pdu" | cut -c3-4)"
+  case "$first" in
+    01|41)
+      [ "$result" = '{"ok":true,"status":"accepted_by_modem"}' ] || fail
+      printf '%s\n' "$result" ;;
+    21|61)
+      # Reject raw/unbounded/ambiguous native output (incl. duplicate fields).
+      [ "$(printf %s "$result"|wc -c)" -le 90 ] || fail
+      mr="$(jsonfilter -s "$result" -e '@.mr' 2>/dev/null || :)"
+      case "$mr" in ''|*[!0-9]*)fail;;esac
+      [ "$(printf %s "$mr"|wc -c)" -le 3 ] && [ "$mr" -le 255 ] || fail
+      canonical="$(printf '{"ok":true,"status":"accepted_by_modem","mr":%d,"report_requested":true}' "$mr")"
+      [ "$result" = "$canonical" ] || fail
+      printf '%s\n' "$canonical" ;;
+    *) fail ;;
+  esac
+  unset pdu result
+) 9>/var/lock/we5927-at.lock

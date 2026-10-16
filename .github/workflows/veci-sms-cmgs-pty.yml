@@ -1,0 +1,24 @@
+name: VeCI native SMS send PTY gate
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/we5927-lte/src/veci-sms-cmgs.c'
+      - 'tests/test_veci_sms_cmgs_pty.py'
+      - '.github/workflows/veci-sms-cmgs-pty.yml'
+permissions:
+  contents: read
+jobs:
+  cmgs-pty:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile native bounded CMGS transport and test local PTY
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_cmgs_pty.py' -v
+      - name: Confirm no production SMS binary is deployed
+        run: |
+          ! grep -q 'veci-sms-cmgs.c' source/we5927-lte/Makefile
+          ! grep -Rql 'veci-sms-cmgs' source/we5927-lte/files 2>/dev/null
+          echo VECI_CMGS_NATIVE_SOURCE_ONLY_PASS

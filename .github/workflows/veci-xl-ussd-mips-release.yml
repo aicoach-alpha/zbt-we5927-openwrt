@@ -1,0 +1,60 @@
+name: VeCI XL USSD native MIPS candidate release
+on:
+  push:
+    paths:
+      - 'source/we5927-lte/src/veci-xl-ussd-once.c'
+      - 'tests/test_veci_xl_ussd_pty.py'
+      - '.github/workflows/veci-xl-ussd-mips-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recheck native AT and asynchronous USSD handling
+        run: python3 -m unittest discover -s tests -p 'test_veci_xl_ussd_pty.py' -v
+      - name: Download verified OpenWrt 25.12.5 RAMIPS toolchain
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd
+          file=openwrt-toolchain-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 240 -o /tmp/toolchain.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$file"
+          echo "5e03963e3b5e2c12f8c1519a07d56a74babcd6147e95c4d50948e50ae465d776  /tmp/toolchain.tar.zst" | sha256sum -c -
+          mkdir -p /tmp/owrt-toolchain
+          tar -xf /tmp/toolchain.tar.zst -C /tmp/owrt-toolchain
+      - name: Compile native MIPS executable
+        run: |
+          set -eu
+          gcc="$(find -L /tmp/owrt-toolchain -type f -name '*gcc' -executable | grep '/bin/' | head -1)"
+          [ -n "$gcc" ]
+          mkdir -p release
+          "$gcc" -static -std=c11 -Os -s -fno-ident -Wall -Wextra -Werror \
+            -o release/veci-xl-ussd-once-mipsel source/we5927-lte/src/veci-xl-ussd-once.c
+          file release/veci-xl-ussd-once-mipsel
+          readelf -h release/veci-xl-ussd-once-mipsel | grep -Eq 'Machine:[ ]*MIPS'
+          readelf -h release/veci-xl-ussd-once-mipsel | grep -q "2's complement, little endian"
+          ! readelf -l release/veci-xl-ussd-once-mipsel | grep -q INTERP
+          [ "$(stat -c %s release/veci-xl-ussd-once-mipsel)" -lt 100000 ]
+          (cd release && sha256sum veci-xl-ussd-once-mipsel > SHA256SUMS)
+          echo VECI_XL_USSD_NATIVE_MIPS_RELEASE_PASS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-xl-ussd-mipsel
+          path: release/
+      - name: Publish tested prerelease not installed on router
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-xl-ussd-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/veci-xl-ussd-once-mipsel release/SHA256SUMS \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI XL *808# USSD native candidate" \
+            --notes "Native RAMIPS transport; no router modification, operator dial or physical USSD validation."
+          echo "VECI_XL_USSD_CANDIDATE=$tag"

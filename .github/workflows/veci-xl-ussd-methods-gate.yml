@@ -1,0 +1,38 @@
+name: VeCI XL USSD method-detection read-only gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-ussd-methods-exact-readonly-20261015.sh'
+      - '.github/workflows/veci-xl-ussd-methods-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify real plugin manifest and no USSD transmission
+        run: |
+          set -eu
+          p=scripts/veci-xl-ussd-methods-exact-readonly-20261015.sh
+          sh -n "$p"
+          python3 - <<'PY'
+          import pathlib
+          s=pathlib.Path("scripts/veci-xl-ussd-methods-exact-readonly-20261015.sh").read_text()
+          rpc=pathlib.Path("scripts/veci-xl-ussd-v17-staged/rpcd-veci.ussd").read_text()
+          assert 'declarative "list" action' in s
+          assert '"$plugin" list' in s
+          assert 'for method in start reply cancel quotaStatus' in s
+          assert s.index('for method in start reply cancel quotaStatus')<s.index('VECI_XL_USSD_METHODS=pass')
+          for method in ('start','reply','cancel','quotaStatus'):
+              assert '"'+method+'"' in rpc,rpc
+          forbidden=('ubus -S call','ubus call','AT+CUSD','AT+CMGS','/dev/tty','we5927-lte',
+                     'apk add','apk del','uci commit','uci set','uci add','uci delete',
+                     'sysupgrade','/etc/init.d/','request-otp','--reply','--start','--cancel')
+          for token in forbidden:
+              assert token not in s,token
+          print('VECI_XL_USSD_METHOD_MANIFEST_SOURCE=pass')
+          print('VECI_XL_USSD_NO_CARRIER_CALLS=pass')
+          PY

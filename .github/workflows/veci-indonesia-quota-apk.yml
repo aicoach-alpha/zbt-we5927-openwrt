@@ -1,0 +1,101 @@
+name: VeCI Indonesia quota LuCI OpenWrt APK prerelease
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/**'
+      - '.github/workflows/veci-indonesia-quota-apk.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify read-only UI and profile contract
+        run: |
+          set -e
+          python3 -m unittest discover -s tests -p 'test_veci_indonesia_contract.py' -q
+          python3 -m unittest discover -s tests -p 'test_veci_quota_cache.py' -q
+          node tests/test_veci_indonesia_quota_ui.cjs
+          node --check source/veci-telco-indonesia/files/www/luci-static/resources/view/veci/quota.js
+      - name: Install OpenWrt SDK build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd make gcc g++ gawk flex bison gettext             libncurses-dev libssl-dev rsync unzip python3 file
+      - name: Download and verify official RAMIPS mt76x8 SDK
+        run: |
+          set -eu
+          sdk=openwrt-sdk-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 360 -o /tmp/veci-sdk.tar.zst \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$sdk"
+          echo 'b44636e0a53f0d769cbce64edb9ca3831e1a9ecdc8c53a5caf128884be6c490e  /tmp/veci-sdk.tar.zst' | sha256sum -c -
+          mkdir -p /tmp/veci-sdk
+          tar -xf /tmp/veci-sdk.tar.zst -C /tmp/veci-sdk --strip-components=1
+          echo VECI_OFFICIAL_SDK_SHA256_PASS
+      - name: Compile actual OpenWrt 25.12.5 apk package
+        run: |
+          set -eu
+          cp -a source/veci-telco-indonesia /tmp/veci-sdk/package/veci-telco-indonesia
+          cd /tmp/veci-sdk
+          printf '\nCONFIG_PACKAGE_veci-telco-indonesia=m\n' >> .config
+          make defconfig
+          make package/veci-telco-indonesia/compile -j2 V=s
+          mkdir -p "$GITHUB_WORKSPACE/release"
+          find bin -type f -name 'veci-telco-indonesia*.apk' -print -exec cp {} "$GITHUB_WORKSPACE/release/" \;
+          test "$(find "$GITHUB_WORKSPACE/release" -name '*.apk' | wc -l)" -eq 1
+          apkfile="$(find "$GITHUB_WORKSPACE/release" -name '*.apk' -type f | head -n 1)"
+          test "$(stat -c %s "$apkfile")" -gt 0
+          test "$(stat -c %s "$apkfile")" -lt 120000
+          sha256sum "$apkfile" > "$GITHUB_WORKSPACE/release/SHA256SUMS"
+          echo "VECI_INDONESIA_QUOTA_APK_COMPILED_PASS size=$(stat -c %s "$apkfile")"
+          # APK v3 is NOT a tarball. Inspect actual package metadata and
+          # payload with the exact apk-tools shipped in the official SDK.
+          apk_host=staging_dir/host/bin/apk
+          test -x "$apk_host"
+          "$apk_host" adbdump --format json "$apkfile" > "$GITHUB_WORKSPACE/release/PACKAGE-METADATA.json"
+          python3 - "$GITHUB_WORKSPACE/release/PACKAGE-METADATA.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1]))
+          text=json.dumps(data,sort_keys=True).lower()
+          assert 'veci-telco-indonesia' in text
+          assert '0.2.1' in text
+          assert 'luci-base' in text and 'rpcd' in text and 'jsonfilter' in text
+          assert '"veci"' not in text
+          # Real APK must ship the LuCI view and its read-only RPC plugin.
+          assert 'quota.js' in text and 'veci.quota' in text
+          assert 'luci-app-veci-quota.json' in text
+          for forbidden in ('/etc/init.d/', '/etc/config/', 'cmgr', 'sysupgrade'):
+              assert forbidden not in text
+          print('VECI_APK_METADATA_AND_READONLY_PAYLOAD_PASS')
+          PY
+
+      - name: Validate archive package contents
+        run: |
+          set -eu
+          cd release
+          python3 - <<'PY'
+          from pathlib import Path
+          files=list(Path('.').glob('*.apk'))
+          assert len(files)==1
+          assert Path('SHA256SUMS').is_file()
+          payload=files[0].read_bytes()
+          assert len(payload)>1024
+          print('VECI_QUOTA_APK_NONEMPTY_PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-indonesia-quota-apk
+          path: release
+      - name: Publish immutable APK release candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-indonesia-quota-apk-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/* \
+            --target "$GITHUB_SHA" --prerelease \
+            --title 'VeCI Indonesia optional quota LuCI APK' \
+            --notes 'Candidate only, not deployed or live. Built with official SHA-pinned OpenWrt 25.12.5 mt76x8 SDK. Read-only quota RPC and LuCI, no carrier credentials, OTP access or LTE/SMS change. Installing an APK requires correct trust/signing and physical staging checks. This is NOT an authenticated XL quota API.'

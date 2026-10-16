@@ -6,10 +6,106 @@ on:
       - 'source/veci-cellular-we5927/**'
       - 'source/we5927-lte/files/usr/sbin/we5927-lte'
       - 'source/we5927-lte/src/we5927-at.c'
+      - 'source/we5927-lte/Makefile'
+      - 'source/we5927-lte/src/veci-at-framing.c'
+      - 'source/we5927-lte/src/veci-at-framing.h'
+      - 'source/we5927-lte/src/veci-modem-session-lock.c'
+      - 'source/we5927-lte/src/veci-modem-job-queue.c'
+      - 'source/we5927-lte/src/veci-modem-job-queue.h'
+      - 'source/we5927-lte/src/veci-modem-transaction.c'
+      - 'source/we5927-lte/src/veci-modem-transaction.h'
+      - 'source/we5927-lte/src/veci-serial-pty-smoke.c'
+      - 'source/we5927-lte/src/veci-modem-identity.c'
+      - 'source/we5927-lte/src/veci-modem-identity.h'
+      - 'source/we5927-lte/src/veci-sms-pdu-decode.c'
+      - 'source/we5927-lte/src/veci-sms-read-slot-policy.c'
+      - 'source/we5927-lte/src/veci-sms-read-capability.c'
+      - 'source/we5927-lte/src/veci-sms-read-capability.h'
+      - 'tests/test_veci_sms_read_capability.py'
+      - 'source/we5927-lte/src/veci-sms-read-cap-store.c'
+      - 'source/we5927-lte/src/veci-sms-read-cap-store.h'
+      - 'tests/test_veci_sms_read_cap_store.py'
+      - 'source/we5927-lte/src/veci-sms-auth-ubus-preflight.uc'
+      - 'tests/test_veci_sms_auth_ubus_preflight.py'
+      - 'scripts/veci-sms-auth-backend-preflight-20261013.sh'
+      - 'tests/test_veci_sms_auth_backend_readonly.py'
+      - 'scripts/veci-sms-auth-effective-preflight-20261013.sh'
+      - 'tests/test_veci_sms_auth_effective_readonly.py'
+      - 'source/we5927-lte/src/veci-sms-private-consent.uc'
+      - 'source/we5927-lte/src/veci-sms-private-acl.json'
+      - 'tests/test_veci_sms_private_consent.py'
+      - 'scripts/veci-sms-private-ui-staged-20261013/**'
+      - 'tests/test_veci_sms_private_ui_v14.py'
+      - 'source/we5927-lte/src/veci-telco-quota-otp-policy.c'
+      - 'source/we5927-lte/src/veci-telco-quota-otp-policy.h'
+      - 'tests/test_veci_telco_quota_otp_policy.py'
+      - 'source/we5927-lte/src/veci-sms-cmgr-frame.c'
+      - 'source/we5927-lte/src/veci-serial-cmgr-pty-guard.c'
+      - 'tests/test_veci_serial_cmgr_pty_guard.py'
+      - 'source/we5927-lte/src/veci-sms-cmgr-frame.h'
+      - 'tests/test_veci_sms_cmgr_frame.py'
+      - 'source/we5927-lte/src/veci-sms-read-slot-policy.h'
+      - 'tests/test_veci_sms_read_slot_policy.py'
+      - 'source/we5927-lte/src/veci-sms-inbox-index.c'
+      - 'source/we5927-lte/src/veci-sms-inbox-index.h'
+      - 'source/we5927-lte/src/veci-ussd-decode.c'
+      - 'source/we5927-lte/src/veci-xl-ussd-consent.c'
+      - 'source/we5927-lte/src/veci-xl-ussd-consent.h'
+      - 'source/we5927-lte/src/veci-sms-multipart.c'
+      - 'source/we5927-lte/src/veci-sms-multipart.h'
       - 'tests/test_we5927_at_transport.py'
+      - 'tests/test_veci_at_framing.py'
+      - 'tests/test_veci_modem_session_lock.py'
+      - 'tests/test_veci_modem_job_queue.py'
+      - 'tests/test_veci_modem_pipeline.py'
+      - 'tests/test_veci_modem_transaction.py'
+      - 'tests/test_veci_serial_pty_smoke.py'
+      - 'tests/test_veci_modem_identity.py'
+      - 'tests/fuzz_veci_modem_transaction.c'
+      - 'tests/test_veci_sms_pdu_decode.py'
+      - 'tests/test_veci_sms_inbox_index.py'
+      - 'tests/test_veci_ussd_decode.py'
+      - 'tests/test_veci_xl_ussd_consent.py'
+      - 'tests/test_veci_message_readiness.py'
+      - 'tests/test_veci_sms_list_command_preflight.py'
+      - 'tests/test_veci_sms_inbox_cli_preview.py'
+      - 'tests/test_veci_sms_storage_ui_hotfix.py'
+      - 'tests/test_veci_sms_storage_ui_built_v11.py'
+      - 'tests/test_veci_sms_ui_exact_live_20261012.py'
+      - 'tests/test_veci_sms_ui_hotfix_v12.py'
+      - 'source/veci-sms-inbox-we5927/**'
+      - 'tests/test_veci_sms_rpc_admin_consent.py'
+      - 'tests/test_veci_sms_inbox_installer_v13.py'
+      - 'tests/test_veci_sms_inbox_installer_v131.py'
+      - 'tests/test_veci_sms_rpcd_preflight_readonly.py'
+      - 'tests/test_veci_sms_acl_session_audit.py'
+      - 'scripts/veci-sms-acl-session-audit-20261013.sh'
+      - 'scripts/veci-sms-rpcd-readonly-preflight-20261013.sh'
+      - 'scripts/veci-sms-inbox-admin-ui-v131-install.sh'
+      - 'scripts/veci-sms-inbox-admin-ui-v13-install.sh'
+      - 'tests/test_veci_sms_inbox_ui_stage.py'
+      - 'scripts/veci-sms-inbox-ui-staged-20261013/**'
+      - 'scripts/veci-sms-storage-ui-exact-live-hotfix-v12.sh'
+      - 'scripts/veci-sms-ui-live-captured-20261012/**'
+      - 'scripts/veci-sms-storage-ui-built-hotfix-v11.sh'
+      - 'scripts/veci-sms-storage-ui-built-v1/**'
+      - 'scripts/veci-sms-storage-ui-hotfix-v1.sh'
+      - 'scripts/veci-sms-inbox-index-preview.sh'
+      - 'scripts/veci-sms-list-command-preflight.sh'
+      - 'scripts/veci-messaging-readiness-ondevice.sh'
+      - 'tests/test_veci_sms_multipart.py'
+      - 'tests/fuzz_veci_sms_multipart.c'
+      - 'tests/fuzz_veci_sms_codec.c'
       - 'tests/test_veci_modem_sms_ussd.py'
+      - 'tests/test_veci_sms_storage_readonly.py'
       - '.github/workflows/veci-modem-diagnostics-ci.yml'
       - 'docs/VECI-SMS-USSD-READINESS.md'
+      - 'scripts/veci-live-capability-hotfix.sh'
+      - 'scripts/veci-live-minimal/**'
+      - 'tests/test_veci_live_capability_hotfix.py'
+      - 'scripts/veci-live-storage-v2/**'
+      - 'scripts/veci-live-storage-hotfix-v2.sh'
+      - 'tests/test_veci_live_storage_hotfix_v2.py'
 
 permissions:
   contents: read
@@ -26,8 +122,137 @@ jobs:
       - uses: actions/checkout@v4
       - name: Offline AT parser, mocked serial replies, lock and ACL tests
         run: python3 -m unittest discover -s tests -p 'test_veci_modem_sms_ussd.py' -v
+      - name: Verify read-only SMS storage counter, mocked modem, corruption and concurrent lock
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_storage_readonly.py' -v
+      - name: "Audit minimal reversible overlay hotfix: pinned SHA256, ACL and legacy RPC ABI"
+        run: python3 -m unittest discover -s tests -p 'test_veci_live_capability_hotfix.py' -v
+      - name: Verify reversible v2 SMS storage overlay package and retained v1 rollback
+        run: python3 -m unittest discover -s tests -p 'test_veci_live_storage_hotfix_v2.py' -v
       - name: Compile and exercise native AT serial transport against fake pseudo-terminal
         run: python3 -m unittest discover -s tests -p 'test_we5927_at_transport.py' -v
+      - name: Compile and test inert PDU-mode SMS and deferred USSD parser
+        run: python3 -m unittest discover -s tests -p 'test_veci_at_framing.py' -v
+      - name: Verify full-session native AT lock against flock and bounded contention
+        run: python3 -m unittest discover -s tests -p 'test_veci_modem_session_lock.py' -v
+      - name: Test inactive bounded and consent-gated SMS/USSD FIFO
+        run: python3 -m unittest discover -s tests -p 'test_veci_modem_job_queue.py' -v
+      - name: Cross-check fragmented AT responses against SMS/USSD FIFO state machine
+        run: python3 -m unittest discover -s tests -p 'test_veci_modem_pipeline.py' -v
+      - name: Compile and test AT session coordinator, epochs, stale URCs, held descriptor (offline)
+        run: python3 -m unittest discover -s tests -p 'test_veci_modem_transaction.py' -v
+      - name: Exercise compile-gated full-session AT transport against isolated mock PTYs
+        run: python3 -m unittest discover -s tests -p 'test_veci_serial_pty_smoke.py' -v
+      - name: Verify read-only modem identity policy using isolated fake sysfs and PTY
+        run: python3 -m unittest discover -s tests -p 'test_veci_modem_identity.py' -v
+      - name: Verify explicit-only CMGL PDU inbox indexing without SMS text or sender disclosure
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_index.py' -v
+      - name: Compile offline-only single CMGR host PTY verified-FD transport and exercise no-retry policy
+        run: python3 -m unittest discover -s tests -p 'test_veci_serial_cmgr_pty_guard.py' -v
+      - name: Verify strict SMS CMGR response and delayed private PDU decode with host-only fixtures
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_cmgr_frame.py' -v
+      - name: Guard automatic OTP to independently verified official telco quota login only
+        run: python3 -m unittest discover -s tests -p 'test_veci_telco_quota_otp_policy.py' -v
+      - name: Verify server-trusted one-use SMS capability binding, TTL, consumed-before-I/O and zeroization
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_capability.py' -v
+      - name: Validate locked one-use SMS capability across separate rpcd processes (offline only)
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_cap_store.py' -v
+      - name: Validate source-only rpcd ucode request context against mock ACL sessions
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_auth_ubus_preflight.py' -v
+      - name: Validate no-install read-only ucode/uhttpd backend readiness probe
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_auth_backend_readonly.py' -v
+      - name: Verify corrected UCI no_ubusauth and effective runtime flags without secrets
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_auth_effective_readonly.py' -v
+      - name: Validate one-process SMS private consent, restricted ACL, replay prevention (no modem)
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_private_consent.py' -v
+      - name: Verify isolated SMS private v1.4 UI stages explicit single-slot consent only
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_private_ui_v14.py' -v
+      - name: Verify one-shot SMS read-slot authorization, CSRF, consent, replay and modem generation guard (source only)
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_read_slot_policy.py' -v
+      - name: Verify bounded 3GPP SMS PDU GSM7 UCS2 and UDH multipart decoding (offline)
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_pdu_decode.py' -v
+      - name: Print SHA256 for exact live v1.2 UI, staged v1.3 UI and optional RPC assets
+        run: |
+          sha256sum scripts/veci-sms-inbox-ui-staged-20261013/cellular.js
+          sha256sum source/veci-sms-inbox-we5927/files/usr/libexec/rpcd/veci.sms
+          sha256sum source/veci-sms-inbox-we5927/files/usr/libexec/veci-sms-inbox-index
+          sha256sum source/veci-sms-inbox-we5927/files/usr/share/rpcd/acl.d/veci-sms-inbox-we5927.json
+      - name: Verify read-only SMS Inbox ACL grants and anonymous session audit with no credentials
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_acl_session_audit.py' -v
+      - name: Verify on-device rpcd list-signature preflight never calls the modem or restarts services
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_rpcd_preflight_readonly.py' -v
+      - name: Simulate v1.3.1 bounded rpcd readiness, delayed registration and verified rollback
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_installer_v131.py' -v
+      - name: Simulate safe v1.3 exact-live UI and independent rpcd package install/rollback
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_installer_v13.py' -v
+      - name: Verify isolated admin-write SMS inbox RPC, explicit consent and rate limit
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_rpc_admin_consent.py' -v
+      - name: Verify exact-v1.2 SMS inbox UI delta, two-step confirmation and no auto CMGL
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_ui_stage.py' -v
+      - name: Simulate captured-hash v1.2 UI overlay installation, fail closed and rollback
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_ui_hotfix_v12.py' -v
+      - name: Prove physical WE5927 Cellular exact-upload hash and surgical SMS storage delta
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_ui_exact_live_20261012.py' -v
+      - name: Verify minified VeCI SMS-count overlay Terser asset hashes and rollback
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_storage_ui_built_v11.py' -v
+      - name: Verify USB LTE-independent reversible UI-only SMS storage metadata overlay
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_storage_ui_hotfix.py' -v
+      - name: Verify explicit-ack inbox index CLI rejects malformed PDU and masks sensitive SMS
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_inbox_cli_preview.py' -v
+      - name: Verify no-write 3GPP AT+CMGL test never lists SMS on the modem
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_list_command_preflight.py' -v
+      - name: Verify W907 physical SMS read-only mode/charset preflight parser
+        run: python3 -m unittest discover -s tests -p 'test_veci_message_readiness.py' -v
+      - name: Verify XL USSD *808# opt-in and per-menu generation-bound consent guard
+        run: python3 -m unittest discover -s tests -p 'test_veci_xl_ussd_consent.py' -v
+      - name: Verify bounded async USSD UCS2/unsupported DCS parser (offline)
+        run: python3 -m unittest discover -s tests -p 'test_veci_ussd_decode.py' -v
+      - name: Verify bounded multipart reconstruction and native SMS-PDU integration (offline)
+        run: python3 -m unittest discover -s tests -p 'test_veci_sms_multipart.py' -v
+      - name: Fuzz 10,000 malformed SMS/USSD payloads under ASAN and UBSAN
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer \
+            tests/fuzz_veci_sms_codec.c \
+            source/we5927-lte/src/veci-sms-pdu-decode.c \
+            source/we5927-lte/src/veci-ussd-decode.c \
+            -o "$RUNNER_TEMP/fuzz-veci-sms-codec"
+          ASAN_OPTIONS=detect_leaks=0 "$RUNNER_TEMP/fuzz-veci-sms-codec"
+      - name: Fuzz 8,000 malformed and 1,000 complete multipart groups under ASAN UBSAN
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I source/we5927-lte/src \
+            tests/fuzz_veci_sms_multipart.c source/we5927-lte/src/veci-sms-multipart.c \
+            -o "$RUNNER_TEMP/fuzz-veci-multipart"
+          ASAN_OPTIONS=detect_leaks=0 "$RUNNER_TEMP/fuzz-veci-multipart"
+      - name: Fuzz 5,000 fragmented AT mock sessions with ASAN and UBSAN
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I source/we5927-lte/src \
+            tests/fuzz_veci_modem_transaction.c \
+            source/we5927-lte/src/veci-modem-transaction.c \
+            source/we5927-lte/src/veci-modem-job-queue.c \
+            source/we5927-lte/src/veci-at-framing.c \
+            -o "$RUNNER_TEMP/fuzz-veci-modem-transaction"
+          ASAN_OPTIONS=detect_leaks=0 "$RUNNER_TEMP/fuzz-veci-modem-transaction"
+      - name: Assert no inactive SMS/USSD C libraries are linked into router
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          mk=Path('source/we5927-lte/Makefile').read_text()
+          assert '$(CP) ./src/we5927-at.c $(PKG_BUILD_DIR)/' in mk
+          for s in ('veci-at-framing.c','veci-modem-job-queue.c','veci-modem-session-lock.c',
+                    'veci-sms-pdu-decode.c','veci-sms-multipart.c','veci-ussd-decode.c',
+                    'veci-modem-transaction.c','veci-serial-pty-smoke.c',
+                    'veci-modem-identity.c'):
+              assert s not in mk, f'Unauthorized modem library in firmware build: {s}'
+          print('INERT_BUILD_GUARD_PASS: optional native SMS/USSD sources not linked into firmware')
+          PY
       - name: Validate existing LTE manager parses before AT integration
         run: sh -n source/we5927-lte/files/usr/sbin/we5927-lte
       - name: Verify both build editions stage the audited LTE manager

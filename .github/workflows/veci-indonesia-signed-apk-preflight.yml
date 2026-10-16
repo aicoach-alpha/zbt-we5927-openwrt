@@ -1,0 +1,60 @@
+name: VeCI Indonesia signed APK isolated-trust preflight check
+on:
+  push:
+    paths:
+      - 'scripts/veci-indonesia-quota-signed-apk-preflight-20261015.sh'
+      - '.github/workflows/veci-indonesia-signed-apk-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static security and sh syntax gate
+        run: |
+          set -eu
+          f=scripts/veci-indonesia-quota-signed-apk-preflight-20261015.sh
+          sh -n "$f"
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-indonesia-quota-signed-apk-preflight-20261015.sh').read_text()
+          active='\n'.join(x for x in s.splitlines() if not x.lstrip().startswith('#'))
+          for banned in ('AT+CMGR','AT+CUSD','AT+CMGS','/etc/init.d/','sysupgrade',
+                         '--allow-untrusted','apk upgrade','apk del ','apk add ',
+                         '/etc/apk/repositories.d/', 'uci set',
+                         'reboot', 'rm -rf /overlay'):
+              assert banned not in active,banned
+          for required in ('apk --keys-dir "$work/keys" verify',
+                           'apk --keys-dir "$work/keys" --simulate add',
+                           'VECI_SIGNED_APK_INSTALLED=false',
+                           'VECI_FLASH_WRITES=none',
+                           'VECI_OPERATOR_QUOTA=not_verified',
+                           'sha256sum','mktemp -d /tmp/',
+                           'da72b09afefcd2bdf99bc501d86bd8e485f6a7156b8ccdaae189449a3b0ce34f',
+                           '4d1bae271c4cca9b46ac10404d887c246637795f5b89d271fa38672efe9bdbfa'):
+              assert required in active,required
+          print('VECI_SIGNED_PREFLIGHT_NO_MUTATION_PASS')
+          PY
+      - name: Verify SHA-pinned signed artifact and public key
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir /tmp/veci-artifacts
+          gh release download veci-indonesia-quota-signed-a0b5b97ff9a2 \
+            -p 'veci-telco-indonesia-0.2.1-r1.apk' \
+            -p 'veci-quota-candidate.pem' \
+            -D /tmp/veci-artifacts
+          printf '%s  %s\n' \
+            da72b09afefcd2bdf99bc501d86bd8e485f6a7156b8ccdaae189449a3b0ce34f \
+            /tmp/veci-artifacts/veci-telco-indonesia-0.2.1-r1.apk | sha256sum -c -
+          printf '%s  %s\n' \
+            4d1bae271c4cca9b46ac10404d887c246637795f5b89d271fa38672efe9bdbfa \
+            /tmp/veci-artifacts/veci-quota-candidate.pem | sha256sum -c -
+          test "$(wc -c < /tmp/veci-artifacts/veci-telco-indonesia-0.2.1-r1.apk)" -eq 5683
+          test "$(wc -c < /tmp/veci-artifacts/veci-quota-candidate.pem)" -eq 178
+          echo 'VECI_SIGNED_RELEASE_INTEGRITY_PASS'

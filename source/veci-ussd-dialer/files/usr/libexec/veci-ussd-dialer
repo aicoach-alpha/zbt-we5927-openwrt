@@ -1,0 +1,107 @@
+#!/bin/sh
+# Generic user-initiated USSD dialing; private write ACL and manual consent.
+set -eu
+umask 077
+LC_ALL=C;export LC_ALL
+BIN=/usr/libexec/veci-ussd-dialer-once
+LTE=/usr/sbin/we5927-lte
+STATE=/tmp/veci-xl-ussd.session
+# Intentionally share with old XL-only backend to serialize interactive sessions.
+LOCK=/var/lock/we5927-at.lock
+fail(){ printf '{"ok":false,"reason":"%s"}\n' "$1";exit 1; }
+[ "$(id -u)" = 0 ] || fail admin_required
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail wrong_router
+[ -x "$BIN" ] && [ -x "$LTE" ] || fail unavailable
+for x in flock jsonfilter sha256sum head awk date;do command -v "$x" >/dev/null 2>&1 || fail unavailable;done
+case "$1" in
+ --start) [ "$#" = 2 ] || fail invalid_request;;
+ --reply) [ "$#" = 3 ] || fail invalid_request;;
+ --cancel) [ "$#" = 2 ] || fail invalid_request;;
+ *)fail invalid_request;;
+esac
+[ ! -L "$STATE" ] && [ ! -L "$LOCK" ] || fail unsafe_path
+(
+ flock -n -x 9 || fail modem_busy
+ [ -c /dev/ttyUSB2 ] || fail modem_unavailable
+ port="$(readlink -f /sys/class/tty/ttyUSB2/device 2>/dev/null || :)"
+ case "$port" in /sys/devices/*:1.4/ttyUSB2);;*)fail wrong_modem;;esac
+ parent="$(dirname "$(dirname "$port")")"
+ [ "$(cat "$parent/idVendor" 2>/dev/null || :)" = 05c6 ] || fail wrong_modem
+ [ "$(cat "$parent/idProduct" 2>/dev/null || :)" = 902e ] || fail wrong_modem
+ info="$("$LTE" status-fast 2>/dev/null)" || fail sim_unverified
+ [ "$(printf %s "$info"|wc -c)" -le 2500 ] || fail sim_unverified
+ operator="$(jsonfilter -s "$info" -e '@.operator' 2>/dev/null || :)"
+ sim="$(jsonfilter -s "$info" -e '@.sim' 2>/dev/null || :)"
+ case "$sim" in 1|2);;*)fail sim_unverified;;esac
+ # USSD is a SIM service independent of operator branding.
+ now="$(date +%s)" || fail clock_unavailable
+ case "$now" in ''|*[!0-9]*)fail clock_unavailable;;esac
+ old=""
+ if [ -f "$STATE" ];then
+  [ "$(wc -c < "$STATE")" -le 90 ] || fail state_invalid
+  old="$(cat "$STATE")" || fail state_invalid
+ fi
+ token="";stamp=0;steps=0;oldsim=0
+ if [ -n "$old" ];then
+  IFS='|' read -r token stamp steps oldsim <<EOF
+$old
+EOF
+  [ "$(printf %s "$token"|wc -c)" = 24 ] || fail state_invalid
+  case "$token" in *[!0-9a-f]*)fail state_invalid;;esac
+  case "$stamp:$steps:$oldsim" in *[!0-9:]*)fail state_invalid;;esac
+  [ "$stamp" -ge 1 ] && [ "$steps" -ge 0 ] && [ "$steps" -le 10 ] || fail state_invalid
+  if [ "$now" -lt "$stamp" ] || [ $((now-stamp)) -gt 90 ] || [ "$oldsim" != "$sim" ];then
+   rm -f "$STATE";old=""
+  fi
+ fi
+ case "$1" in
+  --cancel)
+   [ -n "$old" ] && [ "$2" = "$token" ] || fail session_expired
+   rm -f "$STATE";printf '{"ok":true,"closed":true}\n';exit 0;;
+  --start)
+   [ -z "$old" ] || fail session_active
+   value="$2"
+   [ "${#value}" -ge 3 ] && [ "${#value}" -le 32 ] || fail invalid_dial
+   printf '%s' "$value" | grep -Eq '^[*#][0-9*#]{1,30}#$' || fail invalid_dial
+   # /usr/bin/od is NOT present on the real OpenWrt WE5927 image.
+   # Use the kernel CSPRNG, hash 32 random bytes and return 96-bit hex.
+   # No token bytes, text, account data or OTP written to flash/logs.
+   [ -c /dev/urandom ] && [ -r /dev/urandom ] || fail token_unavailable
+   token="$(head -c 32 /dev/urandom | sha256sum | awk '{print substr($1,1,24)}')" || fail token_unavailable
+   [ "$(printf %s "$token"|wc -c)" = 24 ] || fail token_unavailable
+   case "$token" in *[!0-9a-f]*)fail token_unavailable;;esac;;
+  --reply)
+   [ -n "$old" ] && [ "$2" = "$token" ] || fail session_expired
+   [ "$steps" -lt 10 ] || fail step_limit
+   case "$3" in 0|[1-9]|[1-9][0-9]);;*)fail invalid_choice;;esac
+   value="$3";steps=$((steps+1))
+   rm -f "$STATE";;
+ esac
+ # Native may have already sent AT+CUSD; do not auto-retry after a
+ # transport or network failure. Preserve only well-known native reasons.
+ if result="$("$BIN" /dev/ttyUSB2 "$value" 2>/dev/null)";then :
+ else
+  [ "$(printf %s "$result"|wc -c)" -le 160 ] || fail ussd_unavailable
+  native_reason="$(jsonfilter -s "$result" -e '@.reason' 2>/dev/null || :)"
+  case "$native_reason" in
+   outcome_unknown|network_rejected|serial_unavailable|invalid_response|invalid_request)
+    [ "$result" = "{\"ok\":false,\"reason\":\"$native_reason\"}" ] || fail ussd_unavailable
+    fail "$native_reason";;
+   *)fail ussd_unavailable;;
+  esac
+ fi
+ [ "$(printf %s "$result"|wc -c)" -le 1300 ] || fail invalid_response
+ case "$result" in '{"ok":true,"source":"operator_ussd","mode":'*',"dcs":'*',"text_supported":'*',"interactive":'*',"text":'*'}') ;; *)fail invalid_response;;esac
+ # Generic USSD responses are not cached or interpreted as XL quota.
+ interactive="$(jsonfilter -s "$result" -e '@.interactive' 2>/dev/null || :)"
+ case "$interactive" in
+  true|1)
+   temp="$STATE.new.$$"
+   printf '%s|%s|%s|%s\n' "$token" "$now" "$steps" "$sim" > "$temp" || fail state_unavailable
+   chmod 600 "$temp" && mv -f "$temp" "$STATE" || { rm -f "$temp";fail state_unavailable; };;
+  false|0)rm -f "$STATE";;
+  *)fail invalid_response;;
+ esac
+ prefix="$(printf %s "$result"|sed 's/}$//')"
+ printf '%s,"session":"%s"}\n' "$prefix" "$token"
+) 9>"$LOCK"

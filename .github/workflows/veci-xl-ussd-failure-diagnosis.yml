@@ -1,0 +1,57 @@
+name: VeCI XL USSD failure diagnosis focused
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-ussd-failure-rootcause-readonly-20261015.sh'
+      - 'source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js'
+      - '.github/workflows/veci-xl-ussd-failure-diagnosis.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: No auto dial, verified error reasons and local-only status
+        run: |
+          set -eu
+          d=scripts/veci-xl-ussd-failure-rootcause-readonly-20261015.sh
+          j=source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js
+          sh -n "$d"
+          node --check "$j"
+          python3 - <<'PY'
+          from pathlib import Path
+          d=Path('scripts/veci-xl-ussd-failure-rootcause-readonly-20261015.sh').read_text()
+          j=Path('source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js').read_text()
+          for expected in ('VECI_XL_USSD_RPC=registered', 'VECI_XL_USSD_PORT_PATH=',
+                           'VECI_XL_USSD_USB_ID=', 'VECI_XL_USSD_OPERATOR_GUARD=',
+                           'VECI_XL_USSD_METHOD_', 'VECI_XL_USSD_SIM=',
+                           'VECI_XL_USSD_OPERATOR_REQUEST_SENT=false',
+                           'VECI_XL_USSD_MODEM_CHANGED=false'):
+            assert expected in d,expected
+          for banned in ('AT+CUSD','AT+CMGS','/dev/ttyUSB2 "', 'ubus call',
+                         'ubus -S call', 'apk add', 'apk del','sysupgrade',
+                         'uci commit','uci set','uci delete','uci add',
+                         '/etc/init.d/','--start','--reply','--cancel',
+                         'requestOtp','submitOtp'):
+            assert banned not in d,banned
+          assert 'status-fast' in d
+          assert "answer && typeof answer.reason === 'string'" in j
+          assert 'Object.hasOwn(REASONS, answer.reason)' in j
+          assert 'Object.hasOwn(REASONS, reason)' in j
+          assert "if (!answer || answer.ok !== true) throw failure(answer);" in j
+          assert j.count('throw failure(answer)')==2
+          assert "window.confirm(" in j and j.count('window.confirm(')==2
+          assert "'I_APPROVE_THIS_USSD_CHOICE'" in j
+          for reason in ('wrong_modem','not_xl_network','modem_busy','network_rejected',
+                         'outcome_unknown','invalid_response','sim_unverified'):
+            assert reason in j
+          assert 'innerHTML' not in j and 'console.' not in j
+          assert 'fetch(' not in j and 'AT+CUSD' not in j
+          assert 'setInterval(' not in j and 'localStorage' not in j
+          print('VECI_XL_USSD_READONLY_DIAGNOSTIC=pass')
+          print('VECI_XL_USSD_SAFE_REASON_UI=pass')
+          PY
+          sha256sum "$j"

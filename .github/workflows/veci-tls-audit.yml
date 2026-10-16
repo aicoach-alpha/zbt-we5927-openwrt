@@ -1,0 +1,25 @@
+name: VeCI TLS read only certificate inspection
+on:
+  push:
+    paths:
+      - 'scripts/veci-tls-certificate-readonly-audit-20261016.sh'
+      - '.github/workflows/veci-tls-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sh -n scripts/veci-tls-certificate-readonly-audit-20261016.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-tls-certificate-readonly-audit-20261016.sh').read_text()
+          for x in ('VECI_TLS_PRIVATE_KEY_EXPORTED=false', 'VECI_TLS_CONFIG_CHANGED=false', 'subjectAltName', '192', 'openssl x509'):
+              assert x in s
+          for x in ('uci set','uci commit','/etc/init.d','openssl req','openssl genrsa','sysupgrade','apk add','cat "$key"','ubus call'):
+              assert x not in s,x
+          print('VECI_TLS_AUDIT_READONLY=pass')
+          PY

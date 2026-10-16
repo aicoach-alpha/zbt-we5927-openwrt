@@ -1,0 +1,100 @@
+#!/bin/sh
+# WE5927 private SINGLE-SMS reader, only invoked after rpcd ucode one-use
+# authenticated authorization. Not a general AT endpoint.
+set -eu
+umask 077
+LC_ALL=C; export LC_ALL
+fail() {
+    printf '{"ok":false,"reason":"sms_unavailable"}\n'
+    exit 1
+}
+[ "$#" -eq 1 ] || fail
+slot="$1"
+case "$slot" in
+    ''|*[!0-9]*) fail ;;
+    0|[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[1-9][0-9][0-9][0-9][0-9]) ;;
+    *) fail ;;
+esac
+[ "$slot" -le 65535 ] || fail
+[ "$(id -u)" = 0 ] || fail
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail
+[ -x /usr/sbin/we5927-at ] && command -v flock >/dev/null 2>&1 || fail
+
+# Emit exactly one checked PDU (never raw error/URC) only after final OK.
+parse_single() {
+    awk -v expected_slot="$slot" '
+    function decimal(v,limit) {
+        return v ~ /^[0-9]+$/ && length(v) <= 5 && v + 0 <= limit
+    }
+    function header(line, parts,n) {
+        sub(/^\+CMGR:[ ]*/, "", line)
+        gsub(/[ ]/, "", line)
+        n=split(line,parts,",")
+        if (n != 3 || !decimal(parts[1],4) ||
+            parts[2] != "" || !decimal(parts[3],240) || parts[3]+0 < 1)
+            return 0
+        tpdu=parts[3]+0
+        return 1
+    }
+    function verify_pdu(value, tmp,smsclen,hi,lo,bytes) {
+        tmp=toupper(value)
+        if (length(tmp) < 4 || length(tmp) > 512 ||
+            length(tmp)%2 || tmp ~ /[^0-9A-F]/) return 0
+        hi=index("0123456789ABCDEF",substr(tmp,1,1))-1
+        lo=index("0123456789ABCDEF",substr(tmp,2,1))-1
+        smsclen=hi*16+lo
+        bytes=length(tmp)/2
+        return bytes > 1+smsclen && bytes-1-smsclen==tpdu
+    }
+    {
+        if (length($0) > 1024) { bad=1; next }
+        gsub(/\r/, "", $0)
+        if ($0 == "") next
+        if (bad || done) { bad=1; next }
+        if (!stage && !echoed && $0 == "AT+CMGR=" expected_slot) {
+            echoed=1; next
+        }
+        if (stage==0 && $0 ~ /^\+CMGR:/ && header($0)) {
+            stage=1; next
+        }
+        if (stage==1 && verify_pdu($0)) {
+            pdu=toupper($0); stage=2; next
+        }
+        if (stage==2 && $0=="OK") { done=1; next }
+        bad=1
+    }
+    END {
+        if (bad || !done || stage!=2) exit 1
+        print pdu
+    }'
+}
+
+mode_is_pdu() {
+    awk '
+    { gsub(/\r/,"",$0); if ($0=="") next }
+    $0=="AT+CMGF?" && !seen {next}
+    $0 ~ /^\+CMGF:[ ]*0[ ]*$/ && !seen {seen=1;next}
+    $0=="OK" && seen && !ok {ok=1;next}
+    {bad=1}
+    END{exit (bad || !seen || !ok ? 1 : 0)}'
+}
+
+# The existing modem lock is held ACROSS identity, mode and a single CMGR.
+(
+    flock -n -x 9 || fail
+    [ -c /dev/ttyUSB2 ] || fail
+    port="$(readlink -f /sys/class/tty/ttyUSB2/device 2>/dev/null || :)"
+    case "$port" in /sys/devices/*:1.4/ttyUSB2) ;; *) fail ;; esac
+    parent="$(dirname "$(dirname "$port")")"
+    [ "$(cat "$parent/idVendor" 2>/dev/null || :)" = 05c6 ] || fail
+    [ "$(cat "$parent/idProduct" 2>/dev/null || :)" = 902e ] || fail
+    raw="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF?' 1500 2>/dev/null)" || fail
+    printf '%s\n' "$raw" | mode_is_pdu || fail
+    unset raw
+    raw="$(/usr/sbin/we5927-at /dev/ttyUSB2 "AT+CMGR=$slot" 4000 2>/dev/null)" || fail
+    pdu="$(printf '%s\n' "$raw" | parse_single)" || fail
+    unset raw
+    # Only validated hexadecimal can appear in the private response.
+    printf '{"ok":true,"index":%s,"pdu":"%s"}\n' "$slot" "$pdu"
+    unset pdu
+) 9>/var/lock/we5927-at.lock

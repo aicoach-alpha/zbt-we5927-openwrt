@@ -1,0 +1,15 @@
+{
+  "veci-xl-ussd": {
+    "description": "Private XL on-demand USSD menu (owner explicit action only)",
+    "write": {
+      "ubus": {
+        "veci.ussd": [
+          "start",
+          "reply",
+          "cancel",
+          "quotaStatus"
+        ]
+      }
+    }
+  }
+}

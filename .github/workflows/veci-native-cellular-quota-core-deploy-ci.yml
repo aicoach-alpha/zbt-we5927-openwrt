@@ -1,0 +1,69 @@
+name: VeCI native Cellular quota signed core deployment guard
+on:
+  push:
+    paths:
+      - 'scripts/veci-native-cellular-quota-core-deploy-20261015.sh'
+      - '.github/workflows/veci-native-cellular-quota-core-deploy-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static router upgrade, fingerprint and rollback safety gate
+        run: |
+          set -eu
+          script=scripts/veci-native-cellular-quota-core-deploy-20261015.sh
+          sh -n "$script"
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-native-cellular-quota-core-deploy-20261015.sh').read_text()
+          active='\n'.join(line for line in s.splitlines() if not line.lstrip().startswith('#'))
+          required=(
+            'VECI_CELLULAR_UI_DEPLOY=blocked',
+            'VECI_CELLULAR_UI_CORE_APK_INSTALL=pass',
+            'VECI_CELLULAR_UI_BROWSER_UAT=pending',
+            'VECI_LUCI_UI_MODIFIED=false',
+            'VECI_MODEM_SMS_UNCHANGED=true',
+            'VECI_CELLULAR_UI_ROLLBACK=pass',
+            'existing_core_version_not_0_2_0',
+            'existing_core_source_drift',
+            'quota_helper_mismatch',
+            'unrelated_packages_modified',
+            'existing_quota_backend_unavailable',
+            'do_rollback',
+            'while [ "$attempt" -lt 12 ]; do',
+            'apk --no-network --keys-dir "$WORK/keys" add "$WORK/$NEW"',
+            'apk --no-network --keys-dir "$WORK/keys" add "$WORK/$OLD"',
+            "grep -v '^veci-0[.]2[.]'",
+            'apk --keys-dir "$WORK/keys" verify',
+            'e569794565fd2d59d4badeae9bcc086ab931b1200cafec5f4b247954f29485b4',
+            '2f043f5e45c0839de3caba0f7ee832e1ba30adae7549afe17014d7e96ef9b818',
+            'fb3e078c2e65a39c3d0e852f5364f2fd433cbfd547df21b480b1cfd514104a9d',
+          )
+          for part in required: assert part in active,part
+          forbidden=('sysupgrade','AT+CMGR','AT+CUSD','AT+CMGS',
+            '/etc/init.d/network', '/etc/init.d/we5927', 'uci set',
+            '--allow-untrusted', '/usr/share/luci/menu.d', '/luci-static',
+            'apk upgrade')
+          for part in forbidden: assert part not in active,part
+          assert active.count('apk --no-network --keys-dir')>=4
+          print('VECI_ONLY_NATIVE_QUOTA_CORE_DEPLOY_STATIC_PASS')
+          PY
+      - name: Check immutable release pair fingerprints from GitHub assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir -p /tmp/veci-pair
+          gh release download veci-native-quota-core-pair-9cbf71fcb12f \
+            -p 'veci-0.2.0-r1.apk' -p 'veci-0.2.1-r1.apk' -p 'veci-core.pem' \
+            -D /tmp/veci-pair
+          echo '5822cd96a04bf4a856d1d0abe3ec2065811f712808ca3eaa223ddec933effbcf  /tmp/veci-pair/veci-0.2.0-r1.apk' | sha256sum -c -
+          echo 'fe19f1f1c7c433512cf9c51778877b988a51bdc3b6ef7ab5eebad66eed317b19  /tmp/veci-pair/veci-0.2.1-r1.apk' | sha256sum -c -
+          echo '7c62736c912bed2e08dabb89dfaa05e7ed9a362672a902d119cc7ced4c1f5432  /tmp/veci-pair/veci-core.pem' | sha256sum -c -
+          echo VECI_ONLY_NATIVE_QUOTA_CORE_RELEASE_ASSETS_PASS

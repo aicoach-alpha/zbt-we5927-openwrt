@@ -1,0 +1,74 @@
+#!/bin/sh
+# Verified-operator USSD quota snapshot (volatile, root-only, max age 15m).
+# Stores only the labeled remaining amount/unit, NEVER raw text or OTP.
+set -eu
+umask 077
+LC_ALL=C;export LC_ALL
+FILE=/tmp/veci-xl-quota.state
+fail(){ printf '{"ok":false,"reason":"quota_unavailable"}\n';exit 1; }
+[ "$(id -u)" = 0 ] || fail
+case "$1" in
+ --status)
+  if [ ! -f "$FILE" ] || [ -L "$FILE" ];then
+    printf '{"ok":true,"provider":"xl","state":"not_checked","remaining_display":null,"total_display":null}\n';exit 0
+  fi
+  [ "$(wc -c < "$FILE")" -le 50 ] || fail
+  # File is root-owned 0600, no HTTP access or persistent flash writes.
+  meta="$(ls -ln "$FILE" 2>/dev/null | awk '{print $1":"$3}')" || fail
+  [ "$meta" = "-rw-------:0" ] || fail
+  IFS='|' read -r timestamp amount unit <<EOF
+$(cat "$FILE")
+EOF
+  case "$timestamp:$amount" in *[!0-9.,:]*)fail;;esac
+  case "$unit" in GB|MB|KB);;*)fail;;esac
+  [ "$(printf %s "$amount"|wc -c)" -le 9 ] || fail
+  printf '%s' "$amount" | grep -Eq '^[0-9]{1,6}([.,][0-9]{1,2})?$' || fail
+  now="$(date +%s)" || fail
+  case "$now" in ''|*[!0-9]*)fail;;esac
+  if [ "$now" -lt "$timestamp" ] || [ $((now-timestamp)) -gt 900 ];then
+    printf '{"ok":true,"provider":"xl","state":"stale","remaining_display":null,"total_display":null}\n'
+  else
+    printf '{"ok":true,"provider":"xl","state":"ready","remaining_display":"%s %s","total_display":null,"source":"operator_ussd","fetched_epoch":%s}\n' "$amount" "$unit" "$timestamp"
+  fi;;
+ --record)
+  [ "$#" -eq 1 ] || fail
+  command -v jsonfilter >/dev/null 2>&1 || fail
+  raw="$(head -c 1301)" || fail
+  [ "$(printf %s "$raw"|wc -c)" -le 1300 ] || fail
+  case "$raw" in '{"ok":true,"source":"operator_ussd","mode":'*',"dcs":'*',"text_supported":true,'*) ;; *)fail;;esac
+  text="$(jsonfilter -s "$raw" -e '@.text' 2>/dev/null || :)"
+  [ -n "$text" ] && [ "$(printf %s "$text"|wc -c)" -le 768 ] || fail
+  # Ignore advertising/purchases even if they mention a quota amount.
+  if printf %s "$text" | grep -Eiq '(^|[[:space:]])(beli|diskon|promo|aktivasi|harga)([[:space:]]|$)';then fail;fi
+  amount_unit="$(printf '%s\n' "$text" | awk '
+    {
+      t=tolower($0)
+      if(t !~ /sisa[ \t]+(kuota|paket( internet)?)/)exit 1
+      sub(/^.*sisa[ \t]+(kuota|paket( internet)?)[ \t]*[:=\-]?[ \t]*/, "", t)
+      if(match(t,/^[0-9]+([.,][0-9]{1,2})?[ \t]*(gb|mb|kb)([^a-z]|$)/)){
+        x=substr(t,RSTART,RLENGTH)
+        gsub(/[ \t]/,"",x)
+        sub(/[^a-z]*$/,"",x)
+        u=substr(x,length(x)-1,2)
+        if(u!="gb"&&u!="mb"&&u!="kb")exit 1
+        v=substr(x,1,length(x)-2)
+        if(v ~ /^[0-9]+([.,][0-9][0-9]?)?$/) {
+          printf "%s|%s",v,toupper(u);exit 0
+        }
+      }
+      exit 1
+    }')" || fail
+  # BusyBox awk may not implement interval regex; POSIX shell validates again.
+  IFS='|' read -r amount unit <<EOF
+$amount_unit
+EOF
+  printf %s "$amount" | grep -Eq '^[0-9]{1,6}([.,][0-9]{1,2})?$' || fail
+  case "$unit" in GB|MB|KB);;*)fail;;esac
+  now="$(date +%s)" || fail
+  tmp="$FILE.new.$$"
+  [ ! -L "$FILE" ] || fail
+  printf '%s|%s|%s\n' "$now" "$amount" "$unit" > "$tmp" || fail
+  chmod 600 "$tmp" && mv -f "$tmp" "$FILE" || { rm -f "$tmp";fail; }
+  printf '{"ok":true,"saved":true}\n';;
+ *)fail;;
+esac

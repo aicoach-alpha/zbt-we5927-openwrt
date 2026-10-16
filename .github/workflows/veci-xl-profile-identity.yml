@@ -1,0 +1,31 @@
+name: VeCI XL profile identity focused
+on:
+  push:
+    paths:
+      - 'source/veci-telco-indonesia/files/usr/libexec/veci-xl-profile-identity-check'
+      - 'source/veci-telco-xl-native/Makefile'
+      - 'tests/test_veci_xl_profile_identity.py'
+      - '.github/workflows/veci-xl-profile-identity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  identity-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify actual OpenWrt shell identity gate only
+        run: |
+          set -eu
+          sh -n source/veci-telco-indonesia/files/usr/libexec/veci-xl-profile-identity-check
+          sudo python3 tests/test_veci_xl_profile_identity.py
+          python3 - <<'PY'
+          from pathlib import Path
+          pkg=Path('source/veci-telco-xl-native/Makefile').read_text()
+          assert 'PKG_VERSION:=0.3.2' in pkg
+          assert 'veci-xl-profile-identity-check' in pkg
+          assert 'veci-xl-token-stage' in pkg
+          assert 'veci-xl-ciam' in pkg
+          print('VECI_XL_PROFILE_PACKAGE=pass')
+          PY

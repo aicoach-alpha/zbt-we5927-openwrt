@@ -1,0 +1,15 @@
+{
+  "veci-xl-owner": {
+    "description": "Owner-initiated XL account actions; only with HTTPS-only router guard",
+    "read": {
+      "ubus": {
+        "veci.xl": ["status"]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.xl": ["requestOtp", "submitOtp", "refreshQuota"]
+      }
+    }
+  }
+}

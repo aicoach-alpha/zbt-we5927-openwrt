@@ -1,0 +1,82 @@
+#!/bin/sh
+# OPTIONAL WE5927 rpcd exec plugin: status-changing SMS listing; no general AT.
+# Expose via dedicated WRITE-only ubus ACL, never read/public ACL.
+set -eu
+umask 077
+LC_ALL=C; export LC_ALL
+WORKER=/usr/libexec/veci-sms-inbox-index
+RATE_FILE=/tmp/veci-sms-inbox-last-attempt
+RATE_LOCK=/var/lock/veci-sms-inbox-rpc.lock
+
+deny() {
+  case "$1" in
+    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy)
+      reason="$1" ;;
+    *) reason=index_unavailable ;;
+  esac
+  printf '{"ok":false,"reason":"%s","messages":[]}\n' "$reason"
+}
+list_index() {
+  [ "$(id -u)" -eq 0 ] || { deny admin_required; return; }
+  input="$(head -c 513)" || { deny invalid_request; return; }
+  [ "$(printf %s "$input" | wc -c)" -le 512 ] ||
+    { deny invalid_request; return; }
+  command -v jsonfilter >/dev/null 2>&1 || { deny invalid_request; return; }
+  scope="$(jsonfilter -s "$input" -e '@.scope' 2>/dev/null)" ||
+    { deny invalid_request; return; }
+  ack="$(jsonfilter -s "$input" -e '@.ack_unread_status' 2>/dev/null)" ||
+    { deny invalid_request; return; }
+  unset input
+  if [ "$scope" != metadata_only ] ||
+     [ "$ack" != I_ACCEPT_UNREAD_TO_READ ]; then
+    deny ack_required
+    return
+  fi
+  unset scope ack
+  [ -x "$WORKER" ] || { deny worker_unavailable; return; }
+  command -v flock >/dev/null 2>&1 || { deny index_unavailable; return; }
+  # Per-device rate control prevents accidental repeated state-changing lists.
+  # Reserve attempt BEFORE AT I/O, including if modem later times out.
+  (
+    flock -n -x 8 || { deny request_busy; exit 0; }
+    now="$(date +%s)" || { deny index_unavailable; exit 0; }
+    case "$now" in ''|*[!0-9]*) deny index_unavailable; exit 0 ;; esac
+    last="$(cat "$RATE_FILE" 2>/dev/null || :)"
+    case "$last" in
+      ''|*[!0-9]*) ;;
+      *)
+        if [ "$now" -lt "$last" ] || [ "$((now - last))" -lt 60 ]; then
+          deny retry_later
+          exit 0
+        fi
+        ;;
+    esac
+    printf '%s\n' "$now" > "$RATE_FILE" ||
+      { deny index_unavailable; exit 0; }
+    result="$("$WORKER" --show-indices-only --ack-unread-may-be-marked-read 2>/dev/null)" ||
+    { deny index_unavailable; return; }
+  [ "$(printf %s "$result" | wc -c)" -le 1600 ] ||
+    { deny index_unavailable; return; }
+  # Only allow exact numeric metadata schema from validated worker, no PDU.
+  if ! printf '%s\n' "$result" | grep -Eq \
+     '^\{"ok":true,"source":"on_demand_cmgl","side_effect_acknowledged":true,"count":([0-9]|1[0-6]),"messages":\[(\{"index":[0-9]{1,5},"status":[0-4],"tpdu_octets":[0-9]{1,3}\}(,\{"index":[0-9]{1,5},"status":[0-4],"tpdu_octets":[0-9]{1,3}\}){0,15})?\]\}$'; then
+    deny index_unavailable
+    return
+  fi
+  printf '%s\n' "$result"
+  ) 8>"$RATE_LOCK"
+}
+[ "$#" -ge 1 ] || exit 2
+case "$1" in
+  list)
+    printf '{"listIndex":{"scope":"str","ack_unread_status":"str"}}\n'
+    ;;
+  call)
+    [ "$#" -ge 2 ] || { deny invalid_request; exit 0; }
+    case "$2" in
+      listIndex) list_index ;;
+      *) deny invalid_request ;;
+    esac
+    ;;
+  *) exit 2 ;;
+esac

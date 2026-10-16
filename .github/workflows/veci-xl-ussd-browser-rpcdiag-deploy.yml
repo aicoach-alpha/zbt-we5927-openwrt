@@ -1,0 +1,53 @@
+name: VeCI XL browser RPC diagnosis one-file install gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-ussd-browser-rpcdiag-update-20261015.sh'
+      - '.github/workflows/veci-xl-ussd-browser-rpcdiag-deploy.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check exact update scope, byte pins, and safe rollback
+        run: |
+          set -eu
+          sh -n scripts/veci-xl-ussd-browser-rpcdiag-update-20261015.sh
+          node --check source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js
+          echo 'c60d80b33cd3f49e25ff36ca4801c3ba481244ef2f98bf3697ec19ead61e8d83  source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js' | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          old=Path('scripts/veci-xl-ussd-guide-diagnostic-update-20261015.sh').read_text()
+          new=Path('scripts/veci-xl-ussd-browser-rpcdiag-update-20261015.sh').read_text()
+          expected=old
+          for a,b in [
+           ('REV=c55d458ca1a3cc95967297eb8fab285c404c3c89',
+            'REV=a86e2193b8d229914b473740f49a3e8c8c001f3d'),
+           ('OLD_SHA=7fe4df1ee56cf64fdc1d04239ee59ffc29b09db3deb51a0b2b657049201874b4',
+            'OLD_SHA=7c3141c0903e8af9b4c45f3faac794dd8bae8daa7029863a1a02821a41fd5e14'),
+           ('NEW_SHA=7c3141c0903e8af9b4c45f3faac794dd8bae8daa7029863a1a02821a41fd5e14',
+            'NEW_SHA=c60d80b33cd3f49e25ff36ca4801c3ba481244ef2f98bf3697ec19ead61e8d83'),
+           ('BACKUP=/root/veci-xl-guide-error-rollback-20261015.js',
+            'BACKUP=/root/veci-xl-guide-rpcdiag-rollback-20261015.js'),
+           ('VECI_XL_GUIDE_DIAG','VECI_XL_BROWSER_RPC_DIAG'),
+           ('VeCI-only XL USSD guide error visibility','VeCI-only XL USSD browser permission diagnosis')
+          ]:
+            assert a in expected,a
+            expected=expected.replace(a,b)
+          assert new==expected,'Unexpected scope change from previously tested one-file installer'
+          assert 'same "$FILE" "$OLD_SHA"' in new
+          assert 'same "$FILE" "$NEW_SHA"' in new
+          assert 'same "$BACKUP" "$OLD_SHA"' in new
+          assert new.index('if [ "$MODE" = --verify ]') < new.index('cp "$FILE" "$BACKUP"')
+          assert 'VECI_XL_BROWSER_RPC_DIAG_ROLLBACK=available' in new
+          for bad in ('AT+CUSD','AT+CMGS','ubus -S call','ubus call','apk add',
+                      'apk del','/etc/init.d','sysupgrade','uci commit','uci set',
+                      'uci add','uci delete','/luci-static/'):
+            assert bad not in new,bad
+          print('VECI_XL_BROWSER_RPC_DIAG_INSTALL_SCOPE=pass')
+          print('VECI_XL_BROWSER_RPC_DIAG_HASH_AND_ROLLBACK=pass')
+          PY

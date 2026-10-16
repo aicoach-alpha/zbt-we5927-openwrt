@@ -1,0 +1,88 @@
+name: VeCI XL direct operator native MIPS crypto prerelease
+on:
+  push:
+    paths:
+      - '.github/workflows/veci-xl-crypto-mips-release.yml'
+      - 'source/veci-telco-indonesia/veci-xl-crypto.c'
+      - 'tests/test_veci_xl_native_crypto.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  cross-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify independent host crypto test vectors
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libmbedtls-dev python3-pycryptodome zstd cmake
+          gcc -std=c11 -Os -Wall -Wextra -Werror -D_DEFAULT_SOURCE \
+            -o /tmp/veci-xl-crypto-test \
+            source/veci-telco-indonesia/veci-xl-crypto.c -lmbedcrypto
+          python3 -m unittest discover -s tests -p test_veci_xl_native_crypto.py -v
+      - name: SHA-pin OpenWrt 25.12.5 RAMIPS MIPS toolchain and mbedTLS 3.6.6
+        run: |
+          set -eu
+          toolchain=openwrt-toolchain-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl -fL --retry 3 --max-time 240 \
+            "https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/$toolchain" \
+            -o /tmp/openwrt-toolchain.tar.zst
+          echo "5e03963e3b5e2c12f8c1519a07d56a74babcd6147e95c4d50948e50ae465d776  /tmp/openwrt-toolchain.tar.zst" | sha256sum -c -
+          mkdir -p /tmp/veci-toolchain
+          tar -xf /tmp/openwrt-toolchain.tar.zst -C /tmp/veci-toolchain
+          curl -fL --retry 3 --max-time 150 \
+            "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.6/mbedtls-3.6.6.tar.bz2" \
+            -o /tmp/mbedtls-3.6.6.tar.bz2
+          echo "8fb65fae8dcae5840f793c0a334860a411f884cc537ea290ce1c52bb64ca007a  /tmp/mbedtls-3.6.6.tar.bz2" | sha256sum -c -
+          mkdir -p /tmp/veci-crypto
+          tar -xf /tmp/mbedtls-3.6.6.tar.bz2 -C /tmp/veci-crypto
+      - name: Cross-build compact self-contained MIPS binary without installing packages
+        run: |
+          set -eu
+          gcc="$(find -L /tmp/veci-toolchain -type f -name '*gcc' -executable | grep '/bin/' | head -1)"
+          [ -n "$gcc" ]
+          echo "TARGET_COMPILER=$gcc"
+          src=/tmp/veci-crypto/mbedtls-3.6.6
+          cmake -S "$src" -B /tmp/veci-crypto/build \
+            -DCMAKE_C_COMPILER="$gcc" \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DENABLE_PROGRAMS=OFF \
+            -DENABLE_TESTING=OFF \
+            -DUSE_SHARED_MBEDTLS_LIBRARY=OFF \
+            -DUSE_STATIC_MBEDTLS_LIBRARY=ON \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections -Os"
+          cmake --build /tmp/veci-crypto/build --target mbedcrypto -j 2
+          mkdir -p release
+          "$gcc" -static -Os -s -ffunction-sections -fdata-sections \
+            -std=c11 -D_DEFAULT_SOURCE -Wall -Wextra -Werror \
+            -I"$src/include" \
+            -o release/veci-xl-crypto-mipsel \
+            source/veci-telco-indonesia/veci-xl-crypto.c \
+            /tmp/veci-crypto/build/library/libmbedcrypto.a \
+            -Wl,--gc-sections
+          file release/veci-xl-crypto-mipsel
+          readelf -h release/veci-xl-crypto-mipsel | grep -Eq 'Machine:[ ]*MIPS'
+          readelf -h release/veci-xl-crypto-mipsel | grep -q "2's complement, little endian"
+          ! readelf -l release/veci-xl-crypto-mipsel | grep -q INTERP
+          [ "$(stat -c %s release/veci-xl-crypto-mipsel)" -lt 900000 ]
+          (cd release && sha256sum veci-xl-crypto-mipsel > SHA256SUMS)
+          echo VECI_XL_CRYPTO_NATIVE_MIPS_BUILD_PASS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-xl-native-crypto-mipsel
+          path: release
+      - name: Publish standalone crypto prerelease, NO router deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-xl-crypto-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/veci-xl-crypto-mipsel release/SHA256SUMS \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "VeCI XL native MIPS crypto source-verified candidate" \
+            --notes "Standalone local crypto only; no operator account authentication, HTTP, USSD, SMS, token transfer, or router installation. Physical MIPS smoke verification required before any live deployment."
+          echo "VECI_XL_CRYPTO_MIPS_CANDIDATE=$tag"

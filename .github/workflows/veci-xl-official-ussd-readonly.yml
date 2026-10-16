@@ -1,0 +1,37 @@
+name: VeCI XL official USSD read-only detection
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-official-ussd-readonly-preflight-20261015.sh'
+      - '.github/workflows/veci-xl-official-ussd-readonly.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify no modem or account side effects
+        run: |
+          set -eu
+          sh -n scripts/veci-xl-official-ussd-readonly-preflight-20261015.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          x=Path('scripts/veci-xl-official-ussd-readonly-preflight-20261015.sh').read_text()
+          assert 'VECI_XL_USSD_RPC=registered' in x
+          assert "ubus -S -v list veci.ussd" in x
+          assert "ubus -S list veci.ussd" in x
+          assert "VECI_XL_USSD_OPERATOR_REQUEST_SENT=false" in x
+          assert "VECI_XL_USSD_MODEM_SMS_CHANGED=false" in x
+          assert "VECI_XL_037_RPC=registered" in x
+          assert "VECI_HTTPS_ONLY=pass" in x
+          for blocked in ("ubus -S call", "ubus call","/dev/tty",
+              "AT+CUSD", "AT+CMGS", "we5927-lte", "apk add",
+              "sysupgrade", "/etc/init.d", "uci commit", "uci set",
+              "uci add", "uci delete", "wget", "curl", "requestOtp",
+              "submitOtp", "--start", "--reply", "--cancel"):
+              assert blocked not in x,blocked
+          print('VECI_XL_OFFICIAL_USSD_READONLY_SCOPE=pass')
+          PY

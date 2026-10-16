@@ -1,0 +1,21 @@
+{
+  "veci-ussd-dialer": {
+    "description": "Authenticated owner-initiated general USSD dial and responses",
+    "read": {
+      "ubus": {
+        "veci.dialer": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.dialer": [
+          "start",
+          "reply",
+          "cancel"
+        ]
+      }
+    }
+  }
+}

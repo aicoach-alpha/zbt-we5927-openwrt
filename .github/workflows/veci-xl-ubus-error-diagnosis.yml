@@ -1,0 +1,36 @@
+name: VeCI XL ubus error diagnosis focused
+on:
+  push:
+    paths:
+      - 'source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js'
+      - 'tests/test_veci_xl_ussd_transport_codes.cjs'
+      - '.github/workflows/veci-xl-ubus-error-diagnosis.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact ubus codes, no sensitive output and no USSD retries
+        run: |
+          set -eu
+          node --check source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js
+          node tests/test_veci_xl_ussd_transport_codes.cjs
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js').read_text()
+          assert "call('start', {})" in s
+          assert "call('reply', {" in s
+          assert "approval: 'I_APPROVE_THIS_USSD_CHOICE'" in s
+          assert "api.call('session', 'access'" in s
+          assert "access = transportCode(err)" in s
+          assert "response.json()" not in s
+          assert "innerHTML" not in s
+          assert "console." not in s
+          assert "setInterval(" not in s
+          print("VECI_XL_USSD_ROUTE_GUARD=pass")
+          PY
+          sha256sum source/veci-telco-xl-native/files/www/veci/xl-ussd-guide.js

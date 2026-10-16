@@ -1,0 +1,51 @@
+#!/bin/sh
+# Source-only VeCI v1.6.1 direct status-report ingestion boundary.
+# CALLER MUST be a trusted modem serial owner, never a public ubus/HTTP method.
+# Takes one +CDS header and PDU via stdin, no AT/device/restart/network operations.
+set -eu
+umask 077
+LC_ALL=C;export LC_ALL
+DECODER=/usr/libexec/veci-sms-status-report
+MAP=/usr/libexec/veci-sms-delivery-map
+FLAG=/etc/veci-sms-feature
+fail(){ printf '{"ok":false,"reason":"report_not_recorded"}\n';exit 1; }
+[ "$#" -eq 1 ] && [ "$1" = --direct-from-owner ] || fail
+[ "$(id -u)" -eq 0 ] || fail
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail
+[ -f "$FLAG" ] && [ ! -L "$FLAG" ] &&
+[ "$(cat "$FLAG" 2>/dev/null || :)" = 1 ] || fail
+[ -x "$DECODER" ] && [ -x "$MAP" ] || fail
+command -v jsonfilter >/dev/null 2>&1 || fail
+# Parser enforces exact +CDS framing and bounds. No raw PDU is ever logged.
+parsed="$("$DECODER" --direct-urc 2>/dev/null)" || fail
+[ "$(printf %s "$parsed" | wc -c)" -le 170 ] || fail
+case "$parsed" in
+  '{"ok":true,"route":"direct_urc","mr":'*',"recipient":'*',"tp_st":'*',"state":'*'}')
+    ;;
+  *)fail;;
+esac
+mr="$(jsonfilter -s "$parsed" -e '@.mr' 2>/dev/null || :)"
+recipient="$(jsonfilter -s "$parsed" -e '@.recipient' 2>/dev/null || :)"
+status="$(jsonfilter -s "$parsed" -e '@.tp_st' 2>/dev/null || :)"
+state="$(jsonfilter -s "$parsed" -e '@.state' 2>/dev/null || :)"
+numeric(){ case "$1" in ''|*[!0-9]*)return 1;;*)return 0;;esac; }
+numeric "$mr" && numeric "$status" || fail
+[ "$(printf %s "$mr"|wc -c)" -le 3 ] && [ "$mr" -le 255 ] || fail
+[ "$(printf %s "$status"|wc -c)" -le 3 ] && [ "$status" -le 255 ] || fail
+case "$recipient" in
+  +*)digits="$(printf %s "$recipient"|cut -c2-)" ;;
+  *)digits="$recipient";;
+esac
+numeric "$digits" || fail
+[ "$(printf %s "$digits"|wc -c)" -ge 3 ] &&
+[ "$(printf %s "$digits"|wc -c)" -le 15 ] || fail
+expected=unknown
+if [ "$status" -eq 0 ];then expected=delivered
+elif [ "$status" -ge 32 ] && [ "$status" -lt 64 ];then expected=pending
+elif [ "$status" -ge 64 ] && [ "$status" -lt 128 ];then expected=failed;fi
+[ "$state" = "$expected" ] || fail
+# Map enforces unique TP-MR + recipient + valid time and is independently locked.
+out="$("$MAP" --apply "$mr" "$recipient" "$status" 2>/dev/null)" || fail
+[ "$out" = '{"ok":true,"matched":true}' ] || fail
+unset parsed recipient digits out
+printf '{"ok":true,"delivery_recorded":true}\n'

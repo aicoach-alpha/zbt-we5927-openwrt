@@ -155,6 +155,16 @@ messaging_capabilities() {
 	/usr/libexec/veci-modem-capabilities probe
 }
 
+# Deliberately explicit-on-demand: only SMS storage used/total counts.
+# This never returns text, sender identities, raw AT frames or OTP.
+messaging_storage() {
+    [ -x /usr/libexec/veci-modem-capabilities ] || {
+        emit_error "storage_probe_unavailable"
+        return
+    }
+    /usr/libexec/veci-modem-capabilities storage
+}
+
 reconnect() {
 	[ -x "$LTE" ] || {
 		emit_error "lte_manager_missing"
@@ -181,7 +191,7 @@ switch_sim() {
 
 case "$1" in
 	list)
-		printf '{ "status": {}, "identity": {}, "identityLive": {}, "messagingCapabilities": {}, "reconnect": {}, "switchSim": { "sim": "int" } }\n'
+		printf '{ "status": {}, "identity": {}, "identityLive": {}, "messagingCapabilities": {}, "messagingStorage": {}, "reconnect": {}, "switchSim": { "sim": "int" } }\n'
 		;;
 	call)
 		case "$2" in
@@ -189,6 +199,7 @@ case "$1" in
 			identity) identity ;;
 			identityLive) identity_live ;;
 			messagingCapabilities) messaging_capabilities ;;
+			messagingStorage) messaging_storage ;;
 			reconnect) reconnect ;;
 			switchSim) switch_sim ;;
 			*) emit_error "method_not_found" ;;

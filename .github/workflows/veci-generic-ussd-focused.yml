@@ -1,0 +1,67 @@
+name: VeCI generic USSD dialer focused UAT
+on:
+  push:
+    paths:
+      - 'source/veci-ussd-dialer/**'
+      - 'tests/test_veci_generic_ussd_dialer.py'
+      - '.github/workflows/veci-generic-ussd-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate native PTY, RPC bounds and VeCI interface
+        run: |
+          set -eu
+          python3 -m unittest discover -s tests -p 'test_veci_generic_ussd_dialer.py' -v
+          sh -n source/veci-ussd-dialer/files/usr/libexec/veci-ussd-dialer
+          sh -n source/veci-ussd-dialer/files/usr/libexec/rpcd/veci.dialer
+          node --check source/veci-ussd-dialer/files/www/veci/ussd-dialer.js
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          pkg=Path('source/veci-ussd-dialer/Makefile').read_text()
+          native=Path('source/veci-ussd-dialer/veci-ussd-once.c').read_text()
+          worker=Path('source/veci-ussd-dialer/files/usr/libexec/veci-ussd-dialer').read_text()
+          rpc=Path('source/veci-ussd-dialer/files/usr/libexec/rpcd/veci.dialer').read_text()
+          acl=json.loads(Path('source/veci-ussd-dialer/files/usr/share/rpcd/acl.d/veci-ussd-dialer.json').read_text())
+          js=Path('source/veci-ussd-dialer/files/www/veci/ussd-dialer.js').read_text()
+          html=Path('source/veci-ussd-dialer/files/www/veci/ussd-dialer.html').read_text()
+          assert 'DEPENDS:=+jsonfilter +rpcd' in pkg
+          assert '+luci' not in pkg.lower()
+          assert 'veci-ussd-dialer-once' in pkg
+          assert 'veci-xl-quota-cache' not in worker
+          assert 'not_xl_network' not in worker
+          assert "value='*808#'" not in worker
+          assert 'value="$2"' in worker
+          assert 'we5927-at.lock' in worker
+          assert '05c6' in worker and '902e' in worker and 'ttyUSB2' in worker
+          assert 'STATE=/tmp/veci-xl-ussd.session' in worker
+          assert "grep -Eq '^[*#][0-9*#]{1,30}#$'" in worker
+          assert "grep -Eq '^[*#][0-9*#]{1,30}#$'" in rpc
+          assert 'I_APPROVE_THIS_USSD_DIAL' in rpc
+          assert "emit \"$RUN\" --start \"$code\"" in rpc
+          assert 'strcmp(argv[2],"*808#")' not in native
+          assert 'is_code=' in native and 'dial_len>32' in native
+          assert 'O_NONBLOCK' in native
+          assert 'AT+CUSD=1' in native and 'ATD' not in native
+          assert acl['veci-ussd-dialer']['write']['ubus']['veci.dialer']==['start','reply','cancel']
+          assert acl['veci-ussd-dialer']['read']['ubus']['veci.dialer']==['status']
+          assert "api.call('veci.dialer'" in js
+          assert "CODE = /^[*#][0-9*#]{1,30}#$/" in js
+          assert "window.confirm(" in js and js.count("window.confirm(")==2
+          assert 'setInterval(' not in js and 'setTimeout(' not in js
+          assert 'innerHTML' not in js and 'localStorage' not in js
+          assert "textContent" in js
+          assert "connect-src 'self'" in html
+          assert "ussd-dialer.js" in html
+          for prohibited in ('AT+CUSD','ATD','requestOtp','submitOtp'):
+            assert prohibited not in js
+          print('VECI_GENERIC_USSD_OWNER_EXPLICIT_DIAL=pass')
+          print('VECI_GENERIC_USSD_ANY_SIM_WITH_MODEM_GUARDS=pass')
+          print('VECI_GENERIC_USSD_NO_LUCI_OR_XL_QUOTA=pass')
+          PY

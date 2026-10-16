@@ -1,0 +1,49 @@
+name: VeCI Indonesia quota APK read-only physical preflight gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-indonesia-quota-apk-preflight-20261015.sh'
+      - '.github/workflows/veci-indonesia-quota-apk-preflight-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prove no flash mutation or signature bypass is possible in preflight
+        run: |
+          set -eu
+          src=scripts/veci-indonesia-quota-apk-preflight-20261015.sh
+          sh -n "$src"
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-indonesia-quota-apk-preflight-20261015.sh').read_text()
+          active='\n'.join(x for x in s.splitlines() if not x.lstrip().startswith('#'))
+          for forbidden in ('AT+CMGR', 'AT+CMGS', 'AT+CUSD',
+                            '/etc/init.d/', 'sysupgrade', 'reboot',
+                            '--allow-untrusted', '/etc/apk/keys/',
+                            '/etc/config/', 'apk upgrade', 'apk del '):
+              assert forbidden not in active,forbidden
+          assert 'apk --simulate add' in active
+          assert 'sha256sum' in active
+          assert 'zbtlink,zbt-we5927' in active
+          assert '25.12.5' in active
+          assert 'VECI_INDONESIA_APK_INSTALLED=false' in active
+          assert '/tmp/veci-indonesia-quota-apk.' in active
+          print('VECI_INDONESIA_APK_PREFLIGHT_READONLY_GATE_PASS')
+          PY
+      - name: Pinned release exists with exact expected hash and package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir -p /tmp/staged-apk
+          gh release download veci-indonesia-quota-apk-fb9630bdc1cd \
+            -p veci-telco-indonesia-0.2.1-r1.apk -D /tmp/staged-apk
+          echo '7ebb290ff5973c52a970f2e78b784254dcbafc3e5256633affaad9644685f8b4  /tmp/staged-apk/veci-telco-indonesia-0.2.1-r1.apk' | sha256sum -c -
+          test "$(wc -c < /tmp/staged-apk/veci-telco-indonesia-0.2.1-r1.apk)" -eq 5567
+          echo VECI_INDONESIA_QUOTA_APK_RELEASE_SHA256_PASS

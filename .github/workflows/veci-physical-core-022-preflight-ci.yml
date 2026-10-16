@@ -1,0 +1,60 @@
+name: VeCI physical core 0.2.2 signed preflight gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-physical-core-022-preflight-20261015.sh'
+      - '.github/workflows/veci-physical-core-022-preflight-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check physical upgrade preflight read-only scope
+        run: |
+          set -eu
+          sh -n scripts/veci-physical-core-022-preflight-20261015.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-physical-core-022-preflight-20261015.sh').read_text()
+          active='\n'.join(line for line in s.splitlines() if not line.lstrip().startswith('#'))
+          must=[
+            'core_version_not_0_2_0',
+            'existing_core_rpcd_drift',
+            'existing_core_acl_drift',
+            'active_cellular_source_drift',
+            'VECI_022_PHYSICAL_SOURCE_PARITY=pass',
+            'VECI_022_OFFLINE_APK_SIMULATION=pass',
+            'apk --keys-dir "$WORK/keys" verify',
+            '--simulate add',
+            '57e1c66473e9ce4d7fb920beaeb82dadabfbf7d6984f52837b826d11cb1f1793',
+            'b30d66c259d3a90ffafabecbe0a36baa9377af76e9f51341c1b0c13078c8f1c7',
+            '2d27345b4b48c70131ea03799af96699625378a571dfa1d67c2f18f40ded4147',
+            'VECI_022_PACKAGE_INSTALLED=false',
+          ]
+          for text in must:
+              assert text in active,text
+          for bad in ('sysupgrade','--allow-untrusted','/etc/init.d/',
+                      'AT+CMGS','AT+CMGR','AT+CUSD','uci set',
+                      'apk upgrade','apk add','/luci-static/'):
+              assert bad not in active,bad
+          print('VECI_022_READONLY_STATIC_PASS')
+          PY
+      - name: Cross-verify immutable public release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir /tmp/veci-022-assets
+          gh release download veci-physical-core-022-b9f91e84899c \
+            -p 'veci-0.2.0-r1.apk' -p 'veci-0.2.2-r1.apk' -p 'veci-physical-022.pem' \
+            -D /tmp/veci-022-assets
+          printf '%s  %s\n' \
+            'b30d66c259d3a90ffafabecbe0a36baa9377af76e9f51341c1b0c13078c8f1c7' /tmp/veci-022-assets/veci-0.2.0-r1.apk \
+            '57e1c66473e9ce4d7fb920beaeb82dadabfbf7d6984f52837b826d11cb1f1793' /tmp/veci-022-assets/veci-0.2.2-r1.apk \
+            '2d27345b4b48c70131ea03799af96699625378a571dfa1d67c2f18f40ded4147' /tmp/veci-022-assets/veci-physical-022.pem | sha256sum -c -
+          echo VECI_022_IMMUTABLE_RELEASE_PAIR_PASS

@@ -1,0 +1,43 @@
+name: VeCI XL compact MIPS physical one-shot gate
+on:
+  push:
+    paths:
+      - 'scripts/veci-xl-compact-runtime-physical-20261015.sh'
+      - '.github/workflows/veci-xl-compact-physical-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify physical script does not touch modem, credentials or flash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          sh -n scripts/veci-xl-compact-runtime-physical-20261015.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-xl-compact-runtime-physical-20261015.sh').read_text()
+          active='\n'.join(line for line in s.splitlines() if not line.lstrip().startswith('#'))
+          for x in ("AT+CMGR", "AT+CUSD", "AT+CMGS", "/etc/init.d/",
+                    "sysupgrade", "apk add", "otp ", '"$http" quota',
+                    '"$http" --read-only', "/overlay", "reboot", "Authorization:"):
+              assert x not in active,x
+          for good in ("--invalid-no-network", "VECI_REAL_OPERATOR_LOGIN=not_attempted",
+                       "VECI_OPERATOR_QUOTA=not_verified",
+                       "VECI_FLASH_WRITES=none", "/tmp/veci-xl-compact."):
+              assert good in s,good
+          print('VECI_XL_COMPACT_PHYSICAL_READONLY_GATE_PASS')
+          PY
+          mkdir -p /tmp/veci-download
+          tag=veci-xl-runtime-compact-24653c5bc779
+          gh release download "$tag" -p 'veci-xl-crypto-dynamic-mipsel' -p 'veci-xl-quota-normalize-dynamic-mipsel' -p 'veci-xl-quota-http-dynamic-mipsel' -D /tmp/veci-download
+          echo "4bb8f2cb62d18aa7da34bf84aba25a2681cc0dc1ef75d5d984dd0fd68b44d931  /tmp/veci-download/veci-xl-crypto-dynamic-mipsel" | sha256sum -c -
+          echo "756daba7b1db1dbede615cf6154ed1ca767e66f42118aee947b515a9cdee1015  /tmp/veci-download/veci-xl-quota-normalize-dynamic-mipsel" | sha256sum -c -
+          echo "64c140562ddbc4fd1bb35597ef3a69022e392227a7a89d04ca1bea0c5ca4401b  /tmp/veci-download/veci-xl-quota-http-dynamic-mipsel" | sha256sum -c -
+          echo VECI_XL_COMPACT_RELEASE_INTEGRITY_PASS

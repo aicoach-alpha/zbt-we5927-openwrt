@@ -1,0 +1,76 @@
+name: VeCI generic USSD signed APK
+on:
+  push:
+    paths:
+      - 'source/veci-ussd-dialer/**'
+      - '.github/workflows/veci-generic-ussd-signed.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native generic dial PTY regression
+        run: |
+          set -eu
+          python3 -m unittest discover -s tests -p 'test_veci_generic_ussd_dialer.py' -v
+          sh -n source/veci-ussd-dialer/files/usr/libexec/veci-ussd-dialer
+          sh -n source/veci-ussd-dialer/files/usr/libexec/rpcd/veci.dialer
+          node --check source/veci-ussd-dialer/files/www/veci/ussd-dialer.js
+      - name: Fetch verified SDK
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd make gcc g++ gawk flex bison gettext libncurses-dev libssl-dev rsync unzip python3 file openssl
+          curl -fL --retry 3 --max-time 360 -o /tmp/sdk.tar.zst https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8/openwrt-sdk-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          echo 'b44636e0a53f0d769cbce64edb9ca3831e1a9ecdc8c53a5caf128884be6c490e  /tmp/sdk.tar.zst' | sha256sum -c -
+          mkdir /tmp/sdk
+          tar -xf /tmp/sdk.tar.zst -C /tmp/sdk --strip-components=1
+      - name: Compile and package optional MIPS dialer
+        run: |
+          set -eu
+          cp -a source/veci-ussd-dialer /tmp/sdk/package/
+          cd /tmp/sdk
+          printf '\nCONFIG_PACKAGE_veci-ussd-dialer=m\n' >> .config
+          make defconfig
+          make package/veci-ussd-dialer/compile -j2 V=s
+          found="$(find build_dir -path '*/.pkgdir/veci-ussd-dialer/usr/libexec/veci-ussd-dialer-once' -print -quit)"
+          test -n "$found"
+          root="$(dirname "$(dirname "$(dirname "$found")")")"
+          test -s "$root/usr/libexec/veci-ussd-dialer-once"
+          test -s "$root/usr/libexec/rpcd/veci.dialer"
+          test -s "$root/www/veci/ussd-dialer.js"
+          file "$root/usr/libexec/veci-ussd-dialer-once" | grep -q MIPS
+          mkdir -p "$GITHUB_WORKSPACE/release"
+          /tmp/sdk/staging_dir/host/bin/apk mkpkg --info 'name:veci-ussd-dialer' --info 'version:0.1.0-r1' --info 'arch:mipsel_24kc' --info 'origin:veci-ussd-dialer' --info 'description:VeCI owner manual generic USSD' --info 'depends:jsonfilter rpcd' --files "$root" --output "$GITHUB_WORKSPACE/release/veci-ussd-dialer-0.1.0-r1.apk"
+      - name: Sign APK and verify
+        run: |
+          set -eu
+          p=release/veci-ussd-dialer-0.1.0-r1.apk
+          tool=/tmp/sdk/staging_dir/host/bin/apk
+          umask 077
+          mkdir -p /tmp/sign/keys /tmp/sign/none
+          openssl ecparam -name prime256v1 -genkey -noout -out /tmp/sign/private.pem
+          openssl pkey -in /tmp/sign/private.pem -pubout -out /tmp/sign/keys/veci-ussd-010.pem
+          "$tool" --allow-untrusted adbsign --reset-signatures --sign-key /tmp/sign/private.pem "$p"
+          "$tool" --keys-dir /tmp/sign/keys verify "$p"
+          if "$tool" --keys-dir /tmp/sign/none verify "$p" >/dev/null 2>&1; then exit 1; fi
+          "$tool" --keys-dir /tmp/sign/keys adbdump --format json "$p" > release/manifest.json
+          cp /tmp/sign/keys/veci-ussd-010.pem release/
+          chmod 644 release/veci-ussd-010.pem
+          sha256sum "$p" release/veci-ussd-010.pem > release/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-generic-ussd-010-signed
+          path: release/
+      - name: Publish signed prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="veci-generic-ussd-010-$(echo "$GITHUB_SHA" | cut -c1-12)"
+          gh release create "$tag" release/* --target "$GITHUB_SHA" --prerelease --title 'VeCI generic USSD dialer signed MIPS APK' --notes 'Generic manual code and reply; not installed or real-network tested. LuCI, Core, SMS and XL quota untouched.'

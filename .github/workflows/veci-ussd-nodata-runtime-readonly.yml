@@ -1,0 +1,39 @@
+name: VeCI USSD NO_DATA runtime read-only scope
+on:
+  push:
+    paths:
+      - 'scripts/veci-generic-ussd-nodata-runtime-readonly-20261016.sh'
+      - '.github/workflows/veci-ussd-nodata-runtime-readonly.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell syntax and no-modem runtime-only inspection
+        run: |
+          set -eu
+          sh -n scripts/veci-generic-ussd-nodata-runtime-readonly-20261016.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/veci-generic-ussd-nodata-runtime-readonly-20261016.sh').read_text()
+          for wanted in ('VECI_USSD_RUNTIME_RPC=registered',
+                         'VECI_USSD_RUNTIME_RPCD_TIMEOUT_SECONDS=',
+                         'VECI_USSD_RUNTIME_KERNEL_OOM_EVENTS=present',
+                         'VECI_USSD_RUNTIME_MEMAVAILABLE_KB=',
+                         'VECI_USSD_RUNTIME_WORKER_PROCESS=',
+                         'VECI_USSD_RUNTIME_MODEM_COMMANDS=false',
+                         'VECI_USSD_RUNTIME_SERVICES_CHANGED=false'):
+            assert wanted in s,wanted
+          for banned in ('ubus -S call','ubus call','AT+CUSD','AT+CMGS',
+                         '/dev/ttyUSB2','apk add','apk del','sysupgrade',
+                         'uci commit','uci set','uci delete','uci add',
+                         '/etc/init.d','/usr/sbin/we5927-lte','kill -',
+                         'requestOtp','submitOtp'):
+            assert banned not in s,banned
+          print('VECI_USSD_NODATA_RUNTIME_READ_ONLY=pass')
+          print('VECI_USSD_NODATA_NO_MODEM_OR_CONFIG_CHANGES=pass')
+          PY

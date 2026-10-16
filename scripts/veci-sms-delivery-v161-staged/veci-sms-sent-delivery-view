@@ -1,0 +1,86 @@
+#!/bin/sh
+# VeCI v1.6.1 source-only read model for Sent Messages + verified status reports.
+# This helper runs NO modem commands, changes NO persisted data, and does not
+# change the existing v1.6.0 Sent History ABI. Never exposed as a public RPC.
+set -eu
+umask 077
+LC_ALL=C; export LC_ALL
+HISTORY=/etc/veci-sms-sent-history
+MAP=/etc/veci-sms-delivery-map
+FLAG=/etc/veci-sms-feature
+LOCK=/var/lock/veci-sms-delivery-map.lock
+SECRET=/etc/veci-sms-delivery-secret
+fail(){ printf '{"ok":false,"reason":"history_unavailable"}\n'; exit 1; }
+[ "$#" = 1 ] && [ "$1" = --list ] || fail
+[ "$(id -u)" -eq 0 ] || fail
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail
+[ -f "$FLAG" ] && [ ! -L "$FLAG" ] && [ "$(cat "$FLAG" 2>/dev/null || :)" = 1 ] || fail
+[ -f "$HISTORY" ] && [ ! -L "$HISTORY" ] && [ "$(wc -c < "$HISTORY")" -le 18000 ] || fail
+[ -f "$MAP" ] && [ ! -L "$MAP" ] && [ "$(wc -c < "$MAP")" -le 9000 ] || fail
+[ ! -L "$LOCK" ] || fail
+[ -f "$SECRET" ] && [ ! -L "$SECRET" ] &&
+[ "$(wc -c < "$SECRET")" -eq 65 ] || fail
+secret="$(cat "$SECRET" 2>/dev/null || :)"
+[ "$(printf %s "$secret"|wc -c)" -eq 64 ] || fail
+case "$secret" in *[!0-9a-f]*)fail;;esac
+for tool in flock awk sha256sum; do command -v "$tool" >/dev/null 2>&1 || fail; done
+exec 8>"$LOCK" || fail
+flock -n -s 8 || fail
+# Validate BOTH stores in their entirety before returning any persisted PDU.
+awk -F'|' '
+  NF!=2 || $1 !~ /^[0-9]+$/ || length($1)>11 ||
+  $2 !~ /^[0-9A-F]+$/ || length($2)<22 || length($2)>384 ||
+  length($2)%2 {bad=1}
+  {if(NR>30)bad=1}
+  END{exit bad}' "$HISTORY" || fail
+awk -F'|' '
+  NF!=6 || $1 !~ /^[0-9]+$/ || length($1)>11 ||
+  $2 !~ /^[0-9]+$/ || $2+0>255 ||
+  $3 !~ /^[0-9a-f]+$/ || length($3)!=64 ||
+  $4 !~ /^[0-9a-f]+$/ || length($4)!=64 ||
+  ($5!="accepted" && $5!="pending" && $5!="delivered" &&
+   $5!="failed" && $5!="unknown") ||
+  $6 !~ /^[0-9]+$/ || $6+0>255 ||
+  ($5=="delivered" && $6+0!=0) ||
+  ($5=="pending" && ($6+0<32 || $6+0>=64)) ||
+  ($5=="failed" && ($6+0<64 || $6+0>=128)) ||
+  ($5=="accepted" && $6+0!=255) ||
+  ($5=="unknown" && ($6+0==0 || ($6+0>=32 && $6+0<128))) {bad=1}
+  {if(NR>30)bad=1}
+  END{exit bad}' "$MAP" || fail
+# No temporary file, no plain-text phone digest output. History PDUs are
+# already available only to the authenticated admin through getSent.
+# Process a maximum of 30 rows; hash every submitted PDU once.
+{
+  awk -F'|' '{print "M|"$1"|"$4"|"$5"|"$6}' "$MAP"
+  while IFS='|' read -r timestamp pdu; do
+    [ -n "$timestamp" ] || continue
+    digest="$(printf '%s:%s:%s:%s' "$secret" pdu "$pdu" "$secret" | sha256sum | awk '{print $1}')" || fail
+    printf 'H|%s|%s|%s\n' "$timestamp" "$pdu" "$digest"
+  done < "$HISTORY"
+} | awk -F'|' '
+  $1=="M" {
+    key=$3; seen_map[key]++; m_time[key]=$2; m_state[key]=$4; m_st[key]=$5;
+    next
+  }
+  $1=="H" {
+    n++; h_time[n]=$2; h_pdu[n]=$3; h_hash[n]=$4; seen_history[$4]++;
+    next
+  }
+  END {
+    printf "{\"ok\":true,\"source\":\"local_sent\",\"count\":%d,\"messages\":[",n;
+    for(i=n;i>=1;i--){
+      if(i<n)printf ",";
+      digest=h_hash[i]; state="unconfirmed"; tpst=255;
+      octet=substr(h_pdu[i],3,2);
+      diff=m_time[digest]-h_time[i]; if(diff<0)diff=-diff;
+      if((octet=="21" || octet=="61") && seen_history[digest]==1 &&
+         seen_map[digest]==1 && diff<=300 && m_time[digest]>=h_time[i]-300){
+        state=m_state[digest]; tpst=m_st[digest];
+        if(state=="accepted"){state="awaiting_report";tpst=255}
+      }
+      printf "{\"at\":%s,\"pdu\":\"%s\",\"status\":\"accepted_by_modem\",\"delivery_status\":\"%s\",\"tp_st\":%d}",
+        h_time[i],h_pdu[i],state,tpst;
+    }
+    print "]}"
+  }'
