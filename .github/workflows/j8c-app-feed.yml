@@ -103,6 +103,13 @@ jobs:
           set_module PACKAGE_veci-app-wireguard
           set_module PACKAGE_veci-app-voucher
           make defconfig
+          echo '=== Resolved optional packages ==='
+          for sym in sqm-scripts ddns-scripts wireguard-tools simple-captive-portal uspot uspot-www veci-app-guest veci-app-sqm veci-app-ddns veci-app-wireguard veci-app-voucher; do
+            grep -E "^CONFIG_PACKAGE_${sym}=" .config || echo "CONFIG_PACKAGE_${sym}=unavailable"
+          done
+          echo '=== Signed package settings ==='
+          grep -E '^CONFIG_SIGN(ED_PACKAGES|_EACH_PACKAGE)=' .config || true
+          echo '=== End config diagnostic ==='
           grep -q '^CONFIG_PACKAGE_sqm-scripts=m' .config
           grep -q '^CONFIG_PACKAGE_ddns-scripts=m' .config
           grep -q '^CONFIG_PACKAGE_wireguard-tools=m' .config
@@ -118,7 +125,11 @@ jobs:
           grep -q '^CONFIG_PACKAGE_veci-app-wireguard=m' .config
           grep -q '^CONFIG_PACKAGE_veci-app-voucher=m' .config
           grep -q '^CONFIG_SIGNED_PACKAGES=y' .config
-          grep -q '^CONFIG_SIGN_EACH_PACKAGE=y' .config
+          # OpenWrt 25.12 signs package *indexes*, not individual APKs.
+          # The removed SIGN_EACH_PACKAGE symbol does not exist in this pin.
+          grep -q '^CONFIG_USE_APK=y' .config
+          grep -q '^CONFIG_DOWNLOAD_CHECK_CERTIFICATE=y' .config
+          test ! -e .config.invalid-signing
 
       - name: Build firmware and exact-ABI optional packages
         working-directory: openwrt

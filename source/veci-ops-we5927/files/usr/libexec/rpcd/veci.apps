@@ -1,0 +1,137 @@
+#!/bin/sh
+# VeCI Apps: signed-feed-only optional package manager for WE5927.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+LC_ALL=C
+export LC_ALL
+fail(){ printf '{"ok":false,"reason":"%s"}\n' "$1"; exit 0; }
+[ "$(id -u)" -eq 0 ] || fail root_required
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail wrong_board
+pkg_for(){
+ case "$1" in
+  guest|sqm|ddns|wireguard|voucher) printf 'veci-app-%s' "$1";;
+  *) return 1;;
+ esac
+}
+installed(){ apk list -I 2>/dev/null | grep -q "^$(pkg_for "$1")-[0-9]"; }
+feed_configured(){
+ [ "$(uci -q get veci.main.app_feed_enabled 2>/dev/null || :)" = 1 ] || return 1
+ [ -r /etc/veci-release.json ] || return 1
+ command -v jsonfilter >/dev/null 2>&1 || return 1
+ build="$(jsonfilter -i /etc/veci-release.json -e '@.build_id' 2>/dev/null || :)"
+ [ "$(printf %s "$build" | wc -c)" -eq 40 ] || return 1
+ case "$build" in *[!0-9a-f]*) return 1;; esac
+ [ "$(uci -q get veci.main.app_feed_build_id 2>/dev/null || :)" = "$build" ] || return 1
+ url="$(uci -q get veci.main.app_feed_base_url 2>/dev/null || :)"
+ [ "$url" = "https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/feeds/$build" ] || return 1
+ repo_file=/etc/apk/repositories.d/veci-apps.list
+ [ -f "$repo_file" ] && [ ! -L "$repo_file" ] && [ -s "$repo_file" ] || return 1
+ # Reject extra paths (including vendor/global feeds) before any package action.
+ [ "$(wc -l < "$repo_file" | tr -d '[:space:]')" = 7 ] || return 1
+ for entry in \
+  "$url/targets/ramips/mt76x8/packages/packages.adb" \
+  "$url/packages/mipsel_24kc/base/packages.adb" \
+  "$url/packages/mipsel_24kc/luci/packages.adb" \
+  "$url/packages/mipsel_24kc/packages/packages.adb" \
+  "$url/packages/mipsel_24kc/routing/packages.adb" \
+  "$url/packages/mipsel_24kc/telephony/packages.adb" \
+  "$url/packages/mipsel_24kc/video/packages.adb"; do
+  [ "$(grep -Fxc "$entry" "$repo_file" || :)" = 1 ] || return 1
+ done
+ [ -d /etc/apk/keys ] || return 1
+ # apk must cryptographically check the signed repository index. Never use
+ # --allow-untrusted or implicitly fall through to global release feeds.
+}
+feed_ready(){
+ feed_configured || return 1
+ [ "$(uci -q get veci.main.app_feed_verified_build_id 2>/dev/null || :)" = "$build" ]
+}
+verify_feed(){
+ [ ! -t 0 ] || fail rpc_only
+ feed_configured || fail matching_signed_feed_unavailable
+ [ ! -L /tmp/veci-app-feed-verify.lock ] || fail unsafe_path
+ mkdir /tmp/veci-app-feed-verify.lock 2>/dev/null || fail operation_busy
+ trap 'rmdir /tmp/veci-app-feed-verify.lock 2>/dev/null || :' EXIT
+ available="$(df -Pk /tmp 2>/dev/null | awk 'NR==2 {print $4}')"
+ case "$available" in ''|*[!0-9]*) fail ram_unknown;; esac
+ [ "$available" -ge 8192 ] || fail ram_insufficient
+ # A successful signed-index refresh is the only route to enabling install.
+ # Keep output private to the running process; do not log provider URLs or
+ # display package-index contents to the browser.
+ result="$(apk update --repositories-file /etc/apk/repositories.d/veci-apps.list 2>&1)" || fail index_verification_failed
+ if printf '%s\n' "$result" | grep -iE '(^|[[:space:]])(warning|error):' >/dev/null 2>&1; then
+  fail index_verification_failed
+ fi
+ uci set veci.main.app_feed_verified_build_id="$build"
+ uci commit veci
+ printf '{"ok":true,"verified":true,"build_id":"%s"}\n' "$build"
+}
+status(){
+ free="$(df -k /overlay 2>/dev/null | awk 'NR==2 {print $4}')"
+ case "$free" in ''|*[!0-9]*) free=0;; esac
+ configured=false
+ verified=false
+ if feed_configured; then
+  configured=true
+  [ "$(uci -q get veci.main.app_feed_verified_build_id 2>/dev/null || :)" = "$build" ] && verified=true
+ fi
+ if [ "$verified" = true ]; then
+  if [ "$free" -ge 3072 ]; then ready=true;reason=ready
+  else ready=false;reason=insufficient_overlay_space;fi
+ else
+  ready=false
+  if [ "$configured" = true ]; then reason=feed_not_verified
+  else reason=matching_signed_feed_unavailable;fi
+ fi
+ printf '{"schema":1,"management_available":true,"feed_configured":%s,"feed_verified":%s,"feed_ready":%s,"reason":"%s","overlay_free_kb":%s,"minimum_overlay_kb":3072,"apps":{' "$configured" "$verified" "$ready" "$reason" "$free"
+ sep=''
+ for app in guest sqm ddns wireguard voucher;do
+  if installed "$app";then
+   printf '%s"%s":{"installed":true,"managed":true,"available":true}' "$sep" "$app"
+  else
+   printf '%s"%s":{"installed":false,"managed":false,"available":%s}' "$sep" "$app" "$ready"
+  fi
+  sep=,
+ done
+ printf '}}\n'
+}
+action(){
+ [ "$#" -eq 1 ] || fail usage
+ [ ! -t 0 ] || fail json_required
+ command -v jsonfilter >/dev/null 2>&1 || fail jsonfilter_missing
+ data="$(head -c 128)"
+ [ "$(printf %s "$data" | wc -c)" -le 127 ] || fail input_too_large
+ app="$(printf '%s\n' "$data" | jsonfilter -e '@.id' 2>/dev/null || :)"
+ package="$(pkg_for "$app")" || fail invalid_app
+ [ ! -L /tmp/veci-app-operation.lock ] || fail lock_invalid
+ mkdir /tmp/veci-app-operation.lock 2>/dev/null || fail operation_busy
+ trap 'rmdir /tmp/veci-app-operation.lock 2>/dev/null || :' EXIT
+ if [ "$1" = install ];then
+  feed_ready || fail matching_signed_feed_unavailable
+  if installed "$app";then printf '{"ok":true,"state":"already_installed"}\n';exit 0;fi
+  free="$(df -k /overlay | awk 'NR==2 {print $4}')"
+  case "$free" in ''|*[!0-9]*) fail storage_unknown;; esac
+  [ "$free" -ge 3072 ] || fail insufficient_overlay_space
+  apk -U add --repositories-file /etc/apk/repositories.d/veci-apps.list "$package" >/dev/null 2>&1 || fail package_install_failed
+  installed "$app" || fail package_verification_failed
+  printf '{"ok":true,"state":"installed"}\n'
+ elif [ "$1" = remove ];then
+  if ! installed "$app";then printf '{"ok":true,"state":"already_absent"}\n';exit 0;fi
+  apk del "$package" >/dev/null 2>&1 || fail package_remove_failed
+  ! installed "$app" || fail package_remains
+  printf '{"ok":true,"state":"removed"}\n'
+ else fail unknown_action
+ fi
+}
+case "$1" in
+ list) printf '{"status":{},"verifyFeed":{},"install":{"id":"str"},"remove":{"id":"str"}}\n';;
+ call)
+  case "$2" in
+   status) status;;
+   verifyFeed) verify_feed;;
+   install|remove) action "$2";;
+   *) fail unknown_method;;
+  esac;;
+ *) fail invalid_rpc_call;;
+esac

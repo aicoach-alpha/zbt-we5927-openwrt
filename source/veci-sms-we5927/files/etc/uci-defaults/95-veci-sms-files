@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+umask 077
+for name in veci-sms-feature veci-sms-sent-history veci-sms-drafts; do
+ case "$name" in veci-sms-feature) default=0;; *) default='';; esac
+ f="/etc/$name"
+ [ ! -L "$f" ] || exit 1
+ if [ ! -e "$f" ]; then
+  (umask 077; printf '%s' "$default" > "$f") || exit 1
+  [ "$name" = veci-sms-feature ] && printf '\n' >> "$f" || :
+ fi
+ [ -f "$f" ] || exit 1
+ chmod 600 "$f" || exit 1
+done
+exit 0

@@ -1,0 +1,96 @@
+#!/bin/sh
+# VeCI-only, authenticated ubus backend: only the physical owner's XL number
+# and one-time code. No arbitrary commands, filesystem paths or fake balances.
+set -eu
+umask 077
+LC_ALL=C
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LC_ALL PATH
+ROOT=/tmp/veci-xl-ciam
+NATIVE=/usr/libexec
+LOCK=/tmp/veci-xl-login.lock
+say(){ printf '{"ok":%s,"state":"%s"}\n' "$1" "$2"; }
+deny(){ say false "$1"; exit 1; }
+private(){
+ [ -d "$ROOT" ] && [ ! -L "$ROOT" ] &&
+ [ "$(ls -ldn "$ROOT" | awk '{print $1 " " $3}')" = "drwx------ $(id -u)" ]
+}
+write_once(){
+ name="$1"; value="$2"
+ path="$ROOT/$name"
+ [ ! -e "$path" ] && [ ! -L "$path" ] || return 1
+ (umask 077; printf '%s\n' "$value" > "$path") || return 1
+ chmod 600 "$path"
+}
+parse_input(){
+ input="$(cat)"
+ [ "\${#input}" -le 1024 ] || deny invalid_input
+}
+# Never echo secret contents. Method names and parameters are a closed set.
+case "\${1:-}" in
+ list)
+   printf '{"status":{},"requestOtp":{"number":"str"},"submitOtp":{"otp":"str"},"refreshQuota":{}}\n'
+   ;;
+ call)
+  [ "$(id -u)" = 0 ] || deny root_required
+  case "\${2:-}" in
+   status)
+     if private; then say true ready_for_login; else say true not_configured; fi
+     ;;
+   requestOtp)
+     parse_input
+     number="$(printf '%s' "$input" | jsonfilter -e '@.number' 2>/dev/null)" ||
+       deny invalid_number
+     case "$number" in 62[0-9]*) ;; 08[0-9]*) number="62\${number#0}" ;; *) deny invalid_number ;; esac
+     case "$number" in *[!0-9]*) deny invalid_number ;; esac
+     [ "\${#number}" -ge 10 ] && [ "\${#number}" -le 15 ] || deny invalid_number
+     private || deny not_configured
+     mkdir "$LOCK" 2>/dev/null || deny busy
+     trap 'rmdir "$LOCK" 2>/dev/null || :' EXIT
+     [ ! -e "$ROOT/number" ] || deny login_already_pending
+     write_once number "$number" || deny login_state_failed
+     if "$NATIVE/veci-xl-ciam" request-otp >/dev/null 2>&1; then
+       say true otp_requested
+     else
+       rm -f "$ROOT/number"
+       deny operator_unavailable
+     fi
+     ;;
+   submitOtp)
+     parse_input
+     code="$(printf '%s' "$input" | jsonfilter -e '@.otp' 2>/dev/null)" ||
+       deny invalid_code
+     case "$code" in ''|*[!0-9]*) deny invalid_code ;; esac
+     [ "\${#code}" -ge 4 ] && [ "\${#code}" -le 8 ] || deny invalid_code
+     private || deny not_configured
+     [ -f "$ROOT/number" ] && [ ! -L "$ROOT/number" ] ||
+       deny otp_not_requested
+     mkdir "$LOCK" 2>/dev/null || deny busy
+     trap 'rmdir "$LOCK" 2>/dev/null || :' EXIT
+     write_once otp "$code" || deny otp_in_progress
+     unset code input
+     if "$NATIVE/veci-xl-ciam" submit-otp >/dev/null 2>&1 &&
+        "$NATIVE/veci-xl-token-stage" --stage >/dev/null 2>&1 &&
+        "$NATIVE/veci-xl-profile-chain" --verify-owner >/dev/null 2>&1; then
+       rm -f "$ROOT/number"
+       say true profile_verified
+     else
+       rm -f "$ROOT/otp"
+       deny login_not_verified
+     fi
+     ;;
+   refreshQuota)
+     private || deny not_configured
+     mkdir "$LOCK" 2>/dev/null || deny busy
+     trap 'rmdir "$LOCK" 2>/dev/null || :' EXIT
+     if "$NATIVE/veci-xl-quota-refresh" --refresh >/dev/null 2>&1; then
+       say true quota_refreshed
+     else
+       deny quota_unavailable
+     fi
+     ;;
+   *) deny unknown_method ;;
+  esac
+  ;;
+ *) deny invalid_operation ;;
+esac

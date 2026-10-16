@@ -1,0 +1,70 @@
+name: VeCI Ops staged source checks
+on:
+  push:
+    branches: [feat/operator-apps-firmware-build-20261016]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  safety-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell scripts and ACL
+        run: |
+          sh -n source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps
+          sh -n source/veci-ops-we5927/files/usr/libexec/rpcd/veci.firmware
+          sh -n scripts/prepare-veci.sh
+          sh -n scripts/build-veci-firmware.sh
+          sh -n source/veci-sms-we5927/files/usr/libexec/rpcd/veci.sms
+          sh -n source/veci-sms-we5927/files/etc/uci-defaults/95-veci-sms-files
+          python3 -m json.tool source/veci-sms-we5927/files/usr/share/rpcd/acl.d/veci-sms-inbox-we5927.json >/dev/null
+          grep -q '^CONFIG_PACKAGE_veci-sms-we5927=y' source/openwrt-we5927.config
+          grep -q '^CONFIG_PACKAGE_veci-telco-indonesia=y' source/openwrt-we5927.config
+          grep -q '^CONFIG_PACKAGE_veci-telco-xl-native=y' source/openwrt-we5927.config
+          grep -Fq 'veci-sms-we5927' scripts/prepare-veci.sh
+          ! find source/veci-sms-we5927 -type f -iname '*ussd*' | grep -q .
+          python3 -m json.tool source/veci-ops-we5927/files/usr/share/rpcd/acl.d/veci-ops.json >/dev/null
+          grep -q 'CONFIG_PACKAGE_veci-ops-we5927=y' source/openwrt-we5927.config
+          grep -q 'veci-ops-we5927' scripts/prepare-veci.sh
+          # App installs must not fall back to unrelated global APK feeds.
+          grep -Fq 'apk -U add --repositories-file /etc/apk/repositories.d/veci-apps.list' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps
+          grep -Fq 'grep -Fxc "$entry" "$repo_file"' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps
+          grep -Fq 'matching_signed_feed_unavailable' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps
+          ! grep -E '^[[:space:]]*[^#[:space:]].*(--allow-untrusted|--no-check-certificate|sysupgrade -F|AT.CUSD)' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps source/veci-ops-we5927/files/usr/libexec/rpcd/veci.firmware
+      - name: Validate staged native quota and USSD retirement
+        run: |
+          test -f source/veci-telco-indonesia/Makefile
+          test -f source/veci-telco-xl-native/Makefile
+          test -f source/veci-telco-indonesia/files/usr/libexec/rpcd/veci.quota
+          test -f source/veci-telco-xl-native/files/usr/libexec/rpcd/veci.xl
+          ! grep -i 'luci' source/veci-telco-indonesia/Makefile
+          ! find source/veci-telco-indonesia source/veci-telco-xl-native -type f -iname '*ussd*' | grep -q .
+          ! grep -E '^CONFIG_PACKAGE_veci-ussd' source/openwrt-we5927.config
+          ! grep -q 'AT.CUSD' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps
+          for script in source/veci-telco-indonesia/files/usr/libexec/rpcd/veci.quota source/veci-telco-xl-native/files/usr/libexec/rpcd/veci.xl source/veci-telco-indonesia/files/usr/libexec/veci-xl-*.sh; do
+            [ -f "$script" ] || continue
+            sh -n "$script"
+          done
+          echo VECI_XL_NATIVE_STAGING_PASS
+
+      - name: Validate matched VeCI UI source syntax
+        run: |
+          PIN="$(tr -d '[:space:]' < source/veci.commit)"
+          git init -q /tmp/veci-ui
+          git -C /tmp/veci-ui remote add origin https://github.com/aicoach-alpha/veci.git
+          git -C /tmp/veci-ui fetch -q --depth 1 origin "$PIN"
+          git -C /tmp/veci-ui checkout -q --detach FETCH_HEAD
+          node --input-type=module --check < /tmp/veci-ui/veci/js/pages/apps.js
+          node --input-type=module --check < /tmp/veci-ui/veci/js/pages/system.js
+          node --input-type=module --check < /tmp/veci-ui/veci/js/pages/cellular.js
+          for sms in getConfig listMessages deleteMessage sendMessage getSent getDrafts saveDraft deleteDraft; do
+            grep -Fq "$sms" /tmp/veci-ui/veci/js/pages/cellular.js
+          done
+          ! grep -qi 'ussd' /tmp/veci-ui/veci/js/pages/cellular.js
+          grep -Fq "api.call('veci.quota', 'status'" /tmp/veci-ui/veci/js/pages/cellular.js
+          grep -q "api.call('veci.apps', 'status'" /tmp/veci-ui/veci/js/pages/apps.js
+          grep -q "api.call('veci.firmware', 'check'" /tmp/veci-ui/veci/js/pages/system.js
+          echo VECI_OPS_STATIC_TEST=pass
