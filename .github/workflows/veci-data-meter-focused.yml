@@ -1,0 +1,45 @@
+name: VeCI data meter source and synthetic quota estimate focused gate
+on:
+  push:
+    paths:
+      - 'source/veci-data-meter/**'
+      - 'tests/test_veci_data_meter.py'
+      - '.github/workflows/veci-data-meter-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate unit tests, native VeCI interface and empty-account safety
+        run: |
+          set -eu
+          sudo python3 -m unittest discover -s tests -p 'test_veci_data_meter.py' -v
+          sh -n source/veci-data-meter/files/usr/libexec/rpcd/veci.meter
+          node --check source/veci-data-meter/files/www/veci/data-meter.js
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          a=Path('source/veci-data-meter')
+          pkg=(a/'Makefile').read_text()
+          acl=json.loads((a/'files/usr/share/rpcd/acl.d/veci-data-meter.json').read_text())
+          js=(a/'files/www/veci/data-meter.js').read_text()
+          rpc=(a/'files/usr/libexec/rpcd/veci.meter').read_text()
+          assert 'PKG_NAME:=veci-data-meter' in pkg
+          assert '+luci' not in pkg.lower()
+          assert acl['veci-data-meter']['read']['ubus']['veci.meter']==['status']
+          assert acl['veci-data-meter']['write']['ubus']['veci.meter']==['setBaseline']
+          assert "api.call('veci.meter', 'status'" in js
+          assert "api.call('veci.meter', 'setBaseline'" in js
+          assert "carrier_authenticated !== false" in js
+          assert "manual_baseline_minus_uplink_traffic" in rpc
+          assert 'boot_id' in rpc and 'ifindex' in rpc and 'baseline_expired' in rpc
+          assert "window.confirm(" in js
+          for bad in ('AT+CUSD','/dev/ttyUSB','api.myxl','requestOtp','submitOtp','eval('):
+            assert bad not in js+rpc
+          print('VECI_DATA_METER_NO_CARRIER_BALANCE_FABRICATION=pass')
+          print('VECI_DATA_METER_NO_LUCI_OR_MODEM_CHANGES=pass')
+          PY
