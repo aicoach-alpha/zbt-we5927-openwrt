@@ -26,6 +26,22 @@ jobs:
           grep -Fq 'grep -Fxc "$entry" "$repo_file"' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps
           grep -Fq 'matching_signed_feed_unavailable' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps
           ! grep -E '^[[:space:]]*[^#[:space:]].*(--allow-untrusted|--no-check-certificate|sysupgrade -F|AT.CUSD)' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps source/veci-ops-we5927/files/usr/libexec/rpcd/veci.firmware
+      - name: Validate staged native quota and USSD retirement
+        run: |
+          test -f source/veci-telco-indonesia/Makefile
+          test -f source/veci-telco-xl-native/Makefile
+          test -f source/veci-telco-indonesia/files/usr/libexec/rpcd/veci.quota
+          test -f source/veci-telco-xl-native/files/usr/libexec/rpcd/veci.xl
+          ! grep -i 'luci' source/veci-telco-indonesia/Makefile
+          ! find source/veci-telco-indonesia source/veci-telco-xl-native -type f -iname '*ussd*' | grep -q .
+          ! grep -E '^CONFIG_PACKAGE_veci-ussd' source/openwrt-we5927.config
+          ! grep -q 'AT.CUSD' source/veci-ops-we5927/files/usr/libexec/rpcd/veci.apps
+          for script in source/veci-telco-indonesia/files/usr/libexec/rpcd/veci.quota source/veci-telco-xl-native/files/usr/libexec/rpcd/veci.xl source/veci-telco-indonesia/files/usr/libexec/veci-xl-*.sh; do
+            [ -f "$script" ] || continue
+            sh -n "$script"
+          done
+          echo VECI_XL_NATIVE_STAGING_PASS
+
       - name: Validate matched VeCI UI source syntax
         run: |
           PIN="$(tr -d '[:space:]' < source/veci.commit)"
