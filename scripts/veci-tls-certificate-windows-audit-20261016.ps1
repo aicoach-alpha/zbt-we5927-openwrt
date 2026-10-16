@@ -26,13 +26,13 @@ try {
     param($sender, $cert, $chain, $errors)
     if ($null -ne $cert) {
       $script:observedCertificate =
-        New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cert)
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($cert)
     }
     $script:observedPolicy = [string]$errors
     # Inspection only: no GET, POST, cookie, password, OTP, or SSH.
     return $true
   }
-  $tls = New-Object System.Net.Security.SslStream($tcp.GetStream(), $false, $callback)
+  $tls = [System.Net.Security.SslStream]::new($tcp.GetStream(), $false, $callback)
   $tls.ReadTimeout = 6000
   $tls.WriteTimeout = 6000
   $tls.AuthenticateAsClient($RouterIP)
