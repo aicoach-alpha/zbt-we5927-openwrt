@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "we5927-a",
+  "vendor": "ZBT",
+  "family": "mt7628-cellular",
+  "status": "discovery",
+  "build_enabled": false,
+  "aliases": ["WE5927-A"],
+  "openwrt_compatible": [],
+  "target": null,
+  "soc": null,
+  "ram_mb": null,
+  "flash_mb": null,
+  "network": {},
+  "cellular": {
+    "sim_slots": null,
+    "sim_select_gpio": null,
+    "modem_power_gpio": null
+  },
+  "notes": [
+    "Placeholder only. No firmware image should be produced until flash layout, DTS, GPIOs and modem topology are verified from real hardware.",
+    "Nano-SIM/eSIM marketing variants must not inherit the WE2825-2SIM GPIO map by assumption."
+  ]
+}

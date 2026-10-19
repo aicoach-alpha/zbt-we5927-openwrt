@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ZBT community board profile",
+  "type": "object",
+  "required": ["schema_version","id","vendor","family","status","build_enabled"],
+  "properties": {
+    "schema_version": {"type":"integer","const":1},
+    "id": {"type":"string"},
+    "vendor": {"type":"string"},
+    "family": {"type":"string"},
+    "status": {"enum":["tested","community-tested","discovery","unsupported"]},
+    "build_enabled": {"type":"boolean"},
+    "aliases": {"type":"array","items":{"type":"string"}},
+    "openwrt_compatible": {"type":"array","items":{"type":"string"}},
+    "target": {"type":["string","null"]},
+    "soc": {"type":["string","null"]},
+    "ram_mb": {"type":["integer","null"]},
+    "flash_mb": {"type":["integer","null"]},
+    "network": {"type":"object"},
+    "cellular": {"type":"object"},
+    "flash_layout": {"type":"object"},
+    "notes": {"type":"array","items":{"type":"string"}}
+  },
+  "additionalProperties": true
+}
