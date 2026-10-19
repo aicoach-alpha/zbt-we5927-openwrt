@@ -144,6 +144,7 @@ export async function mountXlConnection(root, api) {
         return;
       }
       if (method === 'requestOtp') {
+        numberInput.value = '';
         say('XL: OTP diminta', 'Periksa pesan OTP lalu masukkan kodenya.');
         otpWrap.hidden = false; numberInput.hidden = true; request.hidden = true;
         return;
