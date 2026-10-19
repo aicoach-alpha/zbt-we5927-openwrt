@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# Safe staging only. Package installation must not expose a guest SSID or
+# change the user's existing openNDS service state.
+
+uci -q get network.voucher_guest_dev >/dev/null || {
+	uci set network.voucher_guest_dev='device'
+	uci set network.voucher_guest_dev.name='br-voucher'
+	uci set network.voucher_guest_dev.type='bridge'
+}
+
+uci -q get network.voucher_guest >/dev/null || {
+	uci set network.voucher_guest='interface'
+	uci set network.voucher_guest.device='br-voucher'
+	uci set network.voucher_guest.proto='static'
+	uci set network.voucher_guest.ipaddr='192.168.20.1'
+	uci set network.voucher_guest.netmask='255.255.255.0'
+}
+
+uci -q get dhcp.voucher_guest >/dev/null || {
+	uci set dhcp.voucher_guest='dhcp'
+	uci set dhcp.voucher_guest.interface='voucher_guest'
+	uci set dhcp.voucher_guest.start='100'
+	uci set dhcp.voucher_guest.limit='100'
+	uci set dhcp.voucher_guest.leasetime='1h'
+}
+
+if ! uci -q get wireless.voucher_guest >/dev/null; then
+	uci set wireless.voucher_guest='wifi-iface'
+	uci set wireless.voucher_guest.device='radio0'
+	uci set wireless.voucher_guest.mode='ap'
+	uci set wireless.voucher_guest.network='voucher_guest'
+	uci set wireless.voucher_guest.ssid='WIFI-Alpha-Guest'
+	uci set wireless.voucher_guest.encryption='none'
+	uci set wireless.voucher_guest.isolate='1'
+	uci set wireless.voucher_guest.disabled='1'
+fi
+
+uci commit network
+uci commit dhcp
+uci commit wireless
+
+exit 0
