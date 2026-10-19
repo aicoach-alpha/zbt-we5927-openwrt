@@ -1,0 +1,45 @@
+#!/bin/sh
+# Local XL sign-out: clear only account/session artifacts, preserve operator app configuration.
+# Invoked through owner-only veci.xl.logout after HTTPS and root checks.
+set -eu
+umask 077
+[ "${1:-}" = "--clear" ] && [ "$#" -eq 1 ] || { echo XL_CLEAR=invalid_action; exit 1; }
+[ "$(id -u)" -eq 0 ] || { echo XL_CLEAR=root_required; exit 1; }
+CIAM=/tmp/veci-xl-ciam
+PRIVATE=/tmp/veci-telco-private
+CACHE=/tmp/veci-telco
+fail() { echo XL_CLEAR=blocked; exit 1; }
+safe_private_dir() {
+ [ ! -e "$1" ] && [ ! -L "$1" ] && return 0
+ [ -d "$1" ] && [ ! -L "$1" ] &&
+ [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "drwx------ 0" ]
+}
+safe_cache_dir() {
+ [ ! -e "$1" ] && [ ! -L "$1" ] && return 0
+ [ -d "$1" ] && [ ! -L "$1" ]
+}
+safe_private_dir "$CIAM" || fail
+safe_private_dir "$PRIVATE" || fail
+safe_cache_dir "$CACHE" || fail
+PENDING="$PRIVATE/pending-profile"
+safe_private_dir "$PENDING" || fail
+# Fail before mutation if any intended file path unexpectedly points to a directory.
+for target in "$CACHE/quota-xl.json" \
+ "$CIAM/number" "$CIAM/otp" "$CIAM/token-candidate.json" \
+ "$PRIVATE/id_token" "$PRIVATE/access_token" "$PRIVATE/refresh_token" \
+ "$PRIVATE/verified_number" "$PRIVATE/verified_epoch" \
+ "$PRIVATE/body.json" "$PRIVATE/signature" "$PRIVATE/signature_time"; do
+ [ ! -d "$target" ] || fail
+done
+# Invalidate cache first. Unlink only fixed names: no recursive deletion of operator config.
+rm -f "$CACHE/quota-xl.json" || fail
+rm -f "$CIAM/number" "$CIAM/otp" "$CIAM/token-candidate.json" || fail
+# Keep CIAM last_otp_epoch to enforce the cooldown across sign-outs.
+rm -f "$PRIVATE/id_token" "$PRIVATE/access_token" "$PRIVATE/refresh_token" \
+ "$PRIVATE/verified_number" "$PRIVATE/verified_epoch" \
+ "$PRIVATE/body.json" "$PRIVATE/signature" "$PRIVATE/signature_time" || fail
+if [ -d "$PENDING" ]; then
+ # Only the verified root-owned 0700 staging directory is removed.
+ rm -rf "$PENDING" || fail
+fi
+echo XL_CLEAR=ok
