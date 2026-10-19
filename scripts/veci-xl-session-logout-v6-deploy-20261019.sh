@@ -78,7 +78,7 @@ if ! {
  rollback
  fail apply_failed_rolled_back
 fi
-sleep 2
+sleep 5
 if ! ubus -v list veci.xl 2>/dev/null | grep -Fq '"logout"'; then
  rollback
  fail rpc_integrity_failed_rolled_back
