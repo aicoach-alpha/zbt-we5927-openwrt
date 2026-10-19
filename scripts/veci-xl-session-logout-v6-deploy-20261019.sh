@@ -23,7 +23,7 @@ done
 [ ! -e "$HELPER" ] && [ ! -L "$HELPER" ] || fail already_installed
 [ "$(grep -Fc '"refreshQuota":{}}' "$RPC")" -eq 1 ] || fail rpc_list_anchor_missing
 [ "$(grep -Fc 'refreshQuota) refresh_quota ;;' "$RPC")" -eq 1 ] || fail rpc_call_anchor_missing
-[ "$(grep -Fc 'case "$1" in' "$RPC")" -eq 1 ] || fail rpc_case_anchor_missing
+[ "$(grep -Fxc 'case "$1" in' "$RPC")" -eq 1 ] || fail rpc_case_anchor_missing
 [ "$(grep -Fc '"refreshQuota"]' "$ACL")" -eq 1 ] || fail acl_anchor_missing
 grep -Fq 'mountXlConnection(root, api)' "$PAGE" || fail ui_anchor_missing
 wget -qO "$WORK/clear" https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/da6b3bc27336b7de26cb7c72a37a29de1a5cd7d2/scripts/veci-xl-session-clear-20261019.sh || fail helper_download_failed
