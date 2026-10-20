@@ -36,3 +36,11 @@ Carrier API: **NOT LIVE**. Native UI/API remains `operator_config_required`. The
 Next implementation workstream: pursue a currently supported, user-authorized XL integration method or formally supported carrier/provider API for consent and account data. Until authorization is available, keep `authentication_required`/`unavailable` and don't fabricate quota. Separately scope a future feed refresh/update lifecycle (not needed to close v12n) when a newer signed package exists.
 
 No claim of a tested post-reboot feed state or full reconstructed rollback: not established in supplied output.
+
+## Authorized XL quota API discovery (post-release)
+
+Public information about SinergiAPI / GSMA Open Gateway describes third-party operator APIs for SIM swap, number/device verification, location and carrier billing; it does not establish a supported subscriber **remaining-data/quota-bucket** API or an approved enrollment path for this use case. Reference: https://www.axiatadigitallabs.com/2024/01/01/axiata-digital-labs-indosat-ooredoo-hutchison-xl-axiata-and-aws-collaborate-to-unveil-the-sinergiapi-portal-in-indonesia/ and https://staticxl.ext.xlaxiata.co.id/s3fs-public/media/documents/IR_XLAxiata_2024_EN_03032025_1930.pdf .
+
+The official myXL application displays quota to subscribers, but its existence does not authorize third-party automation of undocumented APIs. Reference: https://play.google.com/store/apps/details?id=com.apps.MyXL .
+
+**Decision:** Do not activate the operator quota adapter using scraped endpoints, bundled client secrets, speculative API signatures, or unauthorized OTP flows. The next implementable production slice starts when a carrier-approved API contract or third-party user consent mechanism is available, and can reuse the existing VeCI owner UI, local secure session store, and normalized quota contract. This is an external dependency, not a v12n deployment failure.
