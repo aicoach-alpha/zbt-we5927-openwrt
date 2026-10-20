@@ -110,7 +110,7 @@ if ! mv "$STAGE/feed.next" "$FEED"; then
  mv "$BACKUP/feed" "$FEED" || :
  fail repository_swap_failed
 fi
-if ! apk --no-network --keys-dir /etc/apk/keys upgrade "$XL" "$ID"; then
+if ! apk --no-network --keys-dir /etc/apk/keys --repositories-file "$STAGE/plan.list" upgrade "$XL" "$ID"; then
  restore; fail upgrade_failed_rolled_back
 fi
 if [ "$(installed "$XL")" != "$nv" ] || [ "$(installed "$ID")" != "$iv" ] ||
