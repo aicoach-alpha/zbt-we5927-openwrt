@@ -54,7 +54,6 @@ case "$ACTION" in
  *) fail unsupported_action ;;
 esac
 [ -d "$NEW" ] && [ ! -L "$NEW" ] && safe "$STAGE/release-receipt.txt" || fail release_not_staged
-[ ! -e "$BACKUP" ] && [ ! -L "$BACKUP" ] || fail previous_backup_exists
 nv="$(field native_version)"; iv="$(field indonesia_version)"
 nh="$(field native_sha256)"; ih="$(field indonesia_sha256)"; ndx="$(field index_sha256)"
 for ver in "$nv" "$iv"; do
@@ -78,6 +77,7 @@ if [ "$nv" = "$ox" ] && [ "$iv" = "$oi" ]; then
  echo XL_V12P_PRODUCTION=unchanged
  exit 0
 fi
+[ ! -e "$BACKUP" ] && [ ! -L "$BACKUP" ] || fail previous_backup_exists
 printf 'ndx file://%s/Packages.adb\n' "$NEW" > "$STAGE/plan.list"
 if ! apk --no-network --keys-dir /etc/apk/keys --repositories-file "$STAGE/plan.list" \
  upgrade --simulate "$XL" "$ID" > "$STAGE/plan.log" 2>&1; then
