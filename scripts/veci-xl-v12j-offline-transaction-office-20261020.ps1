@@ -28,7 +28,7 @@ $remI = '/tmp/veci-telco-indonesia-0.2.2-r2-v12j.apk'
 if ($LASTEXITCODE -ne 0) { Fail 'xl_staging_failed' }
 & scp -O $id ($router + ':' + $remI)
 if ($LASTEXITCODE -ne 0) { Fail 'indonesia_staging_failed' }
-$remoteScript = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/ad66c19ddb0d7ad61b8cb0d3209b0688db46fca7/scripts/veci-xl-v12j-offline-transaction-simulate-20261020.sh'
+$remoteScript = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/b19d454d7fb8e7507463544902194d9f81bd6492/scripts/veci-xl-v12j-offline-transaction-simulate-20261020.sh'
 $command = 'wget -qO /tmp/veci-xl-v12j-simulate.sh ' + $remoteScript + ' && sh -n /tmp/veci-xl-v12j-simulate.sh && sh /tmp/veci-xl-v12j-simulate.sh'
 $messages = @(& ssh $router $command)
 $exitCode = $LASTEXITCODE
