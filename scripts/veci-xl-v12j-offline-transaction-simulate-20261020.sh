@@ -8,7 +8,7 @@ A=/tmp/veci-xl-native-0.3.8-r2-v12j.apk
 B=/tmp/veci-telco-indonesia-0.2.2-r2-v12j.apk
 fail(){ echo "XL_V12J=$1"; exit 1; }
 [ "$(id -u)" = 0 ] || fail root_required
-[ -f "$A" ] && [ -f "$B" ] || fail_candidate_not_staged
+[ -f "$A" ] && [ -f "$B" ] || fail candidate_not_staged
 [ ! -L "$A" ] && [ ! -L "$B" ] || fail unsafe_stage_symlink
 [ "$(sha256sum "$A" | cut -d ' ' -f1)" = '801b421569f6cd18ade2bfc3a86c7e61e333e680dfc41e29edffd3cdd0793f37' ] || fail xl_checksum_mismatch
 [ "$(sha256sum "$B" | cut -d ' ' -f1)" = 'da3d5d9da1bdc684170d75773a03562f7dcca672a3d3d8dd1575969ad4d65866' ] || fail indonesia_checksum_mismatch
