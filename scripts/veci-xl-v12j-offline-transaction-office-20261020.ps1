@@ -7,6 +7,7 @@ $xl = Join-Path $dir 'veci-telco-xl-native-0.3.8-r2-mipsel_24kc.apk'
 $id = Join-Path $dir 'veci-telco-indonesia-0.2.2-r2-mipsel_24kc.apk'
 $rollX = Join-Path $dir 'rollback\veci-telco-xl-native-0.3.7-r1-mipsel_24kc.apk'
 $rollI = Join-Path $dir 'rollback\veci-telco-indonesia-0.2.1-r1-mipsel_24kc.apk'
+$pub = 'C:\veci-build\keys\veci-meter-r2-rsa.pem'
 $checks = @(
     @($xl,'801b421569f6cd18ade2bfc3a86c7e61e333e680dfc41e29edffd3cdd0793f37'),
     @($id,'da3d5d9da1bdc684170d75773a03562f7dcca672a3d3d8dd1575969ad4d65866'),
@@ -20,6 +21,7 @@ foreach ($entry in $checks) {
         Fail 'artifact_digest_mismatch'
     }
 }
+if (-not (Test-Path -LiteralPath $pub -PathType Leaf)) { Fail 'public_key_missing' }
 Write-Output 'XL_V12J_OFFICE_SHA256=pass'
 $remX = '/tmp/veci-xl-native-0.3.8-r2-v12j.apk'
 $remI = '/tmp/veci-telco-indonesia-0.2.2-r2-v12j.apk'
@@ -28,13 +30,15 @@ $remI = '/tmp/veci-telco-indonesia-0.2.2-r2-v12j.apk'
 if ($LASTEXITCODE -ne 0) { Fail 'xl_staging_failed' }
 & scp -O $id ($router + ':' + $remI)
 if ($LASTEXITCODE -ne 0) { Fail 'indonesia_staging_failed' }
-$remoteScript = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/b19d454d7fb8e7507463544902194d9f81bd6492/scripts/veci-xl-v12j-offline-transaction-simulate-20261020.sh'
+& scp -O $pub ($router + ':/tmp/veci-xl-v12j-public.pem')
+if ($LASTEXITCODE -ne 0) { Fail 'public_key_staging_failed' }
+$remoteScript = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/b7ba0e4734a9efc81e77d919df6f00e73e23fcbf/scripts/veci-xl-v12j-offline-transaction-simulate-20261020.sh'
 $command = 'wget -qO /tmp/veci-xl-v12j-simulate.sh ' + $remoteScript + ' && sh -n /tmp/veci-xl-v12j-simulate.sh && sh /tmp/veci-xl-v12j-simulate.sh'
 $messages = @(& ssh $router $command)
 $exitCode = $LASTEXITCODE
 foreach ($line in $messages) { Write-Output $line }
 # The only router mutation during v12j is transient staging in /tmp.
-$cleanup = 'rm -f /tmp/veci-xl-native-0.3.8-r2-v12j.apk /tmp/veci-telco-indonesia-0.2.2-r2-v12j.apk /tmp/veci-xl-v12j-simulate.sh'
+$cleanup = 'rm -f /tmp/veci-xl-native-0.3.8-r2-v12j.apk /tmp/veci-telco-indonesia-0.2.2-r2-v12j.apk /tmp/veci-xl-v12j-public.pem /tmp/veci-xl-v12j-simulate.sh'
 & ssh $router $cleanup | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail 'staging_cleanup_failed' }
 if ($exitCode -ne 0 -or $messages -notcontains 'XL_V12J_SIMULATE=pass') {
