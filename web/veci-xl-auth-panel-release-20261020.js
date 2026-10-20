@@ -44,13 +44,20 @@ export async function mountXlConnection(root, api) {
     heading.textContent = title; details.textContent = description;
   };
   const formatBytes = n => (n / 1073741824).toFixed(2) + ' GiB';
-  const validBucket = b => b && typeof b.label === 'string' &&
-    b.label.length > 0 && b.label.length <= 100 &&
-    Number.isSafeInteger(b.remaining_bytes) && b.remaining_bytes >= 0 &&
-    (!Object.hasOwn(b, 'total_bytes') ||
-      (Number.isSafeInteger(b.total_bytes) && b.total_bytes >= b.remaining_bytes)) &&
-    (!Object.hasOwn(b, 'expires_at') ||
-      (typeof b.expires_at === 'string' && Number.isFinite(Date.parse(b.expires_at))));
+  // Quota must carry evidence of a complete operator bucket, except when
+  // backend explicitly marks the balance as authenticated "remaining_only".
+  const validBucket = (b, partial) => {
+    if (!b || typeof b !== 'object' || Array.isArray(b) ||
+      typeof b.label !== 'string' || !b.label.trim() || b.label.length > 100 ||
+      !Number.isSafeInteger(b.remaining_bytes) || b.remaining_bytes < 0) return false;
+    const hasTotal = Object.hasOwn(b, 'total_bytes');
+    const hasExpiry = Object.hasOwn(b, 'expires_at');
+    return (partial || (hasTotal && hasExpiry)) &&
+      (!hasTotal ||
+        (Number.isSafeInteger(b.total_bytes) && b.total_bytes >= b.remaining_bytes)) &&
+      (!hasExpiry ||
+        (typeof b.expires_at === 'string' && Number.isFinite(Date.parse(b.expires_at))));
+  };
   let busy = false;
   const buttons = [refreshStatus, refreshQuota, logout, request, submit];
   const disable = value => { for (const b of buttons) b.disabled = value; };
@@ -96,13 +103,16 @@ export async function mountXlConnection(root, api) {
       refreshQuota.hidden = false;
       say('XL: akun terverifikasi', 'Membaca cache kuota operator.');
       const q = await api.call('veci.quota', 'status', {}, { timeout: 5000 });
-      const t = Date.parse(q && q.fetched_at);
+      const t = q && typeof q.fetched_at === 'string' ? Date.parse(q.fetched_at) : NaN;
       const age = Date.now() - t;
+      const partial = q?.quality === 'remaining_only';
       if (!q || (q.provider !== 'xl' && q.operator !== 'xl') ||
         q.source !== 'operator' || q.state !== 'ok' ||
+        (q.quality !== undefined && !partial) ||
         !Array.isArray(q.buckets) || q.buckets.length < 1 ||
         q.buckets.length > 30 || !Number.isFinite(age) ||
-        age < 0 || age > 1800000 || !q.buckets.every(validBucket)) {
+        age < -300000 || age > 1800000 ||
+        !q.buckets.every(b => validBucket(b, partial))) {
         if (Number.isFinite(age) && age > 1800000 &&
           q?.source === 'operator' && q.state === 'ok') {
           say('XL: cache kedaluwarsa', 'Tekan Ambil Kuota XL untuk meminta data terbaru.');
