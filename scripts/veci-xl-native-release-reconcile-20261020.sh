@@ -19,8 +19,6 @@ done
 grep -Fq '/usr/libexec/veci-xl-quota-session-gate --status' "$RPC_Q" || fail quota_rpc_incompatible
 grep -Fq 'logout) logout_local ;;' "$RPC_XL" || fail xl_rpc_incompatible
 grep -Fq 'export async function mountXlConnection' "$UI" || fail ui_incompatible
-[ ! -L "$BACKUP" ] || fail backup_symlink
-[ ! -e "$BACKUP" ] || fail backup_already_exists
 WORK="$(mktemp -d /tmp/veci-xl-release.XXXXXX)" || fail staging_failed
 trap 'rm -rf "$WORK"' EXIT
 chmod 700 "$WORK" || fail staging_permission_failed
@@ -40,6 +38,8 @@ if cmp -s "$WORK/ui" "$UI" && cmp -s "$WORK/gate" "$GATE" &&
  echo XL_RELEASE_INTEGRITY=pass
  exit 0
 fi
+[ ! -L "$BACKUP" ] || fail backup_symlink
+[ ! -e "$BACKUP" ] || fail backup_already_exists
 mkdir -m 700 "$BACKUP" || fail backup_create_failed
 if ! cp -p "$UI" "$BACKUP/ui" ||
    ! cp -p "$GATE" "$BACKUP/gate" ||
