@@ -17,8 +17,6 @@ function Fail([string]$code) {
 if (-not (Test-Path -LiteralPath $archiveReport -PathType Leaf)) { Fail 'v12d_inventory_missing' }
 if (Test-Path -LiteralPath $report) { Fail 'metadata_already_collected' }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Fail 'docker_unavailable' }
-if (Test-Path -LiteralPath $originDir) { Fail 'original_staging_already_exists' }
-New-Item -ItemType Directory -Path $originDir | Out-Null
 $found = @()
 $allApks = @(Get-ChildItem -LiteralPath $base -Recurse -File -Filter '*.apk' -ErrorAction SilentlyContinue)
 foreach ($pkg in $originals) {
@@ -27,8 +25,7 @@ foreach ($pkg in $originals) {
     Write-Output ('XL_V12E_PACKAGE=' + $pkg.Name)
     Write-Output ('XL_V12E_ORIGINAL_CANDIDATES=' + $candidates.Count)
     if ($candidates.Count -ne 1) { continue }
-    $target = Join-Path $originDir ($pkg.Name + '.apk')
-    Copy-Item -LiteralPath $candidates[0].FullName -Destination $target
+    $target = $candidates[0].FullName
     $hash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
     $found += [PSCustomObject]@{
        Name = $pkg.Name
@@ -43,6 +40,12 @@ if ($found.Count -ne 2) {
     Write-Output 'XL_V12E_BUILD=blocked_until_both_original_apks_available'
     Write-Output 'XL_V12E_ROUTER=unchanged'
     exit 0
+}
+if (Test-Path -LiteralPath $originDir) { Fail 'original_staging_already_exists' }
+New-Item -ItemType Directory -Path $originDir | Out-Null
+foreach ($pkg in $found) {
+    $target = Join-Path $originDir ($pkg.Name + '.apk')
+    Copy-Item -LiteralPath $pkg.StagedPath -Destination $target
 }
 $mount = 'type=bind,source=' + $originDir + ',target=/original,readonly'
 $metadata = @()
