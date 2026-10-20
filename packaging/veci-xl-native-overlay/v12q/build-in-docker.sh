@@ -1,5 +1,5 @@
 #!/bin/sh
-# VeCI XL v12q: sign 1.0.1-r1 and reconstructed rollback 1.0.0-r1.
+# VeCI XL v12q: sign 1.0.1-r1; retain exact original 1.0.0-r1 APK for rollback.
 # Offline Alpine apk-tools v3, no router changes.
 set -eu
 umask 077
@@ -19,8 +19,8 @@ for item in veci-xl-quota-session-gate veci-xl-authorized-config-import; do
  sh -n "$SOURCE/after/$item" || die helper_syntax_invalid
 done
 cmp -s "$SOURCE/before/veci-xl-connection-status.js" "$SOURCE/after/veci-xl-connection-status.js" && die ui_unchanged
-for state in before after; do
- if [ "$state" = before ]; then version=1.0.0-r1; else version=1.0.1-r1; fi
+for state in after; do
+ version=1.0.1-r1
  stage="$(mktemp -d /tmp/veci-xl-v12q.XXXXXX)" || die temp_stage_failed
  mkdir -p "$stage/www/veci/js/lib" "$stage/usr/libexec"
  cp "$SOURCE/$state/veci-xl-connection-status.js" "$stage/www/veci/js/lib/veci-xl-connection-status.js"
@@ -48,4 +48,5 @@ done
 echo XL_V12Q_BUILD=pass
 echo XL_V12Q_SIGNATURE=pass
 echo XL_V12Q_HELPERS=unchanged
+echo XL_V12Q_ROLLBACK=reuse_exact_original_apk
 echo XL_V12Q_ROUTER=unchanged
