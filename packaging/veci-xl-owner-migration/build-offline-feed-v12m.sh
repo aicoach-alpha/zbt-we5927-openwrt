@@ -21,7 +21,7 @@ if [ -e Packages.adb ] || [ -L Packages.adb ]; then
   apk --keys-dir /keys verify Packages.adb || { echo XL_V12M=existing_index_signature_failed; exit 1; }
   echo XL_V12M_FEED_BUILD=already_valid
 else
-  apk mkndx --sign-key "$KEY" -o Packages.adb veci-telco-xl-native-0.3.8-r2.apk veci-telco-indonesia-0.2.2-r2.apk || { echo XL_V12M=mkndx_failed; exit 1; }
+  apk --keys-dir /keys mkndx --sign-key "$KEY" -o Packages.adb veci-telco-xl-native-0.3.8-r2.apk veci-telco-indonesia-0.2.2-r2.apk || { echo XL_V12M=mkndx_failed; exit 1; }
   apk --keys-dir /keys verify Packages.adb || { echo XL_V12M=index_signature_failed; exit 1; }
   echo XL_V12M_FEED_BUILD=pass
 fi
