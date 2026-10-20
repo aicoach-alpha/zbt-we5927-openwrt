@@ -14,8 +14,11 @@ fail(){ echo "XL_ORIGIN=$1"; exit 1; }
 command -v apk >/dev/null 2>&1 || fail apk_unavailable
 mkdir -m 700 "$ROOT" || fail staging_failed
 mkdir -m 700 "$ROOT/meta" "$ROOT/payload" || fail staging_failed
-cleanup_failed(){ rm -f "$ARCHIVE"; rm -rf "$ROOT"; }
-trap cleanup_failed HUP INT TERM
+successful=0
+cleanup(){
+ if [ "$successful" = 0 ]; then rm -f "$ARCHIVE"; rm -rf "$ROOT"; fi
+}
+trap cleanup 0 HUP INT TERM
 total=0
 for pkg in $PACKAGES; do
  apk info -e "$pkg" >/dev/null 2>&1 || fail package_missing
@@ -67,6 +70,7 @@ chmod 600 "$ARCHIVE" || fail archive_permission_failed
 size="$(wc -c < "$ARCHIVE" | tr -d '[:space:]')"
 case "$size" in ''|*[!0-9]*) fail archive_size_invalid ;; esac
 [ "$size" -le 4194304 ] || fail archive_size_limit
+successful=1
 echo XL_ORIGIN=ready
 echo "XL_ORIGIN_ARCHIVE=$ARCHIVE"
 echo "XL_ORIGIN_SHA256=$(sha256sum "$ARCHIVE" | cut -d ' ' -f1)"
