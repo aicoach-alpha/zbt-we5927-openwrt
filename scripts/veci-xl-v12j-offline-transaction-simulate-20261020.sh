@@ -25,6 +25,7 @@ echo XL_V12J_SIMULATION_BEGIN
 # --network=false disables remote repository access.
 if apk --network=false add --simulate "$A" "$B"; then
  echo XL_V12J_SIMULATE=pass
+ echo XL_V12J_DEPLOY_GATE=hold_until_simulation_plan_reviewed
  echo XL_V12J_INSTALL=not_attempted
  echo XL_V12J_ROUTER=unchanged
 else
