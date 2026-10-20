@@ -36,7 +36,7 @@ for pkg in $PACKAGES; do
       /*) raw="$(printf "%s" "$raw" | sed "s@^/@@")" ;;
     esac
     case "$raw" in
-      *".."*|*"//"*|*"\"*|*" "*) fail invalid_manifest_path ;;
+      *".."*|*"//"*|*'\'*|*" "*) fail invalid_manifest_path ;;
     esac
     # apk info --contents can list directory entries as well as files.
     case "$raw" in */) dirs=$((dirs+1)); continue ;; esac
