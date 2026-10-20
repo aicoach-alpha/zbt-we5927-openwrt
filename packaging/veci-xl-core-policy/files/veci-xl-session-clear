@@ -3,7 +3,7 @@
 # Invoked through owner-only veci.xl.logout after HTTPS and root checks.
 set -eu
 umask 077
-[ "\${1:-}" = "--clear" ] && [ "$#" -eq 1 ] || { echo XL_CLEAR=invalid_action; exit 1; }
+[ "${1:-}" = "--clear" ] && [ "$#" -eq 1 ] || { echo XL_CLEAR=invalid_action; exit 1; }
 [ "$(id -u)" -eq 0 ] || { echo XL_CLEAR=root_required; exit 1; }
 CIAM=/tmp/veci-xl-ciam
 PRIVATE=/tmp/veci-telco-private
