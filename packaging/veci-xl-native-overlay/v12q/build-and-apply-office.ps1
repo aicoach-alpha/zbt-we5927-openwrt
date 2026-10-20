@@ -3,11 +3,13 @@
 param([switch]$Apply)
 $ErrorActionPreference = 'Stop'
 $root = 'C:\veci-build\xl-native-overlay-v12q'
+$originalApk = 'C:\veci-build\xl-overlay\dist\veci-xl-native-overlay-1.0.0-r1-mipsel_24kc.apk'
+$originalSha256 = '5b418533be9ffdfced4b357bef933934496606f769d400c99df3921116dec486'
 $keys = 'C:\veci-build\keys'
 $repo = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/'
 $oldPrefix = $repo + '68491e24b878efdb06f6226ca6ff5d8f0f0e4ba0/packaging/veci-xl-native-overlay/files/'
 $newPrefix = $repo + 'e27eedb235fb98cd4d078839970923b638d20b13/packaging/veci-xl-native-overlay/v12q/files/'
-$buildUrl = $repo + '5a4c627198ea7d715eb80e96c45f01ad3909d601/packaging/veci-xl-native-overlay/v12q/build-in-docker.sh'
+$buildUrl = $repo + 'b8efa0a72307f265c596a1f412a97cf573e5247d/packaging/veci-xl-native-overlay/v12q/build-in-docker.sh'
 $installUrl = $repo + '4563e4a63ffedd753b46791a794ac3560c9a767b/packaging/veci-xl-native-overlay/v12q/guarded-overlay-install.sh'
 $router = 'root@192.168.1.1'
 $remote = '/tmp/veci-xl-v12q-20261020'
@@ -15,6 +17,10 @@ function Fail([string]$reason) { Write-Output ('XL_V12Q_OFFICE=' + $reason); exi
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Fail 'docker_missing' }
 foreach ($name in @('veci-meter-r2-rsa.key','veci-meter-r2-rsa.pem')) {
  if (-not (Test-Path -LiteralPath (Join-Path $keys $name) -PathType Leaf)) { Fail 'signer_missing' }
+}
+if (-not (Test-Path -LiteralPath $originalApk -PathType Leaf)) { Fail 'original_signed_rollback_archive_missing' }
+if ((Get-FileHash -LiteralPath $originalApk -Algorithm SHA256).Hash.ToLowerInvariant() -ne $originalSha256) {
+ Fail 'original_signed_rollback_archive_digest_mismatch'
 }
 if (Test-Path -LiteralPath $root) { Fail 'working_directory_exists_review_before_retry' }
 $source = Join-Path $root 'source'
@@ -45,7 +51,7 @@ $bmount = 'type=bind,source=' + $build + ',target=/builder.sh,readonly'
 & docker run --rm --network none --mount $smount --mount $dmount --mount $kmount --mount $bmount alpine:edge sh /builder.sh
 if ($LASTEXITCODE -ne 0) { Fail 'apk_build_failed' }
 $newApk = Join-Path $dist 'veci-xl-native-overlay-1.0.1-r1-mipsel_24kc.apk'
-$oldApk = Join-Path $dist 'veci-xl-native-overlay-1.0.0-r1-mipsel_24kc.apk'
+$oldApk = $originalApk
 foreach ($path in @($newApk,$oldApk)) {
  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { Fail 'signed_apk_missing' }
 }
@@ -59,6 +65,7 @@ $newHash = Hash $newApk
 Write-Output 'XL_V12Q_BUILD=pass'
 Write-Output ('XL_V12Q_NEW_APK_SHA256=' + $newHash)
 Write-Output ('XL_V12Q_ROLLBACK_APK_SHA256=' + $oldHash)
+Write-Output 'XL_V12Q_ROLLBACK=exact_original_signed_archive'
 Write-Output ('XL_V12Q_BEFORE_UI_SHA256=' + $oldUI)
 Write-Output ('XL_V12Q_AFTER_UI_SHA256=' + $newUI)
 if (-not $Apply) {
