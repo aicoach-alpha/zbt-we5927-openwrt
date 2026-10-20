@@ -6,6 +6,7 @@ PKG_NAME:=veci-xl-native-overlay
 PKG_VERSION:=1.0.0
 PKG_RELEASE:=1
 PKG_LICENSE:=GPL-2.0-only
+PKGARCH:=all
 PKG_MAINTAINER:=VeCI contributors
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
@@ -16,7 +17,6 @@ define Package/veci-xl-native-overlay
   CATEGORY:=Network
   TITLE:=VeCI XL owner-login UI and local quota/session helpers
   DEPENDS:=+rpcd +jsonfilter
-  PKGARCH:=all
 endef
 
 define Package/veci-xl-native-overlay/description
