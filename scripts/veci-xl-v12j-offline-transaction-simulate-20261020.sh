@@ -6,6 +6,10 @@ LC_ALL=C
 export LC_ALL
 A=/tmp/veci-xl-native-0.3.8-r2-v12j.apk
 B=/tmp/veci-telco-indonesia-0.2.2-r2-v12j.apk
+PUB=/tmp/veci-xl-v12j-public.pem
+KEYDIR=
+cleanup() { [ -z "$KEYDIR" ] || rm -rf "$KEYDIR"; }
+trap cleanup EXIT
 fail(){ echo "XL_V12J=$1"; exit 1; }
 [ "$(id -u)" = 0 ] || fail root_required
 [ -f "$A" ] && [ -f "$B" ] || fail candidate_not_staged
@@ -13,17 +17,22 @@ fail(){ echo "XL_V12J=$1"; exit 1; }
 [ "$(sha256sum "$A" | cut -d ' ' -f1)" = '801b421569f6cd18ade2bfc3a86c7e61e333e680dfc41e29edffd3cdd0793f37' ] || fail xl_checksum_mismatch
 [ "$(sha256sum "$B" | cut -d ' ' -f1)" = 'da3d5d9da1bdc684170d75773a03562f7dcca672a3d3d8dd1575969ad4d65866' ] || fail indonesia_checksum_mismatch
 echo XL_V12J_SHA256=pass
+[ -s "$PUB" ] && [ ! -L "$PUB" ] || fail public_key_not_staged
 apk --version | grep -Eq 'apk-tools 3[.]' || fail apk_tools_v3_required
 apk info -e veci-telco-xl-native >/dev/null 2>&1 || fail original_xl_package_absent
 apk info -e veci-telco-indonesia >/dev/null 2>&1 || fail original_indonesia_package_absent
-apk verify "$A" >/dev/null 2>&1 || fail router_signature_verify_failed
-apk verify "$B" >/dev/null 2>&1 || fail router_signature_verify_failed
+KEYDIR="$(mktemp -d /tmp/veci-xl-v12j-key.XXXXXX)" || fail ephemeral_keydir_failed
+chmod 700 "$KEYDIR"
+cp "$PUB" "$KEYDIR/veci-meter-r2-rsa.pem" || fail public_key_copy_failed
+chmod 600 "$KEYDIR/veci-meter-r2-rsa.pem"
+apk --no-network --keys-dir "$KEYDIR" verify "$A" || fail xl_signature_verify_failed
+apk --no-network --keys-dir "$KEYDIR" verify "$B" || fail indonesia_signature_verify_failed
 echo XL_V12J_ROUTER_SIGNATURE=pass
 echo XL_V12J_SIMULATION_BEGIN
 # Do not run apk update, apk upgrade, --force-overwrite, or scripts.
 # --simulate opens installed package database read-only.
-# --network=false disables remote repository access.
-if apk --network=false add --simulate "$A" "$B"; then
+# --no-network disables remote repository access; --keys-dir uses office public key.
+if apk --no-network --keys-dir "$KEYDIR" add --simulate "$A" "$B"; then
  echo XL_V12J_SIMULATE=pass
  echo XL_V12J_DEPLOY_GATE=hold_until_simulation_plan_reviewed
  echo XL_V12J_INSTALL=not_attempted
