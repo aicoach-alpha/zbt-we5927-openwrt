@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 $inputDir = 'C:\veci-build\xl-native-candidates-v12i\dist'
 $feed = 'C:\veci-build\xl-native-feed-v12m'
 $keyDir = 'C:\veci-build\keys'
-$baseUrl = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/4e10ad988c2cfcb25e8b65ed69215173fbec5b7c/packaging/veci-xl-owner-migration/build-offline-feed-v12m.sh'
+$baseUrl = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/5c248a0d718c817dcd0c28c55a4d237f9076ce6b/packaging/veci-xl-owner-migration/build-offline-feed-v12m.sh'
 function Fail([string]$reason) { Write-Output ('XL_V12M_OFFICE=' + $reason); exit 1 }
 $items = @(
     @{
