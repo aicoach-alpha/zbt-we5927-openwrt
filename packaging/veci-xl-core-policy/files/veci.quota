@@ -1,0 +1,27 @@
+#!/bin/sh
+# Explicit read-only contract. No credentials, fake data or implicit network calls.
+# Authenticated API adapter and cache are intentionally NOT enabled at this stage.
+case "$1" in
+  list)
+    printf '{ "status": {}, "providers": {} }\n'
+    ;;
+  call)
+    case "$2" in
+      status)
+        # Fixed local path only; ubus clients cannot pass an arbitrary file.
+        /usr/libexec/veci-xl-quota-session-gate --status
+        ;;
+      providers)
+        # Root-owned immutable build-time registry; no dynamic credentials.
+        if [ -r /usr/share/veci/telco/providers.json ]; then
+          cat /usr/share/veci/telco/providers.json
+        else
+          printf '{ "error": "provider_registry_unavailable" }\n'
+        fi
+        ;;
+      *)
+        printf '{ "error": "method_not_found" }\n'
+        ;;
+    esac
+    ;;
+esac
