@@ -1,0 +1,182 @@
+#!/bin/sh
+# VeCI XL opt-in account RPC. No SMS read, no modem control, no auto OTP.
+# Secrets never appear in stdout, syslog, arguments or persistent storage.
+set -eu
+umask 077
+LC_ALL=C
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LC_ALL PATH
+CIAM=/tmp/veci-xl-ciam
+PRIVATE=/tmp/veci-telco-private
+LOCK=/tmp/veci-xl-owner-rpc.lock
+J=/usr/bin/jsonfilter
+fail() { printf '{"ok":false,"reason":"%s"}\n' "$1"; exit 0; }
+safe_dir() {
+ [ -d "$1" ] && [ ! -L "$1" ] &&
+ [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "drwx------ $(id -u)" ]
+}
+safe_file() {
+ [ -f "$1" ] && [ ! -L "$1" ] &&
+ [ "$(ls -ldn "$1" | awk '{print $1 " " $3}')" = "-rw------- $(id -u)" ]
+}
+# Even if ubus is exposed over HTTP elsewhere, an account secret operation
+# MUST NOT be available unless router-local uhttpd HTTP listeners are off.
+https_only() {
+ command -v uci >/dev/null 2>&1 || return 1
+ [ -z "$(uci -q get uhttpd.main.listen_http 2>/dev/null || :)" ] || return 1
+ [ -n "$(uci -q get uhttpd.main.listen_https 2>/dev/null || :)" ] || return 1
+ cert="$(uci -q get uhttpd.main.cert 2>/dev/null || :)"
+ key="$(uci -q get uhttpd.main.key 2>/dev/null || :)"
+ [ -n "$cert" ] && [ -f "$cert" ] && [ ! -L "$cert" ] &&
+ [ -n "$key" ] && [ -f "$key" ] && [ ! -L "$key" ]
+}
+have_config() {
+ safe_dir "$CIAM" || return 1
+ for item in basic_auth user_agent fingerprint device_id ax_api_sig_key; do
+  safe_file "$CIAM/$item" || return 1
+ done
+ safe_dir "$PRIVATE" || return 1
+ for item in xdata_key api_key signature_secret; do
+  safe_file "$PRIVATE/$item" || return 1
+ done
+}
+session_state() {
+ if safe_dir "$PRIVATE" && safe_file "$PRIVATE/verified_epoch" &&
+    safe_file "$PRIVATE/id_token"; then
+  echo verified
+ elif safe_dir "$PRIVATE/pending-profile"; then
+  echo pending_profile
+ elif safe_dir "$CIAM" && safe_file "$CIAM/number"; then
+  echo otp_requested
+ else
+  echo not_connected
+ fi
+}
+status() {
+ if https_only; then https=true; else https=false; fi
+ if have_config; then configured=true; else configured=false; fi
+ printf '{"https_only":%s,"operator_configured":%s,"session":"%s","quota_status":"read_local_only"}\n' \
+  "$https" "$configured" "$(session_state)"
+}
+input_field() {
+ [ -x "$J" ] || fail jsonfilter_missing
+ value="$(printf '%s\n' "$1" | "$J" -e "@.$2" 2>/dev/null)" || fail malformed_request
+ printf '%s' "$value"
+}
+valid_number() {
+ case "$1" in 62[0-9]*) ;; *) return 1 ;; esac
+ length="$(printf '%s' "$1" | wc -c | tr -d '[:space:]')"
+ [ "$length" -ge 10 ] && [ "$length" -le 15 ] || return 1
+ case "$1" in *[!0-9]*) return 1 ;; esac
+}
+valid_otp() {
+ case "$1" in ''|*[!0-9]*) return 1 ;; esac
+ length="$(printf '%s' "$1" | wc -c | tr -d '[:space:]')"
+ [ "$length" -ge 4 ] && [ "$length" -le 8 ]
+}
+secure_write() {
+ # Only safe, already checked 0700 directory under /tmp.
+ [ ! -L "$1" ] || fail unsafe_secret_path
+ tmp="$1.tmp.$$"
+ [ ! -e "$tmp" ] && [ ! -L "$tmp" ] || fail secret_temp_exists
+ (umask 077; printf '%s\n' "$2" > "$tmp") || fail secret_write_failed
+ chmod 600 "$tmp" || fail secret_mode_failed
+ mv -f "$tmp" "$1" || fail secret_commit_failed
+}
+lock() {
+ mkdir "$LOCK" 2>/dev/null || fail action_in_progress
+ trap 'rmdir "$LOCK" 2>/dev/null || :' EXIT
+}
+preflight() {
+ [ "$(id -u)" = 0 ] || fail root_required
+ https_only || fail https_only_required
+ have_config || fail operator_config_unavailable
+}
+request_otp() {
+ preflight
+ lock
+ data="$(cat)"
+ number="$(input_field "$data" number)"
+ valid_number "$number" || fail invalid_number
+ [ -x /usr/libexec/veci-xl-ciam ] || fail native_ciam_missing
+ # Avoid unsolicited repeated OTP. Rate-limit requests per account across
+ # failed requests, and never print the number or network response.
+ now="$(date +%s)"
+ stamp="$CIAM/last_otp_epoch"
+ if safe_file "$stamp"; then
+  last="$(cat "$stamp")"
+  case "$last" in *[!0-9]*|'') fail rate_limit_state_invalid ;; esac
+  [ "$now" -ge "$last" ] || fail clock_invalid
+  [ $((now-last)) -ge 180 ] || fail otp_cooldown
+ fi
+ secure_write "$CIAM/number" "$number"
+ secure_write "$stamp" "$now"
+ if /usr/libexec/veci-xl-ciam request-otp >/dev/null 2>&1; then
+  echo '{"ok":true,"state":"otp_requested"}'
+ else
+  fail operator_otp_request_failed
+ fi
+}
+submit_otp() {
+ preflight
+ lock
+ [ -x /usr/libexec/veci-xl-ciam ] || fail native_ciam_missing
+ [ -x /usr/libexec/veci-xl-token-stage ] || fail token_stage_missing
+ [ -x /usr/libexec/veci-xl-profile-chain ] || fail profile_chain_missing
+ [ -x /usr/libexec/veci-xl-quota-refresh ] || fail quota_refresh_missing
+ safe_file "$CIAM/number" || fail otp_request_missing
+ data="$(cat)"
+ otp="$(input_field "$data" otp)"
+ valid_otp "$otp" || fail invalid_otp
+ secure_write "$CIAM/otp" "$otp"
+ unset otp data
+ if ! /usr/libexec/veci-xl-ciam submit-otp >/dev/null 2>&1; then
+  rm -f "$CIAM/otp"
+  fail otp_verification_failed
+ fi
+ rm -f "$CIAM/otp"
+ /usr/libexec/veci-xl-token-stage --stage >/dev/null 2>&1 ||
+  fail token_stage_failed
+ /usr/libexec/veci-xl-profile-chain --verify-owner >/dev/null 2>&1 ||
+  fail account_profile_verification_failed
+ # Quota failure does not invalidate the identity result.
+ if /usr/libexec/veci-xl-quota-refresh --refresh >/dev/null 2>&1; then
+  echo '{"ok":true,"state":"quota_refreshed"}'
+ else
+  echo '{"ok":true,"state":"account_verified_quota_unavailable"}'
+ fi
+}
+refresh_quota() {
+ preflight
+ lock
+ [ -x /usr/libexec/veci-xl-quota-refresh ] || fail quota_refresh_missing
+ if /usr/libexec/veci-xl-quota-refresh --refresh >/dev/null 2>&1; then
+  echo '{"ok":true,"state":"quota_refreshed"}'
+ else
+  fail quota_refresh_failed
+ fi
+}
+logout_local() {
+ [ "$(id -u)" = 0 ] || fail root_required
+ https_only || fail https_only_required
+ lock
+ [ -x /usr/libexec/veci-xl-session-clear ] || fail logout_helper_missing
+ /usr/libexec/veci-xl-session-clear --clear >/dev/null 2>&1 || fail logout_clear_failed
+ echo '{"ok":true,"state":"not_connected","scope":"local"}'
+}
+case "$1" in
+ list)
+  printf '{"status":{},"requestOtp":{"number":"str"},"submitOtp":{"otp":"str"},"refreshQuota":{},"logout":{}}\n'
+  ;;
+ call)
+  case "$2" in
+   status) status ;;
+   requestOtp) request_otp ;;
+   submitOtp) submit_otp ;;
+   refreshQuota) refresh_quota ;;
+   logout) logout_local ;;
+   *) fail unknown_method ;;
+  esac
+  ;;
+ *) fail invalid_rpc_request ;;
+esac
