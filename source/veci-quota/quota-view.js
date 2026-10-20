@@ -1,4 +1,4 @@
-/* Native VeCI quota status view. Does not modify LuCI or access operator APIs. */
+/* Native VeCI quota status view. Fail closed on unverified operator data. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -13,21 +13,46 @@
     stale:'Informasi kuota kedaluwarsa',
     unavailable:'Kuota operator belum tersedia'
   });
+  function failure(state) {
+    const code = Object.hasOwn(messages,state) ? state : 'unavailable';
+    return {state:code,message:messages[code],buckets:[]};
+  }
   function bytes(n) {
-    if (!Number.isSafeInteger(n) || n < 0) throw Error('invalid bytes');
     return (n / 1073741824).toFixed(2) + ' GB';
   }
-  function model(data) {
-    const d = data && typeof data === 'object' ? data : {};
-    if (d.state !== 'ok' || d.source !== 'operator' || !Array.isArray(d.buckets)) {
-      return {state: messages[d.state] ? d.state : 'unavailable', message:messages[d.state] || messages.unavailable,buckets:[]};
+  function model(data, clockMs) {
+    const d = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+    if (d.state !== 'ok' || d.source !== 'operator') return failure(d.state === 'ok' ? 'unavailable' : d.state);
+    const now = Number.isFinite(clockMs) ? clockMs : Date.now();
+    const fetched = typeof d.fetched_at === 'string' ? Date.parse(d.fetched_at) : NaN;
+    if (!Number.isFinite(fetched) || fetched > now + 300000 || now - fetched > 3600000) {
+      return failure('stale');
     }
-    return {state:'ok', message:'Kuota operator', buckets:d.buckets.map(b=>({
-      label:String(b.label), remaining:bytes(b.remaining_bytes),
-      ...(Number.isSafeInteger(b.total_bytes) ? {total:bytes(b.total_bytes)} : {}),
-      ...(typeof b.expires_at === 'string' && Number.isFinite(Date.parse(b.expires_at))
-        ? {expires:new Date(b.expires_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} : {})
-    }))};
+    if (!Array.isArray(d.buckets) || d.buckets.length < 1 || d.buckets.length > 64) {
+      return failure('unavailable');
+    }
+    const partial = d.quality === 'remaining_only';
+    const buckets = [];
+    for (const b of d.buckets) {
+      if (!b || typeof b !== 'object' || Array.isArray(b) ||
+          typeof b.label !== 'string' || !b.label.trim() || b.label.length > 100 ||
+          !Number.isSafeInteger(b.remaining_bytes) || b.remaining_bytes < 0) {
+        return failure('unavailable');
+      }
+      const hasTotal = Object.hasOwn(b,'total_bytes');
+      const hasExpiry = Object.hasOwn(b,'expires_at');
+      if ((!partial && (!hasTotal || !hasExpiry)) ||
+          (hasTotal && (!Number.isSafeInteger(b.total_bytes) || b.total_bytes < b.remaining_bytes)) ||
+          (hasExpiry && (typeof b.expires_at !== 'string' || !Number.isFinite(Date.parse(b.expires_at))))) {
+        return failure('unavailable');
+      }
+      buckets.push({
+        label:b.label,remaining:bytes(b.remaining_bytes),
+        ...(hasTotal ? {total:bytes(b.total_bytes)} : {}),
+        ...(hasExpiry ? {expires:new Date(b.expires_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} : {})
+      });
+    }
+    return {state:'ok',message:'Kuota operator',buckets};
   }
   function render(element, data) {
     if (!element || !element.ownerDocument) throw Error('missing mount element');
@@ -42,7 +67,7 @@
       if (b.expires) lines.push('Berlaku sampai: ' + b.expires);
       for (const line of lines) {
         const p = doc.createElement('p');
-        p.textContent = line; // Never use innerHTML for provider-supplied labels.
+        p.textContent = line;
         article.appendChild(p);
       }
       element.appendChild(article);
