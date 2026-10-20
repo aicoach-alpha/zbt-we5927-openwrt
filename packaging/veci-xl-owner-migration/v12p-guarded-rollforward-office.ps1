@@ -8,13 +8,15 @@ param(
 $ErrorActionPreference = 'Stop'
 $router = 'root@192.168.1.1'
 $stage = '/tmp/veci-xl-v12p'
-$url = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/20d358b989a0d9390537f01ec43a8db0c43cf0cc/packaging/veci-xl-owner-migration/v12p-guarded-rollforward.sh'
+$url = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/bc32f4051eacf0a9ddd51524640bafada14106c8/packaging/veci-xl-owner-migration/v12p-guarded-rollforward.sh'
 function Fail([string]$reason) { Write-Output ('XL_V12P_OFFICE=' + $reason); exit 1 }
 if ($Apply -eq $Rollback) { Fail 'choose_exactly_one_of_apply_or_rollback' }
 $script = Join-Path $env:TEMP 'veci-xl-v12p-guarded-rollforward.sh'
 & curl.exe --fail --location --silent --show-error $url --output $script
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $script -PathType Leaf)) { Fail 'installer_download_failed' }
 if ($Rollback) {
+  & ssh $router ('if [ -e ' + $stage + ' ]; then [ -d ' + $stage + ' ] && [ ! -L ' + $stage + ' ]; else mkdir -m 700 ' + $stage + '; fi')
+  if ($LASTEXITCODE -ne 0) { Fail 'rollback_staging_unavailable' }
   & scp -O $script ($router + ':' + $stage + '/rollforward.sh')
   if ($LASTEXITCODE -ne 0) { Fail 'rollback_script_transfer_failed' }
   & ssh $router ('sh -n ' + $stage + '/rollforward.sh && sh ' + $stage + '/rollforward.sh rollback')
