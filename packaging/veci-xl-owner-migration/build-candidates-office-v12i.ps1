@@ -10,7 +10,7 @@ $hookArchive = 'C:\veci-build\xl-native-origin\veci-xl-v12h-original-hooks-20261
 $hookSha256 = 'b10ee80013608f6f1f66d234588f3cd708c79e5d8cfc3ffbdf960b07e2a33ca7'
 $listFile = Join-Path $source 'meta\veci-telco-indonesia.original.list'
 $builder = Join-Path $build 'build-in-docker-v12i.sh'
-$url = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/c1b365c3ce12dc2a9fa380e6aa6cbcd92beec451/packaging/veci-xl-owner-migration/build-candidates-in-docker-v12i.sh'
+$url = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/b1cc7b0c8d90d8ca04905572f817cb57b4bb3d9e/packaging/veci-xl-owner-migration/build-candidates-in-docker-v12i.sh'
 function Fail([string]$code) { Write-Output ('XL_V12I_OFFICE=' + $code); exit 1 }
 if (-not (Test-Path -LiteralPath $report -PathType Leaf)) { Fail 'v12d_report_missing' }
 try { $receipt = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json }
@@ -75,9 +75,17 @@ foreach ($name in $expected) {
     Write-Output ('XL_V12I_CANDIDATE=' + $name)
     Write-Output ('XL_V12I_CANDIDATE_SHA256=' + (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant())
 }
+$rollbackDir = Join-Path $dist 'rollback'
+foreach ($name in @('veci-telco-xl-native-0.3.7-r1-mipsel_24kc.apk','veci-telco-indonesia-0.2.1-r1-mipsel_24kc.apk')) {
+    $oldFile = Join-Path $rollbackDir $name
+    if (-not (Test-Path -LiteralPath $oldFile -PathType Leaf)) { Fail 'rollback_candidate_missing' }
+    Write-Output ('XL_V12I_ROLLBACK_ARTIFACT=' + $name)
+    Write-Output ('XL_V12I_ROLLBACK_SHA256=' + (Get-FileHash -LiteralPath $oldFile -Algorithm SHA256).Hash.ToLowerInvariant())
+}
 Write-Output 'XL_V12I_OFFICE=pass'
 Write-Output 'XL_V12I_ORIGINAL_INDONESIA_HOOKS=integrated'
 Write-Output 'XL_V12I_PACKAGE_LIST=preserved'
-Write-Output 'XL_V12I_INSTALL=blocked_pending_rollback_and_dependency_staging'
+Write-Output 'XL_V12I_ROLLBACK=signed_reconstructed_from_original_payload'
+Write-Output 'XL_V12I_INSTALL=blocked_pending_offline_dependency_and_hook_validation'
 Write-Output ('XL_V12I_DIST=' + $dist)
 Write-Output 'XL_V12I_ROUTER=unchanged'
