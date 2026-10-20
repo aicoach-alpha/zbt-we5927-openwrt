@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "source": "live ZBT WE5927 office-router four-file capture, SHA256 authenticated",
+  "captured_archive_sha256": "4d6831523d92fd0e674f0406c6b758100c11f62d6cd54267f3a623946b31a795",
+  "signed_core_policy_apk_sha256": "90f68038494cb9910bdc1975cdc6a4120fe9fe4e3b157e15e978999d62b938e1",
+  "legacy_core_policy_install": "forbidden_due_to_multiple_owner_conflicts",
+  "split": [
+    {
+      "owner": "veci-telco-xl-native",
+      "installed_version": "0.3.7-r1",
+      "files": [
+        {
+          "path": "usr/libexec/rpcd/veci.xl",
+          "sha256": "b21b357bb9f9c03be9520c5199c1ba5a8329c03fcda95b45bc75206c916cbfb6"
+        },
+        {
+          "path": "usr/share/rpcd/acl.d/veci-xl-owner.json",
+          "sha256": "38618a27befe26cc278ef96be1fc3dac995d5e6ad5eb8ab91808ce7f2705999d"
+        },
+        {
+          "path": "usr/libexec/veci-xl-session-clear",
+          "sha256": "57fbfab54810ce116b1b4410ce3f921839fa8f10a535ec009a89ede8c60ebb81",
+          "owner_before": "unowned"
+        }
+      ]
+    },
+    {
+      "owner": "veci-telco-indonesia",
+      "installed_version": "0.2.1-r1",
+      "files": [
+        {
+          "path": "usr/libexec/rpcd/veci.quota",
+          "sha256": "86a40eba12f3faa27fbff3c75375454004167a0798dff9f808786b7631922f5d"
+        }
+      ]
+    }
+  ],
+  "prerequisites": [
+    "Complete original signed APKv3 archives for both owning packages",
+    "Preserve all original payload files and scripts/triggers/dependencies",
+    "Build upgraded same-name package versions with exactly assigned file changes",
+    "Offline signature and dependency simulation, rollback artifacts",
+    "Do not replace firmware, modem, SMS, USSD or LuCI"
+  ],
+  "carrier_authentication": "not_connected"
+}
