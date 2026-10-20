@@ -26,6 +26,8 @@ for state in before after; do
  cp "$SOURCE/$state/veci-xl-connection-status.js" "$stage/www/veci/js/lib/veci-xl-connection-status.js"
  cp "$SOURCE/$state/veci-xl-quota-session-gate" "$stage/usr/libexec/veci-xl-quota-session-gate"
  cp "$SOURCE/$state/veci-xl-authorized-config-import" "$stage/usr/libexec/veci-xl-authorized-config-import"
+ # Match original overlay permissions; 0700 on /www would break the Web UI.
+ chmod 755 "$stage" "$stage/www" "$stage/www/veci" "$stage/www/veci/js" "$stage/www/veci/js/lib" "$stage/usr" "$stage/usr/libexec"
  chmod 644 "$stage/www/veci/js/lib/veci-xl-connection-status.js"
  chmod 700 "$stage/usr/libexec/veci-xl-quota-session-gate" "$stage/usr/libexec/veci-xl-authorized-config-import"
  file="$DIST/veci-xl-native-overlay-$version-mipsel_24kc.apk"
