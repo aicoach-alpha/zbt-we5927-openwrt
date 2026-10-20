@@ -23,3 +23,17 @@ The separately tested router release reconciler `scripts/veci-xl-native-release-
 
 ## Actual XL quota
 No official, approved provider API credentials or subscriber quota endpoint have been verified for third-party access. Do not simulate carrier balance, extract mobile-app secrets or treat the myXL website link as an automated quota API.
+
+## Signed APKv3 build on the office laptop
+
+The repository includes `build-office-windows.ps1` and `build-in-docker.sh`. The PowerShell script downloads the three source assets from a **pinned GitHub commit** into `C:\\veci-build\\xl-overlay`, uses Docker Desktop's Alpine edge apk-tools v3 to assemble a package for `mipsel_24kc`, and verifies its signature. It uses the **existing local** meter build signing key at `C:\\veci-build\\keys\\veci-meter-r2-rsa.key` and the associated `.pem` public key **via a read-only Docker mount**. Neither key is uploaded, echoed, embedded in the APK, or included in GitHub.
+
+Run the PowerShell builder from the office computer. Its output is:
+- `C:\\veci-build\\xl-overlay\\dist\\veci-xl-native-overlay-1.0.0-r1-mipsel_24kc.apk`
+- a SHA-256 digest and signature verification receipt.
+
+The separate Makefile defines a platform-independent OpenWrt source recipe; the office build intentionally targets only the tested `mipsel_24kc` router. Both routes package the same three files. A signed package does **not** establish that its native CIAM backend works with XL.
+
+**Safety release gate:** building is permitted without changing router production. Before installing this newly built APK, inspect existing file ownership and live disk space, ensure its signing key is trusted on the router, ensure the native binary prerequisites are already installed, and provide an explicit rollback path. The build script intentionally does not run `apk add` or `sysupgrade`.
+
+The generated local artifact and its signing key must not be committed to GitHub.
