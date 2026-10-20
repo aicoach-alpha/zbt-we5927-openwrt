@@ -94,4 +94,4 @@ echo XL_V12Q_PACKAGE=veci-xl-native-overlay-1.0.1-r1
 echo XL_V12Q_HELPERS=unchanged
 echo XL_V12Q_OTHER_PACKAGES=unchanged
 echo XL_V12Q_ROLLBACK=office_signed_reconstruction_and_tmp_backup
-echo XL_V12Q_OPERATOR_QUOTA=operator_config_required
+echo XL_V12Q_OPERATOR_QUOTA=unchanged_by_this_release
