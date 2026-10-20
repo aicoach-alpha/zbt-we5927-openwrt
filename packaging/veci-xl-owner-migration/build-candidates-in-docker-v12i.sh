@@ -21,6 +21,7 @@ apk --version | grep -Eq 'apk-tools 3[.]' || fail apk_tools_v3_required
 [ -f "$SOURCE/meta/counts.txt" ] || fail v12b_metadata_missing
 [ -d "$SOURCE/payload" ] || fail captured_payload_missing
 [ -d "$OUTPUT" ] || fail output_directory_missing
+mkdir -p "$OUTPUT/rollback" || fail rollback_dir_failed
 [ -s "$LIST_ORIGINAL" ] || fail original_package_list_missing
 for record in \
  "post-install:10aaaceb1f28a6d7c94833275b7bff3b4f244aa46adb38f335a6234aa07ddad4" \
@@ -71,7 +72,7 @@ for pair in 'veci-telco-xl-native:0.3.7-r1:0.3.8-r2:15' \
   mkdir -p "$stage"
   cp -a "$payload/." "$stage/" || fail stage_copy_failed
   # The two special exclusions were reconciled in v12d; the APK package
-  # inventory is 15 + 6 application files. The .list file is not payload.
+  # inventory is 15 + 6 application files. The .list is packaging metadata.
   expected="$WORK/$pkg.expected"
   actual="$WORK/$pkg.actual"
   cat "$paths" > "$expected"
@@ -130,6 +131,33 @@ for pair in 'veci-telco-xl-native:0.3.7-r1:0.3.8-r2:15' \
     --sign-key "$KEY" --output "$output" || fail mkpkg_failed
   fi
   apk --keys-dir /keys verify "$output" >/dev/null || fail candidate_signature_failed
+  # Locally reconstruct signed previous-version package from the exact v12b/d
+  # installed payload. This is rollback material, NOT the original signed APK.
+  rollback="$OUTPUT/rollback/$pkg-$oldver-mipsel_24kc.apk"
+  [ ! -e "$rollback" ] || fail rollback_output_already_exists
+  if [ "$pkg" = veci-telco-indonesia ]; then
+    apk mkpkg --files "$stage" \
+      --info "name:$pkg" --info "version:$oldver" \
+      --info arch:mipsel_24kc --info "origin:$pkg" \
+      --info license:GPL-2.0-only \
+      --info "description:VeCI-reconstructed-rollback-$pkg" \
+      --info "depends:$deps_value" \
+      --script "post-install:$HOOKS/post-install.sh" \
+      --script "post-upgrade:$HOOKS/post-upgrade.sh" \
+      --script "pre-deinstall:$HOOKS/pre-deinstall.sh" \
+      --sign-key "$KEY" --output "$rollback" || fail rollback_build_failed
+  else
+    apk mkpkg --files "$stage" \
+      --info "name:$pkg" --info "version:$oldver" \
+      --info arch:mipsel_24kc --info "origin:$pkg" \
+      --info license:GPL-2.0-only \
+      --info "description:VeCI-reconstructed-rollback-$pkg" \
+      --info "depends:$deps_value" \
+      --sign-key "$KEY" --output "$rollback" || fail rollback_build_failed
+  fi
+  apk --keys-dir /keys verify "$rollback" >/dev/null || fail rollback_signature_failed
+  printf 'XL_V12I_ROLLBACK=%s\n' "$pkg"
+  printf 'XL_V12I_ROLLBACK_SHA256=%s\n' "$(sha256sum "$rollback" | cut -d ' ' -f1)"
   printf 'XL_V12I_PACKAGE=%s\n' "$pkg"
   printf 'XL_V12I_PAYLOAD_FILES=%s\n' "$count"
   printf 'XL_V12I_SHA256=%s\n' "$(sha256sum "$output" | cut -d ' ' -f1)"
@@ -138,6 +166,7 @@ echo XL_V12I_BUILD=pass
 echo XL_V12I_SIGNATURE=pass
 echo XL_V12I_MANIFEST=pass
 echo XL_V12I_ORIGINAL_INDONESIA_HOOKS=preserved
- echo XL_V12I_PACKAGE_LIST=preserved
- echo XL_V12I_INSTALL_GATE=blocked_pending_rollback_and_dependency_staging
+echo XL_V12I_PACKAGE_LIST=preserved
+echo XL_V12I_ROLLBACK_CANDIDATES=signed_reconstructed
+echo XL_V12I_INSTALL_GATE=blocked_pending_offline_dependency_and_hook_validation
 echo XL_V12I_PRODUCTION=unchanged
