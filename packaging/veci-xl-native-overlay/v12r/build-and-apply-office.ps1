@@ -8,6 +8,7 @@ $originalSha256 = 'bc34bcee7996f5ce40e27ac46a9bb40f290c55a3b53857e14d233c5f30c0a
 $keys = 'C:\veci-build\keys'
 $repo = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/'
 $oldPrefix = $repo + '68491e24b878efdb06f6226ca6ff5d8f0f0e4ba0/packaging/veci-xl-native-overlay/files/'
+$oldUiUrl = $repo + 'e27eedb235fb98cd4d078839970923b638d20b13/packaging/veci-xl-native-overlay/v12q/files/veci-xl-connection-status.js'
 $newPrefix = $repo + '6df22e19eec6d238c10c39ac7d2753e45fff742f/packaging/veci-xl-native-overlay/v12r/files/'
 $buildUrl = $repo + '8d75d503c720501bcde8f3e7317b87d318e270c9/packaging/veci-xl-native-overlay/v12r/build-in-docker.sh'
 $installUrl = $repo + 'bd6a2fc6787b899d82cd05a96d8acfa8b894f7a2/packaging/veci-xl-native-overlay/v12r/guarded-overlay-install.sh'
@@ -91,7 +92,10 @@ function Fetch([string]$url,[string]$dest) {
  }
 }
 $names = @('veci-xl-connection-status.js','veci-xl-quota-session-gate','veci-xl-authorized-config-import')
-foreach ($name in $names) { Fetch ($oldPrefix + $name) (Join-Path $before $name) }
+Fetch $oldUiUrl (Join-Path $before 'veci-xl-connection-status.js')
+foreach ($name in @('veci-xl-quota-session-gate','veci-xl-authorized-config-import')) {
+ Fetch ($oldPrefix + $name) (Join-Path $before $name)
+}
 Fetch ($newPrefix + 'veci-xl-connection-status.js') (Join-Path $after 'veci-xl-connection-status.js')
 foreach ($name in @('veci-xl-quota-session-gate','veci-xl-authorized-config-import')) {
  $file = Join-Path $after $name
