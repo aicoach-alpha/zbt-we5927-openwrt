@@ -53,3 +53,45 @@ $p="$env:TEMP\veci-xl-v12r-staging-fix.ps1"; curl.exe -fLsS https://raw.githubus
 ```
 
 The production baseline remains v12q `veci-xl-native-overlay 1.0.1-r1` until a newer owner terminal receipt shows `XL_V12R_RELEASE=installed`, `XL_V12R_INTEGRITY=pass`, and `XL_V12R_OFFICE=live_pass`. Stop on an unexpected error, do not blindly retry `-Apply`.
+
+## FINAL PRODUCTION ACCEPTANCE — 2026-10-21, LIVE/PASS
+
+This later user-provided office terminal receipt **supersedes all pending or blocked status above**. The owner executed the corrected, pinned office wrapper `6f1772465fb9f17f596898e9ec38d16dac5d60ee` from the office laptop against the WE5927 router at 192.168.1.1.
+
+```text
+XL_V12R_DOCKER=linux_engine_ready
+XL_V12R_OFFICE_STAGE=resume_safe
+XL_V12R_BUILD=already_valid_signed_archive
+XL_V12R_BUILD=pass
+XL_V12R_SIGNATURE=pass
+XL_V12R_HELPERS=unchanged
+XL_V12R_NEW_APK_SHA256=e823c14e57b191bc770e59213abfb80c883fdbcf2413bae4982481b5d6467ed8
+XL_V12R_ROLLBACK_APK_SHA256=bc34bcee7996f5ce40e27ac46a9bb40f290c55a3b53857e14d233c5f30c0a34e
+XL_V12R_BEFORE_UI_SHA256=34ae70b75a6604a1f5b2eabbab7216ba59a3567b2012ed5b73e9a5046bc98ce3
+XL_V12R_AFTER_UI_SHA256=695f75b2db3397c1a41c44217e6e739522c8449a157d9c923492d448a58bca1d
+XL_V12R_SIMULATION=one_overlay_upgrade
+XL_V12R_PREFLIGHT=pass
+XL_V12R_ACTION=upgrade_overlay_only
+(1/1) Upgrading veci-xl-native-overlay (1.0.1-r1 -> 1.0.2-r1)
+OK: 11.0 MiB in 157 packages
+XL_V12R_RELEASE=installed
+XL_V12R_INTEGRITY=pass
+XL_V12R_PACKAGE=veci-xl-native-overlay-1.0.2-r1
+XL_V12R_HELPERS=unchanged
+XL_V12R_OTHER_PACKAGES=unchanged
+XL_V12R_ROLLBACK=original_v12q_signed_apk_and_tmp_backup
+XL_V12R_OPERATOR_QUOTA=unchanged_by_this_release
+XL_V12R_OFFICE=live_pass
+XL_V12R_ROLLBACK_ARCHIVE=retained_on_office
+```
+
+**Decision: v12r package installation and focused integrity gate accepted — production LIVE/PASS.** Current accepted package baseline:
+
+- `veci-xl-native-overlay 1.0.2-r1` (new redacted readiness diagnostics UI)
+- `veci-telco-xl-native 0.3.8-r2` (unchanged)
+- `veci-telco-indonesia 0.2.2-r2` (unchanged)
+- v12n signed local APK feed unchanged.
+
+Remote OpenWrt `packages.adb` cache warnings occurred during `--no-network` solver and installation but the exact one-package upgrade succeeded; they are **not** grounds for repeated UAT. Original signed `1.0.1-r1` rollback APK is retained at the office workstation, and tmpfs staging/backup exists only while that router has not rebooted. The rollback was **not executed/tested**. The installer verified package payload hashes and package inventory; no separate post-cutover browser acceptance of the new diagnostic toggle is claimed.
+
+**Close v12r**. No rebuild, reinstall, or repeated SIT/UAT needed. Native subscriber XL quota **remains unconnected** (`operator_config_required` was last observed prior to this UI-only release). Do not claim that carrier balance reads are live; awaiting carrier-authorized integration is a distinct task.
