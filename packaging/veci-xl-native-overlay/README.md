@@ -1,8 +1,13 @@
 # VeCI XL Native Overlay — Production release baseline
 
+## Next candidate v12s (2026-10-21): source ready, production pending
+
+The package Makefile and canonical owner-panel source now target `1.0.3-r1` (on-demand Data Meter diagnostics plus sanitized copyable report), but **the last verified router installation is still `1.0.2-r1` from v12r**. Do not mistake this source update for a live cutover. Build and gated deployment instructions: `docs/VECI-XL-V12S-LOCAL-METER-DIAGNOSTICS-20261021.md`. The signed `1.0.2-r1` APK from v12r is the only approved rollback archive; the 1.0.2 production release must not be rebuilt. Carrier-authenticated XL quota remains unavailable without permitted operator access.
+
+
 **Latest verified production (2026-10-21): `veci-xl-native-overlay 1.0.2-r1` LIVE/PASS** on the office-connected ZBT WE5927 running OpenWrt 25.12.5 (APK v3 / mipsel_24kc). In-place upgrade `1.0.1-r1 → 1.0.2-r1` succeeded as one signed APK transaction, post-install integrity PASS, other packages and helpers unchanged.
 
-Signed new APK SHA-256: `e823c14e57b191bc770e59213abfb80c883fdbcf2413bae4982481b5d6467ed8`. Exact original signed rollback APK `1.0.1-r1` SHA-256: `bc34bcee7996f5ce40e27ac46a9bb40f290c55a3b53857e14d233c5f30c0a34e`, retained on the office PC (rollback **not** exercised). Current source Makefile version is `1.0.2-r1`. Release evidence: `docs/VECI-XL-V12R-OWNER-DIAGNOSTICS-RELEASE-20261021.md`.
+Signed new APK SHA-256: `e823c14e57b191bc770e59213abfb80c883fdbcf2413bae4982481b5d6467ed8`. Exact original signed rollback APK `1.0.1-r1` SHA-256: `bc34bcee7996f5ce40e27ac46a9bb40f290c55a3b53857e14d233c5f30c0a34e`, retained on the office PC (rollback **not** exercised). The production baseline is `1.0.2-r1`, while source Makefile has advanced to the not-yet-deployed v12s `1.0.3-r1`. Release evidence: `docs/VECI-XL-V12R-OWNER-DIAGNOSTICS-RELEASE-20261021.md`.
 
 The package owns only the VeCI XL owner-panel JS and two previously installed local helpers. It does **not** contain carrier credentials, change LTE/SMS/USSD, or authenticate to the operator. The new diagnostics UI reports redacted local status; actual operator quota retrieval remains dependent on authorized XL/XLSMART access.
 
