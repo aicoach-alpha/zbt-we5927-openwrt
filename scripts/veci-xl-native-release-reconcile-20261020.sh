@@ -14,9 +14,10 @@ URL_BASE=https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt
 fail(){ echo "XL_RELEASE=$1"; exit 1; }
 [ "$(id -u)" = 0 ] || fail root_required
 # A newer same-name signed APK owns this UI. Never downgrade it by replaying
-# this legacy loose-file release reconciler after the 1.0.1-r1 cutover.
-if apk list -I 2>/dev/null | grep -Fq 'veci-xl-native-overlay-1.0.1-r1 '; then
- echo XL_RELEASE=managed_by_signed_overlay_1_0_1
+# this legacy loose-file release reconciler after the 1.0.1+ cutover.
+if apk list -I 2>/dev/null |
+  grep -Eq '^veci-xl-native-overlay-1[.]0[.]([1-9]|[0-9][0-9]+)[-]r[0-9]+ '; then
+ echo XL_RELEASE=managed_by_signed_overlay_newer
  echo XL_RELEASE_LEGACY_RECONCILE=skipped
  exit 0
 fi
