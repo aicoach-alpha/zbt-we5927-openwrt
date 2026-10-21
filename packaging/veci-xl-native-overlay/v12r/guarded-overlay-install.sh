@@ -3,7 +3,7 @@
 # All artifacts staged by office laptop under /tmp. No firmware/modem/service restart.
 set -eu
 umask 077
-STAGE=/tmp/veci-xl-v12r-20261020
+STAGE=/tmp/veci-xl-v12r-20261021
 NEW="$STAGE/veci-xl-native-overlay-1.0.2-r1-mipsel_24kc.apk"
 OLD="$STAGE/veci-xl-native-overlay-1.0.1-r1-mipsel_24kc.apk"
 PUB="$STAGE/veci-meter-r2-rsa.pem"
