@@ -15,6 +15,31 @@ $router = 'root@192.168.1.1'
 $remote = '/tmp/veci-xl-v12q-20261020'
 function Fail([string]$reason) { Write-Output ('XL_V12Q_OFFICE=' + $reason); exit 1 }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Fail 'docker_missing' }
+# Docker CLI can exist while Docker Desktop's Linux daemon is stopped.
+# Do this before staging/building anything; never fall back to remote engines.
+function LinuxEngineReady {
+ try {
+  $ostype = & docker info --format '{{.OSType}}' 2>$null
+  return ($LASTEXITCODE -eq 0 -and (($ostype -join '').Trim() -eq 'linux'))
+ } catch { return $false }
+}
+if (-not (LinuxEngineReady)) {
+ $desktop = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+ if (-not (Test-Path -LiteralPath $desktop -PathType Leaf)) {
+  Fail 'docker_linux_engine_offline_start_docker_desktop_manually'
+ }
+ Write-Output 'XL_V12Q_DOCKER=starting_docker_desktop'
+ try {
+  Start-Process -FilePath $desktop -ErrorAction Stop | Out-Null
+ } catch { Fail 'docker_desktop_start_failed' }
+ $ready = $false
+ for ($attempt = 0; $attempt -lt 45; $attempt++) {
+  if (LinuxEngineReady) { $ready = $true; break }
+  Start-Sleep -Seconds 2
+ }
+ if (-not $ready) { Fail 'docker_linux_engine_not_ready_check_docker_desktop' }
+}
+Write-Output 'XL_V12Q_DOCKER=linux_engine_ready'
 foreach ($name in @('veci-meter-r2-rsa.key','veci-meter-r2-rsa.pem')) {
  if (-not (Test-Path -LiteralPath (Join-Path $keys $name) -PathType Leaf)) { Fail 'signer_missing' }
 }
