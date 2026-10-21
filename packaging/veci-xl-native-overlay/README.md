@@ -1,3 +1,15 @@
+# VeCI XL Native Overlay — Production release baseline
+
+**Latest verified production (2026-10-21): `veci-xl-native-overlay 1.0.2-r1` LIVE/PASS** on the office-connected ZBT WE5927 running OpenWrt 25.12.5 (APK v3 / mipsel_24kc). In-place upgrade `1.0.1-r1 → 1.0.2-r1` succeeded as one signed APK transaction, post-install integrity PASS, other packages and helpers unchanged.
+
+Signed new APK SHA-256: `e823c14e57b191bc770e59213abfb80c883fdbcf2413bae4982481b5d6467ed8`. Exact original signed rollback APK `1.0.1-r1` SHA-256: `bc34bcee7996f5ce40e27ac46a9bb40f290c55a3b53857e14d233c5f30c0a34e`, retained on the office PC (rollback **not** exercised). Current source Makefile version is `1.0.2-r1`. Release evidence: `docs/VECI-XL-V12R-OWNER-DIAGNOSTICS-RELEASE-20261021.md`.
+
+The package owns only the VeCI XL owner-panel JS and two previously installed local helpers. It does **not** contain carrier credentials, change LTE/SMS/USSD, or authenticate to the operator. The new diagnostics UI reports redacted local status; actual operator quota retrieval remains dependent on authorized XL/XLSMART access.
+
+**Release policy:** v12n/v12q/v12r installation and integrity gates are closed. Do not rerun completed builders or office cutovers. Legacy 1.0.0 build instructions below are historical; use the versioned `v12r/` release files for v12r traceability and create a separately versioned owner APK for the next change.
+
+---
+
 # VeCI XL native addon — build source (2026-10-20)
 
 This is a **source-only OpenWrt package definition**, staged for the ZBT WE5927 / ramips/mt76x8 OpenWrt 25.12.5 APK build. It has NOT been compiled into an APK or into a new firmware image. **Do not flash firmware based solely on these files.**
