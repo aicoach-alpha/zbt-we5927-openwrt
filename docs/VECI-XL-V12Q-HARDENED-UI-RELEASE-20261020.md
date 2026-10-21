@@ -47,3 +47,9 @@ Updated pinned office script: `364fd297a6c60626b8ee9d4ccf29ec39a0c8a459`. Update
 The office runner now safely resumes an existing non-symlink directory, compares each existing source file against a separately downloaded immutable GitHub source and refuses mismatches. Updated builder accepts an existing signed output APK **only after** verifying the signature, extracting the APKv3 file payload, comparing the exact three-file manifest, content and mode bits (including web directory 0755). Different or unsafe files fail closed; no office release directory is deleted, and no native APKs are rebuilt. The exact original signed rollback APK SHA-256 `5b418533be9ffdfced4b357bef933934496606f769d400c99df3921116dec486` remains mandatory.
 
 One source-readback and targeted contract check passed. No full regression was repeated. **v12q cutover remains pending office execution and receipt**. Never claim v12q LIVE from these checks alone.
+
+## v12q Docker Desktop Linux Engine guard (2026-10-21)
+
+Office owner executed the previous resumable wrapper; pinned sources were safely reused but Docker CLI failed to connect to `npipe:////./pipe/dockerDesktopLinuxEngine`. Receipt: `XL_V12Q_OFFICE=apk_build_failed`. Failure happened before router SSH/cutover. **Production remains v12n LIVE/PASS; v12q is NOT live.**
+
+Wrapper revision `836eabf733dece84598819fd092d4e38351f6011` checks `docker info --format '{{.OSType}}'` before staging/build. If the Linux engine is down, it attempts to start local Docker Desktop and waits up to 90 seconds. On failure it emits a specific `XL_V12Q_OFFICE=docker_linux_engine_not_ready_check_docker_desktop` and stops before touching router. The previous safe directory resume and exact-original signed rollback guard remain unchanged. The only additional validation was targeted source contract verification; no previously passing tests were repeated. Execute only the revised wrapper, not the old one.
