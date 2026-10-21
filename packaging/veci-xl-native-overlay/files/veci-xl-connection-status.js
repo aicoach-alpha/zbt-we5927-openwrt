@@ -23,6 +23,10 @@ export async function mountXlConnection(root, api) {
   };
   const refreshStatus = button('Refresh Status XL');
   const diagnosticsToggle = button('Lihat Diagnostik XL');
+  const inspectMeter = button('Periksa Data Meter Lokal');
+  const copyDiagnostic = button('Salin Laporan Aman');
+  const copyResult = document.createElement('span');
+  copyResult.setAttribute('aria-live', 'polite');
   const diagnostics = document.createElement('pre');
   diagnostics.hidden = true;
   diagnostics.setAttribute('aria-live', 'polite');
@@ -45,6 +49,12 @@ export async function mountXlConnection(root, api) {
   otpWrap.append(otpInput, submit);
   controls.append(refreshStatus, refreshQuota, logout, diagnosticsToggle);
   host.append(heading, details, official, quota, login, controls, diagnostics);
+  // These controls are only shown with diagnostics, and never trigger carrier auth.
+  const diagnosticActions = document.createElement('div');
+  diagnosticActions.className = 'cellular-actions';
+  diagnosticActions.append(inspectMeter, copyDiagnostic, copyResult);
+  host.append(diagnosticActions);
+  diagnosticActions.hidden = true;
   // Only whitelisted diagnostic states may appear: never print the full RPC
   // response, subscriber number, tokens, session identifiers or exceptions.
   const diagnostic = {
@@ -52,6 +62,7 @@ export async function mountXlConnection(root, api) {
     configured: 'belum_diperiksa',
     session: 'belum_diperiksa',
     quota: 'belum_diperiksa',
+    meter: 'belum_diperiksa',
     advice: 'Tekan Refresh Status XL.'
   };
   const sessionLabels = new Set(['not_connected', 'verified', 'otp_requested', 'pending_profile']);
@@ -61,11 +72,53 @@ export async function mountXlConnection(root, api) {
       'Konfigurasi operator: ' + diagnostic.configured + '\n' +
       'Sesi XL: ' + diagnostic.session + '\n' +
       'Kuota operator: ' + diagnostic.quota + '\n' +
+      'Data Meter lokal (bukan kuota operator): ' + diagnostic.meter + '\n' +
       'Langkah berikutnya: ' + diagnostic.advice;
   };
   diagnosticsToggle.addEventListener('click', () => {
     diagnostics.hidden = !diagnostics.hidden;
     diagnosticsToggle.textContent = diagnostics.hidden ? 'Lihat Diagnostik XL' : 'Tutup Diagnostik XL';
+    diagnosticActions.hidden = diagnostics.hidden;
+  });
+  let meterBusy = false;
+  inspectMeter.addEventListener('click', async () => {
+    // Explicit, read-only local status query. Never contact the operator.
+    if (meterBusy || busy) return;
+    meterBusy = true;
+    inspectMeter.disabled = true;
+    copyResult.textContent = '';
+    diagnostic.meter = 'sedang_diperiksa';
+    showDiagnostics();
+    try {
+      const response = await api.call('veci.meter', 'status', {}, { timeout: 5000 });
+      if (!response || response.carrier_authenticated !== false) {
+        diagnostic.meter = 'status_tidak_valid';
+      } else if (response.state === 'needs_baseline') {
+        diagnostic.meter = 'counter_lokal_sejak_boot';
+      } else if (response.state === 'estimated') {
+        diagnostic.meter = 'estimasi_lokal_bukan_sisa_kuota_operator';
+      } else {
+        diagnostic.meter = 'tidak_tersedia';
+      }
+    } catch {
+      diagnostic.meter = 'rpc_tidak_tersedia';
+    } finally {
+      meterBusy = false;
+      inspectMeter.disabled = false;
+      showDiagnostics();
+    }
+  });
+  copyDiagnostic.addEventListener('click', async () => {
+    const report = 'Diagnostik VeCI XL (tanpa data pribadi)\n' + diagnostics.textContent;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+        throw Error('clipboard_unavailable');
+      }
+      await navigator.clipboard.writeText(report);
+      copyResult.textContent = 'Laporan aman tersalin.';
+    } catch {
+      copyResult.textContent = 'Salin manual teks pada panel diagnostik.';
+    }
   });
   showDiagnostics();
   const say = (title, description) => {
@@ -99,6 +152,8 @@ export async function mountXlConnection(root, api) {
     diagnostic.configured = 'belum_diperiksa';
     diagnostic.session = 'belum_diperiksa';
     diagnostic.quota = 'belum_diperiksa';
+    diagnostic.meter = 'belum_diperiksa';
+    copyResult.textContent = '';
     diagnostic.advice = 'Menunggu status lokal VeCI.';
     showDiagnostics();
     try {
