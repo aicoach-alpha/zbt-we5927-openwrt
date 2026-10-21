@@ -31,17 +31,39 @@ for state in after; do
  chmod 644 "$stage/www/veci/js/lib/veci-xl-connection-status.js"
  chmod 700 "$stage/usr/libexec/veci-xl-quota-session-gate" "$stage/usr/libexec/veci-xl-authorized-config-import"
  file="$DIST/veci-xl-native-overlay-$version-mipsel_24kc.apk"
- [ ! -e "$file" ] || die output_already_exists
- apk mkpkg --files "$stage" \
-  --info name:veci-xl-native-overlay \
-  --info "version:$version" \
-  --info arch:mipsel_24kc \
-  --info origin:veci-xl-native-overlay \
-  --info license:GPL-2.0-only \
-  --info description:VeCI-XL-owner-panel-and-local-session-helpers \
-  --info 'depends:veci-telco-xl-native rpcd jsonfilter' \
-  --sign-key "$KEY" --output "$file" || die apk_build_failed
- apk --keys-dir /keys verify "$file" >/dev/null || die signed_apk_verify_failed
+ if [ -e "$file" ] || [ -L "$file" ]; then
+  [ -s "$file" ] && [ -f "$file" ] && [ ! -L "$file" ] || die existing_archive_unsafe
+  apk --keys-dir /keys verify "$file" >/dev/null || die existing_archive_signature_failed
+  extracted="$(mktemp -d /tmp/veci-xl-v12q-verify.XXXXXX)" || die extraction_stage_failed
+  apk --keys-dir /keys extract --no-chown --destination "$extracted" "$file" >/dev/null ||
+    die existing_archive_extract_failed
+  # Exact three-file, content and mode match; never trust archive filename alone.
+  (cd "$stage" && find . -type f | sort) > /tmp/veci-xl-v12q.expected.$
+  (cd "$extracted" && find . -type f | sort) > /tmp/veci-xl-v12q.actual.$
+  cmp -s /tmp/veci-xl-v12q.expected.$ /tmp/veci-xl-v12q.actual.$ ||
+    die existing_archive_manifest_mismatch
+  rm -f /tmp/veci-xl-v12q.expected.$ /tmp/veci-xl-v12q.actual.$
+  for relative in www/veci/js/lib/veci-xl-connection-status.js usr/libexec/veci-xl-quota-session-gate usr/libexec/veci-xl-authorized-config-import; do
+   cmp -s "$stage/$relative" "$extracted/$relative" || die existing_archive_contents_mismatch
+   [ "$(stat -c %a "$stage/$relative")" = "$(stat -c %a "$extracted/$relative")" ] ||
+     die existing_archive_mode_mismatch
+  done
+  [ "$(stat -c %a "$extracted/www/veci/js/lib")" = 755 ] ||
+    die existing_archive_web_dir_mode_mismatch
+  rm -rf "$extracted"
+  echo XL_V12Q_BUILD=already_valid_signed_archive
+ else
+  apk mkpkg --files "$stage" \
+   --info name:veci-xl-native-overlay \
+   --info "version:$version" \
+   --info arch:mipsel_24kc \
+   --info origin:veci-xl-native-overlay \
+   --info license:GPL-2.0-only \
+   --info description:VeCI-XL-owner-panel-and-local-session-helpers \
+   --info 'depends:veci-telco-xl-native rpcd jsonfilter' \
+   --sign-key "$KEY" --output "$file" || die apk_build_failed
+  apk --keys-dir /keys verify "$file" >/dev/null || die signed_apk_verify_failed
+ fi
  echo "XL_V12Q_$state-SHA256=$(sha256sum "$file" | cut -d ' ' -f1)"
  rm -rf "$stage"
 done
