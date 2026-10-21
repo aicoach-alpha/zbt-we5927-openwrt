@@ -23,3 +23,33 @@ $p="$env:TEMP\veci-xl-v12r.ps1"; curl.exe -fLsS https://raw.githubusercontent.co
 ```
 
 Expected success: `XL_V12R_BUILD=pass`, `XL_V12R_SIGNATURE=pass`, `XL_V12R_SIMULATION=one_overlay_upgrade`, `XL_V12R_RELEASE=installed`, `XL_V12R_INTEGRITY=pass`, `XL_V12R_OFFICE=live_pass`. Stop after any failure; do not repeat `-Apply` blindly. Save the office receipt for the next development cycle.
+
+## Office cutover blocker and targeted repair — 2026-10-21
+
+The owner ran the initial v12r `-Apply` and provided:
+
+```text
+XL_V12R_DOCKER=linux_engine_ready
+XL_V12R_BUILD=pass
+XL_V12R_SIGNATURE=pass
+XL_V12R_NEW_APK_SHA256=e823c14e57b191bc770e59213abfb80c883fdbcf2413bae4982481b5d6467ed8
+XL_V12R_ROLLBACK_APK_SHA256=bc34bcee7996f5ce40e27ac46a9bb40f290c55a3b53857e14d233c5f30c0a34e
+XL_V12R_ERROR=staging_unsafe
+XL_V12R_OFFICE=upgrade_blocked_review_router_receipt
+```
+
+**Root cause:** office wrapper transferred files to `/tmp/veci-xl-v12r-20261021`, whereas the router installer referenced `/tmp/veci-xl-v12r-20261020`. Router stopped at the directory preflight before simulation/upgrade; do not claim production v12r LIVE based on this output.
+
+Targeted changes only:
+
+- Router installer now expects `/tmp/veci-xl-v12r-20261021`: commit `a217a8f789debb13ec0dfa00d07425abb579410e`.
+- Office wrapper pins that exact fixed installer and resumes the existing staging directory only if it has no upgrade backup yet: commit `6f1772465fb9f17f596898e9ec38d16dac5d60ee`.
+- One source contract check PASS: matched paths, no stale staging path, correct pinned revision, verified signed-archive reuse, existing-stage resume, signature/rollback safeguards and one-package scope. **No repeated full tests.**
+
+Run the revised office wrapper against the existing working directory; do **not** delete staging or re-sign already-verified APKs:
+
+```powershell
+$p="$env:TEMP\veci-xl-v12r-staging-fix.ps1"; curl.exe -fLsS https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/6f1772465fb9f17f596898e9ec38d16dac5d60ee/packaging/veci-xl-native-overlay/v12r/build-and-apply-office.ps1 -o $p; if ($LASTEXITCODE -eq 0) { & $p -Apply }
+```
+
+The production baseline remains v12q `veci-xl-native-overlay 1.0.1-r1` until a newer owner terminal receipt shows `XL_V12R_RELEASE=installed`, `XL_V12R_INTEGRITY=pass`, and `XL_V12R_OFFICE=live_pass`. Stop on an unexpected error, do not blindly retry `-Apply`.
