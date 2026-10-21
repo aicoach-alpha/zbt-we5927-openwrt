@@ -9,7 +9,7 @@ $keys = 'C:\veci-build\keys'
 $repo = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/'
 $oldPrefix = $repo + '68491e24b878efdb06f6226ca6ff5d8f0f0e4ba0/packaging/veci-xl-native-overlay/files/'
 $newPrefix = $repo + 'e27eedb235fb98cd4d078839970923b638d20b13/packaging/veci-xl-native-overlay/v12q/files/'
-$buildUrl = $repo + 'b8efa0a72307f265c596a1f412a97cf573e5247d/packaging/veci-xl-native-overlay/v12q/build-in-docker.sh'
+$buildUrl = $repo + '45587266bd67bfe21c13e23964709e50a09fec6c/packaging/veci-xl-native-overlay/v12q/build-in-docker.sh'
 $installUrl = $repo + '140a546a8d5d772dc26b2aa62cc511090f695c86/packaging/veci-xl-native-overlay/v12q/guarded-overlay-install.sh'
 $router = 'root@192.168.1.1'
 $remote = '/tmp/veci-xl-v12q-20261020'
@@ -22,26 +22,69 @@ if (-not (Test-Path -LiteralPath $originalApk -PathType Leaf)) { Fail 'original_
 if ((Get-FileHash -LiteralPath $originalApk -Algorithm SHA256).Hash.ToLowerInvariant() -ne $originalSha256) {
  Fail 'original_signed_rollback_archive_digest_mismatch'
 }
-if (Test-Path -LiteralPath $root) { Fail 'working_directory_exists_review_before_retry' }
+function SafeDirectory([string]$dir) {
+ if (Test-Path -LiteralPath $dir) {
+  $existing = Get-Item -LiteralPath $dir -Force
+  if (-not $existing.PSIsContainer -or
+      ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    Fail 'existing_directory_unsafe'
+  }
+ } else {
+  New-Item -ItemType Directory -Path $dir | Out-Null
+ }
+}
+SafeDirectory $root
 $source = Join-Path $root 'source'
 $before = Join-Path $source 'before'
 $after = Join-Path $source 'after'
 $dist = Join-Path $root 'dist'
-New-Item -ItemType Directory -Path $before,$after,$dist -Force | Out-Null
+foreach ($dir in @($source,$before,$after,$dist)) { SafeDirectory $dir }
+Write-Output 'XL_V12Q_OFFICE_STAGE=resume_safe'
+# Download immutable GitHub source to a separate temporary workspace; never
+# overwrite existing office artifacts, even when previous attempts were partial.
+$tempWork = Join-Path $env:TEMP ('veci-xl-v12q-pinned-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $tempWork | Out-Null
 function Fetch([string]$url,[string]$dest) {
- & curl.exe -fLsS --retry 2 $url -o $dest
- if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $dest -PathType Leaf)) {
+ $temporary = Join-Path $tempWork ([guid]::NewGuid().ToString('N'))
+ & curl.exe -fLsS --retry 2 $url -o $temporary
+ if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $temporary -PathType Leaf)) {
   Fail 'pinned_source_download_failed'
+ }
+ if (Test-Path -LiteralPath $dest) {
+  $existing = Get-Item -LiteralPath $dest -Force
+  if ($existing.PSIsContainer -or
+      ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    Fail 'existing_source_path_unsafe'
+  }
+  if ((Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash -ne
+      (Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash) {
+    Fail 'existing_source_differs_from_pinned_release'
+  }
+  Write-Output ('XL_V12Q_SOURCE=reused_' + [IO.Path]::GetFileName($dest))
+ } else {
+  Copy-Item -LiteralPath $temporary -Destination $dest
  }
 }
 $names = @('veci-xl-connection-status.js','veci-xl-quota-session-gate','veci-xl-authorized-config-import')
 foreach ($name in $names) { Fetch ($oldPrefix + $name) (Join-Path $before $name) }
 Fetch ($newPrefix + 'veci-xl-connection-status.js') (Join-Path $after 'veci-xl-connection-status.js')
 foreach ($name in @('veci-xl-quota-session-gate','veci-xl-authorized-config-import')) {
- Copy-Item -LiteralPath (Join-Path $before $name) -Destination (Join-Path $after $name)
+ $file = Join-Path $after $name
+ $beforeFile = Join-Path $before $name
+ if (Test-Path -LiteralPath $file) {
+  $existing = Get-Item -LiteralPath $file -Force
+  if ($existing.PSIsContainer -or
+      ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+      ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne
+       (Get-FileHash -LiteralPath $beforeFile -Algorithm SHA256).Hash)) {
+    Fail 'existing_helper_source_differs_from_original'
+  }
+ } else {
+  Copy-Item -LiteralPath $beforeFile -Destination $file
+ }
 }
-$build = Join-Path $root 'build-in-docker.sh'
-$install = Join-Path $root 'guarded-overlay-install.sh'
+$build = Join-Path $tempWork 'build-in-docker.sh'
+$install = Join-Path $tempWork 'guarded-overlay-install.sh'
 Fetch $buildUrl $build
 Fetch $installUrl $install
 $smount = 'type=bind,source=' + $source + ',target=/source,readonly'
