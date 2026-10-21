@@ -145,7 +145,7 @@ if (-not $Apply) {
  Write-Output 'XL_V12R_OFFICE=build_pass'
  exit 0
 }
-& ssh $router ('umask 077; if [ -e ' + $remote + ' ]; then exit 5; fi; mkdir -m 700 ' + $remote)
+& ssh $router ('umask 077; if [ -e ' + $remote + ' ]; then [ -d ' + $remote + ' ] && [ ! -L ' + $remote + ' ] && [ ! -e ' + $remote + '/backup ]; else mkdir -m 700 ' + $remote + '; fi')
 if ($LASTEXITCODE -ne 0) { Fail 'router_staging_exists_or_unavailable' }
 & scp -O $newApk $oldApk (Join-Path $keys 'veci-meter-r2-rsa.pem') $install ($router + ':' + $remote + '/')
 if ($LASTEXITCODE -ne 0) { Fail 'router_staging_transfer_failed' }
