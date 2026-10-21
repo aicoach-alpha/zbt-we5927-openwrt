@@ -22,6 +22,11 @@ export async function mountXlConnection(root, api) {
     return el;
   };
   const refreshStatus = button('Refresh Status XL');
+  const diagnosticsToggle = button('Lihat Diagnostik XL');
+  const diagnostics = document.createElement('pre');
+  diagnostics.hidden = true;
+  diagnostics.setAttribute('aria-live', 'polite');
+  diagnostics.setAttribute('aria-label', 'Diagnostik kesiapan XL tanpa data pribadi');
   const refreshQuota = button('Ambil Kuota XL');
   const logout = button('Putuskan Sesi XL');
   const login = document.createElement('div');
@@ -38,8 +43,31 @@ export async function mountXlConnection(root, api) {
   const submit = button('Verifikasi OTP');
   login.append(numberInput, request, otpWrap);
   otpWrap.append(otpInput, submit);
-  controls.append(refreshStatus, refreshQuota, logout);
-  host.append(heading, details, official, quota, login, controls);
+  controls.append(refreshStatus, refreshQuota, logout, diagnosticsToggle);
+  host.append(heading, details, official, quota, login, controls, diagnostics);
+  // Only whitelisted diagnostic states may appear: never print the full RPC
+  // response, subscriber number, tokens, session identifiers or exceptions.
+  const diagnostic = {
+    https: 'belum_diperiksa',
+    configured: 'belum_diperiksa',
+    session: 'belum_diperiksa',
+    quota: 'belum_diperiksa',
+    advice: 'Tekan Refresh Status XL.'
+  };
+  const sessionLabels = new Set(['not_connected', 'verified', 'otp_requested', 'pending_profile']);
+  const showDiagnostics = () => {
+    diagnostics.textContent =
+      'HTTPS: ' + diagnostic.https + '\n' +
+      'Konfigurasi operator: ' + diagnostic.configured + '\n' +
+      'Sesi XL: ' + diagnostic.session + '\n' +
+      'Kuota operator: ' + diagnostic.quota + '\n' +
+      'Langkah berikutnya: ' + diagnostic.advice;
+  };
+  diagnosticsToggle.addEventListener('click', () => {
+    diagnostics.hidden = !diagnostics.hidden;
+    diagnosticsToggle.textContent = diagnostics.hidden ? 'Lihat Diagnostik XL' : 'Tutup Diagnostik XL';
+  });
+  showDiagnostics();
   const say = (title, description) => {
     heading.textContent = title; details.textContent = description;
   };
@@ -67,6 +95,12 @@ export async function mountXlConnection(root, api) {
     busy = true; disable(true); quota.replaceChildren();
     login.hidden = true; refreshQuota.hidden = true; logout.hidden = true;
     say('Memeriksa koneksi XL…', 'Tidak mengirim OTP atau menghubungi operator.');
+    diagnostic.https = 'belum_diperiksa';
+    diagnostic.configured = 'belum_diperiksa';
+    diagnostic.session = 'belum_diperiksa';
+    diagnostic.quota = 'belum_diperiksa';
+    diagnostic.advice = 'Menunggu status lokal VeCI.';
+    showDiagnostics();
     try {
       const s = await api.call('veci.xl', 'status', {}, { timeout: 5000 });
       if (!s || typeof s.session !== 'string' ||
@@ -76,6 +110,20 @@ export async function mountXlConnection(root, api) {
       state.configured = s.operator_configured;
       state.session = s.session;
       state.https = s.https_only;
+      diagnostic.https = s.https_only ? 'siap' : 'diperlukan';
+      diagnostic.configured = s.operator_configured ? 'tersedia' : 'belum_tersedia';
+      diagnostic.session = sessionLabels.has(s.session) ? s.session : 'tidak_dikenal';
+      diagnostic.quota = 'tidak_diperiksa';
+      diagnostic.advice = !s.https_only
+        ? 'Akses antarmuka VeCI melalui HTTPS.'
+        : !s.operator_configured
+          ? 'Gunakan myXL resmi; koneksi native memerlukan izin operator.'
+          : s.session === 'verified'
+            ? 'Buka status kuota operator pada panel.'
+            : s.session === 'otp_requested'
+              ? 'Masukkan OTP hanya jika Anda sendiri memulai login.'
+              : 'Hubungkan akun XL hanya melalui metode operator yang diizinkan.';
+      showDiagnostics();
       if (!s.https_only) {
         say('XL: HTTPS diperlukan', 'Autentikasi hanya tersedia melalui koneksi VeCI HTTPS.');
         return;
@@ -115,13 +163,21 @@ export async function mountXlConnection(root, api) {
         !q.buckets.every(b => validBucket(b, partial))) {
         if (Number.isFinite(age) && age > 1800000 &&
           q?.source === 'operator' && q.state === 'ok') {
+          diagnostic.quota = 'kedaluwarsa';
+          diagnostic.advice = 'Tekan Ambil Kuota XL untuk memperbarui cache jika akun sudah terverifikasi.';
           say('XL: cache kedaluwarsa', 'Tekan Ambil Kuota XL untuk meminta data terbaru.');
         } else {
+          diagnostic.quota = 'tidak_tersedia';
+          diagnostic.advice = 'Lihat sisa kuota di myXL resmi sampai saldo operator terverifikasi.';
           say('XL: kuota resmi belum tersedia',
             'Belum ada saldo operator yang valid di router. Cek melalui myXL resmi bila diperlukan.');
         }
+        showDiagnostics();
         return;
       }
+      diagnostic.quota = partial ? 'terverifikasi_sisa_saja' : 'terverifikasi_lengkap';
+      diagnostic.advice = 'Data operator valid; periksa waktu pengambilan di atas.';
+      showDiagnostics();
       say('XL: kuota operator', 'Data: ' + new Date(t).toLocaleString('id-ID'));
       const list = document.createElement('ul');
       for (const b of q.buckets) {
@@ -134,6 +190,9 @@ export async function mountXlConnection(root, api) {
       }
       quota.append(list);
     } catch {
+      diagnostic.quota = 'tidak_tersedia';
+      diagnostic.advice = 'Tekan Refresh Status XL; jika masih gagal gunakan myXL resmi.';
+      showDiagnostics();
       say('XL: status tidak tersedia', 'Gagal membaca status XL menggunakan sesi VeCI.');
     } finally {
       busy = false; disable(false);
