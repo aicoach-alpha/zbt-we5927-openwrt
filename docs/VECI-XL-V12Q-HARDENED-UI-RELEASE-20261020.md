@@ -33,3 +33,17 @@ Expected success includes `XL_V12Q_BUILD=pass`, `XL_V12Q_SIGNATURE=pass`, `XL_V1
 ## External dependency
 
 This is a UI correctness release, not carrier authentication. `operator_config_required` remains the last observed live state; a supported XLSMART/XL operator API enrollment path and authorized configuration are still required for real remaining quota. Do not invent endpoint credentials, scrape app secrets, or show local data-meter bytes as operator quota.
+
+## v12q office resume fix (2026-10-21)
+
+Observed real office output:
+```
+XL_V12Q_OFFICE=working_directory_exists_review_before_retry
+```
+This guard occurs before signing or router SSH; **there is no evidence of a v12q production deployment**. The existing `C:\veci-build\xl-native-overlay-v12q` must not be deleted blindly.
+
+Updated pinned office script: `364fd297a6c60626b8ee9d4ccf29ec39a0c8a459`. Updated offline Docker builder: `45587266bd67bfe21c13e23964709e50a09fec6c`.
+
+The office runner now safely resumes an existing non-symlink directory, compares each existing source file against a separately downloaded immutable GitHub source and refuses mismatches. Updated builder accepts an existing signed output APK **only after** verifying the signature, extracting the APKv3 file payload, comparing the exact three-file manifest, content and mode bits (including web directory 0755). Different or unsafe files fail closed; no office release directory is deleted, and no native APKs are rebuilt. The exact original signed rollback APK SHA-256 `5b418533be9ffdfced4b357bef933934496606f769d400c99df3921116dec486` remains mandatory.
+
+One source-readback and targeted contract check passed. No full regression was repeated. **v12q cutover remains pending office execution and receipt**. Never claim v12q LIVE from these checks alone.
