@@ -1,0 +1,20 @@
+#!/bin/sh
+
+hostname="$(uci -q get system.@system[0].hostname || true)"
+domain="$(uci -q get dhcp.@dnsmasq[0].domain || true)"
+
+[ -n "$hostname" ] || hostname='veci'
+[ -n "$domain" ] || domain='lan'
+
+case "$hostname" in
+	*.*) cert_name="$hostname" ;;
+	*) cert_name="$hostname.$domain" ;;
+esac
+
+uci -q set uhttpd.defaults.organization='VeCI'
+uci -q set uhttpd.defaults.commonname="$cert_name"
+uci -q set uhttpd.defaults.key_type='ec'
+uci -q set uhttpd.defaults.ec_curve='P-256'
+uci -q commit uhttpd
+
+exit 0

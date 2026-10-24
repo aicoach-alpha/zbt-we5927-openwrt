@@ -1,0 +1,58 @@
+name: VeCI SMS and USSD capability diagnostics (offline)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/veci-cellular-we5927/**'
+      - 'source/we5927-lte/files/usr/sbin/we5927-lte'
+      - 'source/we5927-lte/src/we5927-at.c'
+      - 'tests/test_we5927_at_transport.py'
+      - 'tests/test_veci_modem_sms_ussd.py'
+      - '.github/workflows/veci-modem-diagnostics-ci.yml'
+      - 'docs/VECI-SMS-USSD-READINESS.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veci-modem-diagnostics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Offline AT parser, mocked serial replies, lock and ACL tests
+        run: python3 -m unittest discover -s tests -p 'test_veci_modem_sms_ussd.py' -v
+      - name: Compile and exercise native AT serial transport against fake pseudo-terminal
+        run: python3 -m unittest discover -s tests -p 'test_we5927_at_transport.py' -v
+      - name: Validate existing LTE manager parses before AT integration
+        run: sh -n source/we5927-lte/files/usr/sbin/we5927-lte
+      - name: Verify both build editions stage the audited LTE manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          for edition in general indonesia; do
+            stage="$RUNNER_TEMP/sms-ussd-$edition"
+            mkdir -p "$stage/package"
+            VECI_EDITION="$edition" ./scripts/prepare-veci.sh "$stage"
+            cmp source/we5927-lte/files/usr/sbin/we5927-lte "$stage/package/we5927-lte/files/usr/sbin/we5927-lte"
+            cmp source/veci-cellular-we5927/files/usr/libexec/veci-modem-capabilities "$stage/package/veci-cellular-we5927/files/usr/libexec/veci-modem-capabilities"
+            grep -q '"edition": "'$edition'"' "$stage/package/veci-default-ui/files/etc/veci-release.json"
+            echo "SMS-USSD staged safely: $edition"
+          done
+      - name: Fail closed on any active modem command in probe
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('source/veci-cellular-we5927/files/usr/libexec/veci-modem-capabilities').read_text()
+          allowed=('AT+CMGF=?','AT+CPMS=?','AT+CNMI=?','AT+CUSD=?')
+          assert all(s.count(x)==1 for x in allowed)
+          assert "flock -n -x 9" in s
+          assert "we5927-at.lock" in s
+          assert not any(x in s for x in ('AT+CMGS=', 'AT+CMGL=', 'AT+CMGR=', 'AT+CMGD=', 'AT+CUSD=1,'))
+          print('Only 4 AT capability tests, no SMS/USSD transaction, no router touched')
+          PY

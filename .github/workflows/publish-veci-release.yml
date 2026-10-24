@@ -1,0 +1,293 @@
+name: Publish VeCI firmware release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag, for example veci-v2026.10.09-rc1
+        required: true
+        type: string
+      prerelease:
+        description: Publish as a prerelease
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: veci-release-publish
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Validate release input
+        shell: bash
+        run: |
+          set -eu
+          case "${{ inputs.release_tag }}" in
+            ''|*[!A-Za-z0-9._-]*) echo "Invalid release tag"; exit 1 ;;
+          esac
+
+      - name: Checkout firmware integration
+        uses: actions/checkout@v4
+        with:
+          path: firmware
+          fetch-depth: 0
+
+      - name: Capture immutable release identity
+        shell: bash
+        run: |
+          set -eu
+          BUILD_ID="$(git -C firmware rev-parse HEAD)"
+          echo "BUILD_ID=$BUILD_ID" >> "$GITHUB_ENV"
+          . firmware/source/openwrt-maintenance-pins.env
+          {
+            echo "OPENWRT_COMMIT=$OPENWRT_COMMIT"
+            echo "PACKAGES_COMMIT=$PACKAGES_COMMIT"
+            echo "LUCI_COMMIT=$LUCI_COMMIT"
+            echo "ROUTING_COMMIT=$ROUTING_COMMIT"
+            echo "TELEPHONY_COMMIT=$TELEPHONY_COMMIT"
+            echo "VIDEO_COMMIT=$VIDEO_COMMIT"
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout pinned OpenWrt
+        run: |
+          git clone --filter=blob:none https://github.com/openwrt/openwrt.git openwrt
+          git -C openwrt checkout "$OPENWRT_COMMIT"
+
+      - name: Pin package feeds
+        working-directory: openwrt
+        run: |
+          cat > feeds.conf.default <<EOF
+          src-git packages https://git.openwrt.org/feed/packages.git^$PACKAGES_COMMIT
+          src-git luci https://git.openwrt.org/project/luci.git^$LUCI_COMMIT
+          src-git routing https://git.openwrt.org/feed/routing.git^$ROUTING_COMMIT
+          src-git telephony https://git.openwrt.org/feed/telephony.git^$TELEPHONY_COMMIT
+          src-git video https://github.com/openwrt/video.git^$VIDEO_COMMIT
+          EOF
+
+      - name: Apply WE5927 and VeCI sources
+        run: |
+          set -eu
+          git -C openwrt apply --check "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
+          git -C openwrt apply "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
+          VECI_PUBLISHED_RELEASE=1 firmware/scripts/prepare-veci.sh "$GITHUB_WORKSPACE/openwrt"
+
+      - name: Install pinned VeCI feed dependency closure
+        run: sh firmware/scripts/install-veci-feeds.sh "$GITHUB_WORKSPACE/openwrt"
+
+      - name: Resolve firmware and app-feed configuration
+        working-directory: openwrt
+        run: |
+          set -eu
+          cp ../firmware/source/openwrt-we5927.config .config
+          make defconfig
+          set_module() {
+            symbol="$1"
+            sed -i "/^CONFIG_${symbol}=/d;/^# CONFIG_${symbol} is not set$/d" .config
+            printf 'CONFIG_%s=m\n' "$symbol" >> .config
+          }
+          set_module PACKAGE_sqm-scripts
+          set_module PACKAGE_luci-app-sqm
+          set_module PACKAGE_ddns-scripts
+          set_module PACKAGE_luci-app-ddns
+          set_module PACKAGE_wireguard-tools
+          set_module PACKAGE_luci-proto-wireguard
+          set_module PACKAGE_uspot
+          set_module PACKAGE_uspot-www
+          set_module PACKAGE_veci-app-guest
+          set_module PACKAGE_veci-app-sqm
+          set_module PACKAGE_veci-app-ddns
+          set_module PACKAGE_veci-app-wireguard
+          set_module PACKAGE_veci-app-voucher
+          make defconfig
+          grep -q '^CONFIG_PACKAGE_veci=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-default-ui=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-cellular-we5927=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-update-we5927=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
+          grep -q '^CONFIG_PACKAGE_veci-app-voucher=m' .config
+          grep -q '^CONFIG_SIGNED_PACKAGES=y' .config
+
+      - name: Prepare persistent VeCI firmware signing identity
+        working-directory: openwrt
+        shell: bash
+        env:
+          VECI_SIGNING_KEY_B64: ${{ secrets.VECI_FIRMWARE_SIGNING_KEY_B64 }}
+          VECI_SIGNING_PUB_B64: ${{ secrets.VECI_FIRMWARE_SIGNING_PUB_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$VECI_SIGNING_KEY_B64" || { echo "::error::Missing VECI_FIRMWARE_SIGNING_KEY_B64"; exit 1; }
+          test -n "$VECI_SIGNING_PUB_B64" || { echo "::error::Missing VECI_FIRMWARE_SIGNING_PUB_B64"; exit 1; }
+
+          printf '%s' "$VECI_SIGNING_KEY_B64" | base64 -d > key-build
+          printf '%s' "$VECI_SIGNING_PUB_B64" | base64 -d > key-build.pub
+          chmod 600 key-build
+          chmod 644 key-build.pub
+
+          make package/system/usign/host/compile package/system/ucert/host/compile
+          test -x staging_dir/host/bin/usign
+          test -x staging_dir/host/bin/ucert
+          staging_dir/host/bin/ucert -I -c key-build.ucert -p key-build.pub -s key-build
+
+          KEY_ID="$(staging_dir/host/bin/usign -F -p key-build.pub)"
+          test -n "$KEY_ID"
+          mkdir -p package/veci-update-we5927/files/etc/veci/firmware-keys
+          cp key-build.pub "package/veci-update-we5927/files/etc/veci/firmware-keys/$KEY_ID"
+          echo "VECI_IMAGE_KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
+
+      - name: Build firmware and exact-ABI apps together
+        working-directory: openwrt
+        run: make -j2
+
+      - name: Stage release and matched feed
+        working-directory: openwrt
+        shell: bash
+        run: |
+          set -eu
+          TAG="${{ inputs.release_tag }}"
+          RELEASE="$GITHUB_WORKSPACE/release-output"
+          FEED="$GITHUB_WORKSPACE/release-feed"
+          mkdir -p "$RELEASE" "$FEED/targets/ramips/mt76x8" "$FEED/packages/mipsel_24kc"
+
+          IMAGE="$(find bin/targets/ramips/mt76x8 -maxdepth 1 -type f -name '*zbt-we5927*sysupgrade.bin' | head -n 1)"
+          MANIFEST="$(find bin/targets/ramips/mt76x8 -maxdepth 1 -type f -name '*zbt-we5927*.manifest' | head -n 1)"
+          test -n "$IMAGE"
+          test -f "$IMAGE"
+          test -n "$MANIFEST"
+          test -f "$MANIFEST"
+
+          CERT="$GITHUB_WORKSPACE/veci-image.ucert"
+          rm -f "$CERT"
+          staging_dir/host/bin/fwtool -q -s "$CERT" "$IMAGE"
+          test -s "$CERT"
+          mkdir -p "$GITHUB_WORKSPACE/veci-image-keys"
+          cp key-build.pub "$GITHUB_WORKSPACE/veci-image-keys/$VECI_IMAGE_KEY_ID"
+          staging_dir/host/bin/fwtool -q -T -s /dev/null "$IMAGE" | \
+            staging_dir/host/bin/ucert -V -m - -c "$CERT" -P "$GITHUB_WORKSPACE/veci-image-keys"
+
+          FW_NAME="veci-we5927-${TAG}-sysupgrade.bin"
+          cp "$IMAGE" "$RELEASE/$FW_NAME"
+          cp "$MANIFEST" "$RELEASE/veci-we5927-${TAG}.manifest"
+          sha256sum "$RELEASE/$FW_NAME" > "$RELEASE/SHA256SUMS"
+          FW_SIZE="$(wc -c < "$RELEASE/$FW_NAME" | tr -d '[:space:]')"
+          FW_SHA="$(awk '{print $1}' "$RELEASE/SHA256SUMS")"
+          MAX=$((7808 * 1024))
+          test "$FW_SIZE" -le "$MAX"
+
+          cp -a bin/targets/ramips/mt76x8/packages "$FEED/targets/ramips/mt76x8/"
+          for name in base luci packages routing telephony video; do
+            if [ -d "bin/packages/mipsel_24kc/$name" ]; then
+              cp -a "bin/packages/mipsel_24kc/$name" "$FEED/packages/mipsel_24kc/"
+            fi
+          done
+
+          test "$(find "$FEED" -name packages.adb -type f | wc -l)" -ge 2
+          test "$(find "$FEED" -name 'veci-app-guest-*.apk' -type f | wc -l)" -ge 1
+          test "$(find "$FEED" -name 'veci-app-sqm-*.apk' -type f | wc -l)" -ge 1
+          test "$(find "$FEED" -name 'veci-app-ddns-*.apk' -type f | wc -l)" -ge 1
+          test "$(find "$FEED" -name 'veci-app-wireguard-*.apk' -type f | wc -l)" -ge 1
+          test "$(find "$FEED" -name 'veci-app-voucher-*.apk' -type f | wc -l)" -ge 1
+
+          KEY_COUNT="$(find build_dir -path '*/root-*/etc/apk/keys/*' -type f 2>/dev/null | wc -l)"
+          test "$KEY_COUNT" -ge 1
+
+          {
+            echo "RELEASE_TAG=$TAG"
+            echo "FW_NAME=$FW_NAME"
+            echo "FW_SIZE=$FW_SIZE"
+            echo "FW_SHA=$FW_SHA"
+          } >> "$GITHUB_ENV"
+
+      - name: Create GitHub release with exact firmware
+        shell: bash
+        run: |
+          set -eu
+          args=(release create "$RELEASE_TAG"
+            "release-output/$FW_NAME"
+            "release-output/veci-we5927-$RELEASE_TAG.manifest"
+            "release-output/SHA256SUMS"
+            --target "$BUILD_ID"
+            --title "VeCI WE5927 $RELEASE_TAG"
+            --notes "VeCI firmware release built together with its exact-ABI signed Router Apps feed. Build ID: $BUILD_ID")
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            args+=(--prerelease)
+          else
+            args+=(--latest)
+          fi
+          gh "${args[@]}"
+
+      - name: Checkout app-feed publication branch
+        uses: actions/checkout@v4
+        with:
+          ref: app-feed
+          path: publish
+          fetch-depth: 0
+
+      - name: Publish exact-build feed and release channel
+        shell: bash
+        run: |
+          set -eu
+          DEST="$GITHUB_WORKSPACE/publish/feeds/$BUILD_ID"
+          rm -rf "$DEST"
+          mkdir -p "$DEST"
+          cp -a "$GITHUB_WORKSPACE/release-feed/." "$DEST/"
+
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            RELEASE_CHANNEL='prerelease'
+            CHANNEL_FILE='channel-prerelease.json'
+          else
+            RELEASE_CHANNEL='stable'
+            CHANNEL_FILE='channel-stable.json'
+          fi
+          export RELEASE_CHANNEL
+          export CHANNEL_PATH="$GITHUB_WORKSPACE/publish/$CHANNEL_FILE"
+          export FW_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$FW_NAME"
+          export NOTES_URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG"
+          python3 - <<'PY'
+          import json, os
+          data = {
+              "schema": 1,
+              "channel": os.environ["RELEASE_CHANNEL"],
+              "available": True,
+              "version": os.environ["RELEASE_TAG"],
+              "build_id": os.environ["BUILD_ID"],
+              "published_at": os.environ.get("GITHUB_RUN_ID", ""),
+              "supported_devices": ["zbtlink,zbt-we5927", "zbt-we5927"],
+              "board": "zbtlink,zbt-we5927",
+              "target": "ramips/mt76x8",
+              "firmware_url": os.environ["FW_URL"],
+              "sha256": os.environ["FW_SHA"],
+              "size": int(os.environ["FW_SIZE"]),
+              "signed": True,
+              "signing_key_id": os.environ["VECI_IMAGE_KEY_ID"],
+              "notes_url": os.environ["NOTES_URL"],
+              "app_feed_base_url": f"https://raw.githubusercontent.com/{os.environ['GITHUB_REPOSITORY']}/app-feed/feeds/{os.environ['BUILD_ID']}",
+          }
+          with open(os.environ["CHANNEL_PATH"], "w", encoding="utf-8") as f:
+              json.dump(data, f, indent=2)
+              f.write("\n")
+          PY
+
+          cd "$GITHUB_WORKSPACE/publish"
+          git config user.name "VeCI Release Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add "feeds/$BUILD_ID" "$CHANNEL_FILE"
+          git commit -m "Publish VeCI feed $RELEASE_TAG ($BUILD_ID)"
+          git push origin app-feed
+
+      - name: Upload release audit bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: "veci-release-${{ inputs.release_tag }}"
+          path: |
+            release-output/
+            publish/channel-*.json
+          retention-days: 30

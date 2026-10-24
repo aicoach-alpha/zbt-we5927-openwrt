@@ -1,0 +1,12 @@
+{
+	"schema": 1,
+	"channel": "stable",
+	"available": false,
+	"supported_devices": [
+		"zbtlink,zbt-we5927",
+		"zbt-we5927"
+	],
+	"board": "zbtlink,zbt-we5927",
+	"target": "ramips/mt76x8",
+	"message": "No public VeCI firmware release has been published yet."
+}

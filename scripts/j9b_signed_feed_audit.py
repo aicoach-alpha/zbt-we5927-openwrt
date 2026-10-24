@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""J9B offline, signature-first feed audit. Operates ONLY on disposable CI files."""
+import argparse
+import json
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+from j9_offline_audit import IMAGE, APPS, INDEXES
+
+def invoke(args, timeout=90):
+    try:
+        p = subprocess.run(list(map(str, args)), capture_output=True, text=True, timeout=timeout)
+        return {"ok":p.returncode == 0, "exit":p.returncode, "message":" | ".join((p.stderr or p.stdout).splitlines()[-3:])[:400]}
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"ok":False, "exit":-1, "message":type(e).__name__}
+
+def squashfs_offset(image):
+    data = Path(image).read_bytes()
+    offsets = [m.start() for m in re.finditer(b"hsqs",data)]
+    if len(offsets)!=1:
+        raise ValueError("Ambiguous or absent SquashFS header")
+    return offsets[0]
+
+def check_group(results):
+    if not results:
+        return "NOT_TESTED"
+    return "PASS" if all(r["ok"] for r in results) else "BLOCKED"
+
+def audit(firmware,feed,apk,run_id,unsquashfs="/usr/bin/unsquashfs"):
+    firmware,feed,apk=Path(firmware).resolve(),Path(feed).resolve(),Path(apk).resolve()
+    if not re.fullmatch(r"[0-9]{6,15}",str(run_id)):
+        raise ValueError("Invalid J8c run identifier")
+    image=firmware/IMAGE
+    if not image.is_file() or not apk.is_file() or not Path(unsquashfs).is_file():
+        raise ValueError("Required image, apk verifier, or SquashFS reader unavailable")
+    selected=[feed/x for x in INDEXES]
+    for name in ("veci-app-"+n for n in APPS):
+        candidates=[p for p in feed.rglob("*.apk") if p.name.startswith(name+"-")]
+        if len(candidates)!=1:
+            raise ValueError("Missing/duplicate app: "+name)
+        selected+=candidates
+    for name in ("kmod-wireguard","kmod-sched-cake"):
+        candidates=[p for p in feed.rglob("*.apk") if p.name.startswith(name+"-")]
+        if len(candidates)!=1:
+            raise ValueError("Missing/duplicate kmod: "+name)
+        selected+=candidates
+    if any(not p.is_file() for p in selected):
+        raise ValueError("One or more requested APK indexes are absent")
+    result={"j9b":"EXECUTED","j8c_run_id":str(run_id),"release_decision":"NO_GO",
+            "signature":"NOT_TESTED","solver":"NOT_TESTED","metadata":"NOT_TESTED",
+            "keys":"NOT_TESTED","detail":{}}
+    with tempfile.TemporaryDirectory(prefix="j9b-ci-") as scratch:
+        root=Path(scratch)/"root"
+        extracted=invoke([unsquashfs,"-quiet","-o",str(squashfs_offset(image)),
+                          "-d",str(root),str(image),"etc/apk","lib/apk"],150)
+        result["detail"]["squashfs"]=extracted
+        if not extracted["ok"]:
+            result["keys"]="BLOCKED"
+            return result
+        keydir=root/"etc/apk/keys"
+        keys=list(keydir.glob("*")) if keydir.is_dir() else []
+        keys=[p for p in keys if p.is_file() and p.stat().st_size>0]
+        result["detail"]["firmware_key_count"]=len(keys)
+        result["detail"]["firmware_key_extensions"] = sorted(set(x.suffix for x in keys))
+        result["keys"]="PASS" if keys else "BLOCKED"
+        metadata=[invoke([apk,"adbdump","--format","json",p],20) for p in selected]
+        result["metadata"]=check_group(metadata)
+        result["detail"]["metadata_valid"]=sum(x["ok"] for x in metadata)
+        if keys:
+            # OpenWrt APKv3 uses trusted, signed package INDEXES. The indexed
+            # packages need not carry their own separate signature: apk's
+            # repository transaction must validate index membership/hash.
+            indexes=[feed/x for x in INDEXES]
+            verified=[invoke([apk,"--keys-dir",keydir,"verify",p],20) for p in indexes]
+            result["signature"]=check_group(verified)
+            result["detail"]["signed_indexes_valid"]=sum(x["ok"] for x in verified)
+            result["detail"]["signed_indexes_tested"]=len(verified)
+            result["detail"]["index_signature_errors"]=[x["message"] for x in verified if not x["ok"]][:3]
+            # Individual package signatures are informational only.
+            # Some OpenWrt builds sign indexes, not each .apk separately.
+            optional=[invoke([apk,"--keys-dir",keydir,"verify",p],20) for p in selected[4:]]
+            result["detail"]["individual_package_signatures"]=sum(x["ok"] for x in optional)
+            result["detail"]["individual_package_count"]=len(optional)
+        if result["signature"]!="PASS" or result["metadata"]!="PASS":
+            result["detail"]["solver_note"]="Blocked by missing trusted signed indexes or invalid APKv3 metadata"
+            return result
+        # Host apk must see absolute local paths to the signed indexes;
+        # file:///j9b-feed points to the wrong filesystem with --root.
+        repo_file=Path(scratch)/"j9b-repositories.list"
+        repo_file.write_text("".join(str(feed/n)+"\n" for n in INDEXES))
+        result["detail"]["repository_probe"]=invoke([
+            apk,"--keys-dir",keydir,"--repositories-file",repo_file,
+            "--no-network","search","veci-app-guest"],20)
+        simulations=[]
+        for name in APPS:
+            simulations.append(invoke([apk,"--root",root,"--keys-dir",keydir,
+                "--repositories-file",str(repo_file),"--no-network",
+                "--simulate","add","--initdb","veci-app-"+name],75))
+        result["solver"]=check_group(simulations)
+        result["detail"]["solver_passed"]=sum(x["ok"] for x in simulations)
+        result["detail"]["solver_failure_examples"]=[x["message"] for x in simulations if not x["ok"]][:3]
+
+        # Offline fetch reads actual APK payloads by their SIGNED index entry.
+        # The verifier checks the indexed content digest; this is a safer
+        # authenticity test than standalone signature validation for OpenWrt.
+        out=Path(scratch)/"fetched"
+        out.mkdir()
+        names=["veci-app-"+x for x in APPS]+["kmod-wireguard","kmod-sched-cake"]
+        payload=[invoke([apk,"--keys-dir",keydir,"--repositories-file",
+                        str(repo_file),"--no-network","fetch",
+                        "--output",out,name],75) for name in names]
+        result["package_content"]=check_group(payload)
+        result["detail"]["content_verified"]=sum(x["ok"] for x in payload)
+        result["detail"]["content_failure_examples"]=[x["message"] for x in payload if not x["ok"]][:3]
+        return result
+
+def main():
+    p=argparse.ArgumentParser()
+    for name in ("firmware","feed","apk","run-id"):
+        p.add_argument("--"+name,required=True)
+    p.add_argument("--report",default="j9b-report.json")
+    a=p.parse_args()
+    try:
+        report=audit(a.firmware,a.feed,a.apk,a.run_id)
+    except (OSError,ValueError) as e:
+        report={"j9b":"AUDIT_ERROR","release_decision":"NO_GO","error":str(e)}
+    Path(a.report).write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
+    print(json.dumps(report,indent=2,sort_keys=True))
+    return 0 if report["j9b"]=="EXECUTED" else 2
+
+if __name__=="__main__":
+    sys.exit(main())

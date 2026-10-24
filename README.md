@@ -78,6 +78,20 @@ optional SIM failover (only when explicitly enabled)
 
 The goal is to avoid unnecessary full router reboots and avoid power-cycling the modem for a single transient packet loss event.
 
+## VeCI default GUI
+
+The next firmware generation is being developed with **VeCI** as the default everyday web interface. VeCI is maintained as a separate, reusable OpenWrt project at https://github.com/aicoach-alpha/veci and follows the same visual language as CoachAssist / vervue.my.id.
+
+Firmware integration is deliberately layered:
+
+- VeCI Core remains generic and reads the real router model from OpenWrt `system.board` data;
+- `veci-default-ui` makes VeCI the default landing page without deleting LuCI;
+- LuCI remains available under **Expert** as a compatibility/recovery interface;
+- `veci-cellular-we5927` exposes the existing tested LTE manager through VeCI's generic cellular API, without duplicating modem logic;
+- IMEI/ICCID are not forwarded into the generic VeCI cellular API.
+
+See [`docs/VECI.md`](docs/VECI.md) for architecture, source pinning and release gates. The currently published RC1 binary is still the recovery baseline until the VeCI-enabled firmware passes full build and live-router validation.
+
 ## LuCI LTE page
 
 The custom LuCI page exposes:
