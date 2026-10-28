@@ -1,5 +1,8 @@
 # VeCI XL Native Overlay — Production release baseline
 
+> **RETIRED / DO NOT DEPLOY (2026-10-28):** User cancelled native XL carrier-quota and USSD functionality. v12s 1.0.3 was never confirmed LIVE and must not be deployed. Preserve signed v12r 1.0.2 rollback history until v13 removal passes one integrity gate. Source capture and the v13 login/top-navigation work are tracked at `docs/VECI-V13-LOGIN-TOP-NAV-SIMPLIFICATION-20261028.md`. Data Meter local is retained.
+
+
 ## Next candidate v12s (2026-10-21): source ready, production pending
 
 The package Makefile and canonical owner-panel source now target `1.0.3-r1` (on-demand Data Meter diagnostics plus sanitized copyable report), but **the last verified router installation is still `1.0.2-r1` from v12r**. Do not mistake this source update for a live cutover. Build and gated deployment instructions: `docs/VECI-XL-V12S-LOCAL-METER-DIAGNOSTICS-20261021.md`. The signed `1.0.2-r1` APK from v12r is the only approved rollback archive; the 1.0.2 production release must not be rebuilt. Carrier-authenticated XL quota remains unavailable without permitted operator access.
