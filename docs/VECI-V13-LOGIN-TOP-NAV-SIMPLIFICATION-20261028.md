@@ -76,3 +76,26 @@ Owner reports that VeCI still displays `session.login timed out`. Previous audit
 One read-only office helper is committed: `scripts/veci-v13-login-timeout-triage-office-20261028.ps1` (commit `47d65ddc626b1cd5154223ca7b13f32d2c6df32d`). It reads only the previously captured static frontend tar.gz (SHA-256 `1813a12623758fe662eda06eb7c90a4dbbfb85572304ec4b4551381d928b3e15`) and prints bounded source windows for `veci/js/lib/api.js`, `veci/js/app.js`, `veci/index.html`. It runs **one** synthetic `session.login` request over router-local HTTPS using an intentionally nonexistent username and invalid dummy password, reporting only HTTP timing and JSON-RPC status code. This does not use or print the user's password, cannot create a valid login session, and never restarts services or changes router files. A synthetic denial is diagnostic of RPC responsiveness only, not a successful authentication path for a genuine account.
 
 No login patch has been applied or verified yet. The subsequent patch must be grounded in the exact login controller source and probe receipt, should preserve login security, and should be deployed with a rollback and one focused integrity check. Do not reset router passwords or restart `rpcd` speculatively.
+
+## 2026-10-28 — Login timeout confirmed at RPC method, conditional repair source prepared
+
+User's actual office capture of frontend source:
+
+- `veci/js/lib/api.js` uses `fetch('/ubus')` with `AbortController` default 10,000 ms; a client-side abort becomes `session.login timed out`.
+- `veci/js/app.js` directly awaits `this.api.login(username,password)` and displays the error.
+- A synthetic **nonexistent username + invalid password** sent directly to `https://192.168.1.1/ubus` received **HTTP 200 response headers but no JSON body within 12.003 seconds** (`curl exit=28`). Thus blindly increasing JS timeout is not the appropriate first fix; the auth method/HTTP bridge is unresponsive.
+- OpenWrt `ubus -t <seconds>` is a built-in bounded CLI probe, unlike the absent standalone `timeout` executable. OpenWrt rpcd's session login should promptly return status 6/Permission denied for an unknown user, without a costly root password hash operation.
+
+Corrective implementation:
+
+- Router: `scripts/veci-v13-conditional-login-recovery-20261028.sh`. One `ubus -t 4` synthetic invalid login distinguishes local RPC denied_fast vs timeout. When local RPC truly times out, it permits **one `rpcd` restart**, then a single post-check. If local RPC is already responsive, preserve rpcd and existing sessions. It refuses auto-restart for unknown local outcomes. The HTTP bridge may be restarted separately only when RPC is confirmed responsive.
+- Office: `scripts/veci-v13-conditional-login-recovery-office-20261028.ps1` pinned to router script at `81587bebec2d8af410ef1f7f41dac6222dd71997`. Makes one HTTPS synthetic login check, conditionally restarts only `uhttpd` when the RPC is good but HTTP call times out, then one post-check. No password entry, no account changes, no service-wide reboot, no LTE or modem changes, no firmware or package writes. A `rpcd` restart will invalidate prior ubus sessions; a `uhttpd` restart will briefly interrupt web requests.
+- Offline shell syntax test and one focused source-integrity check passed. **Not yet executed against production**; do not claim successful login before the owner applies it and tests the real user login once.
+
+Owner PowerShell command:
+
+```powershell
+$p="$env:TEMP\veci-v13-auth-recover.ps1"; curl.exe -fLsS https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/d0e1a5d7eef8176b0eca61884aac4143d7794f4f/scripts/veci-v13-conditional-login-recovery-office-20261028.ps1 -o $p; if ($LASTEXITCODE -eq 0) { & $p }
+```
+
+Receipt `VECI_AUTH_OFFICE=rpc_path_pass` means only that the dummy account is rejected quickly through the end-to-end RPC route. It does **not** prove real login credentials or the full frontend work. If real login still fails, inspect that specific case and the captured frontend source without repeated router restarts. The top-nav and XL quota/USSD retirement remain pending after authentication recovery.
