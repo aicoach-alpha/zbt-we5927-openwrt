@@ -17,6 +17,10 @@ echo VECI_V13W_STAGE=started
 [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail wrong_router
 grep -Fqx "DISTRIB_RELEASE='25.12.5'" /etc/openwrt_release || fail wrong_firmware
 [ -s "$CFG" ] && [ -f "$CFG" ] && [ ! -L "$CFG" ] && [ -x "$SVC" ] || fail missing_http_config_or_service
+# Do not race a previous interrupted shell that has not actually exited.
+if ps w 2>/dev/null | grep -E '[v]eci-v13[uv]-lan-http-login-20261028[.]sh|[v]eci-v13v-http-no-auth-blocker-20261028[.]sh' >/dev/null 2>&1; then
+ fail previous_cutover_process_still_running
+fi
 echo VECI_V13W_STAGE=local_file_preflight_pass
 if [ -e "$OLD_U" ] || [ -L "$OLD_U" ] || [ -e "$OLD_V" ] || [ -L "$OLD_V" ]; then
  echo VECI_V13W_PREVIOUS_BACKUP=present
