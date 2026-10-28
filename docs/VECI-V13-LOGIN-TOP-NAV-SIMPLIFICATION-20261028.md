@@ -112,3 +112,16 @@ Implementation:
 - Browser HTTPS-Only/HSTS policies may still upgrade \`http://\` locally. Test with the literal \`http://192.168.1.1/veci/\` URL on a trusted LAN. If direct internal ubus still stalls, the problem is **not solely HTTPS**; examine the auth backend rather than rewriting frontend fetch code.
 
 This is a source-ready office cutover script, **not evidence of live HTTP configuration or successful VeCI login**. Owner receipt required. No package upgrade, firmware flash or repeat of prior LTE/UI UAT.
+
+## v13u SSH stall and v13v nonblocking replacement — 2026-10-28
+
+The owner attempted the v13u office `-Action Apply`, got SSH root password prompt after successful SCP and then reported **stuck before any installer receipt**. No `VECI_LOGIN_DIRECT_UBUS_CHECK`, `VECI_V13U_HTTP_LISTEN` or `VECI_V13U_RELEASE` was observed. **Production HTTP state is unknown**, not accepted.
+
+The v13u router script attempted direct `ubus session.login` before applying HTTP configuration, despite that same authentication method already having timed out over HTTPS after a targeted `rpcd` restart. That call was not an appropriate deployment prerequisite. It was not proven to be the precise stall location because the router script did not output any early progress marker. Avoid making that claim.
+
+**Stop/abandon the old v13u SSH run with Ctrl+C; do not replay it.** Corrected candidate v13v:
+- `scripts/veci-v13v-http-no-auth-blocker-20261028.sh`: emits an immediate start marker, never calls `ubus` or tests login during HTTP reconfiguration. Before changes, detects old v13u backup and current config. If already correctly configured and uhttpd running, returns without a restart. If prior backup exists but current HTTP configuration is incomplete, **fails closed** to avoid overriding a partial old transaction. Otherwise stores original uhttpd config, binds HTTP on LAN `192.168.1.1:80`, disables forced HTTPS redirect, preserves HTTPS listener, restarts only uhttpd once, checks configuration and process, and provides `--rollback`.
+- `scripts/veci-v13v-http-office-20261028.ps1`: stages the exact new script, runs `sh -n` before execution, then performs **one anonymous GET** of `http://192.168.1.1/veci/` with bounded timeout. This proves only local HTTP page delivery, not actual login.
+- Source readback/contract checks passed for scope, staging pin, backup order, no `ubus session.login` calls, no `rpcd` or LTE restart, HTTPS retention and status-first handling. **No successful deployment or router integrity receipt has yet been observed.**
+
+If the new script remains stuck before `VECI_V13V_STAGE=started_no_ubus`, focus on SSH command launch/authentication, not `ubus`. If it reaches an error/backup guard, stop and inspect that single state rather than running a second blind apply. The original login timeout may remain even when HTTP is reachable; fix the real auth backend separately. Restore HTTPS as the preferred transport after the authenticated login path is repaired because HTTP sends passwords without encryption.
