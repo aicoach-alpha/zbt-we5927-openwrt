@@ -45,6 +45,7 @@ if [ "$MODE" = recover-rpcd ]; then
  [ "$before" = timeout ] || fail rpcd_not_confirmed_hung_no_restart
  echo VECI_AUTH_RPCD=one_targeted_restart
  /etc/init.d/rpcd restart || fail rpcd_restart_command_failed
+ sleep 2
  after="$(probe_local)"
  echo "VECI_AUTH_LOCAL=$after"
  [ "$after" = denied_fast ] || fail rpcd_login_still_unresponsive
