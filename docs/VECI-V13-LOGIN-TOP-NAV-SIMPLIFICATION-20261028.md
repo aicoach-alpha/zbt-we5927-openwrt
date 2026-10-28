@@ -234,3 +234,31 @@ Upstream OpenWrt rpcd `session.c`, `rpc_handle_login()` and `rpc_login_test_logi
 Committed **one bounded read-only audit** at `scripts/veci-v13y-bounded-auth-uci-diagnose-20261028.sh` (commit `3d7e20a634031ce0cf4999638f9b6de03952d44f`). It counts rpcd login section/option presence without printing usernames, passwords, shadow hashes, tokens or sessions; checks rpcd process presence; then executes exactly three bounded `uci` operations, reporting `completed_rc_*` or `timed_out_terminated`, with exact child-only signal termination, not broad process kills or daemon restarts. This is not a production mutation; final output requires `VECI_V13Y_PRODUCTION=unchanged`.
 
 Only after this receipt should the repair target the observed fault: malformed/missing UCI rpcd config or stalled UCI read, versus another internal rpcd/auth path. Preserve original authentication configuration and credentials; use backup + atomic repair and one final login integrity test. Do not insert a password bypass, create shared/blank credentials or make the router administration accessible from WAN. LAN HTTP is intentionally plaintext and should be limited to a trusted private network.
+
+## v13y complete — UCI reads are healthy, isolate rpcd login branch (2026-10-28)
+
+User's real v13y audit receipt:
+
+```text
+VECI_V13Y_RPCD_CONFIG_BYTES=172
+VECI_V13Y_RPCD_LOGIN_SECTIONS=1
+VECI_V13Y_RPCD_USERNAME_OPTION_COUNT=1
+VECI_V13Y_RPCD_PASSWORD_OPTION_COUNT=1
+VECI_V13Y_RPCD_PROCESS=running
+VECI_V13Y_CHECK_rpcd_uci=completed_rc_0
+VECI_V13Y_CHECK_network_uci=completed_rc_0
+VECI_V13Y_CHECK_uhttpd_uci=completed_rc_0
+VECI_V13Y_PRODUCTION=unchanged
+```
+
+This **falsifies** the earlier simplistic claim that plain command-line UCI reads are stalled. The root cause of `session.login timed out` remains open. Do not change credentials, reset ACLs, reinstall packages, restart services, re-apply v13x, or extend the browser timeout based solely on this receipt.
+
+Upstream OpenWrt rpcd `session.c` shows the login handler immediately rejects missing username/password with invalid argument; for a structurally complete request, it runs `rpc_login_test_login`, loads the UCI `rpcd` package and compares username before password/shadow/crypt. One focused diagnostic distinguishes method dispatch from the credential lookup branch:
+
+- New `scripts/veci-v13z-local-login-path-isolation-20261028.sh` (commit `be352afbb3bccd788fa065fa85c36d82e517ab74`).
+- Direct local `ubus session login '{}'` (must return quickly as invalid argument, without UCI).
+- Only if the empty-argument call completes, one direct local `ubus session login` with an intentionally nonexistent account and invalid dummy password, which cannot authenticate or create a session. No account credentials are read or printed.
+- Each call has a ubus `-t 4` timeout and an independent 5-second shell watchdog with TERM of only its own spawned child; stops rather than issuing more calls if the first request stalls. The output is only status and exit code, never response payload, passwords or session tokens.
+- If both direct calls return while HTTP/HTTPS login times out, investigate `uhttpd-mod-ubus` bridging. If empty arguments return but nonexistent-user lookup stalls, concentrate on rpcd's credential lookup context. If even empty arguments stall, inspect rpcd event-loop/ubus dispatch rather than the UCI data or crypt hash. A valid-user password/hash path is not tested.
+
+Source is ready but not run on router. No mutation, no successful login claim. Leave HTTP reachable; local HTTP is plaintext. The future fix should have a backup and **one real login verification** without printing credentials.
