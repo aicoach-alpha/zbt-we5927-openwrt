@@ -196,3 +196,31 @@ The router script fails closed if old backup/staged files are present or the cur
 The exact AWK transformation was tested once on a fixture matching the audit's `uhttpd` listener and redirect directives, preserving the two HTTPS listeners and adding one LAN HTTP listener. The release source contract includes exact-PID kill scope, backup order, no UCI/network RPC calls, one restart and one final HTTP GET. This is **source-ready only**, not proven deployed until the owner returns `VECI_V13X_INTEGRITY=pass` and `VECI_V13X_HTTP=reachable`.
 
 Separate outstanding root cause: `session.login` has timed out despite an `rpcd` restart. HTTP listener delivery does **not** fix or prove a real authenticated session. Keep actual account credentials out of scripts and diagnostics; investigate authenticated rpcd configuration separately after clearing orphan processes. HTTP sends credentials in plaintext on LAN.
+
+## Owner-verified v13x production success — 2026-10-28 17:14 WIB
+
+The owner's office PowerShell output **confirmed actual live HTTP cutover**:
+
+```text
+VECI_V13X_OLD_v13u=verified_orphan_pid_6052
+VECI_V13X_OLD_v13v=verified_orphan_pid_6081
+VECI_V13X_OLD_PROCESSES=cleared
+VECI_V13X_STAGE=backup_original
+VECI_V13X_STAGE=commit_http_config
+VECI_V13X_STAGE=restart_uhttpd_only
+VECI_V13X_HTTP_LISTEN=192.168.1.1:80
+VECI_V13X_TLS_LISTENER=retained
+VECI_V13X_LTE=unchanged
+VECI_V13X_INTEGRITY=pass
+VECI_V13X_HTTP_CONFIG=applied
+VECI_V13X_HTTP_PAGE=http=200;seconds=0.727348;redirect=
+VECI_V13X_HTTP=reachable
+VECI_V13X_LOGIN=not_yet_verified
+VECI_V13X_OFFICE=http_cutover_integrity_pass
+```
+
+**Status: HTTP access LIVE/PASS**, no redirect; old orphan processes cleared; HTTPS listener retained; LTE untouched. The original uhttpd configuration is backed up at `/etc/config/uhttpd.veci-v13x-original-20261028`. **Do not repeat any HTTP installer or kill the same PIDs again.** Separately, login status is **not yet verified**. Earlier HTTPS dummy `session.login` timed out even after rpcd restart. No actual VeCI credential has been tested successfully, and HTTP availability is not proof of authentication.
+
+### Root-cause priority
+
+OpenWrt `rpcd/session.c` uses `uci_alloc_context()` and `rpc_login_test_login()` followed by `uci_load(uci, "rpcd", ...)` before responding even to an invalid username. Both the frontend 10 s and curl HTTPS 12 s timeouts are therefore consistent with (though do not prove) a blocked UCI authentication configuration read. Earlier v13v stopped after printing HTTP UCI state and before `VECI_V13V_STAGE=backing_up`, at source lines that perform more `uci -q get` calls. The observed pair suggests investigating the UCI/rpcd configuration and any hung `uci` processes using one bounded read-only diagnostic, not repeating service restarts, HTTP cutovers or false frontend timeouts. Restrict diagnostics to counts/modes/process states; never expose auth hashes, tokens or actual user credentials.
