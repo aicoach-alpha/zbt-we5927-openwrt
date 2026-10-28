@@ -125,3 +125,22 @@ The v13u router script attempted direct `ubus session.login` before applying HTT
 - Source readback/contract checks passed for scope, staging pin, backup order, no `ubus session.login` calls, no `rpcd` or LTE restart, HTTPS retention and status-first handling. **No successful deployment or router integrity receipt has yet been observed.**
 
 If the new script remains stuck before `VECI_V13V_STAGE=started_no_ubus`, focus on SSH command launch/authentication, not `ubus`. If it reaches an error/backup guard, stop and inspect that single state rather than running a second blind apply. The original login timeout may remain even when HTTP is reachable; fix the real auth backend separately. Restore HTTPS as the preferred transport after the authenticated login path is repaired because HTTP sends passwords without encryption.
+
+## v13v preflight hang and v13w focused fix — 2026-10-28
+
+User ran v13v and the last printed lines were:
+
+```text
+VECI_V13V_STAGE=started_no_ubus
+VECI_V13V_STAGE=preflight_ok
+VECI_V13V_OLD_BACKUP=absent
+VECI_V13V_NEW_BACKUP=absent
+VECI_V13V_HTTP_CURRENT=unavailable
+VECI_V13V_REDIRECT_CURRENT=0
+```
+
+The v13v source places `uci get network.lan.ipaddr` and `ip -4 addr show` after the last line and before the `VECI_V13V_STAGE=backing_up` marker. This narrows the **likely** stall to one of those LAN preflight operations, not proven individually. No evidence of an HTTP configuration write or service restart was returned. Old script must be interrupted with Ctrl+C and never replayed.
+
+**Corrected implementation:** v13w `scripts/veci-v13w-http-without-lan-probe-20261028.sh` (commit `00590af2c5156d8b8e5c1765d298d82ea2f1564b`), office wrapper `scripts/veci-v13w-http-office-20261028.ps1` (commit `293935b2320ac05a31711f783726a3b7fd15ca54`). Removes *all* direct ubus auth calls, `uci get network.lan.ipaddr` and `ip addr` checks from the HTTP path. The router is already reached via `root@192.168.1.1`. It guards against a prior v13u/v13v process still running and stale v13u/v13v backup files; it stages the original uhttpd config in a new private backup before changing only LAN HTTP listener and redirect. The HTTPS listener, `rpcd`, modem and LTE are untouched. It reports numbered progress stages, performs one uhttpd restart, one uhttpd config/process integrity gate, and one bounded anonymous HTTP GET expecting exactly 200 without redirect. Its static focused source contract passed.
+
+**Status:** v13w source prepared; no live HTTP or login-fix claim yet. If a backup/process guard blocks, do not rerun installer. If the page is reachable on HTTP but `session.login` still fails, the true backend auth blocker requires its own scoped diagnosis. Never treat HTTP reachability as proof of successful login. HTTP credentials travel unencrypted even on a trusted LAN.
