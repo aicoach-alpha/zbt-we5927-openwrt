@@ -43,3 +43,28 @@ Do not mark v13 login repaired, top navigation deployed, or quota/USSD deinstall
 **Not yet installed:** The navigation module needs wiring into the actual VeCI login, routing, and page template extracted from router. Historical XL/USSD package-owned files are not yet removed from router; uninstall decisions depend on a targeted package-ownership audit. Static component source is not a production UI fix.
 
 Next required owner action: run the read-only v13 office capture wrapper and provide the resulting UI source tarball. That is the minimum source needed to repair the screenshot's login timeout, connect the horizontal navigation without fabricating routes, and safely retire all old UI and backend package components in one scoped v13 deployment.
+
+## Real office read-only audit acceptance — 2026-10-28
+
+User ran v13 source capture and returned:
+
+```text
+VECI_V13_BOARD=zbtlink,zbt-we5927
+VECI_V13_VERSION=25.12.5
+VECI_V13_PROCESS_rpcd=running
+VECI_V13_PROCESS_uhttpd=running
+VECI_V13_PROCESS_ubusd=running
+VECI_V13_SESSION_RPC=timeout_command_unavailable
+VECI_V13_HTTPS_UBUS=http=200;duration=0.198189
+VECI_V13_HTTP_JSONRPC=responding
+VECI_V13_AUDIT=pass
+VECI_V13_SOURCE_ARCHIVE_BYTES=45377
+VECI_V13_LOCAL_SOURCE_SHA256=1813a12623758fe662eda06eb7c90a4dbbfb85572304ec4b4551381d928b3e15
+VECI_V13_PRODUCTION=unchanged
+```
+
+`timeout` is not installed on the router, so the many `VECI_V13_RPC_*=not_confirmed` records and `SESSION_RPC=timeout_command_unavailable` **cannot** be interpreted as the RPCs absent or malfunctioning. The public HTTPS /ubus transport responded quickly, but the authenticated `session.login` transaction is still unverified. Retain all credentials and avoid broad service restart. The source archive `C:\veci-build\veci-v13-readonly-20261028\veci-v13-ui-source-20261028.tar.gz` resides on the **user's office PC** and has **not** been uploaded to this chat. Its actual frontend files have not been examined here; request the tar.gz attachment before designing an auth/controller or live nav patch.
+
+## Additional priority: automatic LTE reconnect
+
+As requested after this audit, faster LTE reconnect is handled separately from VeCI frontend and does not require the frontend archive. Existing source confirms `ping_interval=30`, `fail_threshold=6`, checking 1.1.1.1 and 8.8.8.8 and recovering by LTE interface before CFUN. Signed/owned firmware binary need not be overwritten to adjust the two UCI configuration keys. The scoped scripts `scripts/veci-v13-lte-fast-reconnect-20261028.sh` and `scripts/veci-v13-lte-fast-reconnect-office-20261028.ps1` target `10s x 3` checks, preserve SIM/APN/failover, back up the original UCI file, restart only the existing watchdog service once, and check runtime integrity once. Repository defaults and `docs/RECOVERY.md` were changed. **Live application still requires owner execution/receipt**; no controlled outage test has been claimed.
