@@ -99,3 +99,16 @@ $p="$env:TEMP\veci-v13-auth-recover.ps1"; curl.exe -fLsS https://raw.githubuserc
 ```
 
 Receipt `VECI_AUTH_OFFICE=rpc_path_pass` means only that the dummy account is rejected quickly through the end-to-end RPC route. It does **not** prove real login credentials or the full frontend work. If real login still fails, inspect that specific case and the captured frontend source without repeated router restarts. The top-nav and XL quota/USSD retirement remain pending after authentication recovery.
+
+## v13u — Owner-requested LAN HTTP return and isolated login test (2026-10-28)
+
+The user explicitly requested that VeCI switch back from enforced HTTPS to **HTTP on the trusted local network**, while continuing to address the original \`session.login timed out\` failure. The preceding targeted \`rpcd\` restart was verified **ineffective**: the dummy HTTPS \`session.login\` request still timed out after 12 seconds and 0 body bytes. Do not repeat that restart or merely extend the 10-second browser timeout.
+
+Implementation:
+- \`scripts/veci-v13u-lan-http-login-20261028.sh\` changes only \`uhttpd.main.listen_http=192.168.1.1:80\` and \`uhttpd.main.redirect_https=0\`, preserving the HTTPS listener and uhttpd's existing other settings. The script first executes one bounded *direct local ubus* dummy login (\`ubus -S -t 6 call session login\`) to classify internal auth responsiveness.
+- LAN IP \`192.168.1.1\`, OpenWrt board/version and actual local IP assignment are enforced before changing config. The previous \`/etc/config/uhttpd\` is backed up, the \`uhttpd\` service is restarted once (not \`rpcd\`, router, modem or LTE), and a single config/process integrity gate checks the new state. Rollback via \`--rollback\` is available.
+- \`scripts/veci-v13u-lan-http-office-20261028.ps1\` stages the pinned script from Windows, runs it via SSH, then sends exactly one synthetic invalid-credentials login to \`http://192.168.1.1/ubus\`. The printed result distinguishes responsive rejection from timeout without revealing session IDs or user passwords.
+- HTTP is plaintext: router passwords could be captured by users/devices on the same network. It is explicitly restricted to the LAN IP, never exposed on all interfaces; HTTPS stays available for secure fallback. Users should prefer HTTPS again once login is repaired, and avoid sending passwords over public or untrusted Wi-Fi.
+- Browser HTTPS-Only/HSTS policies may still upgrade \`http://\` locally. Test with the literal \`http://192.168.1.1/veci/\` URL on a trusted LAN. If direct internal ubus still stalls, the problem is **not solely HTTPS**; examine the auth backend rather than rewriting frontend fetch code.
+
+This is a source-ready office cutover script, **not evidence of live HTTP configuration or successful VeCI login**. Owner receipt required. No package upgrade, firmware flash or repeat of prior LTE/UI UAT.
