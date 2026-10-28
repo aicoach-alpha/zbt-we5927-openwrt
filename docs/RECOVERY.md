@@ -91,3 +91,24 @@ The scoped hotfix `scripts/veci-v13-lte-fast-reconnect-20261028.sh` changes **on
 The watchdog still uses interface-first recovery (`ifdown/ifup lte`), then CFUN soft reconnect if data does not return, escalating to hardware power-cycle only as configured; dual SIM auto-failover remains disabled unless explicitly enabled. The original config's `hard_reset_after` is unchanged. The script has `--status` and `--rollback` modes.
 
 **Source is not proof of production:** Do not mark this tuning LIVE before an office owner reports `VECI_FAST_RECONNECT_RELEASE=live_pass` and `VECI_FAST_RECONNECT_INTEGRITY=pass`. This verifies configuration and running watchdog, not a controlled real outage recovery. If a real outage still fails to recover, collect just the existing watchdog log segment and runtime status to identify whether the daemon hung or the modem failed to reconnect. Do not create a competing second watchdog or repeatedly reset the modem.
+
+## Office production receipt — Fast Reconnect LIVE/PASS (2026-10-28)
+
+The owner executed the pinned office installer `scripts/veci-v13-lte-fast-reconnect-office-20261028.ps1 -Action Apply` against `root@192.168.1.1`. **Observed real terminal output**:
+
+```text
+VECI_FAST_RECONNECT_REQUEST=Apply
+VECI_FAST_RECONNECT_PREVIOUS=30-s_x_6
+VECI_FAST_RECONNECT_POLICY=10s_x_3
+VECI_FAST_RECONNECT_WATCHDOG=running
+VECI_FAST_RECONNECT_AUTO_SIM=unchanged
+VECI_FAST_RECONNECT_INTEGRITY=pass
+VECI_FAST_RECONNECT_RELEASE=live_pass
+VECI_FAST_RECONNECT_OFFICE=apply_completed
+```
+
+**Release status: production LIVE/PASS**, limited specifically to the updated `we5927_lte.main.ping_interval=10`, `we5927_lte.main.fail_threshold=3`, enabled/running watchdog, unchanged SIM auto-failover and APN/SIM values in the installer's integrity gate. The old config and prior enabled-state record were retained for explicit rollback. No full-router reboot, intentional connectivity outage, or repeated broad testing was performed.
+
+The `30-s_x_6` label is merely a cosmetic formatting artifact in the installer output and means `30s × 6`; it does not indicate an error. First recovery detection target ~30–45 seconds; **full internet recovery is not yet confirmed under an actual outage**. If future incidents occur, diagnose the single failed step (watchdog, LTE interface, CFUN or modem) from the existing log rather than repeatedly toggling the interface or rerunning the installer.
+
+Follow-on scope remains **VeCI v13 login timeout fix, horizontal top navigation, retirement of XL carrier quota and USSD, preservation of local Data Meter**. The private frontend capture `C:\veci-build\veci-v13-readonly-20261028\veci-v13-ui-source-20261028.tar.gz` is still required to patch actual frontend controller safely; it has not been supplied as an attachment.
