@@ -262,3 +262,18 @@ Upstream OpenWrt rpcd `session.c` shows the login handler immediately rejects mi
 - If both direct calls return while HTTP/HTTPS login times out, investigate `uhttpd-mod-ubus` bridging. If empty arguments return but nonexistent-user lookup stalls, concentrate on rpcd's credential lookup context. If even empty arguments stall, inspect rpcd event-loop/ubus dispatch rather than the UCI data or crypt hash. A valid-user password/hash path is not tested.
 
 Source is ready but not run on router. No mutation, no successful login claim. Leave HTTP reachable; local HTTP is plaintext. The future fix should have a backup and **one real login verification** without printing credentials.
+
+## v13z receipt CORRECTION: exit code 7 means TIMEOUT (2026-10-28)
+
+Owner terminal receipt:
+```text
+VECI_V13Z_EMPTY_ARGUMENTS=returned
+VECI_V13Z_EMPTY_ARGUMENTS_CODE=7
+VECI_V13Z_UNKNOWN_USER=returned
+VECI_V13Z_UNKNOWN_USER_CODE=7
+VECI_V13Z_PRODUCTION=unchanged
+```
+
+**Critical interpretation:** OpenWrt libubus defines `UBUS_STATUS_TIMEOUT=7`. The v13z script's `returned` label only indicates the *ubus client process exited*; it did **not** indicate that rpcd sent a method response. Both the missing-arguments login and nonexistent-user login timed out. Previous speculation that this proves only the HTTP bridge or frontend was at fault is **invalid**. Since the missing-arguments branch should synchronously reject as `UBUS_STATUS_INVALID_ARGUMENT=2` before any UCI/auth lookup, the evidence points to session-method RPC dispatch/service responsiveness rather than solely password verification. Plain UCI reads completed normally in v13y.
+
+Next single diagnostic **not another login test:** `scripts/veci-v14a-rpcd-session-responsiveness-20261028.sh`, committed `613319cc4754a2153acae9bc0d2f4a9505f5ab91`. It outputs the current rpcd PID/state/wchan/threads, then runs just two bounded, privacy-safe direct RPCs: `session.access` and `session.list` with a 3-second CLI timeout each. All response bodies (including session IDs) are suppressed. Exit code 7 is explicitly reported as timeout; code 0 or expected permission/argument errors show the service replied. No restart, credentials, session destruction, UCI modification or modem action. If both other methods also time out, investigate general rpcd event-loop/plugin blocking; if they return, investigate session.login handler dispatch. Neither scenario is yet proof of the exact root cause. Do not repeat rpcd restart, v13x HTTP install or old dummy login probes. The office owner must execute this narrow check to supply runtime evidence.
