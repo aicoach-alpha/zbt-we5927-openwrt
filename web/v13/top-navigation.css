@@ -1,0 +1,66 @@
+/* VeCI v13 top navigation: responsive, low-power, no third-party fonts. */
+.veci-v13-topbar {
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+  min-height: 64px;
+  padding: 0 24px;
+  background: #0b1725;
+  color: #f8fbff;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+.veci-v13-brand {
+  flex: 0 0 auto;
+  font-size: 1.35rem;
+  font-weight: 750;
+  letter-spacing: -.025em;
+}
+.veci-v13-topnav {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  gap: 5px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+.veci-v13-topnav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  min-height: 42px;
+  margin: 6px 0;
+  padding: 9px 15px;
+  border-radius: 8px;
+  color: #cbd9e8;
+  text-decoration: none;
+  font-size: .91rem;
+  font-weight: 580;
+  transition: background .12s ease;
+}
+.veci-v13-topnav-link:hover { background: rgba(255,255,255,.09); color: #fff; }
+.veci-v13-topnav-link[aria-current="page"] {
+  background: #176db4;
+  color: #fff;
+}
+.veci-v13-topnav-link:focus-visible {
+  outline: 2px solid #90cbff;
+  outline-offset: 2px;
+}
+@media(max-width: 740px) {
+  .veci-v13-topbar { flex-direction: column; align-items: stretch; gap: 0; padding: 8px 12px; }
+  .veci-v13-brand { padding: 5px 4px 3px; }
+  .veci-v13-topnav { margin: 0 -4px; }
+  .veci-v13-topnav-link { margin: 2px 0 4px; padding: 7px 12px; min-height: 38px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .veci-v13-topnav-link { transition: none; }
+}
