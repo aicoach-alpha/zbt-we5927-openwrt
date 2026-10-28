@@ -277,3 +277,28 @@ VECI_V13Z_PRODUCTION=unchanged
 **Critical interpretation:** OpenWrt libubus defines `UBUS_STATUS_TIMEOUT=7`. The v13z script's `returned` label only indicates the *ubus client process exited*; it did **not** indicate that rpcd sent a method response. Both the missing-arguments login and nonexistent-user login timed out. Previous speculation that this proves only the HTTP bridge or frontend was at fault is **invalid**. Since the missing-arguments branch should synchronously reject as `UBUS_STATUS_INVALID_ARGUMENT=2` before any UCI/auth lookup, the evidence points to session-method RPC dispatch/service responsiveness rather than solely password verification. Plain UCI reads completed normally in v13y.
 
 Next single diagnostic **not another login test:** `scripts/veci-v14a-rpcd-session-responsiveness-20261028.sh`, committed `613319cc4754a2153acae9bc0d2f4a9505f5ab91`. It outputs the current rpcd PID/state/wchan/threads, then runs just two bounded, privacy-safe direct RPCs: `session.access` and `session.list` with a 3-second CLI timeout each. All response bodies (including session IDs) are suppressed. Exit code 7 is explicitly reported as timeout; code 0 or expected permission/argument errors show the service replied. No restart, credentials, session destruction, UCI modification or modem action. If both other methods also time out, investigate general rpcd event-loop/plugin blocking; if they return, investigate session.login handler dispatch. Neither scenario is yet proof of the exact root cause. Do not repeat rpcd restart, v13x HTTP install or old dummy login probes. The office owner must execute this narrow check to supply runtime evidence.
+
+## v14a runtime diagnosis — rpcd PID 1017 in D state (2026-10-28)
+
+Real operator terminal receipt:
+
+```text
+VECI_V14A_RPCD_PROCESS=pid:1017,state:D,threads:1,rss_kib:1748,wchan:unavailable
+VECI_V14A_RPCD_PID_COUNT=1
+VECI_V14A_CHECK_SESSION_ACCESS-CODE=7
+VECI_V14A_CHECK_SESSION_ACCESS=timed_out
+VECI_V14A_CHECK_SESSION_LIST-CODE=7
+VECI_V14A_CHECK_SESSION_LIST=timed_out
+VECI_V14A_PRODUCTION=unchanged
+```
+
+**Strong finding:** rpcd's one observed process is in kernel `TASK_UNINTERRUPTIBLE` (D), and not merely the login method: both unrelated `session.access` and `session.list` time out with ubus code 7. The normal CLI UCI package lookups in v13y were successful. The root cause is therefore **not explained by incorrect password, HTTP redirect, or slow frontend JS**. There is not yet evidence of *which* kernel subsystem or device is blocking rpcd. Do not assert it is USB/ttyUSB3, flash or a specific driver until kernel evidence establishes it. A SIGKILL on a D-state task normally cannot take effect until its kernel wait finishes. Another `rpcd` restart, password reset, reinstall, v13x HTTP cutover or web timeout increase is not justified.
+
+**Next one targeted diagnostic, source committed and readback-gated:**
+`scripts/veci-v14b-rpcd-d-state-kernel-snapshot-20261028.sh` (commit `b6cf8f2e7f8258dd55c3deec02a0f7cc79e4990f`). The script:
+- Verifies exact board, firmware, PID 1017 identity (`/proc/PID/comm`), and current D state to avoid misattributing an exited/recycled process.
+- Reads `/proc/1017/stack` and `/proc/1017/wchan` (may be unavailable depending on kernel options) and numeric `/proc/1017/syscall`; shows only if rpcd has any `/dev/ttyUSB*` or `/dev/ttyACM*` FDs open.
+- Reads up to 24 already-existing **kernel** messages matching blocked I/O/USB/MTD/flash/hung task terms. Does not run SysRq, modify procfs, signal processes, restart any service, rebind USB, edit firmware, send auth requests, or change LAN/LTE.
+- Explicitly reports `VECI_V14B_PRODUCTION=unchanged`. This does not itself fix login.
+
+If the kernel stack identifies a recoverable device driver wait, plan the smallest device-specific remediation **with internet interruption/rollback risk clearly disclosed**. If rpcd remains D-state and cannot resume, restoring management may require a controlled maintenance reboot; this is an outage decision and not an unannounced automatic action. Do not call login PASS until one real browser session is authenticated.
