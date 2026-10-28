@@ -144,3 +144,25 @@ The v13v source places `uci get network.lan.ipaddr` and `ip -4 addr show` after 
 **Corrected implementation:** v13w `scripts/veci-v13w-http-without-lan-probe-20261028.sh` (commit `00590af2c5156d8b8e5c1765d298d82ea2f1564b`), office wrapper `scripts/veci-v13w-http-office-20261028.ps1` (commit `293935b2320ac05a31711f783726a3b7fd15ca54`). Removes *all* direct ubus auth calls, `uci get network.lan.ipaddr` and `ip addr` checks from the HTTP path. The router is already reached via `root@192.168.1.1`. It guards against a prior v13u/v13v process still running and stale v13u/v13v backup files; it stages the original uhttpd config in a new private backup before changing only LAN HTTP listener and redirect. The HTTPS listener, `rpcd`, modem and LTE are untouched. It reports numbered progress stages, performs one uhttpd restart, one uhttpd config/process integrity gate, and one bounded anonymous HTTP GET expecting exactly 200 without redirect. Its static focused source contract passed.
 
 **Status:** v13w source prepared; no live HTTP or login-fix claim yet. If a backup/process guard blocks, do not rerun installer. If the page is reachable on HTTP but `session.login` still fails, the true backend auth blocker requires its own scoped diagnosis. Never treat HTTP reachability as proof of successful login. HTTP credentials travel unencrypted even on a trusted LAN.
+
+## v13w blocked by old process guard — 2026-10-28
+
+Real owner terminal receipt:
+
+```text
+VECI_V13W_STAGE=download
+VECI_V13W_STAGE=upload
+veci-v13w-http-without-lan-probe-20261028.sh 100%
+VECI_V13W_ACTION=Apply
+VECI_V13W_STAGE=started
+VECI_V13W_ERROR=previous_cutover_process_still_running
+VECI_V13W_OFFICE=router_stopped_no_blind_retry
+```
+
+The second SSH password prompt authenticated; one failed password entry in the earlier SCP prompt was retried successfully. The v13w guard ran *before its backup and HTTP configuration changes*. Therefore **v13w did not apply** the HTTP change. Do not repeat v13w `Apply`, restart rpcd, or reboot the router.
+
+A **single read-only exact process audit** was added at `scripts/veci-v13-exact-process-audit-20261028.sh`, commit `87fa13745abaa8f99279558939af175934a53ff3`. This inspects exact `/proc/<PID>/cmdline` arguments for v13u/v13v shell scripts, PID/PPID/state/wchan, existence of three transaction backups, and selected public `/etc/config/uhttpd` listener/redirect directives. Unlike the previous `ps | grep` guard, it cannot mistake a grep command line that mentions script names for the script itself. It does not kill or restart a process, change files, call `ubus`, or read account credentials.
+
+The subsequent focused repair must either terminate only a confirmed stale old deployment script safely (after verifying no backup/config transaction in progress) or correct the guard if no exact script process exists. Do not apply another speculative HTTP cutover before this evidence.
+
+Independent login failure: valid HTTPS `/ubus` endpoint answered `session.access` quickly, while dummy `session.login` timed out twice including after `rpcd` restart. Official OpenWrt `rpcd` code invokes UCI-backed login configuration processing. This means backend auth and configuration stalls may share a cause but the evidence **does not establish that**. HTTP listener recovery alone will not prove login is fixed.
