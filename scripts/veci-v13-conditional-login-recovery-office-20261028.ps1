@@ -4,7 +4,7 @@ $ErrorActionPreference='Stop'
 $router='root@192.168.1.1'
 $remote='/tmp/veci-v13-conditional-login-recovery-20261028.sh'
 $local=Join-Path $env:TEMP 'veci-v13-conditional-login-recovery-20261028.sh'
-$url='https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/602d735c51f8a8ea8cc32163247bb4c7b3561402/scripts/veci-v13-conditional-login-recovery-20261028.sh'
+$url='https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/81587bebec2d8af410ef1f7f41dac6222dd71997/scripts/veci-v13-conditional-login-recovery-20261028.sh'
 function Fail([string]$reason){ Write-Output ('VECI_AUTH_OFFICE='+$reason); exit 1 }
 & curl.exe --fail --location --silent --show-error $url --output $local
 if($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $local -PathType Leaf)){
@@ -55,6 +55,7 @@ if($httpStatus -eq 'denied_fast'){
 if($httpStatus -ne 'timeout_or_transport_error'){ Fail 'unexpected_https_result_no_restart' }
 Write-Output 'VECI_AUTH_DECISION=https_bridge_timeout_restart_uhttpd_once'
 @(Router-Action 'recover-uhttpd') | ForEach-Object { Write-Output $_ }
+Start-Sleep -Seconds 2
 $after=Probe-Https
 Write-Output ('VECI_AUTH_HTTPS_AFTER='+$after)
 if($after -ne 'denied_fast'){ Fail 'http_auth_still_unresponsive_after_restart' }
