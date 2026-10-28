@@ -29,8 +29,8 @@ $response=& curl.exe --silent --show-error --noproxy '*' --max-time 6 --connect-
 $rc=$LASTEXITCODE
 Write-Output ('VECI_V13V_HTTP_PAGE='+($response -join '').Trim())
 if ($rc -ne 0){ Fail ('http_page_unreachable_exit_'+$rc) }
-if (-not (($response -join '') -match 'http=(200|301|302|303|307|308);')){
- Fail 'http_page_unexpected_response'
+if (-not (($response -join '') -match 'http=200;')){
+ Fail 'http_page_not_200_or_redirected'
 }
 Write-Output 'VECI_V13V_LAN_HTTP=reachable'
 Write-Output 'VECI_V13V_LOGIN=not_yet_verified'
