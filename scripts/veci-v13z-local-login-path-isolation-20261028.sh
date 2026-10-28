@@ -43,7 +43,7 @@ probe() {
   state=gone
  fi
  case "$state" in
-  Z|X|gone) wait "$pid" 2>/dev/null || :; printf 'VECI_V13Z_%s=timed_out_terminated\n' "$label"; return 0 ;;
+  Z|X|gone) wait "$pid" 2>/dev/null || :; printf 'VECI_V13Z_%s=timed_out_terminated\n' "$label"; return 1 ;;
   D) printf 'VECI_V13Z_%s=blocked_in_D_state\n' "$label"; return 1 ;;
   *)
    if [ -r "/proc/$pid/cmdline" ] &&
