@@ -166,3 +166,33 @@ A **single read-only exact process audit** was added at `scripts/veci-v13-exact-
 The subsequent focused repair must either terminate only a confirmed stale old deployment script safely (after verifying no backup/config transaction in progress) or correct the guard if no exact script process exists. Do not apply another speculative HTTP cutover before this evidence.
 
 Independent login failure: valid HTTPS `/ubus` endpoint answered `session.access` quickly, while dummy `session.login` timed out twice including after `rpcd` restart. Official OpenWrt `rpcd` code invokes UCI-backed login configuration processing. This means backend auth and configuration stalls may share a cause but the evidence **does not establish that**. HTTP listener recovery alone will not prove login is fixed.
+
+## v13w exact process audit and v13x guarded cleanup — 2026-10-28
+
+The owner ran the exact process audit and returned:
+
+```text
+VECI_V13_OLD_PROCESS=v13u;pid=6052;ppid=1;state=S
+VECI_V13_OLD_PROCESS=v13v;pid=6081;ppid=1;state=S
+VECI_V13_OLD_EXACT_PROCESS_COUNT=2
+VECI_V13_BACKUP_v13u=absent
+VECI_V13_BACKUP_v13v=absent
+VECI_V13_BACKUP_v13w=absent
+listen_https='0.0.0.0:443'
+listen_https='[::]:443'
+redirect_https='0'
+ubus_prefix='/ubus'
+VECI_V13_PROCESS_AUDIT=read_only_complete
+```
+
+This establishes that v13w's blocking guard reflected **real orphaned v13u/v13v shell processes**, not merely a grep false positive. It also establishes no HTTP listener and no transaction backups. The earlier v13u/v13v commands were stopped before any observed HTTP configuration write; production HTTP enablement is still **not confirmed**.
+
+To complete the scoped change without rerunning the stale scripts, a one-shot v13x candidate was committed:
+- Router: `scripts/veci-v13x-safe-orphan-cleanup-http-20261028.sh` (commit `37a3437ad2ee73a5ac1aa7332ab68370209e8bef`)
+- Office: `scripts/veci-v13x-orphan-cleanup-http-office-20261028.ps1` (commit `2238f5178dbca5bf6d74e48800a0346558688e7c`)
+
+The router script fails closed if old backup/staged files are present or the current `uhttpd` main configuration differs from the observed HTTPS-only/redirect=0 baseline. It validates the **exact PID, script argv, PPID=1, and state=S** for 6052 and 6081, revalidates argv immediately before sending **SIGTERM only to those PIDs**, and confirms they are gone. It performs no `killall`, router reboot or `rpcd` restart. Only then does it back up `/etc/config/uhttpd`, insert one `192.168.1.1:80` HTTP listener into the existing `uhttpd.main` UCI text configuration with a minimal AWK edit and atomic rename, preserve the existing HTTPS listeners, restart `uhttpd` once, and perform one integrity gate. It deliberately does not perform a UCI read, netlink probe or ubus login, which were the previously observed stall candidates. Office wrapper requires one HTTP 200 static page response with no redirect and does not send user credentials.
+
+The exact AWK transformation was tested once on a fixture matching the audit's `uhttpd` listener and redirect directives, preserving the two HTTPS listeners and adding one LAN HTTP listener. The release source contract includes exact-PID kill scope, backup order, no UCI/network RPC calls, one restart and one final HTTP GET. This is **source-ready only**, not proven deployed until the owner returns `VECI_V13X_INTEGRITY=pass` and `VECI_V13X_HTTP=reachable`.
+
+Separate outstanding root cause: `session.login` has timed out despite an `rpcd` restart. HTTP listener delivery does **not** fix or prove a real authenticated session. Keep actual account credentials out of scripts and diagnostics; investigate authenticated rpcd configuration separately after clearing orphan processes. HTTP sends credentials in plaintext on LAN.
