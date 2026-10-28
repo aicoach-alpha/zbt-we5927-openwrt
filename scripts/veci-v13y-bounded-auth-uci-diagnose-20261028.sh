@@ -14,7 +14,7 @@ grep -Fqx "DISTRIB_RELEASE='25.12.5'" /etc/openwrt_release || {
 if [ -f /etc/config/rpcd ] && [ ! -L /etc/config/rpcd ]; then
  echo "VECI_V13Y_RPCD_CONFIG_BYTES=$(wc -c < /etc/config/rpcd | tr -d ' ')"
  # Count only the login sections; never print their username/password entries.
- echo "VECI_V13Y_RPCD_LOGIN_SECTIONS=$(awk '$1=="config" && $2=="login"{n++} END{print n+0}' /etc/config/rpcd)"
+ echo "VECI_V13Y_RPCD_LOGIN_SECTIONS=$(awk '$1=="config" {t=$2;gsub(/[\047\042]/,"",t);if(t=="login")n++} END{print n+0}' /etc/config/rpcd)"
  echo "VECI_V13Y_RPCD_USERNAME_OPTION_COUNT=$(awk '$1=="option" && $2=="username"{n++} END{print n+0}' /etc/config/rpcd)"
  echo "VECI_V13Y_RPCD_PASSWORD_OPTION_COUNT=$(awk '$1=="option" && $2=="password"{n++} END{print n+0}' /etc/config/rpcd)"
 else
