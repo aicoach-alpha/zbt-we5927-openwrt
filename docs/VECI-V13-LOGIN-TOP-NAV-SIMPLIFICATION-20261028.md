@@ -302,3 +302,28 @@ VECI_V14A_PRODUCTION=unchanged
 - Explicitly reports `VECI_V14B_PRODUCTION=unchanged`. This does not itself fix login.
 
 If the kernel stack identifies a recoverable device driver wait, plan the smallest device-specific remediation **with internet interruption/rollback risk clearly disclosed**. If rpcd remains D-state and cannot resume, restoring management may require a controlled maintenance reboot; this is an outage decision and not an unannounced automatic action. Do not call login PASS until one real browser session is authenticated.
+
+## v14b accepted: rpcd blocked in MIPS sendmsg(fd=7) — 2026-10-28
+
+Real read-only kernel snapshot from the owner:
+
+```text
+VECI_V14B_PROCESS=rpcd_1017_verified
+VECI_V14B_RPCD_STATE=D
+VECI_V14B_RPCD_PARENT=1
+VECI_V14B_RPCD_RSS_KIB=1748
+VECI_V14B_RPCD_THREADS=1
+VECI_V14B_STACK=not_available
+VECI_V14B_WCHAN=not_available
+/proc/1017/syscall: 4179 0x7 0x7fbccdd0 0x0 0x0 0x0 0x0 0x7fbccd00 0x77dfab34
+VECI_V14B_RPCD_SERIAL_FD_COUNT=0
+VECI_V14B_PRODUCTION=unchanged
+```
+
+Linux MIPS o32 `__NR_Linux=4000` offset 179 = `sendmsg`, first argument `0x7` = file descriptor **7**. **The kernel was blocking rpcd while sending data on descriptor 7.** The descriptor has not been resolved to a particular socket endpoint; do not claim it is ubus, USB, cellular modem, JFFS2, or filesystem without further evidence. `rpcd` had no open `ttyUSB*`/ `ttyACM*` FDs at snapshot time, and the kernel log excerpts had only normal early-boot USB enumeration/JFFS2 messages, not new blocked-task details. This is consistent with an IPC/socket bottleneck but does not prove the peer.
+
+Direct RPC `session.login`, `session.access`, and `session.list` all timed out with ubus 7 while the RPCD task remained `TASK_UNINTERRUPTIBLE`. Restarting rpcd previously did not recover its operation. **Do not repeat rpcd kill/restart, HTTP cutover, password reset, UCI diagnostics, or synthetic auth probes.**
+
+**Recovery recommendation:** The fastest practical path back to functional administration is a **single owner-initiated controlled router reboot during an approved network maintenance window**, after ensuring the office can tolerate temporary LTE/Wi-Fi downtime. Use the *normal* OpenWrt `reboot` mechanism preceded by `sync`; do not use `reboot -f`, SysRq, raw USB reset, firewall restart or power pull as routine fixes. A reboot might restore rpcd but is **not proven as a permanent kernel/socket bug fix**. The user should check the normal VeCI login once afterward and report whether it works, using the already LIVE `http://192.168.1.1/veci/` only on a trusted LAN. The existing fast LTE watchdog configuration `10s × 3` was already committed to persistent UCI; no change necessary. If reboot fails/hangs, do not chain attempts without observing the state. Keep original uhttpd config backup at `/etc/config/uhttpd.veci-v13x-original-20261028`, preserve HTTPS listener, and do not expose HTTP over WAN.
+
+This state has **not** yet been rebooted or validated by an actual authenticated VeCI session. Remediation/long-term prevention remains OPEN until post-reboot login and recurrence evidence. A later recurrence warrants capturing descriptor 7's socket inode/peer and kernel-blocked stack under appropriate kernel debug support, then investigating rpcd/ubusd socket backpressure and vendor package patches without destabilizing live service.
