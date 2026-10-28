@@ -1,13 +1,8 @@
 name: VeCI quota contract tests
+# Retired carrier-quota integration (owner decision 2026-10-28).
+# Preserve archival contract tests for deliberate manual use only.
+# No automatic push/PR jobs or repeat CI spend.
 on:
-  push:
-    paths:
-      - 'source/veci-quota/**'
-      - '.github/workflows/veci-quota-contract.yml'
-  pull_request:
-    paths:
-      - 'source/veci-quota/**'
-      - '.github/workflows/veci-quota-contract.yml'
   workflow_dispatch:
 permissions:
   contents: read
