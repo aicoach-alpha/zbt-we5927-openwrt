@@ -1,5 +1,8 @@
 # VeCI XL v12s — On-demand Local Data Meter Diagnostics (2026-10-21)
 
+> **CANCELLED BEFORE DEPLOYMENT — 2026-10-28.** Do not run the v12s `-Apply` command below. The user retired XL carrier quota and USSD. Migrate any useful read-only local Data Meter diagnostics into the new non-XL navigation after retrieving actual VeCI frontend source. Current confirmed live overlay baseline remains v12r `1.0.2-r1` until verified otherwise.
+
+
 ## Release scope and current authority
 
 **SOURCE READY / FOCUSED TEST PASS / PRODUCTION NOT DEPLOYED.** The last observed production baseline is v12r, `veci-xl-native-overlay 1.0.2-r1` LIVE/PASS. Do not call v12s LIVE until the office router prints `XL_V12S_RELEASE=installed`, `XL_V12S_INTEGRITY=pass` and `XL_V12S_OFFICE=live_pass`.
