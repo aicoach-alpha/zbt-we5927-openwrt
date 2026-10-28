@@ -38,7 +38,7 @@ if [ -e "$ARCH" ]; then fail existing_archive_preserved; fi
   echo VECI_V13_SESSION_RPC=timeout_command_unavailable
  fi
  for service in veci.meter veci.ussd veci.quota veci.xl veci.sms; do
-  if command -v timeout >/dev/null 2>&1 && timeout 3 ubus -S list "$service" >/dev/null 2>&1; then
+  if command -v timeout >/dev/null 2>&1 && timeout 3 ubus -S list "$service" 2>/dev/null | grep -Fqx "$service"; then
    echo "VECI_V13_RPC_$service=registered"
   else
    echo "VECI_V13_RPC_$service=not_confirmed"
