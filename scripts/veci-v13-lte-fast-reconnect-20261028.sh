@@ -12,7 +12,11 @@ BACK=/etc/config/we5927_lte.veci-before-fast-20261028
 FLAG=/etc/config/we5927_lte.veci-fast-enabled-before-20261028
 SERVICE=/etc/init.d/we5927-lte
 numeric(){ case "$1" in ''|*[!0-9]*) return 1;; esac; [ "$1" -le 999 ]; }
-daemon_running(){ ps w 2>/dev/null | grep '[w]e5927-lte daemon' >/dev/null 2>&1; }
+daemon_running(){
+ ps w 2>/dev/null | grep '[w]e5927-lte daemon' >/dev/null 2>&1 && return 0
+ ubus -S call service list '{"name":"we5927-lte"}' 2>/dev/null |
+  grep -Eq '"running"[[:space:]]*:[[:space:]]*true'
+}
 service_state(){ if "$SERVICE" enabled >/dev/null 2>&1; then echo enabled; else echo disabled; fi; }
 [ "$(id -u)" -eq 0 ] || die root_required
 [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || die wrong_router
