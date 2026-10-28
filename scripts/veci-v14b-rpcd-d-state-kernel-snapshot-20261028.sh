@@ -41,6 +41,26 @@ if [ -r "/proc/$PID/wchan" ]; then
 else
  echo VECI_V14B_WCHAN=not_available
 fi
+echo '=== /proc/1017/syscall (numeric, may be unsupported) ==='
+if [ -r "/proc/$PID/syscall" ]; then
+ head -c 240 "/proc/$PID/syscall" 2>/dev/null || :
+ echo
+else
+ echo VECI_V14B_SYSCALL=not_available
+fi
+echo '=== opened modem serial devices, if any ==='
+count_serial=0
+for fd in /proc/1017/fd/*; do
+ [ -L "$fd" ] || continue
+ dest="$(readlink "$fd" 2>/dev/null || :)"
+ case "$dest" in
+  /dev/ttyUSB*|/dev/ttyACM*)
+   echo "VECI_V14B_RPCD_SERIAL_FD=$(basename "$fd"):$dest"
+   count_serial=$((count_serial+1))
+   ;;
+ esac
+done
+echo "VECI_V14B_RPCD_SERIAL_FD_COUNT=$count_serial"
 echo VECI_V14B_STAGE=kernel_related_messages
 # Kernel logs only, bounded to 24 relevant lines; no auth or session data.
 if command -v dmesg >/dev/null 2>&1; then
