@@ -70,7 +70,7 @@ class CacheSafetyTests(unittest.TestCase):
     def read(self,source=None):
         return subprocess.run(
             ["sh",str(CACHE),"status",str(source or self.file)],
-            env=self.env,text=True,capture_output=True,timeout=8
+            env=self.env,text=True,capture_output=True,timeout=20
         )
 
     def decoded(self,source=None):

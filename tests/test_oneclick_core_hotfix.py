@@ -14,7 +14,7 @@ ARCHIVE = ROOT / "releases/veci-core-r4-hotfix/veci-core-r4.tar.gz"
 CHECKSUMS = ROOT / "releases/veci-core-r4-hotfix/SHA256SUMS"
 PS1 = ROOT / "scripts/veci-oneclick-update.ps1"
 APPLY = ROOT / "scripts/veci-core-apply.sh"
-PIN = (ROOT / "source/veci.commit").read_text().strip()
+PIN = "81853a6b8b710a26a2427d1176751bf781bc7243" # Immutable archived r4 bundle, not current firmware source pin.
 
 
 class OneClickCoreTests(unittest.TestCase):
