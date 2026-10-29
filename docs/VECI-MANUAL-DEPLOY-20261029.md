@@ -28,7 +28,7 @@ This verifies only board identity, image size/hash and basic storage inventory. 
 1. Build the exact pinned Core and firmware together with matching signed feed using a controlled build environment (or owner-triggered GitHub workflow if quota permits). Check kernel ABI, package index signatures, firmware SHA256 and board metadata. Old J8c app packages must not be used on another kernel.
 2. Test on owner-approved recoverable hardware. Back up settings and verify physical UART/U-Boot or recovery procedure; keep wired network access and known-good firmware.
 3. After independently verifying file identity and approval, manually upload the candidate on the approved router and run a compatibility check (sysupgrade -T) without force flags. Do not run sysupgrade -F.
-4. Run U01–U16 in docs/J9C-HARDWARE-UAT.md and record results, rollback, and HTTP/LuCI, LTE/USB, cellular, Wi-Fi, DHCP/DNS, Guest/Voucher, SQM and app installation. Mask all private identifiers, credentials, codes and keys in exported evidence.
+4. Run U01–U16 in docs/J9C-HARDWARE-UAT.md using docs/VECI-MANUAL-UAT-EVIDENCE.csv and record results, rollback, and HTTP/LuCI, LTE/USB, cellular, Wi-Fi, DHCP/DNS, Guest/Voucher, SQM and app installation. Mask all private identifiers, credentials, codes and keys in exported evidence.
 5. Flash only after the owner approves the exact image, device and maintenance window and hardware recovery is proven. Use the established manual upgrade procedure; this kit contains no flash command.
 
 Stop immediately if device ID, image hash, signed feed, recovery path, or any preflight condition disagrees. GitHub push is not firmware deployment.

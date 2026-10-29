@@ -1,3 +1,4 @@
+import csv
 import pathlib
 import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -22,6 +23,14 @@ class OperatorKitTests(unittest.TestCase):
             self.assertNotIn('listen_http=0', text)
         doc = (ROOT / 'docs/VECI-MANUAL-DEPLOY-20261029.md').read_text()
         self.assertIn('Never disable HTTP', doc)
+    def test_evidence_template_has_16_untested_cases(self):
+        path = ROOT / 'docs/VECI-MANUAL-UAT-EVIDENCE.csv'
+        with path.open(newline='') as f:
+            rows = list(csv.DictReader(f))
+        self.assertEqual(len(rows), 16)
+        self.assertEqual([row['Case ID'] for row in rows], ['U%02d' % n for n in range(1,17)])
+        self.assertTrue(all(row['Status']=='NOT_TESTED' for row in rows))
+        self.assertTrue(all(not row['Firmware image SHA256'] for row in rows))
     def test_doc_has_correct_approval_gates(self):
         text = (ROOT / "docs/VECI-MANUAL-DEPLOY-20261029.md").read_text()
         for term in ("FLASH NO_GO", "81853a6", "f1dc4d8", "2026-10-06", "U01–U16", "SOURCE_PASS", "HARDWARE_UAT_PASS"):
