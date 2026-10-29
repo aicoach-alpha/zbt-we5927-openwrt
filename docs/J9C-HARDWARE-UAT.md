@@ -44,3 +44,24 @@ Treat these as unresolved risks, not proof of exploitation. Close by correcting 
 Evidence for each executed UAT case must record exact build/device, UTC timestamp, expected/observed outcome, masked screenshots/logs, rollback result, and operator approval. Do not copy IMEI, SIM identifiers, DDNS passwords, voucher codes or WireGuard private keys into shared reports.
 
 Release remains NO_GO until all production-relevant tests PASS with physical evidence, signed updater + recovery PASS, and explicit operator permission for the exact final device/image. This workflow does not connect to or change a physical router.
+
+
+## 2026-10-29 source remediation status (not hardware evidence)
+
+The original review findings above are retained as historical audit observations, not current source conclusions. They have been addressed at source level and regression tested:
+
+- Guest provision and enable use pre-change UCI snapshots with rollback; production restart and connection recovery remain UAT U06/U14.
+- Voucher status is read-only; the separate expiry cleaner performs mutations; active-session revoke still requires UAT U10.
+- WireGuard does not auto-install peer default routes; actual peer handling remains UAT U09/U16.
+- Firmware validation token freshness and signed-image requirements are checked in non-live negative tests; actual firmware flow remains UAT U12/U13.
+- App cleanup requires an explicit positive acknowledgement, and APK simulation/core-package checks fail closed; actual install/uninstall remains UAT U11.
+
+The current General Core is r4, source commit 81853a6. The source and firmware integration have automated test coverage but **NO new r4 sysupgrade image or paired r4 signed app feed** is published by this handover. U01–U16 remain NOT_TESTED until their physical observations are recorded. FINAL FLASH remains NO_GO; only the owner can authorize manual deployment.
+
+## Manual evidence log
+
+| UAT ID | Device / image SHA256 | Observation and masked evidence | Rollback tested? | Tester / UTC | State |
+| --- | --- | --- | --- | --- | --- |
+| U01–U16 | Not provided | No physical test performed | Not verified | Unassigned | NOT_TESTED |
+
+Log each real test as a separate row before changing any NOT_TESTED state. Never copy credentials, IMEI, SIM ID, voucher codes, or encryption keys into evidence.
