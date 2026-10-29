@@ -15,7 +15,7 @@ Obtain this repository on the office Windows laptop. Review scripts/veci-router-
 
     powershell.exe -NoProfile -File .\scripts\veci-router-preflight.ps1 -RouterHost ROUTER_IP_VISIBLE_FROM_OFFICE_LAPTOP
 
-Replace the placeholder with the router IP on the laptop's network, not the IP seen from andre-nas. Requires Windows OpenSSH key-based login, since SSH uses BatchMode=yes. If password-only SSH or HTTP UI is used, manually collect equivalent read-only identity through the router UI. Never disable HTTP or force HTTPS to complete this preflight.
+Replace the placeholder with the router IP on the laptop's network, not the IP seen from andre-nas. Requires Windows OpenSSH. Interactive SSH password login is allowed when the operator runs it locally, and the first host-key confirmation must be checked against a trusted fingerprint; never automatically accept an unknown key. If SSH is unavailable and only HTTP UI is used, collect equivalent read-only identity through the router UI. Never disable HTTP or force HTTPS to complete this preflight.
 
 When a newly built r4 image and independent checksum exist, optionally check the local binary:
 

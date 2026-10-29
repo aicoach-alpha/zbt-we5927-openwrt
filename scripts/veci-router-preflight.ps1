@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 function Read-Router([string]$Command) {
   $ssh = Get-Command ssh.exe -ErrorAction SilentlyContinue
   if (-not $ssh) { throw 'Windows OpenSSH client is missing.' }
-  $output = & $ssh.Source '-o' 'ConnectTimeout=7' '-o' 'BatchMode=yes' ('root@' + $RouterHost) $Command 2>&1
+  $output = & $ssh.Source '-o' 'ConnectTimeout=7' '-o' 'BatchMode=no' '-o' 'NumberOfPasswordPrompts=1' '-o' 'StrictHostKeyChecking=ask' ('root@' + $RouterHost) $Command 2>&1
   if ($LASTEXITCODE -ne 0) { throw ('STOP: SSH read failed: ' + ($output | Out-String).Trim()) }
   return ($output | Out-String).Trim()
 }

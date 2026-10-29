@@ -8,7 +8,9 @@ class OperatorKitTests(unittest.TestCase):
         self.assertIn("zbtlink,zbt-we5927", text)
         self.assertIn("ramips/mt76x8", text)
         self.assertIn("Get-FileHash", text)
-        self.assertIn("BatchMode=yes", text)
+        self.assertIn("BatchMode=no", text)
+        self.assertIn("NumberOfPasswordPrompts=1", text)
+        self.assertIn("StrictHostKeyChecking=ask", text)
         self.assertNotIn("sysupgrade -F", text)
         self.assertNotIn("ssh root@192.168.1.1", text)
     def test_http_fallback_not_forced_to_https(self):
