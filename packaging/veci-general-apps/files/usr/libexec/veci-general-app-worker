@@ -1,0 +1,46 @@
+#!/bin/sh
+# VeCI general Apps: single background APKv3 transaction initiated by admin RPC.
+set -eu
+umask 077
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+LOCK=/tmp/veci-general-app-operation.lock
+STATE=/tmp/veci-general-app-operation.status
+id="$1"
+action="$2"
+package="$3"
+# Re-check fixed mapping: do not trust argv from a stray caller.
+case "$id:$package" in
+ guest-portal:nodogsplash|smart-queue:luci-app-sqm|dynamic-dns:luci-app-ddns|wireguard:luci-proto-wireguard) ;;
+ *) exit 1 ;;
+esac
+case "$action" in install|uninstall) ;; *) exit 1 ;; esac
+[ -d "$LOCK" ] && [ ! -L "$LOCK" ] || exit 1
+cleanup(){ rmdir "$LOCK" 2>/dev/null || :; }
+trap cleanup EXIT
+printf '{"state":"running","app":"%s","action":"%s"}\n' "$id" "$action" > "$STATE"
+result=failed
+if [ "$action" = install ];then
+ # On this small router do not pull packages without available flash space.
+ free="$(df -Pk /overlay 2>/dev/null | awk 'NR==2{print $4+0;exit}')"
+ if [ "$free" -lt 8192 ];then
+  result=insufficient_flash
+ elif apk add --simulate "$package" >/dev/null 2>&1 &&
+      apk add "$package" >/dev/null 2>&1;then
+  result=succeeded
+ else
+  result=apk_install_failed
+ fi
+else
+ # No force removal of dependent packages; apk solver rejects unsafe removal.
+ if apk del --simulate "$package" >/dev/null 2>&1 &&
+    apk del "$package" >/dev/null 2>&1;then
+  result=succeeded
+ else
+  result=apk_remove_failed
+ fi
+fi
+if [ "$result" = succeeded ];then
+ printf '{"state":"succeeded","app":"%s","action":"%s"}\n' "$id" "$action" > "$STATE"
+else
+ printf '{"state":"failed","app":"%s","action":"%s","reason":"%s"}\n' "$id" "$action" "$result" > "$STATE"
+fi
