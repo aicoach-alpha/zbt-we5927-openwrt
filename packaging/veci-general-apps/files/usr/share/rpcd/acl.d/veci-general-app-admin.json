@@ -1,0 +1,15 @@
+{
+  "veci-general-app-admin": {
+    "description": "Authenticated VeCI administrator: signed APK package inventory and explicit app changes",
+    "read": {
+      "ubus": {
+        "veci.apps": ["status"]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.apps": ["start"]
+      }
+    }
+  }
+}
