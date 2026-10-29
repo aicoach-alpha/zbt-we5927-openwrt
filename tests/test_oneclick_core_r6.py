@@ -14,7 +14,7 @@ ARCHIVE = ROOT / "releases/veci-core-r6-hotfix/veci-core-r6.tar.gz"
 CHECKSUMS = ROOT / "releases/veci-core-r6-hotfix/SHA256SUMS"
 PS1 = ROOT / "scripts/veci-oneclick-r6-update.ps1"
 APPLY = ROOT / "scripts/veci-r6-apply.sh"
-PIN = (ROOT / "source/veci.commit").read_text().strip()
+PIN = "72ffc33a2bd30d143692909bd387af5742277d93" # Archived r6 artifact: immutable regardless of newer firmware source.
 
 
 class OneClickCoreTests(unittest.TestCase):
