@@ -341,3 +341,30 @@ Prior verified v13x HTTP cutover established LAN GET /veci HTTP 200 no redirect;
 - Avoid enabling `ubus_noauth`, or blanket CORS to work around login: those could expose administration unauthenticated or cross-origin. Always retain HTTPS admin access. HTTP sends credentials without encryption, even on LAN; returning to HTTPS should remain the preferred secure configuration.
 
 Owner requests for native top menu and removal of failed USSD/carrier quota still open; local Data Meter and fast reconnect remain retained.
+
+## 2026-10-29 — HTTP TCP/80 unreachable after reboot; HTTPS login healthy
+
+Observed after the earlier recovery reboot: the user confirms VeCI admin **logs in successfully via HTTPS**, while HTTP cannot log in. A focused Windows curl check provides the decisive transport failure:
+
+```text
+VECI_V14C_PAGE_TRANSPORT_EXIT=7
+VECI_V14C_PAGE_HTTP=http=000;seconds=2.063857
+VECI_V14C_UBUS_POST_TRANSPORT_EXIT=7
+VECI_V14C_UBUS_POST_HTTP=http=000;seconds=2.058764
+VECI_V14C_UBUS_JSON=no_json_response
+VECI_V14C_ROUTER=unchanged
+```
+
+**Interpretation corrected:** This is not a Firefox HTTPS-Only/CORS/credential failure. The office computer cannot establish TCP to `192.168.1.1:80`, so HTTP login never reaches ubus. HTTPS remains healthy; rpcd/auth is now functional. Earlier v13x proof of HTTP 200 was **before reboot** and did not establish reliable boot-time binding.
+
+**Upstream evidence:** OpenWrt issue `openwrt/openwrt#18551` (https://github.com/openwrt/openwrt/issues/18551) documents exactly this boot ordering defect: uhttpd bound to a specific LAN IPv4 can attempt bind before LAN IP assignment, fail with EADDRNOTAVAIL, and leave no IPv4 listener after boot. A later version of `openwrt/uhttpd` `listen.c` uses IP_FREEBIND to address the startup race, but we have not verified whether the router's installed uhttpd binary includes that code. We must not claim that this is proven without a live bind/error log.
+
+**Source-ready v14d durable correction:**
+- Router installer `scripts/veci-v14d-lan-http-boot-rebind-20261029.sh` commit `8117e88df2c46d0f0d8b24c9321f810e39a9c500`.
+- Office wrapper `scripts/veci-v14d-http-rebind-office-20261029.ps1` commit `07eca27f9608da88fe35673b9358a31e9d40fb88`.
+- Reads only actual `/etc/config/uhttpd` to gate on one `uhttpd.main`, working HTTPS configuration, and `redirect_https=0`. Refuses unknown/wildcard listener or prior transaction; creates a new backup and only restores/adds `192.168.1.1:80` to the existing main webserver config if missing. No `0.0.0.0:80` exposure and no firewall modification. Preserves all HTTPS, authentication and LTE configuration.
+- Installs `/etc/hotplug.d/iface/95-veci-http-lan-rebind` for LAN `ifup|ifupdate` only, with /proc/net/tcp socket check and one tmp lock; webserver restart is attempted only when the specific TCP/80 listener is absent. The deployment itself restarts **uhttpd once** to bring HTTP back immediately; rollback restores the previous config and removes the LAN hook.
+- The wrapper checks one HTTP page, HTTPS page, and credential-free HTTP `/ubus` JSON-RPC transport after apply. It never sends a real password or user session. Repo source/contract readback PASS, but **router production has not yet received v14d**.
+- **Do not mark HTTP after-reboot reliable** based on the post-apply check alone. The hook is a persistence mechanism; verification of survival through a later natural/authorized reboot is still outstanding. Do not force a repeat reboot solely for UAT.
+
+The user requested that HTTP be restored; HTTP is plaintext on LAN and should not be exposed beyond trusted access. Retain HTTPS as secure administrative fallback. Other open work remains horizontal top nav and retiring the abandoned USSD/operator quota features, retaining local Data Meter.
