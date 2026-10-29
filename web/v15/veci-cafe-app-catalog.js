@@ -6,8 +6,8 @@
  */
 export const VECI_CAFE_CATALOG = Object.freeze([
   {id:'hotspot',title:'Hotspot Portal',category:'Cafe & Voucher',priority:'P0',mode:'optional',
-   package:'opennds',description:'Redirect tamu ke captive portal. Belum termasuk penerbit voucher atau billing.',
-   prerequisites:['LAN tamu terpisah dari admin','Portal/guest firewall rules','Feed berisi opennds']},
+   package:'opennds',description:'Portal login Wi-Fi tamu. APK opennds belum ditemukan pada indeks feed resmi 25.12.5 mipsel_24kc; perlu build khusus versi firmware ini, bukan paket snapshot.',
+   prerequisites:['LAN tamu terpisah dari admin','Portal/guest firewall rules','Build APK openNDS kompatibel 25.12.5 yang ditandatangani']},
   {id:'voucher-manager',title:'Voucher Manager',category:'Cafe & Voucher',priority:'P0',mode:'development',
    package:null,description:'Kode voucher dan paket durasi/kecepatan/kuota via openNDS ThemeSpec; butuh pengelola voucher dan penyimpanan aman di luar flash router.',
    prerequisites:['openNDS + ThemeSpec voucher','Penyimpanan voucher persisten di luar flash','Guest network isolation']},
@@ -48,6 +48,15 @@ export const VECI_CAFE_CATALOG = Object.freeze([
    route:'#/system',description:'Ekspor dan pulihkan konfigurasi router sebelum membuat perubahan hotspot.',
    prerequisites:[]}
 ]);
+// Homepage shows only essentials that matter to a café; optional extras remain
+// in the extended catalog but do not crowd the small-router Apps dashboard.
+export const VECI_CAFE_ESSENTIAL_IDS = Object.freeze([
+ 'hotspot','voucher-manager','guest-wifi','client-manager','bandwidth',
+ 'speed-profiles','device-quota','firewall','data-meter','lte-watchdog','backup'
+]);
+export function cafeEssentials(){
+ return VECI_CAFE_CATALOG.filter(item=>VECI_CAFE_ESSENTIAL_IDS.includes(item.id));
+}
 export const VECI_CAFE_CATEGORIES = Object.freeze([
   'Cafe & Voucher','Bandwidth & QoS','Network & Security','Monitoring & Maintenance'
 ]);
