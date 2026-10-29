@@ -55,7 +55,7 @@ class OneClickCoreTests(unittest.TestCase):
         self.assertIn("WRONG_BOARD", apply)
 
     def test_offline_backup_apply_and_restore(self):
-        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory(prefix="veci-oneclick-", dir="/tmp") as job:
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory(prefix="veci-oneclick-a", dir="/tmp") as job:
             root = Path(tmp) / "fake-router"
             (root / "www/veci").mkdir(parents=True)
             (root / "usr/libexec/rpcd").mkdir(parents=True)

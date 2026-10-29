@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-app-catalog-we5927
 PKG_VERSION:=1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKGARCH:=all
 
 include $(INCLUDE_DIR)/package.mk
@@ -24,6 +24,10 @@ endef
 define Package/veci-app-catalog-we5927/install
 	$(INSTALL_DIR) $(1)/usr/share/veci/apps
 	$(INSTALL_DATA) ./files/usr/share/veci/apps/*.json $(1)/usr/share/veci/apps/
+	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
+	$(INSTALL_BIN) ./files/usr/libexec/rpcd/veci.apps $(1)/usr/libexec/rpcd/veci.apps
+	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
+	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/veci-apps.json $(1)/usr/share/rpcd/acl.d/veci-apps.json
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./files/etc/uci-defaults/95-veci-app-feed-we5927 $(1)/etc/uci-defaults/95-veci-app-feed-we5927
 endef
