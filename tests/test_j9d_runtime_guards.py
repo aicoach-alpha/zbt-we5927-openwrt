@@ -56,11 +56,13 @@ class J9DNegativeTests(unittest.TestCase):
                 'manifest_remove_packages() { printf "veci-app-guest\\n"; }\n'
                 'safe_package_words() { return 0; }\n'
                 'ubus() { case "$1" in list) printf "veci.app.guest\\n";; call) return 0;; esac; }\n'
-                'apk() { touch '+shlex.quote(str(temp/"WRONG_PACKAGE_REMOVAL"))+'; }\n'
+                'app_removal_has_core_packages() { return 1; }\n'
+                'apk() { if [ "$1" = "--simulate" ]; then touch '+shlex.quote(str(temp/"PREFLIGHT_RUN"))+'; return 0; fi; touch '+shlex.quote(str(temp/"WRONG_PACKAGE_REMOVAL"))+'; }\n'
                 +fn+'\nprintf "{\\"id\\":\\"guest\\",\\"action\\":\\"remove\\"}" | method_app_action\n'
             )
             r=shell(src)
             self.assertIn("app_cleanup_failed",r.stdout)
+            self.assertTrue((temp/"PREFLIGHT_RUN").exists())
             self.assertFalse((temp/"WRONG_PACKAGE_REMOVAL").exists())
             self.assertIn("app_cleanup_provider_missing",fn)
             self.assertIn("app_cleanup_unavailable",fn)
