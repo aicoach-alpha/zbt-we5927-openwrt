@@ -1,0 +1,115 @@
+name: VeCI General-Cafe matched firmware candidate (MANUAL ONLY)
+
+# Free GitHub Actions quota: no push/schedule trigger. Never flashes or publishes firmware.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veci-general-cafe-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    name: Pinned WE5927 General-Cafe, never flash
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout VeCI firmware integration
+        uses: actions/checkout@v4
+        with:
+          path: firmware
+
+      - name: Verify immutable source pins and prepare build tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          . firmware/source/openwrt-maintenance-pins.env
+          for variable in OPENWRT_COMMIT PACKAGES_COMMIT LUCI_COMMIT ROUTING_COMMIT TELEPHONY_COMMIT VIDEO_COMMIT; do
+            value="${!variable}"
+            [[ "$value" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::$variable is not SHA40"; exit 2; }
+          done
+          {
+            echo "OPENWRT_COMMIT=$OPENWRT_COMMIT"
+            echo "PACKAGES_COMMIT=$PACKAGES_COMMIT"
+            echo "LUCI_COMMIT=$LUCI_COMMIT"
+            echo "ROUTING_COMMIT=$ROUTING_COMMIT"
+            echo "TELEPHONY_COMMIT=$TELEPHONY_COMMIT"
+            echo "VIDEO_COMMIT=$VIDEO_COMMIT"
+          } >> "$GITHUB_ENV"
+          git clone --filter=blob:none https://github.com/openwrt/openwrt.git openwrt
+          git -C openwrt checkout "$OPENWRT_COMMIT"
+          git -C openwrt apply --check "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
+          git -C openwrt apply "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
+          cat > openwrt/feeds.conf.default <<EOF
+          src-git packages https://git.openwrt.org/feed/packages.git^$PACKAGES_COMMIT
+          src-git luci https://git.openwrt.org/project/luci.git^$LUCI_COMMIT
+          src-git routing https://git.openwrt.org/feed/routing.git^$ROUTING_COMMIT
+          src-git telephony https://git.openwrt.org/feed/telephony.git^$TELEPHONY_COMMIT
+          src-git video https://github.com/openwrt/video.git^$VIDEO_COMMIT
+          EOF
+          VECI_EDITION=general firmware/scripts/prepare-veci.sh "$GITHUB_WORKSPACE/openwrt"
+          firmware/scripts/install-veci-feeds.sh "$GITHUB_WORKSPACE/openwrt"
+
+      - name: Select native Guest/Voucher and run static tests
+        working-directory: firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C ../openwrt rev-parse HEAD)" = "$OPENWRT_COMMIT"
+          cp source/openwrt-we5927.config ../openwrt/.config
+          make -C ../openwrt defconfig
+          scripts/prepare-veci-general-cafe-profile.sh "$GITHUB_WORKSPACE/openwrt"
+          mkdir -p /tmp/j9d-openwrt/package
+          ln -s "$GITHUB_WORKSPACE/openwrt/package/veci" /tmp/j9d-openwrt/package/veci
+          python3 -B -m unittest discover -s tests -p 'test_*.py'
+          python3 scripts/j9c_readiness_audit.py --root . \
+            --veci-source ../openwrt/package/veci --output ../j9c-cafe-source.json
+          python3 - <<'PY'
+          import json
+          audit=json.load(open('../j9c-cafe-source.json'))
+          assert audit['source_readiness']=='PASS',audit
+          assert audit['flash_decision']=='NO_GO',audit
+          print('Café source gates PASS; flash decision stays NO_GO')
+          PY
+
+      - name: Build pinned full firmware and matching signed APK indexes
+        working-directory: openwrt
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -j2
+
+      - name: Validate single WE5927 image, 7808 KiB limit and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t imgs < <(find openwrt/bin/targets/ramips/mt76x8 -maxdepth 1 -name '*zbt-we5927*sysupgrade.bin' -type f | sort)
+          mapfile -t manifests < <(find openwrt/bin/targets/ramips/mt76x8 -maxdepth 1 -name '*zbt-we5927*.manifest' -type f | sort)
+          [ "${#imgs[@]}" = 1 ] && [ "${#manifests[@]}" = 1 ] || {
+            echo "::error::Expected exactly one board image + manifest"
+            exit 7
+          }
+          fwtool="$GITHUB_WORKSPACE/openwrt/staging_dir/host/bin/fwtool"
+          test -x "$fwtool" || { echo "::error::Matched host fwtool missing"; exit 8; }
+          firmware/scripts/verify-veci-general-cafe-image.sh \
+            "${imgs[0]}" "${manifests[0]}" "$fwtool"
+          mkdir -p candidate
+          cp "${imgs[0]}" "${manifests[0]}" candidate/
+          cp j9c-cafe-source.json candidate/
+          (
+            cd candidate
+            sha256sum * > SHA256SUMS
+            sha256sum -c SHA256SUMS
+            printf 'FLASH_DECISION=NO_GO_UNTIL_HARDWARE_UAT_AND_OPERATOR_APPROVAL\n' > HARDWARE-NO-GO.txt
+          )
+
+      - name: Retain candidate for investigation only
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-general-cafe-unapproved-candidate
+          path: candidate/
+          retention-days: 7
+          if-no-files-found: error
