@@ -4,11 +4,14 @@
  * Expected api.request(sessionId,object,method,params) interface.
  */
 export const VECl_APP_IDS = Object.freeze({
-  'Guest portal':'guest-portal',
-  'Smart Queue':'smart-queue',
-  'Dynamic DNS':'dynamic-dns',
+  'Hotspot Portal':'hotspot',
+  'Guest portal':'hotspot',
+  'Smart Queue':'bandwidth',
+  'DNS Filtering Lite':'dns-filter',
+  'Dynamic DNS':'ddns',
   'WireGuard':'wireguard',
-  'Voucher':'voucher'
+  'Voucher Manager':'voucher-manager',
+  'Voucher':'voucher-manager'
 });
 export function makeVeCiAppService(api) {
   if(!api || typeof api.request!=='function') throw new TypeError('authenticated_api_required');
@@ -42,7 +45,7 @@ export function makeVeCiAppService(api) {
   }
   async function action(title,verb) {
     const id=VECl_APP_IDS[title];
-    if(!id || id==='voucher') throw new Error('unsupported_app');
+    if(!id || id==='voucher-manager') throw new Error('unsupported_app');
     if(verb!=='install' && verb!=='uninstall') throw new TypeError('invalid_action');
     const previous=await inventory(true);
     const meta=previous.apps?.[id];
