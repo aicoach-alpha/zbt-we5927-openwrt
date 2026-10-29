@@ -1,0 +1,104 @@
+#!/bin/sh
+# VeCI general Apps v15 — constrained authenticated rpcd-exec package manager.
+# No arbitrary package names, URLs, or shell commands accepted from a browser.
+set -eu
+umask 077
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+LOCK=/tmp/veci-general-app-operation.lock
+STATE=/tmp/veci-general-app-operation.status
+WORKER=/usr/libexec/veci-general-app-worker
+error(){ printf '{"ok":false,"reason":"%s"}\n' "$1"; exit 0; }
+mapping(){
+ case "$1" in
+  guest-portal) echo nodogsplash ;;
+  smart-queue) echo luci-app-sqm ;;
+  dynamic-dns) echo luci-app-ddns ;;
+  wireguard) echo luci-proto-wireguard ;;
+  voucher) echo none ;;
+  *) return 1 ;;
+ esac
+}
+installed(){
+ apk list -I "$1" 2>/dev/null | awk -v pkg="$1" 'index($1,pkg"-")==1{x=1} END{exit !x}'
+}
+available(){
+ apk list -a "$1" 2>/dev/null | awk -v pkg="$1" 'index($1,pkg"-")==1{x=1} END{exit !x}'
+}
+feed_present(){
+ for f in /etc/apk/repositories.d/*.list /etc/apk/repositories; do
+  [ -f "$f" ] && [ ! -L "$f" ] || continue
+  grep -Eq '^[[:space:]]*https://[^ #]+/packages[.]adb' "$f" && return 0
+ done
+ return 1
+}
+free_kib(){
+ df -Pk /overlay 2>/dev/null | awk 'NR==2{print $4;exit}' | grep -E '^[0-9]+$' || echo 0
+}
+read_status(){
+ [ "$(id -u)" = 0 ] || error requires_root
+ [ -x /sbin/apk ] || command -v apk >/dev/null 2>&1 || error apk_missing
+ if feed_present; then feeds=true; else feeds=false; fi
+ free="$(free_kib)"
+ printf '{"ok":true,"feedConfigured":%s,"freeOverlayKiB":%s,"apps":{' "$feeds" "$free"
+ comma=''
+ for id in guest-portal smart-queue dynamic-dns wireguard voucher; do
+  pkg="$(mapping "$id")"
+  isinst=false
+  isavail=false
+  if [ "$pkg" != none ]; then
+   if installed "$pkg"; then isinst=true; fi
+   if [ "$feeds" = true ] && available "$pkg"; then isavail=true; fi
+  fi
+  printf '%s"%s":{"package":"%s","installed":%s,"available":%s}' "$comma" "$id" "$pkg" "$isinst" "$isavail"
+  comma=','
+ done
+ printf '},"operation":'
+ if [ -f "$STATE" ] && [ ! -L "$STATE" ] && [ "$(wc -c < "$STATE")" -lt 256 ]; then
+  cat "$STATE"
+ else
+  printf '{"state":"idle"}'
+ fi
+ printf '}\n'
+}
+start_job(){
+ [ "$(id -u)" = 0 ] || error requires_root
+ command -v jsonfilter >/dev/null 2>&1 || error jsonfilter_missing
+ [ -x "$WORKER" ] || error worker_missing
+ [ -x /sbin/apk ] || command -v apk >/dev/null 2>&1 || error apk_missing
+ request="$(head -c 1024)" || error invalid_input
+ id="$(printf '%s' "$request" | jsonfilter -e '@.app' 2>/dev/null)" || error invalid_json
+ action="$(printf '%s' "$request" | jsonfilter -e '@.action' 2>/dev/null)" || error invalid_json
+ pkg="$(mapping "$id")" || error unknown_app
+ [ "$pkg" != none ] || error app_has_no_supported_package
+ case "$action" in install|uninstall) ;; *) error unknown_action ;; esac
+ [ ! -L "$LOCK" ] && [ ! -L "$STATE" ] || error unsafe_operation_paths
+ mkdir -m 700 "$LOCK" 2>/dev/null || error operation_already_running
+ trap 'rmdir "$LOCK" 2>/dev/null || :' EXIT
+ if [ "$action" = install ]; then
+  feed_present || error signed_feed_not_configured
+  available "$pkg" || error package_not_in_signed_feed
+  free="$(free_kib)"
+  [ "$free" -ge 8192 ] || error insufficient_overlay_space
+  ! installed "$pkg" || error already_installed
+ else
+  installed "$pkg" || error not_installed
+ fi
+ printf '{"state":"queued","app":"%s","action":"%s"}\n' "$id" "$action" > "$STATE"
+ # Child writes no output to inherited RPC sockets.
+ "$WORKER" "$id" "$action" "$pkg" </dev/null >/dev/null 2>&1 &
+ worker_pid=$!
+ # The worker owns the lock from this point.
+ trap - EXIT
+ printf '{"ok":true,"accepted":true,"state":"queued"}\n'
+}
+case "$1" in
+ list) printf '{"status":{},"start":{"app":"str","action":"str"}}\n' ;;
+ call)
+  case "$2" in
+   status) read_status ;;
+   start) start_job ;;
+   *) error method_not_found ;;
+  esac ;;
+ *) error unsupported_request ;;
+esac
