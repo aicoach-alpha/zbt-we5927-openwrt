@@ -109,4 +109,21 @@ EOF
             self.assertNotEqual(p.returncode,0)
             self.assertIn('board/target',p.stderr+p.stdout)
 
+    def test_archived_october_image_rejected_for_missing_cafe_dependencies(self):
+        archived=ROOT/'releases/v2026.10.06'
+        image=archived/'openwrt-25.12.5-zbt-we5927-v2026.10.06-sysupgrade.bin'
+        manifest=archived/'openwrt-25.12.5-zbt-we5927-v2026.10.06.manifest'
+        metadata=archived/'sysupgrade-meta.json'
+        self.assertTrue(image.is_file())
+        self.assertTrue(manifest.is_file())
+        with tempfile.TemporaryDirectory() as d:
+            fwtool=pathlib.Path(d)/'mock-fwtool'
+            fwtool.write_text('#!/bin/sh\ncp '+str(metadata)+' "$2"\n')
+            fwtool.chmod(0o755)
+            r=subprocess.run(['sh',str(VERIFY),str(image),str(manifest),str(fwtool)],
+                             capture_output=True,text=True,timeout=12)
+            self.assertNotEqual(r.returncode,0)
+            self.assertIn('STOP: missing firmware packages',r.stdout+r.stderr)
+            self.assertIn('uspot',r.stdout+r.stderr)
+
 if __name__=='__main__': unittest.main()
