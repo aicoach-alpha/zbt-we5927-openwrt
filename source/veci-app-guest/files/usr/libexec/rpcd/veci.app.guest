@@ -326,6 +326,62 @@ disable_portal() {
 	return 0
 }
 
+valid_client_mac() {
+  case "$1" in
+    [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+guest_client_list() {
+  ubus call uspot client_list '{"uspot":"veci_guest"}' 2>/dev/null |
+    jsonfilter -e '@.veci_guest[*]' 2>/dev/null
+}
+
+method_clients() {
+  . /usr/share/libubox/jshn.sh
+  json_init
+  json_add_array clients
+  count=0
+  for address in $(guest_client_list); do
+    valid_client_mac "$address" || continue
+    [ "$count" -lt 64 ] || break
+    count=$((count + 1))
+    detail="$(ubus call uspot client_get "{ \"uspot\": \"veci_guest\", \"address\": \"$address\" }" 2>/dev/null || true)"
+    user="$(printf '%s' "$detail" | jsonfilter -e '@.username' 2>/dev/null || true)"
+    user="$(printf '%s' "$user" | cut -c1-48 | tr -cd 'A-Za-z0-9._-')"
+    json_add_object
+    json_add_string mac "$address"
+    json_add_string username "$user"
+    json_close_object
+  done
+  json_close_array
+  json_add_int count "$count"
+  json_dump
+}
+
+method_disconnect() {
+  input="$(cat)"
+  address="$(printf '%s' "$input" | jsonfilter -e '@.address' 2>/dev/null)"
+  valid_client_mac "$address" || {
+    printf '{ "ok": false, "error": "invalid_client_mac" }\n'
+    return
+  }
+  found=0
+  for online in $(guest_client_list); do
+    if [ "$online" = "$address" ]; then found=1; break; fi
+  done
+  [ "$found" -eq 1 ] || {
+    printf '{ "ok": false, "error": "client_not_connected_to_guest" }\n'
+    return
+  }
+  if ubus call uspot client_remove "{ \"uspot\": \"veci_guest\", \"address\": \"$address\" }" >/dev/null 2>&1; then
+    printf '{ "ok": true }\n'
+  else
+    printf '{ "ok": false, "error": "disconnect_failed" }\n'
+  fi
+}
+
 method_save() {
 	input="$(cat)"
 	ssid="$(printf '%s' "$input" | jsonfilter -e '@.ssid' 2>/dev/null)"
@@ -420,11 +476,13 @@ method_cleanup() {
 
 case "$1" in
 	list)
-		printf '{ "status": {}, "save": { "ssid": "str", "idle_timeout": "str", "session_timeout": "str" }, "action": { "action": "str" }, "cleanup": {} }\n'
+		printf '{ "status": {}, "clients": {}, "disconnect": { "address": "str" }, "save": { "ssid": "str", "idle_timeout": "str", "session_timeout": "str" }, "action": { "action": "str" }, "cleanup": {} }\n'
 		;;
 	call)
 		case "$2" in
 			status) method_status ;;
+			clients) method_clients ;;
+			disconnect) method_disconnect ;;
 			save) method_save ;;
 			action) method_action ;;
 			cleanup) method_cleanup ;;

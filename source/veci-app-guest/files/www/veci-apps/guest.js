@@ -4,6 +4,7 @@ export default {
 	async render({ api, root, toast, confirm, back, app }) {
 		let status = await api.call('veci.app.guest', 'status', {});
 
+		let clients = [];
 		const draw = () => {
 			root.innerHTML = `
 				<div class="page-intro">
@@ -53,13 +54,60 @@ export default {
 					</article>
 				</div>
 
-				<div class="notice-card">
+				<section class="panel" aria-labelledby="guest-client-heading">
+                <div class="panel-heading"><div><p class="eyebrow">SESSIONS</p><h3 id="guest-client-heading">Connected guests</h3></div>
+                <button class="button button-secondary" id="guest-clients-refresh" type="button">Refresh</button></div>
+                <div class="detail-list">
+                ${clients.length ? clients.map(client => `
+                  <div><span><strong>${escapeHtml(client.mac)}</strong>
+                  <small>${escapeHtml(client.username || 'Guest')}</small></span>
+                  <button class="button button-secondary" data-disconnect="${escapeHtml(client.mac)}" type="button">Disconnect</button></div>
+                `).join('') : '<div><span>No active sessions loaded</span><strong>—</strong></div>'}
+                </div><p class="panel-copy">Refresh reads up to 64 active uspot sessions. Disconnect ends only this guest session.</p>
+            </section>
+            <div class="notice-card">
 					<strong>Guest isolation is intentional.</strong>
 					<p>The VeCI guest profile uses a dedicated 10.20.0.0/24 network and firewall zone. The portal only forwards authenticated clients toward WAN and does not bridge them into LAN.</p>
 				</div>
 			`;
 
 			root.querySelector('#guest-back')?.addEventListener('click', back);
+            root.querySelector('#guest-clients-refresh')?.addEventListener('click', async () => {
+                const button = root.querySelector('#guest-clients-refresh');
+                setBusy(button, true, 'Refreshing…');
+                try {
+                    const result = await api.call('veci.app.guest', 'clients', {});
+                    clients = Array.isArray(result?.clients) ? result.clients : [];
+                    draw();
+                } catch (error) {
+                    toast(error.message || 'Unable to list guest clients.', 'error');
+                    setBusy(button, false);
+                }
+            });
+            root.querySelectorAll('[data-disconnect]').forEach(button => {
+                button.addEventListener('click', async () => {
+                    const address = button.dataset.disconnect;
+                    const allowed = await confirm({
+                        title: 'Disconnect guest?',
+                        message: 'Disconnect guest session ' + address + '?',
+                        confirmLabel: 'Disconnect', tone: 'danger'
+                    });
+                    if (!allowed) return;
+                    setBusy(button, true, 'Disconnecting…');
+                    try {
+                        const result = await api.call('veci.app.guest', 'disconnect', { address });
+                        if (result?.ok !== true) throw new Error(result?.error || 'Disconnect failed');
+                        const latest = await api.call('veci.app.guest', 'clients', {});
+                        clients = Array.isArray(latest?.clients) ? latest.clients : [];
+                        draw();
+                        toast('Guest session disconnected.', 'success');
+                    } catch (error) {
+                        toast(error.message || 'Unable to disconnect guest.', 'error');
+                        setBusy(button, false);
+                    }
+                });
+            });
+
 
 			const runAction = async (id, action, label) => {
 				const button = root.querySelector(id);
