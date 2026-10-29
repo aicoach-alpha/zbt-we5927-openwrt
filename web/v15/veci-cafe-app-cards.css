@@ -1,0 +1,20 @@
+/* VeCI v15 compact, accessible cafe app catalog */
+.veci-cafe-apps { padding:clamp(12px,2.4vw,32px); background:transparent; color:#142d42; }
+.veci-cafe-apps-intro h2 { font-size:clamp(1.3rem,2vw,1.8rem); margin:0 0 7px; letter-spacing:-.03em; }
+.veci-cafe-apps-intro p { max-width:68ch; margin:0 0 16px; color:#596c7f; }
+.veci-cafe-apps-note { border:1px solid #f1d9a7; padding:12px 14px; background:#fffaf0; border-radius:10px; }
+.veci-cafe-apps-category { margin-top:28px; }
+.veci-cafe-apps-category h3 { margin-bottom:11px; font-size:1rem; font-weight:780; }
+.veci-cafe-apps-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,245px),1fr)); gap:13px; }
+.veci-cafe-card { display:flex; flex-direction:column; gap:10px; background:#fff; border:1px solid #d8e4ef; border-radius:14px;
+ padding:17px; box-shadow:0 6px 23px rgba(12,45,77,.05); min-height:173px; }
+.veci-cafe-card h4 { font-size:1.02rem; font-weight:760; margin:0; }
+.veci-cafe-card-description { font-size:.88rem; color:#4d6379; line-height:1.5; margin:0; flex:1; }
+.veci-cafe-card-status { font-size:.78rem; color:#536d82; margin:0; }
+.veci-cafe-card-footer { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:auto; }
+.veci-cafe-card-priority { font-size:.72rem; background:#eef4f9; color:#57738b; border-radius:20px; padding:4px 9px; }
+.veci-cafe-card-link,.veci-cafe-card-button { border:1px solid #bcd4e5; border-radius:8px; padding:7px 12px; color:#145b94;
+ background:#eff8ff; font-size:.83rem; text-decoration:none; cursor:pointer; font-weight:650; }
+.veci-cafe-card-button:disabled { background:#f3f6fa; color:#788795; cursor:not-allowed; }
+.veci-cafe-card-link:focus-visible,.veci-cafe-card-button:focus-visible { outline:3px solid #34a8df; outline-offset:2px; }
+@media(prefers-reduced-motion:reduce) { .veci-cafe-card * { transition:none!important; } }
