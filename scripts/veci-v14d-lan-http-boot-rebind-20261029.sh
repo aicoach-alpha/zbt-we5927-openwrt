@@ -92,7 +92,13 @@ fi
 echo VECI_V14D_STAGE=one_integrity_gate
 check_config
 [ -x "$HOOK" ] && [ ! -L "$HOOK" ] || fail persistent_hook_missing
-listener_present || fail http_listener_absent_after_restart
+if ! listener_present;then
+ echo VECI_V14D_STAGE=http_listener_missing_rollback
+ rm -f "$HOOK" || :
+ cp -p "$BACK" "$CFG" || fail failed_integrity_restore_config_failed
+ "$SVC" restart || fail failed_integrity_restore_https_failed
+ fail http_listener_absent_original_restored
+fi
 pidof uhttpd >/dev/null 2>&1 || fail uhttpd_not_running
 echo VECI_V14D_HTTP=192.168.1.1:80
 echo VECI_V14D_HTTPS=preserved
