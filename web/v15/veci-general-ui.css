@@ -1,0 +1,44 @@
+/* VeCI general v15, namespaced. Authenticated app only. */
+#app-view.veci-general-layout:not(.hidden) { display:block !important; min-width:0; padding:0 !important; }
+.veci-general-topnav {
+  position:sticky; top:0; z-index:90; width:100%;
+  box-sizing:border-box; display:flex; gap:18px; align-items:center;
+  min-height:68px; padding:9px clamp(12px,2.2vw,32px);
+  background:#0a1d30; color:#fff; box-shadow:0 4px 16px rgba(7,28,52,.12);
+}
+.veci-general-brand { flex:0 0 auto; font-size:1.28rem; font-weight:800; letter-spacing:-.03em; }
+.veci-general-links { display:flex; gap:4px; flex:1 1 auto; min-width:0; align-items:center; overflow-x:auto; scrollbar-width:thin; }
+.veci-general-links a {
+  display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;
+  border-radius:9px; min-height:38px; padding:7px 12px; margin:1px 0;
+  color:#d1dfec; text-decoration:none; white-space:nowrap; font-size:.88rem;
+}
+.veci-general-links a:hover,.veci-general-links a:focus-visible {
+  background:rgba(255,255,255,.1); color:#fff;
+}
+.veci-general-links a[aria-current="page"] { background:#156aa3; color:#fff; }
+.veci-general-actions { display:flex; align-items:center; gap:14px; flex:0 0 auto; }
+.veci-general-actions a,.veci-general-actions button { color:#d1dfec; }
+.veci-general-app-actions { margin-top:12px; display:flex; align-items:center; gap:8px; }
+.veci-general-app-button {
+  border:1px solid #b7cfdf; border-radius:8px; padding:8px 13px;
+  background:#e9f4ff; color:#153657; font:inherit; cursor:pointer;
+}
+.veci-general-app-button:disabled { opacity:.65; cursor:not-allowed; }
+.veci-general-app-pending { font-size:.82rem; color:#637b91; }
+#app-view.veci-general-layout .main-content,
+#app-view.veci-general-layout .app-content,
+#app-view.veci-general-layout main,
+#app-view.veci-general-layout #main-content,
+#app-view.veci-general-layout #page-content {
+  margin-left:0 !important; width:100% !important; max-width:none;
+}
+@media(max-width:1000px) {
+  .veci-general-topnav { flex-wrap:wrap; gap:5px; padding:9px 12px; }
+  .veci-general-brand { margin-right:12px; }
+  .veci-general-links { order:3; flex-basis:100%; }
+  .veci-general-actions { margin-left:auto; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .veci-general-topnav * { transition:none !important; }
+}
