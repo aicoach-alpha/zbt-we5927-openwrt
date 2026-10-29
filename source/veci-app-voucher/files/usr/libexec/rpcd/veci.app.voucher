@@ -120,9 +120,176 @@ method_create() {
 		return
 	fi
 
-	now="$(date +%s)"
-	expires=$((now + duration))
-	uci -q batch <<EOF
+    if ! mkdir /tmp/veci-voucher-batch.lock 2>/dev/null; then
+        printf '{ "ok": false, "error": "voucher_batch_busy" }\n'
+        return
+    fi
+    work="$(mktemp -d /tmp/veci-voucher-one.XXXXXX)" || {
+        rmdir /tmp/veci-voucher-batch.lock
+        printf '{ "ok": false, "error": "voucher_temp_failed" }\n'
+        return
+    }
+    chmod 700 "$work"
+    one_cleanup() {
+        rm -rf "$work"
+        rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+    }
+    for name in uspot veci_voucher; do
+        if [ -f "/etc/config/$name" ]; then
+            cp -p "/etc/config/$name" "$work/$name" || {
+                one_cleanup
+                printf '{ "ok": false, "error": "voucher_backup_failed" }\n'
+                return
+            }
+        else
+            : > "$work/$name.absent"
+        fi
+    done
+    # Recheck uniqueness while holding the same lock used by batch generation.
+    if uci -q get "veci_voucher.$section" >/dev/null 2>&1; then
+        one_cleanup
+        printf '{ "ok": false, "error": "voucher_exists" }\n'
+        return
+    fi
+    now="$(date +%s)"
+    case "$now" in ''|*[!0-9]*)
+        one_cleanup
+        printf '{ "ok": false, "error": "clock_unavailable" }\n'
+        return ;;
+    esac
+    expires=$((now + duration))
+    if ! uci -q batch <<EOF
+set veci_voucher.$section=voucher
+set veci_voucher.$section.code='$code'
+set veci_voucher.$section.created='$now'
+set veci_voucher.$section.expires='$expires'
+set uspot.veci_voucher_$section=credentials
+set uspot.veci_voucher_$section.uspot='veci_guest'
+set uspot.veci_voucher_$section.username='$code'
+set uspot.veci_voucher_$section.password='$code'
+set uspot.veci_guest.auth_mode='credentials'
+EOF
+    then
+        one_failed=1
+    else
+        one_failed=0
+        uci commit veci_voucher || one_failed=1
+        [ "$one_failed" -ne 0 ] || uci commit uspot || one_failed=1
+        [ "$one_failed" -ne 0 ] || /etc/init.d/uspot restart >/dev/null 2>&1 || one_failed=1
+    fi
+    if [ "$one_failed" -ne 0 ]; then
+        restored=1
+        for name in uspot veci_voucher; do
+            if [ -f "$work/$name.absent" ]; then
+                rm -f "/etc/config/$name" || restored=0
+            else
+                cp -p "$work/$name" "/etc/config/$name" || restored=0
+            fi
+        done
+        /etc/init.d/uspot restart >/dev/null 2>&1 || true
+        one_cleanup
+        if [ "$restored" -eq 1 ]; then
+            printf '{ "ok": false, "error": "voucher_create_failed_rolled_back" }\n'
+        else
+            printf '{ "ok": false, "error": "voucher_create_rollback_incomplete" }\n'
+        fi
+        return
+    fi
+    one_cleanup
+    printf '{ "ok": true, "code": "%s", "expires": %s }\n' "$code" "$expires"
+}
+
+# Batch creates 1-20 unique 48-bit random credentials with one UCI commit
+# per config file. The lock and snapshots prevent simultaneous batch writes.
+safe_batch_count() {
+    case "$1" in ''|*[!0-9]*) return 1;; esac
+    [ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 20 ] 2>/dev/null
+}
+
+method_create_batch() {
+    input="$(cat)"
+    count="$(printf '%s' "$input" | jsonfilter -e '@.count' 2>/dev/null)"
+    duration="$(printf '%s' "$input" | jsonfilter -e '@.duration' 2>/dev/null)"
+    safe_batch_count "$count" || {
+        printf '{ "ok": false, "error": "invalid_batch_count" }\n'
+        return
+    }
+    safe_duration "$duration" || {
+        printf '{ "ok": false, "error": "invalid_duration" }\n'
+        return
+    }
+    ensure_guest_ready || {
+        printf '{ "ok": false, "error": "guest_portal_not_enabled" }\n'
+        return
+    }
+    if ! mkdir /tmp/veci-voucher-batch.lock 2>/dev/null; then
+        printf '{ "ok": false, "error": "voucher_batch_busy" }\n'
+        return
+    fi
+    chmod 700 /tmp/veci-voucher-batch.lock || {
+        rmdir /tmp/veci-voucher-batch.lock
+        printf '{ "ok": false, "error": "voucher_batch_lock_failed" }\n'
+        return
+    }
+    dir="$(mktemp -d /tmp/veci-voucher-batch.XXXXXX)" || {
+        rmdir /tmp/veci-voucher-batch.lock
+        printf '{ "ok": false, "error": "voucher_temp_failed" }\n'
+        return
+    }
+    chmod 700 "$dir"
+    batch_cleanup() {
+        rm -rf "$dir"
+        rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+    }
+    batch_rollback() {
+        for name in uspot veci_voucher; do
+            if [ -f "$dir/$name.absent" ]; then
+                rm -f "/etc/config/$name"
+            else
+                cp -p "$dir/$name" "/etc/config/$name" || return 1
+            fi
+        done
+        /etc/init.d/uspot restart >/dev/null 2>&1 || true
+    }
+    for name in uspot veci_voucher; do
+        if [ -f "/etc/config/$name" ]; then
+            cp -p "/etc/config/$name" "$dir/$name" || {
+                batch_cleanup
+                printf '{ "ok": false, "error": "voucher_backup_failed" }\n'
+                return
+            }
+        else
+            : > "$dir/$name.absent"
+        fi
+    done
+    existing="$(uci show veci_voucher 2>/dev/null | grep -c '=voucher$' || true)"
+    case "$existing" in ''|*[!0-9]*) existing=0;; esac
+    if [ $((existing + count)) -gt 250 ]; then
+        batch_cleanup
+        printf '{ "ok": false, "error": "voucher_capacity_limit" }\n'
+        return
+    fi
+    now="$(date +%s)"
+    case "$now" in ''|*[!0-9]*) batch_cleanup; printf '{ "ok": false, "error": "clock_unavailable" }\n'; return;; esac
+    expires=$((now + duration))
+    : > "$dir/codes"
+    : > "$dir/commands"
+    produced=0
+    attempts=0
+    while [ "$produced" -lt "$count" ] && [ "$attempts" -lt 100 ]; do
+        attempts=$((attempts + 1))
+        code="$(od -An -N6 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' | tr 'a-f' 'A-F')"
+        case "$code" in
+            ????????????) ;;
+            *) break;;
+        esac
+        section="$(section_for_code "$code")"
+        if grep -Fxq "$code" "$dir/codes" ||
+           uci -q get "veci_voucher.$section" >/dev/null 2>&1; then
+            continue
+        fi
+        printf '%s\n' "$code" >> "$dir/codes"
+        cat >> "$dir/commands" <<EOF
 set veci_voucher.$section=voucher
 set veci_voucher.$section.code='$code'
 set veci_voucher.$section.created='$now'
@@ -132,10 +299,37 @@ set uspot.veci_voucher_$section.uspot='veci_guest'
 set uspot.veci_voucher_$section.username='$code'
 set uspot.veci_voucher_$section.password='$code'
 EOF
-	uci commit veci_voucher
-	uci commit uspot
-	sync_mode
-	printf '{ "ok": true, "code": "%s", "expires": %s }\n' "$code" "$expires"
+        produced=$((produced + 1))
+    done
+    if [ "$produced" -ne "$count" ]; then
+        batch_cleanup
+        printf '{ "ok": false, "error": "secure_random_unavailable" }\n'
+        return
+    fi
+    printf "set uspot.veci_guest.auth_mode='credentials'\n" >> "$dir/commands"
+    if ! uci -q batch < "$dir/commands" ||
+       ! uci commit veci_voucher ||
+       ! uci commit uspot ||
+       ! /etc/init.d/uspot restart >/dev/null 2>&1; then
+        if batch_rollback; then
+            printf '{ "ok": false, "error": "voucher_batch_failed_rolled_back" }\n'
+        else
+            printf '{ "ok": false, "error": "voucher_batch_rollback_incomplete" }\n'
+        fi
+        batch_cleanup
+        return
+    fi
+    . /usr/share/libubox/jshn.sh
+    json_init
+    json_add_boolean ok 1
+    json_add_int expires "$expires"
+    json_add_array vouchers
+    while IFS= read -r code; do
+        json_add_string '' "$code"
+    done < "$dir/codes"
+    json_close_array
+    json_dump
+    batch_cleanup
 }
 
 method_revoke() {
@@ -181,12 +375,13 @@ method_cleanup_all() {
 
 case "$1" in
 	list)
-		printf '{ "status": {}, "create": { "code": "str", "duration": "str" }, "revoke": { "code": "str" }, "cleanupExpired": {}, "cleanup": {} }\n'
+		printf '{ "status": {}, "create": { "code": "str", "duration": "str" }, "createBatch": { "count": "int", "duration": "str" }, "revoke": { "code": "str" }, "cleanupExpired": {}, "cleanup": {} }\n'
 		;;
 	call)
 		case "$2" in
 			status) method_status ;;
 			create) method_create ;;
+			createBatch) method_create_batch ;;
 			revoke) method_revoke ;;
 			cleanupExpired) method_cleanup ;;
 			cleanup) method_cleanup_all ;;
