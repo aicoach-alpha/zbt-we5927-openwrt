@@ -11,11 +11,11 @@ WORKER=/usr/libexec/veci-general-app-worker
 error(){ printf '{"ok":false,"reason":"%s"}\n' "$1"; exit 0; }
 mapping(){
  case "$1" in
-  guest-portal) echo nodogsplash ;;
-  smart-queue) echo luci-app-sqm ;;
-  dynamic-dns) echo luci-app-ddns ;;
+  hotspot) echo opennds ;;
+  bandwidth) echo sqm-scripts ;;
+  ddns) echo ddns-scripts ;;
   wireguard) echo luci-proto-wireguard ;;
-  voucher) echo none ;;
+  dns-filter) echo adblock-fast ;;
   *) return 1 ;;
  esac
 }
@@ -42,7 +42,7 @@ read_status(){
  free="$(free_kib)"
  printf '{"ok":true,"feedConfigured":%s,"freeOverlayKiB":%s,"apps":{' "$feeds" "$free"
  comma=''
- for id in guest-portal smart-queue dynamic-dns wireguard voucher; do
+ for id in hotspot bandwidth dns-filter ddns wireguard; do
   pkg="$(mapping "$id")"
   isinst=false
   isavail=false
