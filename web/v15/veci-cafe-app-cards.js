@@ -3,15 +3,16 @@
  * Injected only into the authenticated Apps route by owning VeCI app.
  * No local credential storage, arbitrary packages, or fake install success.
  */
-import {VECI_CAFE_CATALOG, VECI_CAFE_CATEGORIES} from './veci-cafe-app-catalog.js';
+import {VECI_CAFE_CATALOG, VECI_CAFE_CATEGORIES, cafeEssentials} from './veci-cafe-app-catalog.js';
 function el(doc,tag,cls,text){
  const node=doc.createElement(tag);
  if(cls) node.className=cls;
  if(text!==undefined) node.textContent=text;
  return node;
 }
-export function renderCafeApps(root,{service=null,doc=root.ownerDocument}={}){
+export function renderCafeApps(root,{service=null,doc=root.ownerDocument,showAdvanced=false}={}){
  if(!root || !doc || !doc.createElement) throw new TypeError('Apps root required');
+ const chosen=showAdvanced?VECI_CAFE_CATALOG:cafeEssentials();
  const outer=el(doc,'section','veci-cafe-apps');
  const head=el(doc,'div','veci-cafe-apps-intro');
  head.append(el(doc,'h2','','Apps untuk Kafe & Router'));
@@ -19,14 +20,14 @@ export function renderCafeApps(root,{service=null,doc=root.ownerDocument}={}){
   'Voucher, bandwidth, keamanan tamu dan monitoring. Status instalasi dibaca dari router, bukan perkiraan.'));
  outer.append(head);
  const notice=el(doc,'p','veci-cafe-apps-note',
-  'Hotspot Portal adalah captive portal. Voucher berbayar, masa aktif dan kuota baru tersedia setelah backend voucher terintegrasi.');
+  'Khusus perangkat ini, instalasi paket diblokir jika tidak muat atau tidak tersedia di feed firmware. Hotspot voucher memerlukan portal dan backend voucher yang benar; kode voucher belum aktif.');
  outer.append(notice);
  const controls=new Map();
  for(const category of VECI_CAFE_CATEGORIES){
   const group=el(doc,'section','veci-cafe-apps-category');
   group.append(el(doc,'h3','',category));
   const grid=el(doc,'div','veci-cafe-apps-grid');
-  for(const item of VECI_CAFE_CATALOG.filter(x=>x.category===category)){
+  for(const item of chosen.filter(x=>x.category===category)){
    const card=el(doc,'article','veci-cafe-card');
    card.dataset.appId=item.id;
    card.append(el(doc,'h4','',item.title));
@@ -102,5 +103,5 @@ export function renderCafeApps(root,{service=null,doc=root.ownerDocument}={}){
   }
  };
  void refresh();
- return {count:VECI_CAFE_CATALOG.length,refresh,dispose:()=>root.replaceChildren()};
+ return {count:chosen.length,refresh,dispose:()=>root.replaceChildren()};
 }
