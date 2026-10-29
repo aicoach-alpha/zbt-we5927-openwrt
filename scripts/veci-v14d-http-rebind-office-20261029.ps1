@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 $router='root@192.168.1.1'
 $remote='/tmp/veci-v14d-lan-http-boot-rebind-20261029.sh'
 $local=Join-Path $env:TEMP 'veci-v14d-lan-http-boot-rebind-20261029.sh'
-$url='https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/8117e88df2c46d0f0d8b24c9321f810e39a9c500/scripts/veci-v14d-lan-http-boot-rebind-20261029.sh'
+$url='https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/4a3871e0af47e28cf5cafe2b8161602697d1337d/scripts/veci-v14d-lan-http-boot-rebind-20261029.sh'
 function Fail([string]$reason) { Write-Output ('VECI_V14D_OFFICE='+$reason); exit 1 }
 Write-Output 'VECI_V14D_OFFICE_STAGE=fetch'
 & curl.exe --fail --location --silent --show-error --max-time 15 $url --output $local
