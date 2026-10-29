@@ -7,6 +7,7 @@ export const VECl_APP_IDS = Object.freeze({
   'Hotspot Portal':'hotspot',
   'Guest portal':'hotspot',
   'Smart Queue':'bandwidth',
+  'Smart Queue (SQM)':'bandwidth',
   'DNS Filtering Lite':'dns-filter',
   'Dynamic DNS':'ddns',
   'WireGuard':'wireguard',
