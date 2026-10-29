@@ -10,7 +10,7 @@ class ContainerBuildTests(unittest.TestCase):
   s=SCRIPT.read_text()
   for term in ('--cpus=1.5','--memory=4g','--memory-swap=6g',
                '--cap-drop=ALL','--security-opt=no-new-privileges',
-               '--user 1000:1000','/mnt/data/andre-maintenance-archives/',
+               '--user 1000:1000','-v "$repo:/firmware:ro"','/mnt/data/andre-maintenance-archives/',
                'c740570351512e4400369b3c2aff49741f65580e'):
    self.assertIn(term,s)
   for term in ('sysupgrade','scp','ssh root@','apk add','apt-get','--privileged','--network=host'):

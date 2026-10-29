@@ -27,4 +27,4 @@ case "$mode" in
   download) cmd='make download -j2' ;;
   build) cmd='make -j2' ;;
 esac
-exec docker run --rm --name veci-cafe-builder   --cpus=1.5 --memory=4g --memory-swap=6g --pids-limit=256   --security-opt=no-new-privileges --cap-drop=ALL   --network=bridge --user 1000:1000   -e HOME=/tmp -v "$root/openwrt:/build"   -w /build veci-general-cafe-builder:20261029   /bin/bash -lc "$cmd"
+exec docker run --rm --name veci-cafe-builder   --cpus=1.5 --memory=4g --memory-swap=6g --pids-limit=256   --security-opt=no-new-privileges --cap-drop=ALL   --network=bridge --user 1000:1000   -e HOME=/tmp -v "$root/openwrt:/build" -v "$repo:/firmware:ro"   -w /build veci-general-cafe-builder:20261029   /bin/bash -lc "$cmd"
