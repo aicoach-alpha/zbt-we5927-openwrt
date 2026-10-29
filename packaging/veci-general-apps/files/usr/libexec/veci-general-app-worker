@@ -10,7 +10,7 @@ action="$2"
 package="$3"
 # Re-check fixed mapping: do not trust argv from a stray caller.
 case "$id:$package" in
- guest-portal:nodogsplash|smart-queue:luci-app-sqm|dynamic-dns:luci-app-ddns|wireguard:luci-proto-wireguard) ;;
+ hotspot:opennds|bandwidth:sqm-scripts|dns-filter:adblock-fast|ddns:ddns-scripts|wireguard:luci-proto-wireguard) ;;
  *) exit 1 ;;
 esac
 case "$action" in install|uninstall) ;; *) exit 1 ;; esac
