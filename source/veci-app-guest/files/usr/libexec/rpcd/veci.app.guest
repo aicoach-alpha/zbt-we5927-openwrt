@@ -70,7 +70,8 @@ set veci_guest.main.ssid='$ssid'
 set veci_guest.main.idle_timeout='$idle'
 set veci_guest.main.session_timeout='$session'
 EOF
-	uci commit veci_guest
+	[ "$?" -eq 0 ] || return 1
+	uci commit veci_guest || return 1
 }
 
 # All activation changes are transactional against these router-owned UCI
@@ -303,11 +304,12 @@ enable_portal() {
 }
 
 disable_portal() {
+	rc=0
 	uci -q delete uspot.veci_guest
-	uci commit uspot
+	uci commit uspot || rc=1
 	if uci -q get wireless.veci_guest >/dev/null 2>&1; then
 		uci set wireless.veci_guest.disabled='1'
-		uci commit wireless
+		uci commit wireless || rc=1
 	fi
 
 	original="$(uci -q get veci_guest.main.original_listen_http 2>/dev/null || true)"
@@ -318,12 +320,12 @@ disable_portal() {
 			uci add_list uhttpd.main.listen_http="$listener"
 		done
 	fi
-	uci commit uhttpd
+	uci commit uhttpd || rc=1
 
-	service_restart uspot || true
-	service_restart uhttpd || true
-	wifi reload >/dev/null 2>&1 || true
-	return 0
+	service_restart uspot || rc=1
+	service_restart uhttpd || rc=1
+	wifi reload >/dev/null 2>&1 || rc=1
+	[ "$rc" -eq 0 ]
 }
 
 valid_client_mac() {
@@ -402,19 +404,35 @@ method_save() {
 		return
 	}
 
-	save_preferences "$ssid" "$idle" "$session"
-	if uci -q get wireless.veci_guest >/dev/null 2>&1; then
-		uci set wireless.veci_guest.ssid="$ssid"
-		uci commit wireless
-		wifi reload >/dev/null 2>&1 || true
-	fi
-	if uci -q get uspot.veci_guest >/dev/null 2>&1; then
-		uci set uspot.veci_guest.idle_timeout="$idle"
-		uci set uspot.veci_guest.session_timeout="$session"
-		uci commit uspot
-		service_restart uspot || true
-	fi
-	printf '{ "ok": true }\n'
+    portal_snapshot_begin || {
+        printf '{ "ok": false, "error": "guest_settings_snapshot_failed" }\n'
+        return
+    }
+    saved=0
+    if save_preferences "$ssid" "$idle" "$session"; then
+        saved=1
+    fi
+    if [ "$saved" -eq 1 ] && uci -q get wireless.veci_guest >/dev/null 2>&1; then
+        uci set wireless.veci_guest.ssid="$ssid" &&
+            uci commit wireless &&
+            wifi reload >/dev/null 2>&1 || saved=0
+    fi
+    if [ "$saved" -eq 1 ] && uci -q get uspot.veci_guest >/dev/null 2>&1; then
+        uci set uspot.veci_guest.idle_timeout="$idle" &&
+            uci set uspot.veci_guest.session_timeout="$session" &&
+            uci commit uspot &&
+            service_restart uspot || saved=0
+    fi
+    if [ "$saved" -eq 1 ]; then
+        portal_snapshot_discard
+        printf '{ "ok": true }\n'
+        return
+    fi
+    if portal_snapshot_restore; then
+        printf '{ "ok": false, "error": "guest_save_failed_rolled_back" }\n'
+    else
+        printf '{ "ok": false, "error": "guest_save_rollback_incomplete" }\n'
+    fi
 }
 
 method_action() {
@@ -436,7 +454,11 @@ method_action() {
 			fi
 			;;
 		disable)
-			if disable_portal; then printf '{ "ok": true }\n'; fi
+			if disable_portal; then
+                printf '{ "ok": true }\n'
+            else
+                printf '{ "ok": false, "error": "guest_disable_failed" }\n'
+            fi
 			;;
 		*)
 			printf '{ "ok": false, "error": "unsupported_action" }\n'
