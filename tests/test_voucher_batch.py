@@ -20,6 +20,7 @@ class VoucherBatchTests(unittest.TestCase):
     def test_transaction_fail_closed(self):
         src=self.script
         batch=src.split('method_create_batch() {',1)[1].split('\nmethod_revoke() {',1)[0]
+        self.assertIn('json_add_boolean batch_supported 1', src)
         for keyword in ['voucher_batch_busy','voucher_capacity_limit','secure_random_unavailable',
           'voucher_batch_failed_rolled_back','voucher_batch_rollback_incomplete','/dev/urandom',
           'batch_rollback()', 'batch_cleanup()', 'json_add_array vouchers',

@@ -75,6 +75,7 @@ method_status() {
 	. /usr/share/libubox/jshn.sh
 	json_init
 	json_add_boolean guest_ready "$guest_ready"
+	json_add_boolean batch_supported 1
 	json_add_array vouchers
 	for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
 		code="$(uci -q get veci_voucher.$section.code 2>/dev/null || true)"
