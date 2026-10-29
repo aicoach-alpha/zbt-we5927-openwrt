@@ -89,3 +89,21 @@ be verified on the router before enabling Install. No production changes
 are claimed for this v15 catalog. Confirm installation status after
 future deploy using one targeted integrity gate and one actual App action,
 not repeated legacy UAT.
+
+## v15.1 — Curated essential cards and compatibility reality (2026-10-29)
+
+The owner reiterated the requirement that **only apps useful for a café and realistic on the WE5927** should dominate the page. The initial 14-card catalog was too broad for the default view. Source is now updated:
+
+- `VECI_CAFE_ESSENTIAL_IDS` and `cafeEssentials()` choose **11 essential** cards (Hotspot Portal, Voucher Manager, Guest Wi-Fi, Connected Clients, Smart Queue, Speed Profiles, Data & Time Limits, Firewall & Guest Isolation, Data Meter, Fast LTE Reconnect, Backup & Restore).
+- The responsive card renderer displays only those 11 by default. Three lower-priority cards (DNS Filtering Lite, Dynamic DNS and WireGuard) remain in the extended `showAdvanced=true` catalog.
+- Voucher Manager and per-user limits are **development only**, not installable pretend packages. OpenNDS is a conditional package, not a working voucher implementation. Guest Wi-Fi, client listing, firewall, Data Meter, LTE watchdog and backup link back to existing authenticated VeCI pages.
+- The official OpenWrt **25.12.5 mipsel_24kc packages** listing does show `sqm-scripts-1.7.2-r1.apk` 20.0 KB, `adblock-fast-1.2.4-r4.apk` 30.7 KB, and `ddns-scripts-2.8.4-r8.apk` 23.1 KB. Those are download archive sizes only. The same 25.12.5 base/packages indexes did **not** contain an `opennds-` APK on the date checked, while the snapshot repository showed opennds 10.3.1 (~150 KB). **Do not mix SNAPSHOT packages into stable 25.12.5** or claim openNDS is signed and installable from the current firmware's feed. Use a reproducible exact-version custom build if later authorized.
+- The prior audit's overlay was ~1120 KiB free; installed dependencies, uncompressed package sizes and build matching require runtime verification. The existing provisional Apps RPC keeps a conservative **8192 KiB free-space gate**, meaning it should never falsely accept new app installs on that observed state.
+- A focused catalog test PASS: 14 valid ids, 11 default essential cards, 3 advanced, UI renderer syntax OK, cross-file package mapping consistent, no voucher fake-install and conservative flash/feed checks intact.
+
+Sources:
+- https://downloads.openwrt.org/releases/25.12.5/packages/mipsel_24kc/packages/
+- https://downloads.openwrt.org/releases/25.12.5/packages/mipsel_24kc/base/
+- https://downloads.openwrt.org/releases/25.12.5/packages/mipsel_24kc/luci/
+
+**Production remains unchanged** by these Github source commits. The real runtime VeCI app source has never been available in this chat, so do not install/inject JS blindly or claim cards already appear on the live router. The upstream packager itself remains a non-shipped source prototype; one release hardening pass and authentic backend integration are required before a signed APK build and a guarded deploy. No new firmware or APN/LTE changes.
