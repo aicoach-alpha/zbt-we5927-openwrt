@@ -197,6 +197,47 @@ class CandidateFinalizerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Missing physical MTD"):
                 module.verify_hardware_attestation(fw, image)
 
+    def test_real_squashfs_extraction_and_embedded_release_fields(self):
+        import shutil
+        if not shutil.which("mksquashfs") or not shutil.which("unsquashfs"):
+            self.skipTest("SquashFS host tools not installed")
+        with tempfile.TemporaryDirectory() as d:
+            work = pathlib.Path(d)
+            tree = work / "root"
+            needed = [
+                "etc/veci-release.json",
+                "usr/libexec/rpcd/veci",
+                "usr/libexec/rpcd/veci.apps",
+                "usr/libexec/rpcd/veci.app.guest",
+                "usr/libexec/rpcd/veci.app.voucher",
+                "www/veci/index.html",
+                "etc/apk/keys/openwrt-public.pem"
+            ]
+            metadata = {
+                "build_id": "f" * 40,
+                "veci_commit": "c" * 40,
+                "openwrt_commit": module.PINNED_OPENWRT,
+                "edition": "general"
+            }
+            for name in needed:
+                file = tree / name
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text(json.dumps(metadata) if name.endswith("veci-release.json")
+                                else "UNIT_TEST_DATA_NOT_AN_APK_SIGNATURE")
+            filesystem = work / "filesystem.squashfs"
+            build = subprocess.run(
+                ["mksquashfs", str(tree), str(filesystem),
+                 "-noappend", "-no-progress", "-processors", "1"],
+                capture_output=True, text=True, timeout=20
+            )
+            self.assertEqual(build.returncode, 0, build.stderr[-600:])
+            image = work / "synthetic-sysupgrade.bin"
+            image.write_bytes(b"SYNTHETIC_IMAGE_HEADER" + filesystem.read_bytes())
+            self.assertTrue(module.verify_embedded_rootfs(image, metadata))
+            metadata["edition"] = "indonesia"
+            with self.assertRaisesRegex(ValueError, "Embedded rootfs release metadata mismatch"):
+                module.verify_embedded_rootfs(image, metadata)
+
     def test_no_router_or_publish_actions(self):
         content = FILE.read_text()
         self.assertIn("NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT", content)
