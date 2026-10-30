@@ -100,7 +100,9 @@ check_once() {
 	fi
 }
 
-while true; do
+# Auto-check disabled: leave memory rather than sleeping indefinitely.
+# procd's UCI reload trigger owns process restart after a setting change.
+while [ "$(uci -q get veci.update.auto_check 2>/dev/null)" = "1" ]; do
 	check_once
 	interval="$(clean_interval "$(uci -q get veci.update.check_interval 2>/dev/null || true)")"
 	sleep "$interval"
