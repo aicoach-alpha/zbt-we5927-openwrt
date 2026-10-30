@@ -197,6 +197,23 @@ class CandidateFinalizerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Missing physical MTD"):
                 module.verify_hardware_attestation(fw, image)
 
+    def test_operator_mtd_json_type_and_report_name_fail_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            fw, build, image, _ = self.fixture(d)
+            evidence = fw / "docs/WE5927-OPERATOR-MTD-EVIDENCE-20261030.json"
+            evidence.write_text("[]")
+            with self.assertRaisesRegex(ValueError, "JSON object"):
+                module.verify_hardware_attestation(fw, image)
+            data = json.loads((ROOT / "docs/WE5927-OPERATOR-MTD-EVIDENCE-20261030.json").read_text())
+            del data["operator_report_basename"]
+            evidence.write_text(json.dumps(data))
+            with self.assertRaisesRegex(ValueError, "report reference"):
+                module.verify_hardware_attestation(fw, image)
+            data["operator_report_basename"] = "../secrets.txt"
+            evidence.write_text(json.dumps(data))
+            with self.assertRaisesRegex(ValueError, "report reference"):
+                module.verify_hardware_attestation(fw, image)
+
     def test_real_squashfs_extraction_and_embedded_release_fields(self):
         import shutil
         if not shutil.which("mksquashfs") or not shutil.which("unsquashfs"):

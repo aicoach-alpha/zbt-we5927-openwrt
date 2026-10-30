@@ -89,6 +89,12 @@ def verify_hardware_attestation(firmware, image):
     if not attestation_path.is_file() or attestation_path.is_symlink():
         fail("Missing physical MTD evidence from the operator")
     entry = json.loads(attestation_path.read_text())
+    if not isinstance(entry, dict):
+        fail("Operator MTD evidence must be a JSON object")
+    report_name = entry.get("operator_report_basename")
+    if (not isinstance(report_name, str)
+            or report_name != "192.168.1.1-20261030-120117-flash-capacity.txt"):
+        fail("Operator MTD audit report reference missing or invalid")
     needed = {
         "schema": 1,
         "source": "operator-provided-read-only-router-audit",
