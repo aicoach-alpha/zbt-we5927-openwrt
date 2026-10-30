@@ -49,12 +49,12 @@ class CandidateFinalizerTests(unittest.TestCase):
         script.write_text("#!/bin/sh\necho 'FLASH_DECISION=NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT'\n")
         return fw, build, image, manifest
 
-    def setup_mock(self):
+    def setup_mock(self, head="f" * 40):
         real_run = subprocess.run
         real_check = subprocess.check_output
         def command(args, **kwargs):
             if args[0] == "git" and args[-2:] == ["rev-parse", "HEAD"]:
-                return ("a" * 40 if "firmware" in str(args[2])
+                return (head if "firmware" in str(args[2])
                         else module.PINNED_OPENWRT)
             if args[0] == "git" and args[-2:] == ["show", "f" * 40 + ":source/veci.commit"]:
                 return "c" * 40 + "\n"
@@ -254,6 +254,34 @@ class CandidateFinalizerTests(unittest.TestCase):
             metadata["edition"] = "indonesia"
             with self.assertRaisesRegex(ValueError, "Embedded rootfs release metadata mismatch"):
                 module.verify_embedded_rootfs(image, metadata)
+
+    def test_stale_build_is_hard_refused_for_production(self):
+        with tempfile.TemporaryDirectory() as d, self.setup_mock(head="a" * 40):
+            fw, build, image, _ = self.fixture(d)
+            target = pathlib.Path("/mnt/data/andre-maintenance-archives") / ("veci-stale-" + pathlib.Path(d).name)
+            with self.assertRaisesRegex(ValueError, "STALE_BUILD_REQUIRES_REBUILD"):
+                module.finalize(fw, build, target)
+            self.assertFalse(target.exists())
+
+    def test_explicit_historical_audit_retains_no_go(self):
+        external = pathlib.Path("/mnt/data/andre-maintenance-archives")
+        with tempfile.TemporaryDirectory(dir=external, prefix="veci-history-") as d, self.setup_mock(head="a" * 40):
+            fw, build, image, _ = self.fixture(d)
+            report = module.finalize(fw, build, pathlib.Path(d)/"forensic",
+                                     allow_stale_audit=True)
+            self.assertEqual(report["source_freshness"], "STALE")
+            self.assertIn("HISTORICAL_AUDIT", report["status"])
+            self.assertEqual(report["flash_decision"], "NO_GO_STALE_BUILD_REQUIRES_REBUILD")
+            self.assertEqual(report["router_deployment"], "NOT_PERFORMED")
+
+    def test_fresh_release_still_requires_hardware_uat(self):
+        external = pathlib.Path("/mnt/data/andre-maintenance-archives")
+        with tempfile.TemporaryDirectory(dir=external, prefix="veci-fresh-") as d, self.setup_mock():
+            fw, build, image, _ = self.fixture(d)
+            report = module.finalize(fw, build, pathlib.Path(d)/"fresh")
+            self.assertEqual(report["source_freshness"], "CURRENT")
+            self.assertEqual(report["current_repo_commit"], report["source_commit"])
+            self.assertEqual(report["flash_decision"], "NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT")
 
     def test_no_router_or_publish_actions(self):
         content = FILE.read_text()

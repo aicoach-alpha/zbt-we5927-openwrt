@@ -129,7 +129,7 @@ def verify_hardware_attestation(firmware, image):
         "decision": "CAPACITY_PASS_ONLY_FLASH_NO_GO"
     }
 
-def finalize(firmware, build_tree, out):
+def finalize(firmware, build_tree, out, allow_stale_audit=False):
     firmware = pathlib.Path(firmware).resolve()
     build_tree = pathlib.Path(build_tree).resolve()
     out = pathlib.Path(out).absolute()
@@ -169,6 +169,13 @@ def finalize(firmware, build_tree, out):
         ["git", "-C", str(firmware), "merge-base", "--is-ancestor", source_commit, head],
         capture_output=True, check=True, timeout=10
     )
+    source_freshness = "CURRENT" if source_commit == head else "STALE"
+    # A successful build from an ancestor is useful for forensic inspection,
+    # but must NEVER be a release candidate for current production. An
+    # explicit historical-audit mode can preserve evidence with a NO_GO label.
+    if source_freshness == "STALE" and not allow_stale_audit:
+        fail("STALE_BUILD_REQUIRES_REBUILD: image source " + source_commit
+             + " differs from current tested repository HEAD " + head)
     expected_core = subprocess.check_output(
         ["git", "-C", str(firmware), "show", source_commit + ":source/veci.commit"],
         text=True, timeout=10
@@ -204,8 +211,14 @@ def finalize(firmware, build_tree, out):
         for origin in (image, manifest):
             shutil.copyfile(origin, out / origin.name)
         report = {
-            "status": "CANDIDATE_OFFLINE_VALIDATED_NOT_FLASH_APPROVED",
-            "flash_decision": "NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT",
+            "status": ("CANDIDATE_OFFLINE_VALIDATED_NOT_FLASH_APPROVED"
+                       if source_freshness == "CURRENT" else
+                       "HISTORICAL_AUDIT_STALE_SOURCE_NOT_A_RELEASE_CANDIDATE"),
+            "flash_decision": ("NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT"
+                               if source_freshness == "CURRENT" else
+                               "NO_GO_STALE_BUILD_REQUIRES_REBUILD"),
+            "source_freshness": source_freshness,
+            "current_repo_commit": head,
             "source_commit": source_commit,
             "core_commit": expected_core,
             "openwrt_commit": actual_openwrt,
@@ -238,9 +251,12 @@ def main():
     p.add_argument("--firmware", required=True)
     p.add_argument("--build-tree", required=True)
     p.add_argument("--output", required=True)
+    p.add_argument("--audit-stale", action="store_true",
+                   help="forensic validation only; never permits production flash")
     args = p.parse_args()
     try:
-        report = finalize(args.firmware, args.build_tree, args.output)
+        report = finalize(args.firmware, args.build_tree, args.output,
+                          allow_stale_audit=args.audit_stale)
     except (OSError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         print("CANDIDATE_BLOCKED: " + str(e), file=sys.stderr)
         return 2

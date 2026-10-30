@@ -40,3 +40,7 @@ This is operator-provided data, NOT a cryptographic router attestation.
 Do not flash automatically. After offline candidate verification, physical
 boot, rescue procedure, LTE, captive portal, voucher authentication and
 restored settings still require manual UAT and explicit approval.
+
+## Stale build guard
+
+Default release validation requires staged build_id equal to current tested HEAD. Historical ancestor builds are rejected with STALE_BUILD_REQUIRES_REBUILD. For offline inspection use --audit-stale, which marks output HISTORICAL_AUDIT and NO_GO_STALE_BUILD_REQUIRES_REBUILD. This is never permission for flashing. Current-source builds must still pass recovery and hardware UAT.
