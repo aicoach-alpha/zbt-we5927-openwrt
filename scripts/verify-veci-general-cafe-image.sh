@@ -31,8 +31,10 @@ meta=json.loads(pathlib.Path(sys.argv[1]).read_text())
 expected={'zbtlink,zbt-we5927','zbt-we5927'}
 devices=set(meta.get('supported_devices',[]))
 version=meta.get('version',{})
-if not devices.intersection(expected) or version.get('target')!='ramips/mt76x8':
+if 'zbtlink,zbt-we5927' not in devices or version.get('target')!='ramips/mt76x8' or version.get('board')!='zbtlink_zbt-we5927':
     raise SystemExit('STOP: firmware board/target metadata mismatch')
+if version.get('dist')!='OpenWrt' or version.get('version')!='25.12.5':
+    raise SystemExit('STOP: firmware OpenWrt release metadata mismatch')
 installed={}
 for line in pathlib.Path(sys.argv[2]).read_text().splitlines():
     if ' - ' not in line: continue
@@ -45,6 +47,8 @@ required=('kernel','base-files','dropbear','rpcd','uhttpd','dnsmasq',
 missing=[pkg for pkg in required if pkg not in installed]
 if missing:
     raise SystemExit('STOP: missing firmware packages '+','.join(missing))
+if not installed['kernel'].startswith('6.12.'):
+    raise SystemExit('STOP: expected 6.12-series kernel package in firmware manifest')
 print('BOARD_METADATA=PASS')
 print('BUNDLED_APPS_AND_ROUTER_CORE=PASS')
 print('KERNEL_PACKAGE='+installed['kernel'])

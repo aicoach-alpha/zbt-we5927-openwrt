@@ -67,11 +67,11 @@ class CafeProfileTests(unittest.TestCase):
         image=d/'sysupgrade.bin'
         image.write_bytes(b'a'*1048576)
         manifest=d/'image.manifest'
-        manifest.write_text(''.join(x+' - 1.0-r1\n' for x in (*BASIC,*CORE,*NEEDED)))
+        manifest.write_text(''.join(x+' - '+('6.12.112-r1' if x=='kernel' else '1.0-r1')+'\n' for x in (*BASIC,*CORE,*NEEDED)))
         fwtool=d/'fwtool'
         fwtool.write_text("""#!/bin/sh
 cat > "$2" <<EOF
-{"supported_devices":["zbtlink,zbt-we5927"],"version":{"target":"ramips/mt76x8"}}
+{"supported_devices":["zbtlink,zbt-we5927"],"version":{"dist":"OpenWrt","version":"25.12.5","target":"ramips/mt76x8","board":"zbtlink_zbt-we5927"}}
 EOF
 """)
         fwtool.chmod(0o755)
@@ -92,6 +92,33 @@ EOF
             p=subprocess.run(['sh',str(VERIFY),str(image),str(manifest),str(fwtool)],capture_output=True,text=True)
             self.assertNotEqual(p.returncode,0)
             self.assertIn('uspot-www',p.stderr+p.stdout)
+
+    def test_reject_wrong_openwrt_release(self):
+        with tempfile.TemporaryDirectory() as d:
+            image,manifest,fwtool=self.fixture_image(d)
+            fwtool.write_text(fwtool.read_text().replace('25.12.5','24.10.0'))
+            p=subprocess.run(['sh',str(VERIFY),str(image),str(manifest),str(fwtool)],
+                             capture_output=True,text=True)
+            self.assertNotEqual(p.returncode,0)
+            self.assertIn('firmware OpenWrt release metadata mismatch',p.stderr+p.stdout)
+
+    def test_reject_wrong_kernel_series(self):
+        with tempfile.TemporaryDirectory() as d:
+            image,manifest,fwtool=self.fixture_image(d)
+            manifest.write_text(manifest.read_text().replace('kernel - 6.12.112','kernel - 6.6.999'))
+            p=subprocess.run(['sh',str(VERIFY),str(image),str(manifest),str(fwtool)],
+                             capture_output=True,text=True)
+            self.assertNotEqual(p.returncode,0)
+            self.assertIn('expected 6.12-series kernel',p.stderr+p.stdout)
+
+    def test_reject_wrong_board_field(self):
+        with tempfile.TemporaryDirectory() as d:
+            image,manifest,fwtool=self.fixture_image(d)
+            fwtool.write_text(fwtool.read_text().replace('zbtlink_zbt-we5927','wrong-model'))
+            p=subprocess.run(['sh',str(VERIFY),str(image),str(manifest),str(fwtool)],
+                             capture_output=True,text=True)
+            self.assertNotEqual(p.returncode,0)
+            self.assertIn('firmware board/target metadata mismatch',p.stderr+p.stdout)
 
     def test_reject_oversize(self):
         with tempfile.TemporaryDirectory() as d:
