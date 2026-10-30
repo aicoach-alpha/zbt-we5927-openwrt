@@ -1,0 +1,6 @@
+{
+  "veci": {
+    "read": {"ubus": {"veci.apps": ["status"]}},
+    "write": {"ubus": {"veci.apps": ["verifyFeed"]}}
+  }
+}

@@ -1,0 +1,56 @@
+name: J9C Router Apps and updater UAT readiness
+on:
+  push:
+    paths:
+      - 'scripts/j9c_readiness_audit.py'
+      - 'tests/test_j9c_readiness.py'
+      - 'docs/J9C-HARDWARE-UAT.md'
+      - 'source/veci-app-*/**'
+      - 'source/veci-update-we5927/**'
+      - 'source/veci.commit'
+      - '.github/workflows/j9c-readiness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: j9c-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: J9C scanner regression tests
+        run: python3 -m unittest discover -s tests -p 'test_j9c_readiness.py' -v
+      - name: Prepare exact pinned VeCI source in disposable runner
+        run: |
+          mkdir -p /tmp/j9c-openwrt/package
+          ./scripts/prepare-veci.sh /tmp/j9c-openwrt
+      - name: J9C source/UAT safety audit
+        run: |
+          python3 scripts/j9c_readiness_audit.py \
+            --root . --veci-source /tmp/j9c-openwrt/package/veci \
+            --output j9c-readiness.json
+      - name: Require explicit release NO_GO
+        run: |
+          python3 - <<'PY'
+          import json
+          result=json.load(open('j9c-readiness.json'))
+          assert result['source_readiness']=='PASS'
+          assert result['product_readiness']=='BLOCKED'
+          assert result['flash_decision']=='NO_GO'
+          assert all(x=='NOT_TESTED' for x in result['hardware_uat'].values())
+          print('J9C STATIC PASS / LIVE NOT TESTED / FLASH NO_GO')
+          PY
+      - name: Archive reproducible readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-j9c-uat-readiness
+          path: j9c-readiness.json
+          if-no-files-found: warn
+          retention-days: 14

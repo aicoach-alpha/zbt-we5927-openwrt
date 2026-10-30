@@ -1,0 +1,270 @@
+#!/usr/bin/env python3
+"""Generate a local, non-flashable candidate artifact with source/manifest evidence.
+
+Do not publish, deploy, install, or contact the live router. Output directory
+must be a new empty path below the external NAS build-cache tree.
+"""
+import argparse
+import hashlib
+import json
+import re
+import tempfile
+import pathlib
+import shutil
+import subprocess
+import sys
+
+TARGET = "ramips/mt76x8"
+BOARD = "zbtlink_zbt-we5927"
+PINNED_OPENWRT = "c740570351512e4400369b3c2aff49741f65580e"
+
+
+def fail(message):
+    raise ValueError(message)
+
+
+def sha(path):
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def exact_one(paths, meaning):
+    found = sorted(p for p in paths if p.is_file() and not p.is_symlink())
+    if len(found) != 1:
+        fail("Expected exactly one %s, found %d" % (meaning, len(found)))
+    return found[0]
+
+
+
+def verify_embedded_rootfs(image, meta, require_prerm_hooks=True):
+    """Validate actual SquashFS bytes, not merely a manifest alongside the image."""
+    data = image.read_bytes()
+    offsets = [m.start() for m in re.finditer(b"hsqs", data)]
+    if len(offsets) != 1:
+        fail("Expected exactly one embedded SquashFS filesystem")
+    unsquashfs = shutil.which("unsquashfs")
+    if not unsquashfs:
+        fail("Host unsquashfs required to attest embedded firmware files")
+    needed = [
+        "etc/veci-release.json",
+        "usr/libexec/rpcd/veci",
+        "usr/libexec/rpcd/veci.apps",
+        "usr/libexec/rpcd/veci.app.guest",
+        "usr/libexec/rpcd/veci.app.voucher",
+        "www/veci/index.html",
+        "etc/apk/keys",
+    ]
+    if require_prerm_hooks:
+        needed.extend(["usr/libexec/veci/guest-prerm", "usr/libexec/veci/voucher-prerm"])
+    with tempfile.TemporaryDirectory(prefix="veci-image-rootfs-") as extract_dir:
+        result = subprocess.run(
+            [unsquashfs, "-quiet", "-o", str(offsets[0]), "-d", extract_dir,
+             str(image), *needed],
+            capture_output=True, text=True, timeout=110,
+        )
+        if result.returncode:
+            fail("Rootfs extraction failed: " + result.stderr[-350:])
+        tree = pathlib.Path(extract_dir)
+        for name in (item for item in needed if item != "etc/apk/keys"):
+            file = tree / name
+            if not file.is_file() or file.is_symlink() or file.stat().st_size <= 0:
+                fail("Rootfs missing mandatory file " + name)
+        actual = json.loads((tree / "etc/veci-release.json").read_text())
+        for key in ("build_id", "veci_commit", "openwrt_commit", "edition"):
+            if actual.get(key) != meta[key]:
+                fail("Embedded rootfs release metadata mismatch on " + key)
+        key_dir = tree / "etc/apk/keys"
+        if not key_dir.is_dir() or key_dir.is_symlink():
+            fail("Firmware image missing trusted APK keys")
+        if not any(x.is_file() and not x.is_symlink() and x.stat().st_size
+                   for x in key_dir.iterdir()):
+            fail("No trusted APK public keys embedded in firmware")
+    return True
+
+
+def verify_hardware_attestation(firmware, image):
+    """Check operator-reported MTD partition, not a presumed flash capacity."""
+    attestation_path = firmware / "docs/WE5927-OPERATOR-MTD-EVIDENCE-20261030.json"
+    if not attestation_path.is_file() or attestation_path.is_symlink():
+        fail("Missing physical MTD evidence from the operator")
+    entry = json.loads(attestation_path.read_text())
+    if not isinstance(entry, dict):
+        fail("Operator MTD evidence must be a JSON object")
+    report_name = entry.get("operator_report_basename")
+    if (not isinstance(report_name, str)
+            or report_name != "192.168.1.1-20261030-120117-flash-capacity.txt"):
+        fail("Operator MTD audit report reference missing or invalid")
+    needed = {
+        "schema": 1,
+        "source": "operator-provided-read-only-router-audit",
+        "board": "zbtlink,zbt-we5927",
+        "target": TARGET,
+        "partition_name": "firmware",
+        "kernel": "6.12.94",
+        "partition_size_hex": "007a0000",
+        "partition_size_bytes": 7995392,
+        "profile_max_image_bytes": 7995392,
+        "audit_result": "MTD_GATE=PROFILE_LIMIT_FITS_REPORTED_PARTITION",
+        "flash_decision": "NO_GO_UNTIL_IMAGE_VERIFIED_RECOVERY_AND_HARDWARE_UAT",
+        "hardware_uat": "NOT_TESTED"
+    }
+    if any(entry.get(k) != v or type(entry.get(k)) is not type(v)
+           for k, v in needed.items()):
+        fail("Operator-reported MTD evidence is invalid or mismatched")
+    if int(entry["partition_size_hex"], 16) != entry["partition_size_bytes"]:
+        fail("Operator-reported MTD hexadecimal/decimal size mismatch")
+    size = image.stat().st_size
+    if size > entry["partition_size_bytes"] or size > entry["profile_max_image_bytes"]:
+        fail("Actual sysupgrade image exceeds verified firmware partition capacity")
+    return {
+        "source": entry["source"],
+        "board": entry["board"],
+        "target": entry["target"],
+        "kernel": entry["kernel"],
+        "mtd_firmware_bytes": entry["partition_size_bytes"],
+        "operator_report_basename": entry["operator_report_basename"],
+        "image_bytes": size,
+        "spare_partition_bytes": entry["partition_size_bytes"] - size,
+        "decision": "CAPACITY_PASS_ONLY_FLASH_NO_GO"
+    }
+
+def finalize(firmware, build_tree, out, allow_stale_audit=False):
+    firmware = pathlib.Path(firmware).resolve()
+    build_tree = pathlib.Path(build_tree).resolve()
+    out = pathlib.Path(out).absolute()
+    if out.is_symlink() or out.exists():
+        fail("Output already exists; refusing to overwrite or follow a symlink")
+    archive = pathlib.Path("/mnt/data/andre-maintenance-archives").resolve()
+    # Check resolved parents too: a symlinked parent must not redirect output
+    # onto the NAS root disk or into an unrelated service's directory.
+    try:
+        out.parent.resolve().relative_to(archive)
+    except ValueError:
+        fail("Only an external maintenance archive may receive a candidate")
+    if build_tree.is_symlink() or not (build_tree / "rules.mk").is_file():
+        fail("OpenWrt build tree missing")
+    actual_openwrt = subprocess.check_output(
+        ["git", "-C", str(build_tree), "rev-parse", "HEAD"], text=True, timeout=10
+    ).strip()
+    if actual_openwrt != PINNED_OPENWRT:
+        fail("OpenWrt source commit mismatch")
+    build_metadata = build_tree / "package/veci-default-ui/files/etc/veci-release.json"
+    meta = json.loads(build_metadata.read_text())
+    source_commit = meta.get("build_id", "")
+    if (not isinstance(source_commit, str) or len(source_commit) != 40
+            or any(c not in "0123456789abcdef" for c in source_commit)):
+        fail("Invalid source commit in staged firmware metadata")
+    # A safe long-running build can finish AFTER additional tested changes
+    # have landed. Check against its original immutable Git object rather
+    # than the repository's moving HEAD.
+    subprocess.run(
+        ["git", "-C", str(firmware), "cat-file", "-e", source_commit + "^{commit}"],
+        capture_output=True, text=True, check=True, timeout=10
+    )
+    head = subprocess.check_output(
+        ["git", "-C", str(firmware), "rev-parse", "HEAD"], text=True, timeout=10
+    ).strip()
+    subprocess.run(
+        ["git", "-C", str(firmware), "merge-base", "--is-ancestor", source_commit, head],
+        capture_output=True, check=True, timeout=10
+    )
+    source_freshness = "CURRENT" if source_commit == head else "STALE"
+    # A successful build from an ancestor is useful for forensic inspection,
+    # but must NEVER be a release candidate for current production. An
+    # explicit historical-audit mode can preserve evidence with a NO_GO label.
+    if source_freshness == "STALE" and not allow_stale_audit:
+        fail("STALE_BUILD_REQUIRES_REBUILD: image source " + source_commit
+             + " differs from current tested repository HEAD " + head)
+    expected_core = subprocess.check_output(
+        ["git", "-C", str(firmware), "show", source_commit + ":source/veci.commit"],
+        text=True, timeout=10
+    ).strip()
+    if (meta.get("veci_commit") != expected_core
+            or meta.get("openwrt_commit") != PINNED_OPENWRT
+            or meta.get("edition") != "general"):
+        fail("Staged firmware metadata is stale or has mismatched source pins")
+    target_dir = build_tree / "bin/targets/ramips/mt76x8"
+    if not target_dir.is_dir():
+        fail("No target output folder: firmware build unfinished")
+    image = exact_one(target_dir.glob("*zbt-we5927*sysupgrade.bin"), "WE5927 image")
+    manifest = exact_one(target_dir.glob("*zbt-we5927*.manifest"), "WE5927 manifest")
+    fwtool = build_tree / "staging_dir/host/bin/fwtool"
+    if not fwtool.is_file() or not fwtool.stat().st_mode & 0o111:
+        fail("Build-matched host fwtool missing")
+    verifier = firmware / "scripts/verify-veci-general-cafe-image.sh"
+    validated = subprocess.run(
+        ["sh", str(verifier), str(image), str(manifest), str(fwtool)],
+        text=True, capture_output=True, timeout=80
+    )
+    if validated.returncode:
+        fail("Image verification failed: " + (validated.stderr + validated.stdout)[-900:])
+    if "FLASH_DECISION=NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT" not in validated.stdout:
+        fail("Verifier did not explicitly retain physical-flash NO_GO")
+    hardware_evidence = verify_hardware_attestation(firmware, image)
+    verify_embedded_rootfs(image, meta, require_prerm_hooks=(source_freshness == "CURRENT"))
+    image_sha = sha(image)
+    manifest_sha = sha(manifest)
+    # Never copy artifacts to the public web directory or GitHub release.
+    out.mkdir(parents=True, mode=0o700)
+    try:
+        for origin in (image, manifest):
+            shutil.copyfile(origin, out / origin.name)
+        report = {
+            "status": ("CANDIDATE_OFFLINE_VALIDATED_NOT_FLASH_APPROVED"
+                       if source_freshness == "CURRENT" else
+                       "HISTORICAL_AUDIT_STALE_SOURCE_NOT_A_RELEASE_CANDIDATE"),
+            "flash_decision": ("NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT"
+                               if source_freshness == "CURRENT" else
+                               "NO_GO_STALE_BUILD_REQUIRES_REBUILD"),
+            "source_freshness": source_freshness,
+            "current_repo_commit": head,
+            "source_commit": source_commit,
+            "core_commit": expected_core,
+            "openwrt_commit": actual_openwrt,
+            "board": BOARD,
+            "target": TARGET,
+            "image": {"name": image.name, "sha256": image_sha, "bytes": image.stat().st_size},
+            "manifest": {"name": manifest.name, "sha256": manifest_sha},
+            "verifier_output": validated.stdout.strip(),
+            "rootfs_files": ("SQUASHFS_RELEASE_RPC_AND_PRERM_VERIFIED" if source_freshness == "CURRENT" else "SQUASHFS_HISTORICAL_RPC_VERIFIED"),
+            "hardware_partition_evidence": hardware_evidence,
+            "hardware_uat": "NOT_TESTED",
+            "signed_app_feed": "NOT_ATTESTED_BY_THIS_GATE",
+            "router_deployment": "NOT_PERFORMED"
+        }
+        (out / "RELEASE-CANDIDATE.json").write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n"
+        )
+        lines = [sha(out / name) + "  " + name for name in sorted(
+            [image.name, manifest.name, "RELEASE-CANDIDATE.json"
+        ])]
+        (out / "SHA256SUMS").write_text("\n".join(lines) + "\n")
+    except Exception:
+        shutil.rmtree(out)
+        raise
+    return report
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--firmware", required=True)
+    p.add_argument("--build-tree", required=True)
+    p.add_argument("--output", required=True)
+    p.add_argument("--audit-stale", action="store_true",
+                   help="forensic validation only; never permits production flash")
+    args = p.parse_args()
+    try:
+        report = finalize(args.firmware, args.build_tree, args.output,
+                          allow_stale_audit=args.audit_stale)
+    except (OSError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        print("CANDIDATE_BLOCKED: " + str(e), file=sys.stderr)
+        return 2
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
