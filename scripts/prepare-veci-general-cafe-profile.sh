@@ -20,7 +20,15 @@ python3 - "$config" <<'PY'
 import pathlib, re, sys
 path=pathlib.Path(sys.argv[1])
 data=path.read_text()
-required=('uspot','uspot-www','veci-app-guest','veci-app-voucher')
+required=('uspot','uspot-www','veci-app-guest','veci-app-voucher','luci-light')
+# Keep LuCI Light as independent rescue UI, but avoid the full LuCI
+# collection which pulls in the redundant second APK package-manager UI.
+# VeCI itself remains the primary app installer.
+disabled=('luci','luci-app-package-manager')
+for pkg in disabled:
+    pattern=re.compile(r'(?m)^(?:CONFIG_PACKAGE_'+re.escape(pkg)+r'=[^\n]*|# CONFIG_PACKAGE_'+re.escape(pkg)+r' is not set)\n?')
+    data=pattern.sub('',data)
+    data+='# CONFIG_PACKAGE_'+pkg+' is not set\n'
 for pkg in required:
     pattern=re.compile(r'(?m)^(?:CONFIG_PACKAGE_'+re.escape(pkg)+r'=[^\n]*|# CONFIG_PACKAGE_'+re.escape(pkg)+r' is not set)\n?')
     data=pattern.sub('',data)
@@ -28,12 +36,19 @@ for pkg in required:
 path.write_text(data)
 PY
 make -C "$root" defconfig >/dev/null
-for pkg in uspot uspot-www veci-app-guest veci-app-voucher; do
+for pkg in uspot uspot-www veci-app-guest veci-app-voucher luci-light; do
     grep -qx "CONFIG_PACKAGE_$pkg=y" "$config" ||
       { echo "STOP: Kconfig did not select $pkg=y" >&2; exit 7; }
+done
+for pkg in luci luci-app-package-manager; do
+  ! grep -qx "CONFIG_PACKAGE_$pkg=y" "$config" || {
+    echo "STOP: redundant LuCI collection/package-manager was reselected" >&2
+    exit 9
+  }
 done
 grep -qx 'CONFIG_SIGNED_PACKAGES=y' "$config" ||
   { echo 'STOP: signed package configuration changed' >&2; exit 8; }
 echo GENERAL_CAFE_PROFILE_CONFIGURED
-echo REQUIRED_BUILTIN=uspot,uspot-www,veci-app-guest,veci-app-voucher
+echo REQUIRED_BUILTIN=uspot,uspot-www,veci-app-guest,veci-app-voucher,luci-light
+echo REDUNDANT_REMOVED=luci,luci-app-package-manager
 echo NEXT=build_image_then_validate_size_metadata_manifest_and_UAT
