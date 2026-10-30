@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-app-guest
 PKG_VERSION:=1
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKGARCH:=all
 
 include $(INCLUDE_DIR)/package.mk

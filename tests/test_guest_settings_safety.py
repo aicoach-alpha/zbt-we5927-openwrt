@@ -19,4 +19,4 @@ class GuestSettingsSafetyTests(unittest.TestCase):
     fn=s.split('disable_portal() {',1)[1].split('\n}',1)[0]
     self.assertIn('[ "$rc" -eq 0 ]',fn)
   def test_pkg_bumped(self):
-    self.assertIn('PKG_RELEASE:=3',(ROOT/'source/veci-app-guest/Makefile').read_text())
+    self.assertIn('PKG_RELEASE:=4',(ROOT/'source/veci-app-guest/Makefile').read_text())
