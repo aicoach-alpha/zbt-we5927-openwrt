@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-app-voucher
 PKG_VERSION:=1
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKGARCH:=all
 
 include $(INCLUDE_DIR)/package.mk
@@ -25,6 +25,8 @@ define Package/veci-app-voucher/install
 	$(INSTALL_DIR) $(1)/usr/share/veci/apps-installed
 	touch $(1)/usr/share/veci/apps-installed/voucher
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
+	$(INSTALL_DIR) $(1)/usr/libexec/veci
+	$(INSTALL_BIN) ./files/usr/libexec/veci/voucher-prerm $(1)/usr/libexec/veci/voucher-prerm
 	$(INSTALL_BIN) ./files/usr/libexec/rpcd/veci.app.voucher $(1)/usr/libexec/rpcd/veci.app.voucher
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/usr/sbin/veci-voucher-cleaner $(1)/usr/sbin/veci-voucher-cleaner
@@ -45,16 +47,9 @@ endef
 
 define Package/veci-app-voucher/prerm
 #!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] || {
-	ubus call veci.app.voucher cleanup '{}' >/dev/null 2>&1 || true
-	/etc/init.d/veci-voucher-cleaner stop >/dev/null 2>&1 || true
-	/etc/init.d/veci-voucher-cleaner disable >/dev/null 2>&1 || true
-	if uci -q get uspot.veci_guest >/dev/null 2>&1; then
-		uci set uspot.veci_guest.auth_mode='click-to-continue'
-		uci commit uspot
-		/etc/init.d/uspot restart >/dev/null 2>&1 || true
-	fi
-}
+# Offline staging must not contact the router.
+[ -n "$${IPKG_INSTROOT}" ] || /usr/libexec/veci/voucher-prerm
+
 endef
 
 $(eval $(call BuildPackage,veci-app-voucher))

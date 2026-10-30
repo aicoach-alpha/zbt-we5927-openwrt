@@ -139,7 +139,7 @@ class VoucherLifecycleTests(unittest.TestCase):
         self.assertNotIn('disconnect',audit)
         self.assertFalse(locked)
     def test_package_revision_and_syntax(self):
-        self.assertIn('PKG_RELEASE:=3',PKG.read_text())
+        self.assertIn('PKG_RELEASE:=4',PKG.read_text())
         r=subprocess.run(['sh','-n',str(SRC)],capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stderr)
 if __name__=='__main__':unittest.main()

@@ -1,0 +1,19 @@
+#!/bin/sh
+# Never remove voucher files unless transactional cleanup succeeded.
+set -eu
+command -v ubus >/dev/null 2>&1 || exit 1
+command -v jsonfilter >/dev/null 2>&1 || exit 1
+cleanup="$(ubus call veci.app.voucher cleanup '{}')" || {
+    echo "STOP: voucher_cleanup_rpc_unavailable" >&2
+    exit 1
+}
+ok="$(printf '%s' "$cleanup" | jsonfilter -e '@.ok' 2>/dev/null)" || exit 1
+[ "$ok" = "true" ] || {
+    echo "STOP: voucher_cleanup_not_confirmed" >&2
+    exit 1
+}
+# Cleanup RPC already resets auth mode and restarts uspot.
+# Avoid a second nontransactional UCI mutation.
+/etc/init.d/veci-voucher-cleaner stop >/dev/null 2>&1 || exit 1
+/etc/init.d/veci-voucher-cleaner disable >/dev/null 2>&1 || exit 1
+exit 0

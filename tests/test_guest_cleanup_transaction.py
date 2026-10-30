@@ -70,7 +70,7 @@ class GuestCleanupSafetyTests(unittest.TestCase):
         self.assertIn('reload',actions)
         self.assertEqual(actions[-1],'discard')
     def test_package_is_uprev_and_shell_parses(self):
-        self.assertIn('PKG_RELEASE:=4',PKG.read_text())
+        self.assertIn('PKG_RELEASE:=5',PKG.read_text())
         p=subprocess.run(['sh','-n',str(SCRIPT)],capture_output=True,text=True)
         self.assertEqual(p.returncode,0,p.stderr)
 if __name__=='__main__':unittest.main()
