@@ -43,14 +43,22 @@ for line in pathlib.Path(sys.argv[2]).read_text().splitlines():
 required=('kernel','base-files','dropbear','rpcd','uhttpd','dnsmasq',
  'firewall4','netifd','veci','veci-default-ui','veci-cellular-we5927',
  'veci-app-catalog-we5927','veci-app-guest','veci-app-voucher',
- 'uspot','uspot-www','we5927-lte')
+ 'uspot','uspot-www','we5927-lte',
+ 'luci-base','luci-mod-network','luci-mod-system','luci-app-firewall',
+ 'luci-theme-bootstrap','apk-mbedtls','wpad-basic-mbedtls')
 missing=[pkg for pkg in required if pkg not in installed]
 if missing:
     raise SystemExit('STOP: missing firmware packages '+','.join(missing))
+redundant=('luci','luci-light','luci-mod-admin-full','luci-mod-status',
+           'luci-app-package-manager','rpcd-mod-rrdns')
+present=[pkg for pkg in redundant if pkg in installed]
+if present:
+    raise SystemExit('STOP: redundant packages bundled into slim Cafe image '+','.join(present))
 if not installed['kernel'].startswith('6.12.'):
     raise SystemExit('STOP: expected 6.12-series kernel package in firmware manifest')
 print('BOARD_METADATA=PASS')
 print('BUNDLED_APPS_AND_ROUTER_CORE=PASS')
+print('SLIM_CAFE_PACKAGE_SELECTION=PASS')
 print('KERNEL_PACKAGE='+installed['kernel'])
 PY
 sha256sum "$image"
