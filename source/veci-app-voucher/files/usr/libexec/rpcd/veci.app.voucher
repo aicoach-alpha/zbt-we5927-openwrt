@@ -43,26 +43,54 @@ disconnect_voucher_clients() {
 }
 
 cleanup_expired() {
-	now="$(date +%s)"
-	changed=0
-	for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
-		expires="$(uci -q get veci_voucher.$section.expires 2>/dev/null || printf '0')"
-		case "$expires" in
-			''|*[!0-9]*) expires=0 ;;
-		esac
-		if [ "$expires" -gt 0 ] 2>/dev/null && [ "$expires" -le "$now" ] 2>/dev/null; then
-			code="$(uci -q get veci_voucher.$section.code 2>/dev/null || true)"
-			[ -n "$code" ] && disconnect_voucher_clients "$code"
-			uci -q delete "veci_voucher.$section"
-			uci -q delete "uspot.veci_voucher_$section"
-			changed=1
-		fi
-	done
-	if [ "$changed" -eq 1 ]; then
-		uci commit veci_voucher
-		uci commit uspot
-		/etc/init.d/uspot restart >/dev/null 2>&1 || true
-	fi
+    # Expiry cleanup uses the SAME transaction lock as create, batch, revoke,
+    # and package removal. Never leave partial UCI state on a failed commit.
+    if ! voucher_tx_begin; then
+        return 1
+    fi
+    now="$(date +%s)"
+    case "$now" in
+        ''|*[!0-9]*)
+            voucher_tx_end
+            return 1;;
+    esac
+    changed=0
+    failed=0
+    : > "$VOUCHER_TX_DIR/expired-codes"
+    for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
+        expires="$(uci -q get veci_voucher.$section.expires 2>/dev/null || printf '0')"
+        case "$expires" in
+            ''|*[!0-9]*) expires=0;;
+        esac
+        if [ "$expires" -gt 0 ] 2>/dev/null && [ "$expires" -le "$now" ] 2>/dev/null; then
+            code="$(uci -q get veci_voucher.$section.code 2>/dev/null || true)"
+            if safe_code "$code"; then
+                printf '%s\n' "$code" >> "$VOUCHER_TX_DIR/expired-codes"
+            fi
+            uci -q delete "veci_voucher.$section" || failed=1
+            if uci -q get "uspot.veci_voucher_$section" >/dev/null 2>&1; then
+                uci -q delete "uspot.veci_voucher_$section" || failed=1
+            fi
+            changed=1
+        fi
+    done
+    if [ "$changed" -eq 0 ]; then
+        voucher_tx_end
+        return 0
+    fi
+    [ "$failed" -eq 0 ] && uci commit veci_voucher || failed=1
+    [ "$failed" -eq 0 ] && uci commit uspot || failed=1
+    [ "$failed" -eq 0 ] && /etc/init.d/uspot restart >/dev/null 2>&1 || failed=1
+    if [ "$failed" -ne 0 ]; then
+        voucher_tx_rollback >/dev/null 2>&1 || true
+        voucher_tx_end
+        return 1
+    fi
+    while IFS= read -r code; do
+        disconnect_voucher_clients "$code"
+    done < "$VOUCHER_TX_DIR/expired-codes"
+    voucher_tx_end
+    return 0
 }
 
 method_status() {
@@ -333,45 +361,144 @@ EOF
     batch_cleanup
 }
 
+
+# Revoke and uninstall cleanup share the same lock as voucher batch creation.
+# Keep exact UCI source-file snapshots until writes and uspot restart pass.
+voucher_tx_begin() {
+    if ! mkdir /tmp/veci-voucher-batch.lock 2>/dev/null; then
+        return 1
+    fi
+    chmod 700 /tmp/veci-voucher-batch.lock || {
+        rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+        return 1
+    }
+    VOUCHER_TX_DIR="$(mktemp -d /tmp/veci-voucher-tx.XXXXXX)" || {
+        rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+        return 1
+    }
+    chmod 700 "$VOUCHER_TX_DIR" || {
+        rm -rf "$VOUCHER_TX_DIR"
+        rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+        return 1
+    }
+    for name in uspot veci_voucher; do
+        if [ -f "/etc/config/$name" ]; then
+            cp -p "/etc/config/$name" "$VOUCHER_TX_DIR/$name" || {
+                voucher_tx_end
+                return 1
+            }
+        else
+            : > "$VOUCHER_TX_DIR/$name.absent" || {
+                voucher_tx_end
+                return 1
+            }
+        fi
+    done
+}
+
+voucher_tx_end() {
+    [ -n "$VOUCHER_TX_DIR" ] && rm -rf "$VOUCHER_TX_DIR"
+    VOUCHER_TX_DIR=''
+    rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+}
+
+voucher_tx_rollback() {
+    tx_restored=1
+    for name in uspot veci_voucher; do
+        # Drop uncommitted UCI deltas before restoring the router-owned files.
+        uci -q revert "$name" >/dev/null 2>&1 || true
+        if [ -f "$VOUCHER_TX_DIR/$name.absent" ]; then
+            rm -f "/etc/config/$name" || tx_restored=0
+        else
+            cp -p "$VOUCHER_TX_DIR/$name" "/etc/config/$name" || tx_restored=0
+        fi
+    done
+    /etc/init.d/uspot restart >/dev/null 2>&1 || tx_restored=0
+    [ "$tx_restored" -eq 1 ]
+}
+
+voucher_tx_failed() {
+    prefix="$1"
+    if voucher_tx_rollback; then
+        printf '{ "ok": false, "error": "%s_failed_rolled_back" }\n' "$prefix"
+    else
+        printf '{ "ok": false, "error": "%s_rollback_incomplete" }\n' "$prefix"
+    fi
+    voucher_tx_end
+}
+
 method_revoke() {
-	input="$(cat)"
-	code="$(printf '%s' "$input" | jsonfilter -e '@.code' 2>/dev/null)"
-	safe_code "$code" || {
-		printf '{ "ok": false, "error": "invalid_code" }\n'
-		return
-	}
-	section="$(section_for_code "$code")"
-	uci -q get "veci_voucher.$section" >/dev/null 2>&1 || {
-		printf '{ "ok": false, "error": "voucher_not_found" }\n'
-		return
-	}
-	disconnect_voucher_clients "$code"
-	uci -q delete "veci_voucher.$section"
-	uci -q delete "uspot.veci_voucher_$section"
-	uci commit veci_voucher
-	uci commit uspot
-	/etc/init.d/uspot restart >/dev/null 2>&1 || true
-	printf '{ "ok": true }\n'
+    input="$(cat)"
+    code="$(printf '%s' "$input" | jsonfilter -e '@.code' 2>/dev/null)"
+    safe_code "$code" || {
+        printf '{ "ok": false, "error": "invalid_code" }\n'
+        return
+    }
+    section="$(section_for_code "$code")"
+    if ! voucher_tx_begin; then
+        printf '{ "ok": false, "error": "voucher_revoke_snapshot_or_lock_failed" }\n'
+        return
+    fi
+    if ! uci -q get "veci_voucher.$section" >/dev/null 2>&1; then
+        voucher_tx_end
+        printf '{ "ok": false, "error": "voucher_not_found" }\n'
+        return
+    fi
+    failed=0
+    uci -q delete "veci_voucher.$section" || failed=1
+    if uci -q get "uspot.veci_voucher_$section" >/dev/null 2>&1; then
+        uci -q delete "uspot.veci_voucher_$section" || failed=1
+    fi
+    [ "$failed" -eq 0 ] && uci commit veci_voucher || failed=1
+    [ "$failed" -eq 0 ] && uci commit uspot || failed=1
+    [ "$failed" -eq 0 ] && /etc/init.d/uspot restart >/dev/null 2>&1 || failed=1
+    if [ "$failed" -ne 0 ]; then
+        voucher_tx_failed voucher_revoke
+        return
+    fi
+    # Once credentials are invalidated and service restarted, best-effort
+    # disconnect any existing client sessions using the revoked username.
+    disconnect_voucher_clients "$code"
+    voucher_tx_end
+    printf '{ "ok": true }\n'
 }
 
 method_cleanup() {
-	cleanup_expired
-	printf '{ "ok": true }\n'
+    if cleanup_expired; then
+        printf '{ "ok": true }\n'
+    else
+        printf '{ "ok": false, "error": "voucher_expiry_cleanup_failed" }\n'
+    fi
 }
 
 
 method_cleanup_all() {
-	for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
-		uci -q delete "veci_voucher.$section"
-		uci -q delete "uspot.veci_voucher_$section"
-	done
-	uci commit veci_voucher >/dev/null 2>&1 || true
-	if uci -q get uspot.veci_guest >/dev/null 2>&1; then
-		uci set uspot.veci_guest.auth_mode='click-to-continue'
-	fi
-	uci commit uspot >/dev/null 2>&1 || true
-	/etc/init.d/uspot restart >/dev/null 2>&1 || true
-	printf '{ "ok": true }\n'
+    if ! voucher_tx_begin; then
+        printf '{ "ok": false, "error": "voucher_cleanup_snapshot_or_lock_failed" }\n'
+        return
+    fi
+    failed=0
+    for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
+        uci -q delete "veci_voucher.$section" || failed=1
+        if uci -q get "uspot.veci_voucher_$section" >/dev/null 2>&1; then
+            uci -q delete "uspot.veci_voucher_$section" || failed=1
+        fi
+    done
+    if uci -q get uspot.veci_guest >/dev/null 2>&1; then
+        uci set uspot.veci_guest.auth_mode='click-to-continue' || failed=1
+    fi
+    # Empty voucher file is valid: first installation can have no vouchers.
+    if [ -f /etc/config/veci_voucher ]; then
+        [ "$failed" -eq 0 ] && uci commit veci_voucher || failed=1
+    fi
+    [ "$failed" -eq 0 ] && uci commit uspot || failed=1
+    [ "$failed" -eq 0 ] && /etc/init.d/uspot restart >/dev/null 2>&1 || failed=1
+    if [ "$failed" -ne 0 ]; then
+        voucher_tx_failed voucher_cleanup
+        return
+    fi
+    voucher_tx_end
+    printf '{ "ok": true }\n'
 }
 
 case "$1" in

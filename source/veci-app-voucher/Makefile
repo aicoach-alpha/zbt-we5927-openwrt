@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-app-voucher
 PKG_VERSION:=1
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKGARCH:=all
 
 include $(INCLUDE_DIR)/package.mk

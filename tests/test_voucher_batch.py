@@ -112,6 +112,6 @@ json_dump() { echo 'json_complete'; }
                                   (root/'commands').read_text())
 
     def test_manifest_release_bumped(self):
-        self.assertIn('PKG_RELEASE:=2', (ROOT/'source/veci-app-voucher/Makefile').read_text())
+        self.assertIn('PKG_RELEASE:=3', (ROOT/'source/veci-app-voucher/Makefile').read_text())
 
 if __name__=='__main__': unittest.main()
