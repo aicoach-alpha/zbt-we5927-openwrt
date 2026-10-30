@@ -15,6 +15,14 @@ class ContainerBuildTests(unittest.TestCase):
    self.assertIn(term,s)
   for term in ('sysupgrade','scp','ssh root@','apk add','apt-get','--privileged','--network=host'):
    self.assertNotIn(term,s)
+ def test_build_process_has_scoped_cleanup_guard(self):
+  s=SCRIPT.read_text()
+  self.assertIn('cidfile="$root/.veci-cafe-active.cid"',s)
+  self.assertIn('trap cleanup EXIT HUP INT TERM',s)
+  self.assertIn('--cidfile="$cidfile"',s)
+  self.assertIn('docker stop --time 10 "$id"',s)
+  self.assertIn('STOP: prior builder cidfile exists',s)
+  self.assertIn('rm -f "$cidfile"',s)
  def test_dockerfile_build_only(self):
   s=DOCKER.read_text()
   self.assertIn('ubuntu:24.04@sha256:',s)

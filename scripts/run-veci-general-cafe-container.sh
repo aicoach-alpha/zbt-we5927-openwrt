@@ -27,4 +27,28 @@ case "$mode" in
   download) cmd='make download -j2' ;;
   build) cmd='make -j2' ;;
 esac
-exec docker run --rm --name veci-cafe-builder   --cpus=1.5 --memory=4g --memory-swap=6g --pids-limit=256   --security-opt=no-new-privileges --cap-drop=ALL   --network=bridge --user 1000:1000   -e HOME=/tmp -v "$root/openwrt:/build" -v "$repo:/firmware:ro"   -w /build veci-general-cafe-builder:20261029   /bin/bash -lc "$cmd"
+# Own our specific container ID, not any other Docker services. A terminated
+# build must leave its source/cache on external storage but no live build worker.
+cidfile="$root/.veci-cafe-active.cid"
+[ ! -e "$cidfile" ] || {
+  echo 'STOP: prior builder cidfile exists; inspect its container before retry' >&2
+  exit 9
+}
+cleanup() {
+  if [ -s "$cidfile" ]; then
+    id="$(cat "$cidfile" 2>/dev/null || true)"
+    case "$id" in
+      ''|*[!a-f0-9]*) ;;
+      *) docker stop --time 10 "$id" >/dev/null 2>&1 || true ;;
+    esac
+  fi
+  rm -f "$cidfile"
+}
+trap cleanup EXIT HUP INT TERM
+docker run --rm --cidfile="$cidfile" --name veci-cafe-builder \
+  --cpus=1.5 --memory=4g --memory-swap=6g --pids-limit=256 \
+  --security-opt=no-new-privileges --cap-drop=ALL \
+  --network=bridge --user 1000:1000 \
+  -e HOME=/tmp -v "$root/openwrt:/build" -v "$repo:/firmware:ro" \
+  -w /build veci-general-cafe-builder:20261029 \
+  /bin/bash -lc "$cmd"
