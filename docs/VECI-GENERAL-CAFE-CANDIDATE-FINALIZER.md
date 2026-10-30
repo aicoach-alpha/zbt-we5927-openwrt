@@ -44,3 +44,7 @@ restored settings still require manual UAT and explicit approval.
 ## Stale build guard
 
 Default release validation requires staged build_id equal to current tested HEAD. Historical ancestor builds are rejected with STALE_BUILD_REQUIRES_REBUILD. For offline inspection use --audit-stale, which marks output HISTORICAL_AUDIT and NO_GO_STALE_BUILD_REQUIRES_REBUILD. This is never permission for flashing. Current-source builds must still pass recovery and hardware UAT.
+
+## Fail-closed APK cleanup hooks in finished image
+
+A current-source release candidate must contain both usr/libexec/veci/guest-prerm and usr/libexec/veci/voucher-prerm in the actual SquashFS rootfs, in addition to the Guest/Voucher RPC scripts and signed APK trust keys. Missing either hook is a hard NO-GO, even when package manifests claim the applications are present. Historical --audit-stale inspection can omit them but never gains release eligibility.

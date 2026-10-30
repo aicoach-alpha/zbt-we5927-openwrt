@@ -228,6 +228,8 @@ class CandidateFinalizerTests(unittest.TestCase):
                 "usr/libexec/rpcd/veci.app.guest",
                 "usr/libexec/rpcd/veci.app.voucher",
                 "www/veci/index.html",
+                "usr/libexec/veci/guest-prerm",
+                "usr/libexec/veci/voucher-prerm",
                 "etc/apk/keys/openwrt-public.pem"
             ]
             metadata = {
@@ -251,6 +253,20 @@ class CandidateFinalizerTests(unittest.TestCase):
             image = work / "synthetic-sysupgrade.bin"
             image.write_bytes(b"SYNTHETIC_IMAGE_HEADER" + filesystem.read_bytes())
             self.assertTrue(module.verify_embedded_rootfs(image, metadata))
+            self.assertTrue(module.verify_embedded_rootfs(image, metadata, require_prerm_hooks=False))
+            (tree / "usr/libexec/veci/guest-prerm").unlink()
+            oldfs = work / "missing-hook.squashfs"
+            result = subprocess.run(
+                ["mksquashfs", str(tree), str(oldfs),
+                 "-noappend", "-no-progress", "-processors", "1"],
+                capture_output=True, text=True, timeout=20
+            )
+            self.assertEqual(result.returncode, 0, result.stderr[-400:])
+            oldimage = work / "missing-hook-sysupgrade.bin"
+            oldimage.write_bytes(b"SYNTHETIC_IMAGE_HEADER" + oldfs.read_bytes())
+            with self.assertRaisesRegex(ValueError, "Rootfs missing mandatory file usr/libexec/veci/guest-prerm"):
+                module.verify_embedded_rootfs(oldimage, metadata)
+            self.assertTrue(module.verify_embedded_rootfs(oldimage, metadata, require_prerm_hooks=False))
             metadata["edition"] = "indonesia"
             with self.assertRaisesRegex(ValueError, "Embedded rootfs release metadata mismatch"):
                 module.verify_embedded_rootfs(image, metadata)
@@ -282,6 +298,16 @@ class CandidateFinalizerTests(unittest.TestCase):
             self.assertEqual(report["source_freshness"], "CURRENT")
             self.assertEqual(report["current_repo_commit"], report["source_commit"])
             self.assertEqual(report["flash_decision"], "NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT")
+
+    def test_source_requirements_contain_fail_closed_package_hooks(self):
+        data = FILE.read_text()
+        self.assertIn("usr/libexec/veci/guest-prerm", data)
+        self.assertIn("usr/libexec/veci/voucher-prerm", data)
+        self.assertIn('require_prerm_hooks=(source_freshness == "CURRENT")', data)
+        for package in ("guest", "voucher"):
+            helper = ROOT / ("source/veci-app-" + package + "/files/usr/libexec/veci/" + package + "-prerm")
+            self.assertTrue(helper.is_file())
+            self.assertGreater(helper.stat().st_size, 0)
 
     def test_no_router_or_publish_actions(self):
         content = FILE.read_text()

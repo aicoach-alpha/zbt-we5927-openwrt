@@ -39,7 +39,7 @@ def exact_one(paths, meaning):
 
 
 
-def verify_embedded_rootfs(image, meta):
+def verify_embedded_rootfs(image, meta, require_prerm_hooks=True):
     """Validate actual SquashFS bytes, not merely a manifest alongside the image."""
     data = image.read_bytes()
     offsets = [m.start() for m in re.finditer(b"hsqs", data)]
@@ -57,6 +57,8 @@ def verify_embedded_rootfs(image, meta):
         "www/veci/index.html",
         "etc/apk/keys",
     ]
+    if require_prerm_hooks:
+        needed.extend(["usr/libexec/veci/guest-prerm", "usr/libexec/veci/voucher-prerm"])
     with tempfile.TemporaryDirectory(prefix="veci-image-rootfs-") as extract_dir:
         result = subprocess.run(
             [unsquashfs, "-quiet", "-o", str(offsets[0]), "-d", extract_dir,
@@ -66,7 +68,7 @@ def verify_embedded_rootfs(image, meta):
         if result.returncode:
             fail("Rootfs extraction failed: " + result.stderr[-350:])
         tree = pathlib.Path(extract_dir)
-        for name in needed[:-1]:
+        for name in (item for item in needed if item != "etc/apk/keys"):
             file = tree / name
             if not file.is_file() or file.is_symlink() or file.stat().st_size <= 0:
                 fail("Rootfs missing mandatory file " + name)
@@ -202,7 +204,7 @@ def finalize(firmware, build_tree, out, allow_stale_audit=False):
     if "FLASH_DECISION=NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT" not in validated.stdout:
         fail("Verifier did not explicitly retain physical-flash NO_GO")
     hardware_evidence = verify_hardware_attestation(firmware, image)
-    verify_embedded_rootfs(image, meta)
+    verify_embedded_rootfs(image, meta, require_prerm_hooks=(source_freshness == "CURRENT"))
     image_sha = sha(image)
     manifest_sha = sha(manifest)
     # Never copy artifacts to the public web directory or GitHub release.
@@ -227,7 +229,7 @@ def finalize(firmware, build_tree, out, allow_stale_audit=False):
             "image": {"name": image.name, "sha256": image_sha, "bytes": image.stat().st_size},
             "manifest": {"name": manifest.name, "sha256": manifest_sha},
             "verifier_output": validated.stdout.strip(),
-            "rootfs_files": "SQUASHFS_EMBEDDED_RELEASE_AND_RPC_VERIFIED",
+            "rootfs_files": ("SQUASHFS_RELEASE_RPC_AND_PRERM_VERIFIED" if source_freshness == "CURRENT" else "SQUASHFS_HISTORICAL_RPC_VERIFIED"),
             "hardware_partition_evidence": hardware_evidence,
             "hardware_uat": "NOT_TESTED",
             "signed_app_feed": "NOT_ATTESTED_BY_THIS_GATE",
