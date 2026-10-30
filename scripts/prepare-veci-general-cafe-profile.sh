@@ -57,5 +57,6 @@ for pkg in luci luci-light luci-mod-admin-full luci-mod-status \
 done
 echo 'SLIM_CAFE=LuCI_rescue_network_system_firewall_only;no_duplicate_package_manager_or_mesh_debugfs'
 echo GENERAL_CAFE_PROFILE_CONFIGURED
-echo REQUIRED_BUILTIN=uspot,uspot-www,veci-app-guest,veci-app-voucher
+echo REQUIRED_BUILTIN=uspot,uspot-www,veci-app-guest,veci-app-voucher,luci-base,luci-mod-network,luci-mod-system,luci-app-firewall
+echo REDUNDANT_REMOVED=luci,luci-light,luci-mod-admin-full,luci-mod-status,luci-app-package-manager,rpcd-mod-rrdns,MAC80211_MESH,MAC80211_DEBUGFS
 echo NEXT=build_image_then_validate_size_metadata_manifest_and_UAT
