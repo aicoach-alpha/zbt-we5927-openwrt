@@ -66,6 +66,7 @@ class CandidateFinalizerTests(unittest.TestCase):
         stack = ExitStack()
         stack.enter_context(patch.object(module.subprocess, "check_output", side_effect=command))
         stack.enter_context(patch.object(module.subprocess, "run", side_effect=run))
+        stack.enter_context(patch.object(module, "verify_embedded_rootfs", return_value=True))
         return stack
 
     def test_missing_build_fails_without_creating_output(self):
@@ -142,6 +143,25 @@ class CandidateFinalizerTests(unittest.TestCase):
                 self.assertFalse((pathlib.Path(d) / "candidate").exists())
             finally:
                 link.unlink(missing_ok=True)
+
+    def test_squashfs_required_not_just_matching_manifest(self):
+        with tempfile.TemporaryDirectory() as d:
+            file = pathlib.Path(d) / "firmware.bin"
+            file.write_bytes(b"NOT_AN_EMBEDDED_SQUASHFS_IMAGE")
+            with self.assertRaisesRegex(ValueError, "embedded SquashFS"):
+                module.verify_embedded_rootfs(file, {"build_id":"f"*40})
+
+    def test_embedded_filesystem_missing_required_file_is_blocked(self):
+        with tempfile.TemporaryDirectory() as d:
+            image = pathlib.Path(d) / "firmware.bin"
+            image.write_bytes(b"U-Boot" + b"hsqs" + b"A"*128)
+            shim = pathlib.Path(d) / "unsquashfs"
+            # A mock extractor that succeeds but does not extract a file must not pass.
+            shim.write_text("#!/bin/sh\nexit 0\n")
+            shim.chmod(0o755)
+            with patch.object(module.shutil, "which", return_value=str(shim)):
+                with self.assertRaisesRegex(ValueError, "Rootfs missing mandatory file"):
+                    module.verify_embedded_rootfs(image, {"build_id":"f"*40})
 
     def test_no_router_or_publish_actions(self):
         content = FILE.read_text()

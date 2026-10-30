@@ -7,6 +7,8 @@ must be a new empty path below the external NAS build-cache tree.
 import argparse
 import hashlib
 import json
+import re
+import tempfile
 import pathlib
 import shutil
 import subprocess
@@ -35,6 +37,50 @@ def exact_one(paths, meaning):
         fail("Expected exactly one %s, found %d" % (meaning, len(found)))
     return found[0]
 
+
+
+def verify_embedded_rootfs(image, meta):
+    """Validate actual SquashFS bytes, not merely a manifest alongside the image."""
+    data = image.read_bytes()
+    offsets = [m.start() for m in re.finditer(b"hsqs", data)]
+    if len(offsets) != 1:
+        fail("Expected exactly one embedded SquashFS filesystem")
+    unsquashfs = shutil.which("unsquashfs")
+    if not unsquashfs:
+        fail("Host unsquashfs required to attest embedded firmware files")
+    needed = [
+        "etc/veci-release.json",
+        "usr/libexec/rpcd/veci",
+        "usr/libexec/rpcd/veci.apps",
+        "usr/libexec/rpcd/veci.app.guest",
+        "usr/libexec/rpcd/veci.app.voucher",
+        "www/veci/index.html",
+        "etc/apk/keys",
+    ]
+    with tempfile.TemporaryDirectory(prefix="veci-image-rootfs-") as extract_dir:
+        result = subprocess.run(
+            [unsquashfs, "-quiet", "-o", str(offsets[0]), "-d", extract_dir,
+             str(image), *needed],
+            capture_output=True, text=True, timeout=110,
+        )
+        if result.returncode:
+            fail("Rootfs extraction failed: " + result.stderr[-350:])
+        tree = pathlib.Path(extract_dir)
+        for name in needed[:-1]:
+            file = tree / name
+            if not file.is_file() or file.is_symlink() or file.stat().st_size <= 0:
+                fail("Rootfs missing mandatory file " + name)
+        actual = json.loads((tree / "etc/veci-release.json").read_text())
+        for key in ("build_id", "veci_commit", "openwrt_commit", "edition"):
+            if actual.get(key) != meta[key]:
+                fail("Embedded rootfs release metadata mismatch on " + key)
+        key_dir = tree / "etc/apk/keys"
+        if not key_dir.is_dir() or key_dir.is_symlink():
+            fail("Firmware image missing trusted APK keys")
+        if not any(x.is_file() and not x.is_symlink() and x.stat().st_size
+                   for x in key_dir.iterdir()):
+            fail("No trusted APK public keys embedded in firmware")
+    return True
 
 def finalize(firmware, build_tree, out):
     firmware = pathlib.Path(firmware).resolve()
@@ -101,6 +147,7 @@ def finalize(firmware, build_tree, out):
         fail("Image verification failed: " + (validated.stderr + validated.stdout)[-900:])
     if "FLASH_DECISION=NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT" not in validated.stdout:
         fail("Verifier did not explicitly retain physical-flash NO_GO")
+    verify_embedded_rootfs(image, meta)
     image_sha = sha(image)
     manifest_sha = sha(manifest)
     # Never copy artifacts to the public web directory or GitHub release.
@@ -119,6 +166,7 @@ def finalize(firmware, build_tree, out):
             "image": {"name": image.name, "sha256": image_sha, "bytes": image.stat().st_size},
             "manifest": {"name": manifest.name, "sha256": manifest_sha},
             "verifier_output": validated.stdout.strip(),
+            "rootfs_files": "SQUASHFS_EMBEDDED_RELEASE_AND_RPC_VERIFIED",
             "hardware_uat": "NOT_TESTED",
             "signed_app_feed": "NOT_ATTESTED_BY_THIS_GATE",
             "router_deployment": "NOT_PERFORMED"
