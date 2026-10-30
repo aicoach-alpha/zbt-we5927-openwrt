@@ -82,6 +82,47 @@ def verify_embedded_rootfs(image, meta):
             fail("No trusted APK public keys embedded in firmware")
     return True
 
+
+def verify_hardware_attestation(firmware, image):
+    """Check operator-reported MTD partition, not a presumed flash capacity."""
+    attestation_path = firmware / "docs/WE5927-OPERATOR-MTD-EVIDENCE-20261030.json"
+    if not attestation_path.is_file() or attestation_path.is_symlink():
+        fail("Missing physical MTD evidence from the operator")
+    entry = json.loads(attestation_path.read_text())
+    needed = {
+        "schema": 1,
+        "source": "operator-provided-read-only-router-audit",
+        "board": "zbtlink,zbt-we5927",
+        "target": TARGET,
+        "partition_name": "firmware",
+        "kernel": "6.12.94",
+        "partition_size_hex": "007a0000",
+        "partition_size_bytes": 7995392,
+        "profile_max_image_bytes": 7995392,
+        "audit_result": "MTD_GATE=PROFILE_LIMIT_FITS_REPORTED_PARTITION",
+        "flash_decision": "NO_GO_UNTIL_IMAGE_VERIFIED_RECOVERY_AND_HARDWARE_UAT",
+        "hardware_uat": "NOT_TESTED"
+    }
+    if any(entry.get(k) != v or type(entry.get(k)) is not type(v)
+           for k, v in needed.items()):
+        fail("Operator-reported MTD evidence is invalid or mismatched")
+    if int(entry["partition_size_hex"], 16) != entry["partition_size_bytes"]:
+        fail("Operator-reported MTD hexadecimal/decimal size mismatch")
+    size = image.stat().st_size
+    if size > entry["partition_size_bytes"] or size > entry["profile_max_image_bytes"]:
+        fail("Actual sysupgrade image exceeds verified firmware partition capacity")
+    return {
+        "source": entry["source"],
+        "board": entry["board"],
+        "target": entry["target"],
+        "kernel": entry["kernel"],
+        "mtd_firmware_bytes": entry["partition_size_bytes"],
+        "operator_report_basename": entry["operator_report_basename"],
+        "image_bytes": size,
+        "spare_partition_bytes": entry["partition_size_bytes"] - size,
+        "decision": "CAPACITY_PASS_ONLY_FLASH_NO_GO"
+    }
+
 def finalize(firmware, build_tree, out):
     firmware = pathlib.Path(firmware).resolve()
     build_tree = pathlib.Path(build_tree).resolve()
@@ -147,6 +188,7 @@ def finalize(firmware, build_tree, out):
         fail("Image verification failed: " + (validated.stderr + validated.stdout)[-900:])
     if "FLASH_DECISION=NO_GO_UNTIL_HARDWARE_RECOVERY_AND_UAT" not in validated.stdout:
         fail("Verifier did not explicitly retain physical-flash NO_GO")
+    hardware_evidence = verify_hardware_attestation(firmware, image)
     verify_embedded_rootfs(image, meta)
     image_sha = sha(image)
     manifest_sha = sha(manifest)
@@ -167,6 +209,7 @@ def finalize(firmware, build_tree, out):
             "manifest": {"name": manifest.name, "sha256": manifest_sha},
             "verifier_output": validated.stdout.strip(),
             "rootfs_files": "SQUASHFS_EMBEDDED_RELEASE_AND_RPC_VERIFIED",
+            "hardware_partition_evidence": hardware_evidence,
             "hardware_uat": "NOT_TESTED",
             "signed_app_feed": "NOT_ATTESTED_BY_THIS_GATE",
             "router_deployment": "NOT_PERFORMED"

@@ -22,3 +22,21 @@ NO-GO, even if the manifest lists all packages.
 The generated candidate is still not a deployable production release.
 The tester must separately verify signatures, hardware boot, LTE,
 guest isolation, captive portal login, voucher expiration and rollback.
+
+## Actual device flash capacity evidence (operator attested)
+
+On 30 October 2026 at 12:01 WIB the operator ran a read-only,
+SHA256-pinned flash capacity audit against the physical ZBT WE5927.
+Board: zbtlink,zbt-we5927; target: ramips/mt76x8; kernel: 6.12.94.
+The firmware MTD size was 0x007a0000 = 7,995,392 bytes (7,808 KiB).
+The audit retained FLASH_DECISION=NO_GO.
+
+The operator-reported evidence is in docs/WE5927-OPERATOR-MTD-EVIDENCE-20261030.json.
+The finalizer requires this evidence and independently verifies exact board,
+size, release-gate fields, and actual image byte size. It reports remaining
+partition bytes but this equality check cannot prove hardware bootability.
+
+This is operator-provided data, NOT a cryptographic router attestation.
+Do not flash automatically. After offline candidate verification, physical
+boot, rescue procedure, LTE, captive portal, voucher authentication and
+restored settings still require manual UAT and explicit approval.

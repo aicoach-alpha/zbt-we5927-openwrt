@@ -25,6 +25,10 @@ class CandidateFinalizerTests(unittest.TestCase):
         (build / "rules.mk").write_text("test\n")
         (fw / "source").mkdir()
         (fw / "scripts").mkdir()
+        (fw / "docs").mkdir()
+        (fw / "docs/WE5927-OPERATOR-MTD-EVIDENCE-20261030.json").write_text(
+            (ROOT / "docs/WE5927-OPERATOR-MTD-EVIDENCE-20261030.json").read_text()
+        )
         (fw / "source/veci.commit").write_text("c" * 40 + "\n")
         (build / "package/veci-default-ui/files/etc").mkdir(parents=True)
         (build / "package/veci-default-ui/files/etc/veci-release.json").write_text(json.dumps(
@@ -162,6 +166,36 @@ class CandidateFinalizerTests(unittest.TestCase):
             with patch.object(module.shutil, "which", return_value=str(shim)):
                 with self.assertRaisesRegex(ValueError, "Rootfs missing mandatory file"):
                     module.verify_embedded_rootfs(image, {"build_id":"f"*40})
+
+    def test_real_operator_mtd_evidence_matches_reported_hardware(self):
+        with tempfile.TemporaryDirectory() as d:
+            fw, build, image, _ = self.fixture(d)
+            result = module.verify_hardware_attestation(fw, image)
+            self.assertEqual(result["mtd_firmware_bytes"], 7995392)
+            self.assertEqual(result["board"], "zbtlink,zbt-we5927")
+            self.assertEqual(result["spare_partition_bytes"], 7995392 - 128)
+            self.assertEqual(result["decision"], "CAPACITY_PASS_ONLY_FLASH_NO_GO")
+
+    def test_firmware_image_exceeding_real_partition_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            fw, build, image, _ = self.fixture(d)
+            with image.open("r+b") as file:
+                file.truncate(7995393)
+            with self.assertRaisesRegex(ValueError, "exceeds verified firmware partition"):
+                module.verify_hardware_attestation(fw, image)
+
+    def test_operator_mtd_evidence_cannot_be_missing_or_mutated(self):
+        with tempfile.TemporaryDirectory() as d:
+            fw, build, image, _ = self.fixture(d)
+            evidence = fw / "docs/WE5927-OPERATOR-MTD-EVIDENCE-20261030.json"
+            data = json.loads(evidence.read_text())
+            data["partition_size_bytes"] = 16777216
+            evidence.write_text(json.dumps(data))
+            with self.assertRaisesRegex(ValueError, "invalid or mismatched"):
+                module.verify_hardware_attestation(fw, image)
+            evidence.unlink()
+            with self.assertRaisesRegex(ValueError, "Missing physical MTD"):
+                module.verify_hardware_attestation(fw, image)
 
     def test_no_router_or_publish_actions(self):
         content = FILE.read_text()
