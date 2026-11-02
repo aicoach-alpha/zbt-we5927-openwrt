@@ -130,7 +130,7 @@ EOF
             self.assertNotEqual(p.returncode,0)
             self.assertIn('firmware OpenWrt release metadata mismatch',p.stderr+p.stdout)
 
-    def test_pinned_snapshot_release_metadata_is_accepted_only_with_exact_revision(self):
+    def test_snapshot_release_metadata_is_rejected_for_stable_build(self):
         with tempfile.TemporaryDirectory() as d:
             image,manifest,fwtool=self.fixture_image(d)
             original=fwtool.read_text()
@@ -139,8 +139,8 @@ EOF
             fwtool.write_text(exact)
             passed=subprocess.run(['sh',str(VERIFY),str(image),str(manifest),str(fwtool)],
                                   capture_output=True,text=True)
-            self.assertEqual(passed.returncode,0,passed.stderr)
-            self.assertIn('SLIM_CAFE_PACKAGE_SELECTION=PASS',passed.stdout)
+            self.assertNotEqual(passed.returncode,0)
+            self.assertIn('release metadata mismatch',passed.stderr+passed.stdout)
             fwtool.write_text(exact.replace('r0+1-c74057035','r0+1-otherref'))
             denied=subprocess.run(['sh',str(VERIFY),str(image),str(manifest),str(fwtool)],
                                   capture_output=True,text=True)

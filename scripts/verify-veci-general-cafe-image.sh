@@ -33,12 +33,8 @@ devices=set(meta.get('supported_devices',[]))
 version=meta.get('version',{})
 if 'zbtlink,zbt-we5927' not in devices or version.get('target')!='ramips/mt76x8' or version.get('board')!='zbtlink_zbt-we5927':
     raise SystemExit('STOP: firmware board/target metadata mismatch')
-# OpenWrt pin c74057035 carries the upstream default label
-# 25.12-SNAPSHOT with revision r0+1-c74057035; 25.12.5 is the
-# released version. Do not accept arbitrary snapshot revisions.
-release_ok = (version.get('version') == '25.12.5' or (
-    version.get('version') == '25.12-SNAPSHOT' and
-    version.get('revision') == 'r0+1-c74057035'))
+# Stable source releases must contain exact 25.12.5 metadata.
+release_ok = version.get("version") == "25.12.5"
 if version.get('dist')!='OpenWrt' or not release_ok:
     raise SystemExit('STOP: firmware OpenWrt release metadata mismatch')
 installed={}

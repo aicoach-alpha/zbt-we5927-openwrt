@@ -16,7 +16,7 @@ esac
   echo "STOP: Pinned OpenWrt source and config not prepared" >&2; exit 4;
 }
 case "$(git -C "$root/openwrt" rev-parse HEAD)" in
-  c740570351512e4400369b3c2aff49741f65580e) ;;
+  f0a60eee2fe051741c643ea6118718aae1ef17fb) ;;
   *) echo "STOP: Wrong OpenWrt pinned commit" >&2; exit 5;;
 esac
 command -v docker >/dev/null 2>&1 || { echo "STOP: Docker unavailable" >&2; exit 6; }
