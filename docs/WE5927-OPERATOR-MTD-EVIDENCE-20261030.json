@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "source": "operator-provided-read-only-router-audit",
+  "date_local": "2026-10-30T12:01:17+07:00",
+  "board": "zbtlink,zbt-we5927",
+  "target": "ramips/mt76x8",
+  "kernel": "6.12.94",
+  "partition_name": "firmware",
+  "partition_size_hex": "007a0000",
+  "partition_size_bytes": 7995392,
+  "profile_max_image_bytes": 7995392,
+  "audit_result": "MTD_GATE=PROFILE_LIMIT_FITS_REPORTED_PARTITION",
+  "flash_decision": "NO_GO_UNTIL_IMAGE_VERIFIED_RECOVERY_AND_HARDWARE_UAT",
+  "hardware_uat": "NOT_TESTED",
+  "operator_report_basename": "192.168.1.1-20261030-120117-flash-capacity.txt"
+}

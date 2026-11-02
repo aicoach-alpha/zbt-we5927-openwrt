@@ -1,0 +1,20 @@
+#!/bin/sh
+# Never remove Guest while Voucher depends on it or cleanup failed.
+set -eu
+command -v ubus >/dev/null 2>&1 || exit 1
+command -v jsonfilter >/dev/null 2>&1 || exit 1
+if command -v apk >/dev/null 2>&1 &&
+   apk info -e veci-app-voucher >/dev/null 2>&1; then
+    echo "STOP: voucher_depends_on_guest" >&2
+    exit 1
+fi
+cleanup="$(ubus call veci.app.guest cleanup '{}')" || {
+    echo "STOP: guest_cleanup_rpc_unavailable" >&2
+    exit 1
+}
+ok="$(printf '%s' "$cleanup" | jsonfilter -e '@.ok' 2>/dev/null)" || exit 1
+[ "$ok" = "true" ] || {
+    echo "STOP: guest_cleanup_not_confirmed" >&2
+    exit 1
+}
+exit 0

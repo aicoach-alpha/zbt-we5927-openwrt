@@ -1,0 +1,99 @@
+name: J9B signed feed and dependency simulation
+on:
+  workflow_dispatch:
+    inputs:
+      j8c_run_id:
+        description: Build run containing BOTH paired artifacts
+        required: true
+        type: string
+        default: '37913407078'
+  push:
+    paths:
+      - '.github/workflows/j9b-signed-feed.yml'
+      - 'scripts/j9b_signed_feed_audit.py'
+      - 'tests/test_j9b_signed_feed.py'
+      - 'docs/J9B-SIGNED-FEED.md'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: j9b-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      J8C_RUN_ID: ${{ inputs.j8c_run_id || '37913407078' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: J9B fail-closed unit tests
+        run: python3 -m unittest discover -s tests -p 'test_j9b_signed_feed.py' -v
+      - name: Validate same-run artifact identifier
+        shell: bash
+        run: |
+          case "$J8C_RUN_ID" in ''|*[!0-9]*) echo "Invalid run ID"; exit 1 ;; esac
+      - name: Download J8c firmware candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: veci-j8c-maintenance-candidate
+          path: j9b-input/fw
+          repository: ${{ github.repository }}
+          run-id: ${{ env.J8C_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download matched feed from SAME J8c run
+        uses: actions/download-artifact@v4
+        with:
+          name: veci-j8c-matched-app-feed
+          path: j9b-input/feed
+          repository: ${{ github.repository }}
+          run-id: ${{ env.J8C_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Revalidate J9 integrity and kernel compatibility
+        run: |
+          python3 scripts/j9_offline_audit.py --firmware j9b-input/fw \
+            --feed j9b-input/feed --run-id "$J8C_RUN_ID" --report j9b-prereq.json
+      - name: Build pinned APK v3 verification binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y meson ninja-build pkg-config libssl-dev zlib1g-dev squashfs-tools
+          git clone --filter=blob:none https://github.com/alpinelinux/apk-tools.git apk-tools
+          git -C apk-tools checkout b5a31c0d865342ad80be10d68f1bb3d3ad9b0866
+          meson setup apk-tools/build apk-tools -Dprefix=/usr \
+            -Ddocs=disabled -Dhelp=disabled -Dlua=disabled -Dpython=disabled \
+            -Dtests=disabled -Dzstd=disabled -Dcrypto_backend=openssl -Durl_backend=wget
+          ninja -C apk-tools/build src/apk
+          apk-tools/build/src/apk --version
+      - name: Verify signatures and offline solver in disposable extracted firmware
+        run: |
+          python3 scripts/j9b_signed_feed_audit.py \
+            --firmware j9b-input/fw --feed j9b-input/feed \
+            --apk apk-tools/build/src/apk --run-id "$J8C_RUN_ID" \
+            --report j9b-report.json
+      - name: Ensure audit NEVER authorizes a firmware flash
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('j9b-report.json'))
+          assert r['release_decision']=='NO_GO'
+          assert r['j9b']=='EXECUTED'
+          required=('keys','metadata','signature','package_content','solver')
+          for key in required:
+              assert r.get(key)=='PASS', f'{key} must PASS; got {r.get(key)}'
+          print('J9B OFFLINE PASS; final firmware release still NO_GO:',r['gates'] if 'gates' in r else required)
+          PY
+      - name: Archive J9B evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-j9b-trust-dependency-report
+          path: |
+            j9b-report.json
+            j9b-prereq.json
+          if-no-files-found: warn
+          retention-days: 14

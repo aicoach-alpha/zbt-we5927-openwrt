@@ -1,0 +1,519 @@
+#!/bin/sh
+
+safe_code() {
+	case "$1" in
+		''|*[!A-Za-z0-9]*) return 1 ;;
+	esac
+	[ "${#1}" -ge 6 ] && [ "${#1}" -le 20 ]
+}
+
+safe_duration() {
+	case "$1" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$1" -ge 300 ] 2>/dev/null && [ "$1" -le 604800 ] 2>/dev/null
+}
+
+section_for_code() {
+	printf 'v_%s' "$(printf '%s' "$1" | tr 'A-Z' 'a-z')"
+}
+
+ensure_guest_ready() {
+	uci -q get uspot.veci_guest >/dev/null 2>&1 || return 1
+}
+
+sync_mode() {
+	if uci -q get uspot.veci_guest >/dev/null 2>&1; then
+		uci set uspot.veci_guest.auth_mode='credentials'
+		uci commit uspot
+		/etc/init.d/uspot restart >/dev/null 2>&1 || true
+	fi
+}
+
+
+disconnect_voucher_clients() {
+	code="$1"
+	clients="$(ubus call uspot client_list '{"uspot":"veci_guest"}' 2>/dev/null | jsonfilter -e '@.veci_guest[*]' 2>/dev/null || true)"
+	for mac in $clients; do
+		[ -n "$mac" ] || continue
+		user="$(ubus call uspot client_get "{ \"uspot\": \"veci_guest\", \"address\": \"$mac\" }" 2>/dev/null | jsonfilter -e '@.username' 2>/dev/null || true)"
+		[ "$user" = "$code" ] || continue
+		ubus call uspot client_remove "{ \"uspot\": \"veci_guest\", \"address\": \"$mac\" }" >/dev/null 2>&1 || true
+	done
+}
+
+cleanup_expired() {
+    # Expiry cleanup uses the SAME transaction lock as create, batch, revoke,
+    # and package removal. Never leave partial UCI state on a failed commit.
+    if ! voucher_tx_begin; then
+        return 1
+    fi
+    now="$(date +%s)"
+    case "$now" in
+        ''|*[!0-9]*)
+            voucher_tx_end
+            return 1;;
+    esac
+    changed=0
+    failed=0
+    : > "$VOUCHER_TX_DIR/expired-codes"
+    for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
+        expires="$(uci -q get veci_voucher.$section.expires 2>/dev/null || printf '0')"
+        case "$expires" in
+            ''|*[!0-9]*) expires=0;;
+        esac
+        if [ "$expires" -gt 0 ] 2>/dev/null && [ "$expires" -le "$now" ] 2>/dev/null; then
+            code="$(uci -q get veci_voucher.$section.code 2>/dev/null || true)"
+            if safe_code "$code"; then
+                printf '%s\n' "$code" >> "$VOUCHER_TX_DIR/expired-codes"
+            fi
+            uci -q delete "veci_voucher.$section" || failed=1
+            if uci -q get "uspot.veci_voucher_$section" >/dev/null 2>&1; then
+                uci -q delete "uspot.veci_voucher_$section" || failed=1
+            fi
+            changed=1
+        fi
+    done
+    if [ "$changed" -eq 0 ]; then
+        voucher_tx_end
+        return 0
+    fi
+    [ "$failed" -eq 0 ] && uci commit veci_voucher || failed=1
+    [ "$failed" -eq 0 ] && uci commit uspot || failed=1
+    [ "$failed" -eq 0 ] && /etc/init.d/uspot restart >/dev/null 2>&1 || failed=1
+    if [ "$failed" -ne 0 ]; then
+        voucher_tx_rollback >/dev/null 2>&1 || true
+        voucher_tx_end
+        return 1
+    fi
+    while IFS= read -r code; do
+        disconnect_voucher_clients "$code"
+    done < "$VOUCHER_TX_DIR/expired-codes"
+    voucher_tx_end
+    return 0
+}
+
+method_status() {
+	# Read-only. Expiry cleanup belongs to the background cleaner or
+	# explicit cleanupExpired write method, never a status poll.
+	now="$(date +%s)"
+	guest_ready=0
+	ensure_guest_ready && guest_ready=1
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_boolean guest_ready "$guest_ready"
+	json_add_boolean batch_supported 1
+	json_add_array vouchers
+	for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
+		code="$(uci -q get veci_voucher.$section.code 2>/dev/null || true)"
+		expires="$(uci -q get veci_voucher.$section.expires 2>/dev/null || printf '0')"
+		created="$(uci -q get veci_voucher.$section.created 2>/dev/null || printf '0')"
+		case "$expires:$created" in
+			*[!0-9:]*|:*) continue ;;
+		esac
+		# Do not expose expired vouchers while the cleaner is pending.
+		[ "$expires" -gt "$now" ] 2>/dev/null || continue
+		remaining=$((expires - now))
+		json_add_object
+		json_add_string code "$code"
+		json_add_int created "$created"
+		json_add_int expires "$expires"
+		json_add_int remaining "$remaining"
+		json_close_object
+	done
+	json_close_array
+	json_dump
+}
+
+method_create() {
+	input="$(cat)"
+	code="$(printf '%s' "$input" | jsonfilter -e '@.code' 2>/dev/null)"
+	duration="$(printf '%s' "$input" | jsonfilter -e '@.duration' 2>/dev/null)"
+	safe_code "$code" || {
+		printf '{ "ok": false, "error": "invalid_code" }\n'
+		return
+	}
+	safe_duration "$duration" || {
+		printf '{ "ok": false, "error": "invalid_duration" }\n'
+		return
+	}
+	ensure_guest_ready || {
+		printf '{ "ok": false, "error": "guest_portal_not_enabled" }\n'
+		return
+	}
+
+	section="$(section_for_code "$code")"
+	if uci -q get "veci_voucher.$section" >/dev/null 2>&1; then
+		printf '{ "ok": false, "error": "voucher_exists" }\n'
+		return
+	fi
+
+    if ! mkdir /tmp/veci-voucher-batch.lock 2>/dev/null; then
+        printf '{ "ok": false, "error": "voucher_batch_busy" }\n'
+        return
+    fi
+    work="$(mktemp -d /tmp/veci-voucher-one.XXXXXX)" || {
+        rmdir /tmp/veci-voucher-batch.lock
+        printf '{ "ok": false, "error": "voucher_temp_failed" }\n'
+        return
+    }
+    chmod 700 "$work"
+    one_cleanup() {
+        rm -rf "$work"
+        rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+    }
+    for name in uspot veci_voucher; do
+        if [ -f "/etc/config/$name" ]; then
+            cp -p "/etc/config/$name" "$work/$name" || {
+                one_cleanup
+                printf '{ "ok": false, "error": "voucher_backup_failed" }\n'
+                return
+            }
+        else
+            : > "$work/$name.absent"
+        fi
+    done
+    # Recheck uniqueness while holding the same lock used by batch generation.
+    if uci -q get "veci_voucher.$section" >/dev/null 2>&1; then
+        one_cleanup
+        printf '{ "ok": false, "error": "voucher_exists" }\n'
+        return
+    fi
+    now="$(date +%s)"
+    case "$now" in ''|*[!0-9]*)
+        one_cleanup
+        printf '{ "ok": false, "error": "clock_unavailable" }\n'
+        return ;;
+    esac
+    expires=$((now + duration))
+    if ! uci -q batch <<EOF
+set veci_voucher.$section=voucher
+set veci_voucher.$section.code='$code'
+set veci_voucher.$section.created='$now'
+set veci_voucher.$section.expires='$expires'
+set uspot.veci_voucher_$section=credentials
+set uspot.veci_voucher_$section.uspot='veci_guest'
+set uspot.veci_voucher_$section.username='$code'
+set uspot.veci_voucher_$section.password='$code'
+set uspot.veci_guest.auth_mode='credentials'
+EOF
+    then
+        one_failed=1
+    else
+        one_failed=0
+        uci commit veci_voucher || one_failed=1
+        [ "$one_failed" -ne 0 ] || uci commit uspot || one_failed=1
+        [ "$one_failed" -ne 0 ] || /etc/init.d/uspot restart >/dev/null 2>&1 || one_failed=1
+    fi
+    if [ "$one_failed" -ne 0 ]; then
+        restored=1
+        for name in uspot veci_voucher; do
+            if [ -f "$work/$name.absent" ]; then
+                rm -f "/etc/config/$name" || restored=0
+            else
+                cp -p "$work/$name" "/etc/config/$name" || restored=0
+            fi
+        done
+        /etc/init.d/uspot restart >/dev/null 2>&1 || true
+        one_cleanup
+        if [ "$restored" -eq 1 ]; then
+            printf '{ "ok": false, "error": "voucher_create_failed_rolled_back" }\n'
+        else
+            printf '{ "ok": false, "error": "voucher_create_rollback_incomplete" }\n'
+        fi
+        return
+    fi
+    one_cleanup
+    printf '{ "ok": true, "code": "%s", "expires": %s }\n' "$code" "$expires"
+}
+
+# Batch creates 1-20 unique 48-bit random credentials with one UCI commit
+# per config file. The lock and snapshots prevent simultaneous batch writes.
+safe_batch_count() {
+    case "$1" in ''|*[!0-9]*) return 1;; esac
+    [ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 20 ] 2>/dev/null
+}
+
+method_create_batch() {
+    input="$(cat)"
+    count="$(printf '%s' "$input" | jsonfilter -e '@.count' 2>/dev/null)"
+    duration="$(printf '%s' "$input" | jsonfilter -e '@.duration' 2>/dev/null)"
+    safe_batch_count "$count" || {
+        printf '{ "ok": false, "error": "invalid_batch_count" }\n'
+        return
+    }
+    safe_duration "$duration" || {
+        printf '{ "ok": false, "error": "invalid_duration" }\n'
+        return
+    }
+    ensure_guest_ready || {
+        printf '{ "ok": false, "error": "guest_portal_not_enabled" }\n'
+        return
+    }
+    if ! mkdir /tmp/veci-voucher-batch.lock 2>/dev/null; then
+        printf '{ "ok": false, "error": "voucher_batch_busy" }\n'
+        return
+    fi
+    chmod 700 /tmp/veci-voucher-batch.lock || {
+        rmdir /tmp/veci-voucher-batch.lock
+        printf '{ "ok": false, "error": "voucher_batch_lock_failed" }\n'
+        return
+    }
+    dir="$(mktemp -d /tmp/veci-voucher-batch.XXXXXX)" || {
+        rmdir /tmp/veci-voucher-batch.lock
+        printf '{ "ok": false, "error": "voucher_temp_failed" }\n'
+        return
+    }
+    chmod 700 "$dir"
+    batch_cleanup() {
+        rm -rf "$dir"
+        rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+    }
+    batch_rollback() {
+        for name in uspot veci_voucher; do
+            if [ -f "$dir/$name.absent" ]; then
+                rm -f "/etc/config/$name"
+            else
+                cp -p "$dir/$name" "/etc/config/$name" || return 1
+            fi
+        done
+        /etc/init.d/uspot restart >/dev/null 2>&1 || true
+    }
+    for name in uspot veci_voucher; do
+        if [ -f "/etc/config/$name" ]; then
+            cp -p "/etc/config/$name" "$dir/$name" || {
+                batch_cleanup
+                printf '{ "ok": false, "error": "voucher_backup_failed" }\n'
+                return
+            }
+        else
+            : > "$dir/$name.absent"
+        fi
+    done
+    existing="$(uci show veci_voucher 2>/dev/null | grep -c '=voucher$' || true)"
+    case "$existing" in ''|*[!0-9]*) existing=0;; esac
+    if [ $((existing + count)) -gt 250 ]; then
+        batch_cleanup
+        printf '{ "ok": false, "error": "voucher_capacity_limit" }\n'
+        return
+    fi
+    now="$(date +%s)"
+    case "$now" in ''|*[!0-9]*) batch_cleanup; printf '{ "ok": false, "error": "clock_unavailable" }\n'; return;; esac
+    expires=$((now + duration))
+    : > "$dir/codes"
+    : > "$dir/commands"
+    produced=0
+    attempts=0
+    while [ "$produced" -lt "$count" ] && [ "$attempts" -lt 100 ]; do
+        attempts=$((attempts + 1))
+        code="$(od -An -N6 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' | tr 'a-f' 'A-F')"
+        case "$code" in
+            ????????????) ;;
+            *) break;;
+        esac
+        section="$(section_for_code "$code")"
+        if grep -Fxq "$code" "$dir/codes" ||
+           uci -q get "veci_voucher.$section" >/dev/null 2>&1; then
+            continue
+        fi
+        printf '%s\n' "$code" >> "$dir/codes"
+        cat >> "$dir/commands" <<EOF
+set veci_voucher.$section=voucher
+set veci_voucher.$section.code='$code'
+set veci_voucher.$section.created='$now'
+set veci_voucher.$section.expires='$expires'
+set uspot.veci_voucher_$section=credentials
+set uspot.veci_voucher_$section.uspot='veci_guest'
+set uspot.veci_voucher_$section.username='$code'
+set uspot.veci_voucher_$section.password='$code'
+EOF
+        produced=$((produced + 1))
+    done
+    if [ "$produced" -ne "$count" ]; then
+        batch_cleanup
+        printf '{ "ok": false, "error": "secure_random_unavailable" }\n'
+        return
+    fi
+    printf "set uspot.veci_guest.auth_mode='credentials'\n" >> "$dir/commands"
+    if ! uci -q batch < "$dir/commands" ||
+       ! uci commit veci_voucher ||
+       ! uci commit uspot ||
+       ! /etc/init.d/uspot restart >/dev/null 2>&1; then
+        if batch_rollback; then
+            printf '{ "ok": false, "error": "voucher_batch_failed_rolled_back" }\n'
+        else
+            printf '{ "ok": false, "error": "voucher_batch_rollback_incomplete" }\n'
+        fi
+        batch_cleanup
+        return
+    fi
+    . /usr/share/libubox/jshn.sh
+    json_init
+    json_add_boolean ok 1
+    json_add_int expires "$expires"
+    json_add_array vouchers
+    while IFS= read -r code; do
+        json_add_string '' "$code"
+    done < "$dir/codes"
+    json_close_array
+    json_dump
+    batch_cleanup
+}
+
+
+# Revoke and uninstall cleanup share the same lock as voucher batch creation.
+# Keep exact UCI source-file snapshots until writes and uspot restart pass.
+voucher_tx_begin() {
+    if ! mkdir /tmp/veci-voucher-batch.lock 2>/dev/null; then
+        return 1
+    fi
+    chmod 700 /tmp/veci-voucher-batch.lock || {
+        rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+        return 1
+    }
+    VOUCHER_TX_DIR="$(mktemp -d /tmp/veci-voucher-tx.XXXXXX)" || {
+        rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+        return 1
+    }
+    chmod 700 "$VOUCHER_TX_DIR" || {
+        rm -rf "$VOUCHER_TX_DIR"
+        rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+        return 1
+    }
+    for name in uspot veci_voucher; do
+        if [ -f "/etc/config/$name" ]; then
+            cp -p "/etc/config/$name" "$VOUCHER_TX_DIR/$name" || {
+                voucher_tx_end
+                return 1
+            }
+        else
+            : > "$VOUCHER_TX_DIR/$name.absent" || {
+                voucher_tx_end
+                return 1
+            }
+        fi
+    done
+}
+
+voucher_tx_end() {
+    [ -n "$VOUCHER_TX_DIR" ] && rm -rf "$VOUCHER_TX_DIR"
+    VOUCHER_TX_DIR=''
+    rmdir /tmp/veci-voucher-batch.lock 2>/dev/null || true
+}
+
+voucher_tx_rollback() {
+    tx_restored=1
+    for name in uspot veci_voucher; do
+        # Drop uncommitted UCI deltas before restoring the router-owned files.
+        uci -q revert "$name" >/dev/null 2>&1 || true
+        if [ -f "$VOUCHER_TX_DIR/$name.absent" ]; then
+            rm -f "/etc/config/$name" || tx_restored=0
+        else
+            cp -p "$VOUCHER_TX_DIR/$name" "/etc/config/$name" || tx_restored=0
+        fi
+    done
+    /etc/init.d/uspot restart >/dev/null 2>&1 || tx_restored=0
+    [ "$tx_restored" -eq 1 ]
+}
+
+voucher_tx_failed() {
+    prefix="$1"
+    if voucher_tx_rollback; then
+        printf '{ "ok": false, "error": "%s_failed_rolled_back" }\n' "$prefix"
+    else
+        printf '{ "ok": false, "error": "%s_rollback_incomplete" }\n' "$prefix"
+    fi
+    voucher_tx_end
+}
+
+method_revoke() {
+    input="$(cat)"
+    code="$(printf '%s' "$input" | jsonfilter -e '@.code' 2>/dev/null)"
+    safe_code "$code" || {
+        printf '{ "ok": false, "error": "invalid_code" }\n'
+        return
+    }
+    section="$(section_for_code "$code")"
+    if ! voucher_tx_begin; then
+        printf '{ "ok": false, "error": "voucher_revoke_snapshot_or_lock_failed" }\n'
+        return
+    fi
+    if ! uci -q get "veci_voucher.$section" >/dev/null 2>&1; then
+        voucher_tx_end
+        printf '{ "ok": false, "error": "voucher_not_found" }\n'
+        return
+    fi
+    failed=0
+    uci -q delete "veci_voucher.$section" || failed=1
+    if uci -q get "uspot.veci_voucher_$section" >/dev/null 2>&1; then
+        uci -q delete "uspot.veci_voucher_$section" || failed=1
+    fi
+    [ "$failed" -eq 0 ] && uci commit veci_voucher || failed=1
+    [ "$failed" -eq 0 ] && uci commit uspot || failed=1
+    [ "$failed" -eq 0 ] && /etc/init.d/uspot restart >/dev/null 2>&1 || failed=1
+    if [ "$failed" -ne 0 ]; then
+        voucher_tx_failed voucher_revoke
+        return
+    fi
+    # Once credentials are invalidated and service restarted, best-effort
+    # disconnect any existing client sessions using the revoked username.
+    disconnect_voucher_clients "$code"
+    voucher_tx_end
+    printf '{ "ok": true }\n'
+}
+
+method_cleanup() {
+    if cleanup_expired; then
+        printf '{ "ok": true }\n'
+    else
+        printf '{ "ok": false, "error": "voucher_expiry_cleanup_failed" }\n'
+    fi
+}
+
+
+method_cleanup_all() {
+    if ! voucher_tx_begin; then
+        printf '{ "ok": false, "error": "voucher_cleanup_snapshot_or_lock_failed" }\n'
+        return
+    fi
+    failed=0
+    for section in $(uci show veci_voucher 2>/dev/null | sed -n "s/^veci_voucher\.\([^.=]*\)=voucher$/\1/p"); do
+        uci -q delete "veci_voucher.$section" || failed=1
+        if uci -q get "uspot.veci_voucher_$section" >/dev/null 2>&1; then
+            uci -q delete "uspot.veci_voucher_$section" || failed=1
+        fi
+    done
+    if uci -q get uspot.veci_guest >/dev/null 2>&1; then
+        uci set uspot.veci_guest.auth_mode='click-to-continue' || failed=1
+    fi
+    # Empty voucher file is valid: first installation can have no vouchers.
+    if [ -f /etc/config/veci_voucher ]; then
+        [ "$failed" -eq 0 ] && uci commit veci_voucher || failed=1
+    fi
+    [ "$failed" -eq 0 ] && uci commit uspot || failed=1
+    [ "$failed" -eq 0 ] && /etc/init.d/uspot restart >/dev/null 2>&1 || failed=1
+    if [ "$failed" -ne 0 ]; then
+        voucher_tx_failed voucher_cleanup
+        return
+    fi
+    voucher_tx_end
+    printf '{ "ok": true }\n'
+}
+
+case "$1" in
+	list)
+		printf '{ "status": {}, "create": { "code": "str", "duration": "str" }, "createBatch": { "count": "int", "duration": "str" }, "revoke": { "code": "str" }, "cleanupExpired": {}, "cleanup": {} }\n'
+		;;
+	call)
+		case "$2" in
+			status) method_status ;;
+			create) method_create ;;
+			createBatch) method_create_batch ;;
+			revoke) method_revoke ;;
+			cleanupExpired) method_cleanup ;;
+			cleanup) method_cleanup_all ;;
+			*) printf '{ "error": "method_not_found" }\n' ;;
+		esac
+		;;
+esac

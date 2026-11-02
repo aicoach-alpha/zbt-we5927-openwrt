@@ -1,0 +1,299 @@
+name: J8c matched app feed build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/openwrt-maintenance-pins.env'
+      - 'source/openwrt-we5927.config'
+      - 'source/openwrt-zbt-we5927-current.patch'
+      - 'source/veci.commit'
+      - 'source/veci-default-ui/**'
+      - 'source/veci-cellular-we5927/**'
+      - 'source/veci-update-we5927/**'
+      - 'source/veci-app-*/**'
+      - 'scripts/prepare-veci.sh'
+      - 'scripts/install-veci-feeds.sh'
+      - '.github/workflows/j8c-app-feed.yml'
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout firmware integration
+        uses: actions/checkout@v4
+        with:
+          path: firmware
+
+      - name: Load immutable maintenance pins
+        shell: bash
+        run: |
+          set -eu
+          . firmware/source/openwrt-maintenance-pins.env
+          {
+            echo "OPENWRT_COMMIT=$OPENWRT_COMMIT"
+            echo "PACKAGES_COMMIT=$PACKAGES_COMMIT"
+            echo "LUCI_COMMIT=$LUCI_COMMIT"
+            echo "ROUTING_COMMIT=$ROUTING_COMMIT"
+            echo "TELEPHONY_COMMIT=$TELEPHONY_COMMIT"
+            echo "VIDEO_COMMIT=$VIDEO_COMMIT"
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout pinned OpenWrt maintenance baseline
+        run: |
+          git clone --filter=blob:none https://github.com/openwrt/openwrt.git openwrt
+          git -C openwrt checkout "$OPENWRT_COMMIT"
+
+      - name: Pin all package feeds
+        working-directory: openwrt
+        run: |
+          cat > feeds.conf.default <<EOF
+          src-git packages https://git.openwrt.org/feed/packages.git^$PACKAGES_COMMIT
+          src-git luci https://git.openwrt.org/project/luci.git^$LUCI_COMMIT
+          src-git routing https://git.openwrt.org/feed/routing.git^$ROUTING_COMMIT
+          src-git telephony https://git.openwrt.org/feed/telephony.git^$TELEPHONY_COMMIT
+          src-git video https://github.com/openwrt/video.git^$VIDEO_COMMIT
+          EOF
+
+      - name: Apply WE5927 and VeCI sources
+        run: |
+          set -eu
+          git -C openwrt apply --check "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
+          git -C openwrt apply "$GITHUB_WORKSPACE/firmware/source/openwrt-zbt-we5927-current.patch"
+          firmware/scripts/prepare-veci.sh "$GITHUB_WORKSPACE/openwrt"
+
+      - name: J9E verify exact J9D source and negative runtime tests BEFORE build
+        working-directory: firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(tr -d '[:space:]' < source/veci.commit)" = "$(python3 -c "import json; print(json.load(open('../openwrt/package/veci-default-ui/files/etc/veci-release.json'))['veci_commit'])")"
+          test "$(git rev-parse HEAD)" = "$(python3 -c "import json; print(json.load(open('../openwrt/package/veci-default-ui/files/etc/veci-release.json'))['build_id'])")"
+          mkdir -p /tmp/j9d-openwrt/package
+          ln -s "$GITHUB_WORKSPACE/openwrt/package/veci" /tmp/j9d-openwrt/package/veci
+          python3 -m unittest discover -s tests -p 'test_j9d_runtime_guards.py' -v
+          python3 scripts/j9c_readiness_audit.py --root . \
+            --veci-source "$GITHUB_WORKSPACE/openwrt/package/veci" \
+            --output j9e-static-readiness.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open('j9e-static-readiness.json'))
+          assert r['source_readiness']=='PASS'
+          assert all(x=='MITIGATED_STATIC' for x in r['findings'].values()),r['findings']
+          assert r['flash_decision']=='NO_GO'
+          print('J9D source mitigations and 7 negative tests PASS before firmware build')
+          PY
+
+      - name: Install pinned VeCI feed dependency closure
+        run: sh firmware/scripts/install-veci-feeds.sh "$GITHUB_WORKSPACE/openwrt"
+
+      - name: Resolve base firmware config
+        working-directory: openwrt
+        run: |
+          cp ../firmware/source/openwrt-we5927.config .config
+          make defconfig
+
+      - name: Select matched optional apps as modules
+        working-directory: openwrt
+        run: |
+          set -eu
+          set_module() {
+            symbol="$1"
+            sed -i "/^CONFIG_${symbol}=/d;/^# CONFIG_${symbol} is not set$/d" .config
+            printf 'CONFIG_%s=m\n' "$symbol" >> .config
+          }
+          set_module PACKAGE_sqm-scripts
+          set_module PACKAGE_luci-app-sqm
+          set_module PACKAGE_ddns-scripts
+          set_module PACKAGE_luci-app-ddns
+          set_module PACKAGE_wireguard-tools
+          set_module PACKAGE_luci-proto-wireguard
+          set_module PACKAGE_uspot
+          set_module PACKAGE_uspot-www
+          set_module PACKAGE_veci-app-guest
+          set_module PACKAGE_veci-app-sqm
+          set_module PACKAGE_veci-app-ddns
+          set_module PACKAGE_veci-app-wireguard
+          set_module PACKAGE_veci-app-voucher
+          make defconfig
+
+          require_config() {
+            symbol="$1"
+            expected="$2"
+            actual="$(grep -E "^CONFIG_${symbol}=|^# CONFIG_${symbol} is not set$" .config | tail -n 1 || true)"
+            echo "J8CFG ${symbol}: expected=${expected} actual=${actual:-missing}"
+            [ "$actual" = "CONFIG_${symbol}=${expected}" ] || {
+              echo "::error::J8 Kconfig mismatch for ${symbol}: expected ${expected}, got ${actual:-missing}"
+              return 1
+            }
+          }
+
+          require_config PACKAGE_sqm-scripts m
+          require_config PACKAGE_ddns-scripts m
+          require_config PACKAGE_wireguard-tools m
+          require_config PACKAGE_uspot m
+          require_config PACKAGE_veci y
+          require_config PACKAGE_veci-default-ui y
+          require_config PACKAGE_veci-cellular-we5927 y
+          require_config PACKAGE_veci-update-we5927 y
+          require_config PACKAGE_veci-app-catalog-we5927 y
+          require_config PACKAGE_veci-app-guest m
+          require_config PACKAGE_veci-app-sqm m
+          require_config PACKAGE_veci-app-ddns m
+          require_config PACKAGE_veci-app-wireguard m
+          require_config PACKAGE_veci-app-voucher m
+          require_config SIGNED_PACKAGES y
+
+      - name: Build firmware and exact-ABI optional packages
+        working-directory: openwrt
+        run: make -j2
+
+      - name: Create compatibility inventory
+        working-directory: openwrt
+        shell: bash
+        run: |
+          set -eu
+          OUT="$GITHUB_WORKSPACE/j8c-output"
+          mkdir -p "$OUT"
+          cp bin/targets/ramips/mt76x8/*zbt-we5927*sysupgrade.bin "$OUT/"
+          cp bin/targets/ramips/mt76x8/*zbt-we5927.manifest "$OUT/"
+          cp bin/targets/ramips/mt76x8/sha256sums "$OUT/target-sha256sums"
+          {
+            echo "OpenWrt: $OPENWRT_COMMIT"
+            echo "packages: $PACKAGES_COMMIT"
+            echo "luci: $LUCI_COMMIT"
+            echo "routing: $ROUTING_COMMIT"
+            echo "telephony: $TELEPHONY_COMMIT"
+            echo "video: $VIDEO_COMMIT"
+            echo
+            echo "Selected app APKs:"
+            find bin -type f \(               -name 'sqm-scripts-*.apk' -o               -name 'luci-app-sqm-*.apk' -o               -name 'ddns-scripts-*.apk' -o               -name 'luci-app-ddns-*.apk' -o               -name 'wireguard-tools-*.apk' -o               -name 'luci-proto-wireguard-*.apk' -o               -name 'uspot-*.apk' -o               -name 'uspot-www-*.apk' -o               -name 'veci-app-guest-*.apk' -o               -name 'veci-app-sqm-*.apk' -o               -name 'veci-app-ddns-*.apk' -o               -name 'veci-app-wireguard-*.apk' -o               -name 'veci-app-voucher-*.apk'             \) -printf '%s %p\n' | sort -n
+            echo
+            echo "Matched kernel packages:"
+            find bin/targets/ramips/mt76x8/packages -type f -name 'kmod-*.apk' -printf '%s %f\n' | sort -n || true
+          } > "$OUT/J8C-INVENTORY.txt"
+          (
+            cd "$OUT"
+            sha256sum J8C-INVENTORY.txt target-sha256sums *sysupgrade.bin *.manifest > J8C-SHA256SUMS.txt
+            sha256sum -c J8C-SHA256SUMS.txt
+          )
+
+      - name: Stage matched package feed tree
+        working-directory: openwrt
+        run: |
+          set -eu
+          mkdir -p "$GITHUB_WORKSPACE/j8c-feed/targets/ramips/mt76x8"
+          mkdir -p "$GITHUB_WORKSPACE/j8c-feed/packages/mipsel_24kc"
+          cp -a bin/targets/ramips/mt76x8/packages "$GITHUB_WORKSPACE/j8c-feed/targets/ramips/mt76x8/"
+          for feed in base luci packages routing telephony video; do
+            if [ -d "bin/packages/mipsel_24kc/$feed" ]; then
+              cp -a "bin/packages/mipsel_24kc/$feed" "$GITHUB_WORKSPACE/j8c-feed/packages/mipsel_24kc/"
+            fi
+          done
+
+      - name: Upload J8c firmware candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-j8c-maintenance-candidate
+          path: j8c-output/
+          retention-days: 14
+
+      - name: Upload exact-ABI app feed candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-j8c-matched-app-feed
+          path: j8c-feed/
+          retention-days: 14
+
+  j9e-artifact-audit:
+    name: J9E paired firmware/feed integrity and trust
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve firmware candidate from THIS workflow run
+        uses: actions/download-artifact@v4
+        with:
+          name: veci-j8c-maintenance-candidate
+          path: j9e-input/firmware
+      - name: Retrieve exact-ABI feed from SAME workflow run
+        uses: actions/download-artifact@v4
+        with:
+          name: veci-j8c-matched-app-feed
+          path: j9e-input/feed
+      - name: J9 matched-artifact checksum, inventory and ABI audit
+        run: |
+          python3 -m unittest discover -s tests -p 'test_j9_offline_audit.py' -v
+          python3 scripts/j9_offline_audit.py \
+            --firmware j9e-input/firmware --feed j9e-input/feed \
+            --run-id "${{ github.run_id }}" --report j9e-j9.json
+      - name: Build pinned APKv3 verifier for J9B trust and dependency simulation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y meson ninja-build pkg-config libssl-dev zlib1g-dev squashfs-tools
+          git clone --filter=blob:none https://github.com/alpinelinux/apk-tools.git apk-tools
+          git -C apk-tools checkout b5a31c0d865342ad80be10d68f1bb3d3ad9b0866
+          meson setup apk-tools/build apk-tools -Dprefix=/usr \
+            -Ddocs=disabled -Dhelp=disabled -Dlua=disabled -Dpython=disabled \
+            -Dtests=disabled -Dzstd=disabled -Dcrypto_backend=openssl -Durl_backend=wget
+          ninja -C apk-tools/build src/apk
+          apk-tools/build/src/apk --version
+      - name: J9B signed repository, package payload and offline 5-app solver audit
+        run: |
+          python3 -m unittest discover -s tests -p 'test_j9b_signed_feed.py' -v
+          python3 scripts/j9b_signed_feed_audit.py \
+            --firmware j9e-input/firmware --feed j9e-input/feed \
+            --apk apk-tools/build/src/apk --run-id "${{ github.run_id }}" \
+            --report j9e-j9b.json
+      - name: Enforce strict offline PASS and always release NO_GO
+        env:
+          J9E_SHA: ${{ github.sha }}
+          J9E_RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib
+          j9=json.load(open('j9e-j9.json'))
+          b=json.load(open('j9e-j9b.json'))
+          assert j9['j9']=='OFFLINE_PASS' and j9['release_decision']=='NO_GO'
+          assert b['j9b']=='EXECUTED' and b['release_decision']=='NO_GO'
+          for gate in ('keys','metadata','signature','package_content','solver'):
+              assert b.get(gate)=='PASS',f'{gate} not PASS: {b.get(gate)}'
+          assert j9['run_id']==b['j8c_run_id']==os.environ['J9E_RUN_ID']
+          pin=pathlib.Path('source/veci.commit').read_text().strip()
+          provenance={
+              'j9e':'OFFLINE_PASS','release_decision':'NO_GO',
+              'run_id':os.environ['J9E_RUN_ID'],
+              'firmware_source_commit':os.environ['J9E_SHA'],
+              'veci_core_commit':pin,
+              'firmware_sha256':j9['firmware']['sha256'],
+              'kernel':j9['firmware']['kernel'],
+              'signed_index_count':b['detail']['signed_indexes_valid'],
+              'payloads_verified':b['detail']['content_verified'],
+              'router_apps_solver_passed':b['detail']['solver_passed'],
+              'live_hardware_uat':'NOT_TESTED'
+          }
+          pathlib.Path('j9e-provenance.json').write_text(json.dumps(provenance,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(provenance,indent=2))
+          PY
+      - name: Preserve paired audit reports and provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-j9e-paired-audit
+          path: |
+            j9e-j9.json
+            j9e-j9b.json
+            j9e-provenance.json
+          if-no-files-found: warn
+          retention-days: 14
+

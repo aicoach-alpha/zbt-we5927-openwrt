@@ -1454,7 +1454,7 @@ define Device/zbtlink_zbt-we5927
   DEVICE_VENDOR := Zbtlink
   DEVICE_MODEL := ZBT-WE5927
   SUPPORTED_DEVICES += zbt-we5927
-  DEVICE_PACKAGES := luci we5927-lte kmod-usb2 kmod-usb-ohci kmod-usb-net-rndis kmod-usb-serial-option
+  DEVICE_PACKAGES := luci we5927-lte veci veci-default-ui veci-cellular-we5927 kmod-usb2 kmod-usb-ohci kmod-usb-net-rndis kmod-usb-serial-option
 endef
 TARGET_DEVICES += zbtlink_zbt-we5927
 

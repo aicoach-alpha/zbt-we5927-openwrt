@@ -1,0 +1,65 @@
+name: J9D runtime safety negative tests
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/veci-app-guest/**'
+      - 'source/veci-app-voucher/**'
+      - 'source/veci-app-wireguard/**'
+      - 'source/veci.commit'
+      - 'tests/test_j9d_runtime_guards.py'
+      - 'scripts/j9c_readiness_audit.py'
+      - '.github/workflows/j9d-negative-tests.yml'
+      - 'docs/J9D-RUNTIME-HARDENING.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: j9d-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare immutable pinned VeCI Core in temp build workspace
+        run: |
+          mkdir -p /tmp/j9d-openwrt/package
+          ./scripts/prepare-veci.sh /tmp/j9d-openwrt
+      - name: J9D failure-injection and negative tests
+        run: python3 -m unittest discover -s tests -p 'test_j9d_runtime_guards.py' -v
+      - name: Re-run J9C static review against patched source
+        run: |
+          python3 scripts/j9c_readiness_audit.py --root . \
+            --veci-source /tmp/j9d-openwrt/package/veci \
+            --output j9d-readiness.json
+      - name: Enforce all 5 static mitigations and keep FLASH NO_GO
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('j9d-readiness.json'))
+          assert r['source_readiness']=='PASS'
+          assert set(r['findings'])=={
+              'guest_partial_activation_rollback',
+              'voucher_read_side_effect',
+              'wireguard_peer_auto_routes',
+              'updater_token_expiry',
+              'app_cleanup_empty_response'
+          }
+          assert all(x=='MITIGATED_STATIC' for x in r['findings'].values()), r['findings']
+          assert r['product_readiness']=='BLOCKED'
+          assert r['flash_decision']=='NO_GO'
+          assert all(x=='NOT_TESTED' for x in r['hardware_uat'].values())
+          print('J9D STATIC MITIGATION PASS / LIVE UAT NOT TESTED / FLASH NO_GO')
+          PY
+      - name: Publish J9D source safety evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-j9d-runtime-negative-tests
+          path: j9d-readiness.json
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,17 @@
+Case ID,Scenario,Pass criteria,Status,Board ID,Firmware image SHA256,Tester,UTC timestamp,Observed (masked),Evidence reference,Rollback verified
+U01,VeCI authentication and unauthorized RPC,Login/logout works; unauthorized calls rejected,NOT_TESTED,,,,,,,NOT_TESTED
+U02,LuCI fallback and default UI,Both HTTP VeCI and LuCI reachable; fallback works,NOT_TESTED,,,,,,,NOT_TESTED
+U03,LAN/Wi-Fi/DHCP/DNS after reboot,Service survives restart; clients reconnect,NOT_TESTED,,,,,,,NOT_TESTED
+U04,LTE/RNDIS and SIM recovery,Internet uplink recovers; no unintended modem writes,NOT_TESTED,,,,,,,NOT_TESTED
+U05,Cached versus AT modem data,Sources labeled and identifiers protected,NOT_TESTED,,,,,,,NOT_TESTED
+U06,Guest portal lifecycle,Guest isolated; provisioning and rollback work,NOT_TESTED,,,,,,,NOT_TESTED
+U07,SQM CAKE/IFB performance,Latency improved without OOM; uninstall restores,NOT_TESTED,,,,,,,NOT_TESTED
+U08,DDNS update and credentials,DNS updates; secrets not logged,NOT_TESTED,,,,,,,NOT_TESTED
+U09,WireGuard peer routing,Handshake correct; no accidental default route,NOT_TESTED,,,,,,,NOT_TESTED
+U10,Voucher login/expiry/revoke,Invalid credentials rejected; expired sessions disconnected,NOT_TESTED,,,,,,,NOT_TESTED
+U11,Five signed app install/config/removal,All actions complete with rollback; no core removal,NOT_TESTED,,,,,,,NOT_TESTED
+U12,Manual firmware upload validation,Reject malformed or wrong board and hash,NOT_TESTED,,,,,,,NOT_TESTED
+U13,Signature and token expiry,Only signed compatible firmware accepted,NOT_TESTED,,,,,,,NOT_TESTED
+U14,Power loss / rollback,Recovery route and rollback verified,NOT_TESTED,,,,,,,NOT_TESTED
+U15,Memory/flash/CPU stress,No resource exhaustion in repeated app use,NOT_TESTED,,,,,,,NOT_TESTED
+U16,Trusted LAN isolation,Guest clients cannot access trusted LAN,NOT_TESTED,,,,,,,NOT_TESTED
