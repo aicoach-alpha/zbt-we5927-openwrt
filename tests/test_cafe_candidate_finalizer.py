@@ -230,6 +230,8 @@ class CandidateFinalizerTests(unittest.TestCase):
                 "www/veci/index.html",
                 "usr/libexec/veci/guest-prerm",
                 "usr/libexec/veci/voucher-prerm",
+                module.FIRMWARE_KEY_FILE,
+                "etc/veci-release-channel",
                 "etc/apk/keys/openwrt-public.pem"
             ]
             metadata = {
@@ -241,8 +243,14 @@ class CandidateFinalizerTests(unittest.TestCase):
             for name in needed:
                 file = tree / name
                 file.parent.mkdir(parents=True, exist_ok=True)
-                file.write_text(json.dumps(metadata) if name.endswith("veci-release.json")
-                                else "UNIT_TEST_DATA_NOT_AN_APK_SIGNATURE")
+                if name == module.FIRMWARE_KEY_FILE:
+                    file.write_bytes((ROOT / "source/veci-default-ui/files" /
+                                      module.FIRMWARE_KEY_FILE).read_bytes())
+                elif name == "etc/veci-release-channel":
+                    file.write_text("development\n")
+                else:
+                    file.write_text(json.dumps(metadata) if name.endswith("veci-release.json")
+                                    else "UNIT_TEST_DATA_NOT_AN_APK_SIGNATURE")
             filesystem = work / "filesystem.squashfs"
             build = subprocess.run(
                 ["mksquashfs", str(tree), str(filesystem),
@@ -254,6 +262,21 @@ class CandidateFinalizerTests(unittest.TestCase):
             image.write_bytes(b"SYNTHETIC_IMAGE_HEADER" + filesystem.read_bytes())
             self.assertTrue(module.verify_embedded_rootfs(image, metadata))
             self.assertTrue(module.verify_embedded_rootfs(image, metadata, require_prerm_hooks=False))
+            trust_file = tree / module.FIRMWARE_KEY_FILE
+            trusted_original = trust_file.read_bytes()
+            trust_file.write_text("UNTRUSTED_DIFFERENT_PUBLIC_KEY")
+            mismatch_fs = work / "wrong-trust.squashfs"
+            mismatch_build = subprocess.run(
+                ["mksquashfs", str(tree), str(mismatch_fs),
+                 "-noappend", "-no-progress", "-processors", "1"],
+                capture_output=True, text=True, timeout=20
+            )
+            self.assertEqual(mismatch_build.returncode, 0, mismatch_build.stderr[-350:])
+            mismatch_img = work / "wrong-trust-sysupgrade.bin"
+            mismatch_img.write_bytes(b"SYNTHETIC_IMAGE_HEADER" + mismatch_fs.read_bytes())
+            with self.assertRaisesRegex(ValueError, "trust root fingerprint mismatch"):
+                module.verify_embedded_rootfs(mismatch_img, metadata)
+            trust_file.write_bytes(trusted_original)
             (tree / "usr/libexec/veci/guest-prerm").unlink()
             oldfs = work / "missing-hook.squashfs"
             result = subprocess.run(

@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-default-ui
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -27,6 +27,9 @@ endef
 define Package/veci-default-ui/install
 	$(INSTALL_DIR) $(1)/etc
 	$(INSTALL_DATA) ./files/etc/veci-release.json $(1)/etc/veci-release.json
+	$(INSTALL_DATA) ./files/etc/veci-release-channel $(1)/etc/veci-release-channel
+	$(INSTALL_DIR) $(1)/etc/veci/firmware-keys
+	$(INSTALL_DATA) ./files/etc/veci/firmware-keys/veci-20261102.pub $(1)/etc/veci/firmware-keys/veci-20261102.pub
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/etc/config/veci_default_ui $(1)/etc/config/veci_default_ui
 	$(INSTALL_DIR) $(1)/usr/sbin

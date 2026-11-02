@@ -16,6 +16,8 @@ import sys
 
 TARGET = "ramips/mt76x8"
 BOARD = "zbtlink_zbt-we5927"
+FIRMWARE_KEY_FILE = "etc/veci/firmware-keys/veci-20261102.pub"
+FIRMWARE_KEY_SHA256 = "68a7270d6464cca4b9282f5cf7fa4a84482816fc5e9c0a47c7ae0793fa81e25a"
 PINNED_OPENWRT = "c740570351512e4400369b3c2aff49741f65580e"
 
 
@@ -58,7 +60,8 @@ def verify_embedded_rootfs(image, meta, require_prerm_hooks=True):
         "etc/apk/keys",
     ]
     if require_prerm_hooks:
-        needed.extend(["usr/libexec/veci/guest-prerm", "usr/libexec/veci/voucher-prerm"])
+        needed.extend(["usr/libexec/veci/guest-prerm", "usr/libexec/veci/voucher-prerm",
+                       FIRMWARE_KEY_FILE, "etc/veci-release-channel"])
     with tempfile.TemporaryDirectory(prefix="veci-image-rootfs-") as extract_dir:
         result = subprocess.run(
             [unsquashfs, "-quiet", "-o", str(offsets[0]), "-d", extract_dir,
@@ -72,6 +75,12 @@ def verify_embedded_rootfs(image, meta, require_prerm_hooks=True):
             file = tree / name
             if not file.is_file() or file.is_symlink() or file.stat().st_size <= 0:
                 fail("Rootfs missing mandatory file " + name)
+        if require_prerm_hooks:
+            if sha(tree / FIRMWARE_KEY_FILE) != FIRMWARE_KEY_SHA256:
+                fail("Embedded firmware trust root fingerprint mismatch")
+            channel = (tree / "etc/veci-release-channel").read_text().strip()
+            if channel not in ("development", "published"):
+                fail("Embedded firmware release channel invalid")
         actual = json.loads((tree / "etc/veci-release.json").read_text())
         for key in ("build_id", "veci_commit", "openwrt_commit", "edition"):
             if actual.get(key) != meta[key]:
