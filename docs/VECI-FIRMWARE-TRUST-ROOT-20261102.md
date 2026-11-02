@@ -2,6 +2,9 @@
 
 The public Ed25519 firmware release-signing key is embedded by veci-default-ui
 at /etc/veci/firmware-keys/veci-20261102.pub.
+The same public key is installed at /etc/opkg/keys/c0465b699a01a426,
+because the pinned OpenWrt sysupgrade verifier reads that directory
+even on APK-based systems. The finalizer checks both copies.
 Expected SHA256: 68a7270d6464cca4b9282f5cf7fa4a84482816fc5e9c0a47c7ae0793fa81e25a.
 
 The private signing key is NOT in Git, an APK, or a firmware image.

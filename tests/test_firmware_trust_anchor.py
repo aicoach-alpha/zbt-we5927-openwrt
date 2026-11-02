@@ -13,8 +13,9 @@ class TrustAnchorTests(unittest.TestCase):
 
     def test_package_installs_public_key_and_release_channel(self):
         text = (PACKAGE/"Makefile").read_text()
-        self.assertIn("PKG_RELEASE:=3", text)
+        self.assertIn("PKG_RELEASE:=4", text)
         self.assertIn("$(1)/etc/veci/firmware-keys/veci-20261102.pub", text)
+        self.assertIn("$(1)/etc/opkg/keys/c0465b699a01a426", text)
         self.assertIn("./files/etc/veci/firmware-keys/veci-20261102.pub", text)
         self.assertIn("$(1)/etc/veci-release-channel", text)
 
@@ -33,6 +34,8 @@ class TrustAnchorTests(unittest.TestCase):
     def test_finalizer_checks_rootfs_key_fingerprint(self):
         code = (ROOT/"scripts/finalize-veci-cafe-candidate.py").read_text()
         self.assertIn("Embedded firmware trust root fingerprint mismatch",code)
+        self.assertIn("OpenWrt firmware verifier trust root fingerprint mismatch",code)
+        self.assertIn("OPENWRT_FIRMWARE_TRUST_FILE",code)
         self.assertIn("Embedded firmware release channel invalid",code)
         self.assertIn(EXPECTED,code)
 if __name__=="__main__":

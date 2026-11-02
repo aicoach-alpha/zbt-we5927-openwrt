@@ -231,6 +231,7 @@ class CandidateFinalizerTests(unittest.TestCase):
                 "usr/libexec/veci/guest-prerm",
                 "usr/libexec/veci/voucher-prerm",
                 module.FIRMWARE_KEY_FILE,
+                module.OPENWRT_FIRMWARE_TRUST_FILE,
                 "etc/veci-release-channel",
                 "etc/apk/keys/openwrt-public.pem"
             ]
@@ -243,7 +244,7 @@ class CandidateFinalizerTests(unittest.TestCase):
             for name in needed:
                 file = tree / name
                 file.parent.mkdir(parents=True, exist_ok=True)
-                if name == module.FIRMWARE_KEY_FILE:
+                if name in (module.FIRMWARE_KEY_FILE, module.OPENWRT_FIRMWARE_TRUST_FILE):
                     file.write_bytes((ROOT / "source/veci-default-ui/files" /
                                       module.FIRMWARE_KEY_FILE).read_bytes())
                 elif name == "etc/veci-release-channel":
