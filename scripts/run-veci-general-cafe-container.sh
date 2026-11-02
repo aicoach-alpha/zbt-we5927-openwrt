@@ -34,6 +34,13 @@ cidfile="$root/.veci-cafe-active.cid"
   echo 'STOP: prior builder cidfile exists; inspect its container before retry' >&2
   exit 9
 }
+# Upstream radcli install-exec-hook unconditionally creates TWO aliases.
+# On an incremental build these aliases may already exist from a previous
+# successful invocation, causing make world to fail before image generation.
+# Validate and clear only those two staging symlinks while no worker runs.
+if [ "$mode" = build ]; then
+  python3 "$repo/scripts/prepare-libradcli-install-aliases.py" "$root" || exit 10
+fi
 cleanup() {
   if [ -s "$cidfile" ]; then
     id="$(cat "$cidfile" 2>/dev/null || true)"
