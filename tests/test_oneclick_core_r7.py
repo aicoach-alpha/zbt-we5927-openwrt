@@ -34,7 +34,7 @@ class OneClickCoreTests(unittest.TestCase):
             self.assertTrue(all(not m.name.startswith("/") and ".." not in Path(m.name).parts for m in members))
             marker = tar.extractfile("www/veci/veci-core-commit.txt").read().decode().strip()
         self.assertEqual(marker, "185249af9ba217f2bedf4f554104e6fe3e321a45")
-        self.assertEqual(PIN, "5af5bf5a6afbc16afdf5e1658614045cdd1580e2")
+        self.assertEqual(PIN, "cdde08151b6d061c3294d08a094141626557e055")
 
     def test_windows_runner_never_flashes_and_preserves_http(self):
         script = PS1.read_text()
