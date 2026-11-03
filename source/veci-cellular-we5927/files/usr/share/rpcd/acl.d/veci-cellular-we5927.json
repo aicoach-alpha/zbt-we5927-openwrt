@@ -11,7 +11,9 @@
         ],
         "veci.sms": [
           "getConfig",
-          "listMessages"
+          "listMessages",
+          "getSent",
+          "getDrafts"
         ]
       }
     },
@@ -22,7 +24,11 @@
           "switchSim"
         ],
         "veci.sms": [
-          "setEnabled"
+          "setEnabled",
+          "sendMessage",
+          "deleteMessage",
+          "saveDraft",
+          "deleteDraft"
         ]
       }
     }

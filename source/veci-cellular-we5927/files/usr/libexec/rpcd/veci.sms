@@ -13,15 +13,24 @@ error_json() {
     printf '{"ok":false,"error":"%s"}\n' "$why"
 }
 enabled() { [ "$(uci -q get "$CFG.enabled" 2>/dev/null || true)" = 1 ]; }
-get_config() {
-    . /usr/share/libubox/jshn.sh
-    json_init
-    json_add_boolean ok 1
-    if enabled; then json_add_boolean enabled 1; else json_add_boolean enabled 0; fi
-    json_add_string mode receive_only
-    json_add_string transport w907_at_pdu
-    json_dump
+full_ready() {
+  for name in veci-sms-delete-one veci-sms-send-one veci-sms-sent-history veci-sms-drafts; do
+    [ -x "/usr/libexec/$name" ] || return 1
+  done
+  [ -x /usr/libexec/veci-sms-cmgs ] || return 1
+  [ -f /etc/veci-sms-drafts ] && [ ! -L /etc/veci-sms-drafts ] || return 1
+  [ -f /etc/veci-sms-sent-history ] && [ ! -L /etc/veci-sms-sent-history ]
 }
+get_config() {
+  mode=receive_only
+  full_ready && mode=full
+  if enabled; then
+    printf '{"ok":true,"enabled":true,"mode":"%s","transport":"w907_at_pdu"}\n' "$mode"
+  else
+    printf '{"ok":true,"enabled":false,"mode":"%s","transport":"w907_at_pdu"}\n' "$mode"
+  fi
+}
+
 set_enabled() {
     input="$(head -c 256)" || { error_json invalid_state; return; }
     state="$(printf '%s' "$input" | jsonfilter -e '@.state' 2>/dev/null)" || state=''
@@ -76,6 +85,15 @@ read_inbox() {
                 error_json modem_error; exit 0;
             }
         fi
+        # Read-only query of preferred message store. No AT+CPMS= mutation.
+        storage=unknown
+        raw_mem="$(/usr/sbin/we5927-at "$PORT" 'AT+CPMS?' 2300 2>/dev/null)" || raw_mem=''
+        case "$raw_mem" in
+            *'+CPMS: "SM"'*) storage=SM ;;
+            *'+CPMS: "ME"'*) storage=ME ;;
+            *'+CPMS: "MT"'*) storage=MT ;;
+        esac
+        unset raw_mem
         # Explicit inbox only; this may mark unread messages as read.
         # we5927-at bounds raw AT output at 8192 bytes.
         read_ok=1
@@ -89,18 +107,213 @@ read_inbox() {
             error_json modem_error
             exit 0
         fi
-        printf '%s\n' "$response" | /usr/libexec/veci-sms-parse || :
+        printf '%s\n' "$response" | /usr/libexec/veci-sms-parse "$storage" || :
         unset response
     ) 9>/var/lock/we5927-at.lock
 }
+RATE_LOCK=/var/lock/veci-sms-inbox-rpc.lock
+SMS_DELETE=/usr/libexec/veci-sms-delete-one
+
+delete_message(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required; return; }
+  enabled || { deny sms_disabled; return; }
+  full_ready || { deny worker_unavailable; return; }
+  [ -x "$SMS_DELETE" ] || { deny worker_unavailable; return; }
+  command -v jsonfilter >/dev/null 2>&1 || { deny invalid_request; return; }
+  input="$(head -c 1025)" || { deny invalid_request; return; }
+  [ "$(printf %s "$input" | wc -c)" -le 1024 ] || { deny invalid_request; return; }
+  idx="$(jsonfilter -s "$input" -e '@.index' 2>/dev/null || :)"
+  store="$(jsonfilter -s "$input" -e '@.storage' 2>/dev/null || :)"
+  pdu="$(jsonfilter -s "$input" -e '@.expectedPdu' 2>/dev/null || :)"
+  unset input
+  case "$idx" in ''|*[!0-9]*) deny invalid_request;return;;esac
+  [ "$(printf %s "$idx"|wc -c)" -le 5 ] && [ "$idx" -le 65535 ] ||
+      { deny invalid_request;return; }
+  case "$store" in SM|ME);;*) deny invalid_request;return;;esac
+  n="$(printf %s "$pdu"|wc -c)"
+  [ "$n" -ge 4 ] && [ "$n" -le 512 ] && [ "$((n%2))" -eq 0 ] ||
+      { deny invalid_request;return; }
+  case "$pdu" in *[!0-9A-F]*) deny invalid_request;return;;esac
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    enabled || { deny sms_disabled;exit 0; }
+    result="$(printf %s "$pdu" | "$SMS_DELETE" "$idx" "$store" 2>/dev/null)" ||
+      { deny index_unavailable;exit 0; }
+    enabled || { deny sms_disabled;exit 0; }
+    expected="{\"ok\":true,\"deleted\":$idx,\"storage\":\"$store\"}"
+    [ "$result" = "$expected" ] || { deny index_unavailable;exit 0; }
+    printf '%s\n' "$expected"
+  ) 8>"$RATE_LOCK"
+}
+
+
+SMS_SEND=/usr/libexec/veci-sms-send-one
+SENT_HISTORY=/usr/libexec/veci-sms-sent-history
+SEND_RATE=/tmp/veci-sms-send-last-attempt
+send_message(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required;return; }
+  enabled || { deny sms_disabled;return; }
+  [ -x "$SMS_SEND" ] || { deny worker_unavailable;return; }
+  command -v flock >/dev/null 2>&1 || { deny worker_unavailable;return; }
+  input="$(head -c 525)" || { deny invalid_request;return; }
+  [ "$(printf %s "$input" | wc -c)" -le 524 ] || { deny invalid_request;return; }
+  pdu="$(jsonfilter -s "$input" -e '@.pdu' 2>/dev/null || :)"
+  unset input
+  n="$(printf %s "$pdu"|wc -c)"
+  [ "$n" -ge 22 ] && [ "$n" -le 384 ] && [ "$((n%2))" -eq 0 ] ||
+      { deny invalid_request;return; }
+  case "$pdu" in *[!0-9A-F]*)deny invalid_request;return;;esac
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    enabled || { deny sms_disabled;exit 0; }
+    now="$(date +%s)" || { deny send_unavailable;exit 0; }
+    case "$now" in ''|*[!0-9]*)deny send_unavailable;exit 0;;esac
+    last="$(cat "$SEND_RATE" 2>/dev/null || :)"
+    case "$last" in
+      ''|*[!0-9]*);;
+      *)
+       if [ "$now" -lt "$last" ] || [ "$((now-last))" -lt 5 ];then
+         deny send_rate_limited;exit 0
+       fi;;
+    esac
+    # Reserve before potentially sending; an uncertain outcome must not
+    # provoke automatic retries.
+    printf '%s\n' "$now" > "$SEND_RATE" || { deny send_unavailable;exit 0; }
+    response="$(printf '%s\n' "$pdu" | "$SMS_SEND" 2>/dev/null)" || {
+      deny send_unavailable;exit 0;
+    }
+    enabled || { deny sms_disabled;exit 0; }
+    case "$response" in
+      '{"ok":true,"status":"accepted_by_modem"}')
+        # Store only after positive modem acceptance, never on unknown status.
+        # Persist the already-authorized bounded Submit PDU, never log it.
+        if [ -x "$SENT_HISTORY" ] &&
+          [ "$(printf '%s' "$pdu" | "$SENT_HISTORY" --add 2>/dev/null)" = '{"ok":true,"saved":true}' ]; then
+          printf '{"ok":true,"status":"accepted_by_modem","history_saved":true}\n'
+        else
+          # The SMS was already sent; a flash error must never trigger retry.
+          printf '{"ok":true,"status":"accepted_by_modem","history_saved":false}\n'
+        fi
+        ;;
+      '{"ok":false,"reason":"network_rejected"}'|\
+      '{"ok":false,"reason":"outcome_unknown"}'|\
+      '{"ok":false,"reason":"prompt_unavailable"}')
+        printf '%s\n' "$response";;
+      *)deny send_unavailable;;
+    esac
+  ) 8>"$RATE_LOCK"
+  unset pdu
+}
+
+get_sent(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required;return; }
+  enabled || { deny sms_disabled;return; }
+  [ -x "$SENT_HISTORY" ] || { deny worker_unavailable;return; }
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    enabled || { deny sms_disabled;exit 0; }
+    result="$("$SENT_HISTORY" --list 2>/dev/null)" || {
+      deny history_unavailable;exit 0;
+    }
+    [ "$(printf %s "$result"|wc -c)" -le 15000 ] || {
+      deny history_unavailable;exit 0;
+    }
+    case "$result" in
+      '{"ok":true,"source":"local_sent","count":'*)
+        printf '%s\n' "$result";;
+      *)deny history_unavailable;;
+    esac
+  ) 8>"$RATE_LOCK"
+}
+
+
+SMS_DRAFTS=/usr/libexec/veci-sms-drafts
+draft_request(){
+  [ "$(id -u)" -eq 0 ] || { deny admin_required;return; }
+  enabled || { deny sms_disabled;return; }
+  [ -x "$SMS_DRAFTS" ] || { deny worker_unavailable;return; }
+  command -v flock >/dev/null 2>&1 || { deny worker_unavailable;return; }
+  method="$1"
+  case "$method" in
+    getDrafts) operation=--list ;;
+    saveDraft) operation=--save ;;
+    deleteDraft) operation=--delete ;;
+    *)deny invalid_request;return;;
+  esac
+  if [ "$operation" != --list ];then
+    input="$(head -c 1025)" || { deny invalid_request;return; }
+    [ "$(printf %s "$input"|wc -c)" -le 1024 ] || { deny invalid_request;return; }
+    id="$(jsonfilter -s "$input" -e '@.id' 2>/dev/null || :)"
+    old="$(jsonfilter -s "$input" -e '@.expectedPdu' 2>/dev/null || :)"
+    case "$id" in 0|1|2|3|4|5|6|7|8|9|10);;*)deny invalid_request;return;;esac
+    if [ "$id" = 0 ];then [ "$old" = - ] || { deny invalid_request;return; }
+    else
+      len="$(printf %s "$old"|wc -c)"
+      [ "$len" -ge 22 ] && [ "$len" -le 384 ] && [ "$((len%2))" -eq 0 ] ||
+        { deny invalid_request;return; }
+      case "$old" in *[!0-9A-F]*)deny invalid_request;return;;esac
+    fi
+    if [ "$operation" = --save ];then
+      fresh="$(jsonfilter -s "$input" -e '@.pdu' 2>/dev/null || :)"
+      n="$(printf %s "$fresh"|wc -c)"
+      [ "$n" -ge 22 ] && [ "$n" -le 384 ] && [ "$((n%2))" -eq 0 ] ||
+        { deny invalid_request;return; }
+      case "$fresh" in *[!0-9A-F]*)deny invalid_request;return;;esac
+    fi
+    unset input
+  fi
+  (
+    flock -n -x 8 || { deny request_busy;exit 0; }
+    enabled || { deny sms_disabled;exit 0; }
+    case "$operation" in
+      --list)
+        result="$("$SMS_DRAFTS" --list 2>/dev/null)" ||
+          { deny draft_unavailable;exit 0; }
+        [ "$(printf %s "$result"|wc -c)" -le 6000 ] || { deny draft_unavailable;exit 0; }
+        case "$result" in
+          '{"ok":true,"source":"local_drafts","count":'*)printf '%s\n' "$result";;
+          *)deny draft_unavailable;;
+        esac
+        ;;
+      --save)
+        result="$(printf '%s' "$fresh" | "$SMS_DRAFTS" --save "$id" "$old" 2>/dev/null)" ||
+          { deny draft_unavailable;exit 0; }
+        case "$result" in
+          '{"ok":true,"saved":true,"id":'*)printf '%s\n' "$result";;
+          *)deny draft_unavailable;;
+        esac
+        ;;
+      --delete)
+        result="$("$SMS_DRAFTS" --delete "$id" "$old" 2>/dev/null)" ||
+          { deny draft_unavailable;exit 0; }
+        [ "$result" = "{\"ok\":true,\"deleted\":$id}" ] ||
+          { deny draft_unavailable;exit 0; }
+        printf '%s\n' "$result"
+        ;;
+    esac
+  ) 8>"$RATE_LOCK"
+  unset fresh old
+}
+
+deny() {
+  case "$1" in
+    admin_required|invalid_request|ack_required|worker_unavailable|index_unavailable|retry_later|request_busy|sms_disabled|send_unavailable|send_rate_limited|history_unavailable|draft_unavailable) reason="$1";;
+    *) reason=unavailable;;
+  esac
+  printf '{"ok":false,"reason":"%s"}\n' "$reason"
+}
 case "$1" in
     list)
-        printf '{"getConfig":{},"setEnabled":{"state":"string"},"listMessages":{}}\n' ;;
+        printf '{"getConfig":{},"setEnabled":{"state":"string"},"listMessages":{},"deleteMessage":{"index":"int","storage":"str","expectedPdu":"str"},"sendMessage":{"pdu":"str"},"getSent":{},"getDrafts":{},"saveDraft":{"id":"int","expectedPdu":"str","pdu":"str"},"deleteDraft":{"id":"int","expectedPdu":"str"}}\n' ;;
     call)
         case "$2" in
             getConfig) get_config ;;
             setEnabled) set_enabled ;;
             listMessages) read_inbox ;;
+            deleteMessage) delete_message ;;
+            sendMessage) send_message ;;
+            getSent) get_sent ;;
+            getDrafts|saveDraft|deleteDraft) draft_request "$2" ;;
             *) error_json unsupported_method ;;
         esac ;;
     *) error_json unsupported_method ;;

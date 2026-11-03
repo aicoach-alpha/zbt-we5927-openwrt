@@ -71,10 +71,10 @@ class SmsInboxReadOnlyTest(unittest.TestCase):
 
     def test_minimal_ubus_contract_acl_and_package(self):
         d = json.loads(ACL.read_text())['veci-cellular-we5927']
-        self.assertEqual(d['read']['ubus']['veci.sms'],['getConfig','listMessages'])
-        self.assertEqual(d['write']['ubus']['veci.sms'],['setEnabled'])
+        self.assertEqual(d['read']['ubus']['veci.sms'],['getConfig','listMessages','getSent','getDrafts'])
+        self.assertEqual(d['write']['ubus']['veci.sms'],['setEnabled','sendMessage','deleteMessage','saveDraft','deleteDraft'])
         m = PKG.joinpath('Makefile').read_text()
-        for marker in ['PKG_RELEASE:=2','/etc/config/veci_sms','/usr/libexec/rpcd/veci.sms','/usr/libexec/veci-sms-parse']:
+        for marker in ['PKG_RELEASE:=3','/etc/config/veci_sms','/usr/libexec/rpcd/veci.sms','/usr/libexec/veci-sms-parse','veci-sms-send-one','veci-sms-delete-one','veci-sms-drafts','veci-sms-sent-history']:
             self.assertIn(marker,m)
         self.assertTrue(PKG.joinpath('files/etc/config/veci_sms').exists())
 

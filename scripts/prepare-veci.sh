@@ -120,6 +120,31 @@ grep -q '"veci.sms"' "$OPENWRT_ROOT/package/veci-cellular-we5927/files/usr/share
     echo "error: SMS ubus ACL missing" >&2; exit 1;
 }
 
+# Full SMS release MUST include matching native transport, RPC, workers,
+# ACL and v160 UI. A frontend-only candidate is forbidden.
+for name in veci-sms-send-one veci-sms-delete-one veci-sms-sent-history veci-sms-drafts; do
+  [ -x "$OPENWRT_ROOT/package/veci-cellular-we5927/files/usr/libexec/$name" ] || {
+    echo "error: missing SMS worker $name" >&2
+    exit 1
+  }
+done
+[ -s "$OPENWRT_ROOT/package/we5927-lte/src/veci-sms-cmgs.c" ] || {
+  echo "error: missing native SMS submit source" >&2
+  exit 1
+}
+grep -q 'veci-sms-cmgs' "$OPENWRT_ROOT/package/we5927-lte/Makefile" || {
+  echo "error: missing native SMS packaging" >&2
+  exit 1
+}
+grep -q 'deleteMessage' "$OPENWRT_ROOT/package/veci-cellular-we5927/files/usr/share/rpcd/acl.d/veci-cellular-we5927.json" || {
+  echo "error: missing SMS mutation permissions" >&2
+  exit 1
+}
+grep -q 'sendMessage' "$DEST/veci/js/pages/cellular.js" || {
+  echo "error: full SMS UI contract unavailable" >&2
+  exit 1
+}
+
 echo "Prepared VeCI $PIN (edition: $VECI_EDITION)"
 echo "  core:      $DEST"
 echo "  default:   $OPENWRT_ROOT/package/veci-default-ui"
