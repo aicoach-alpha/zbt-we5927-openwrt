@@ -63,14 +63,32 @@ read_inbox() {
     # Shared lock remains held throughout the PDU-mode and inbox commands.
     (
         flock -n -x 9 || { error_json modem_busy; exit 0; }
-        /usr/sbin/we5927-at "$PORT" 'AT+CMGF=0' 2300 >/dev/null 2>&1 || {
+        # Query the existing SMS mode and restore it after the explicit read.
+        # Keep the modem AT lock for the ENTIRE transaction.
+        old_mode_raw="$(/usr/sbin/we5927-at "$PORT" 'AT+CMGF?' 2300 2>/dev/null)" || {
             error_json modem_error; exit 0;
         }
+        old_mode="$(printf '%s\n' "$old_mode_raw" | tr -d '\r' | awk '/^\+CMGF:[ \t]*[01][ \t]*$/ { gsub(/[ \t]/,""); print substr($0,length($0),1); exit }')"
+        unset old_mode_raw
+        case "$old_mode" in 0|1) ;; *) error_json invalid_modem_response; exit 0 ;; esac
+        if [ "$old_mode" = 1 ]; then
+            /usr/sbin/we5927-at "$PORT" 'AT+CMGF=0' 2300 >/dev/null 2>&1 || {
+                error_json modem_error; exit 0;
+            }
+        fi
         # Explicit inbox only; this may mark unread messages as read.
         # we5927-at bounds raw AT output at 8192 bytes.
-        response="$(/usr/sbin/we5927-at "$PORT" 'AT+CMGL=4' 8500 2>/dev/null)" || {
-            error_json modem_error; exit 0;
-        }
+        read_ok=1
+        response="$(/usr/sbin/we5927-at "$PORT" 'AT+CMGL=4' 8500 2>/dev/null)" || read_ok=0
+        restore_ok=1
+        if [ "$old_mode" = 1 ]; then
+            /usr/sbin/we5927-at "$PORT" 'AT+CMGF=1' 2300 >/dev/null 2>&1 || restore_ok=0
+        fi
+        if [ "$read_ok" -ne 1 ] || [ "$restore_ok" -ne 1 ]; then
+            unset response
+            error_json modem_error
+            exit 0
+        fi
         printf '%s\n' "$response" | /usr/libexec/veci-sms-parse || :
         unset response
     ) 9>/var/lock/we5927-at.lock
