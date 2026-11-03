@@ -1,0 +1,52 @@
+#!/bin/sh
+# Bounded +CMGL PDU-mode parser. Never emit raw unsolicited modem lines.
+LC_ALL=C awk '
+function markbad() { invalid=1 }
+function trim(x) {
+    sub(/^[ \t\r]+/, "", x)
+    sub(/[ \t\r]+$/, "", x)
+    return x
+}
+{
+    line=trim($0)
+    if (line=="") next
+    if (expect) {
+        if (line !~ /^[[:xdigit:]]+$/ || length(line)%2 || length(line)>512 || length(line)<4) markbad()
+        else {
+            n++
+            indices[n]=idx
+            states[n]=state
+            pdus[n]=toupper(line)
+        }
+        expect=0
+        next
+    }
+    if (line ~ /^\+CMGL:[ \t]*/) {
+        sub(/^\+CMGL:[ \t]*/, "", line)
+        parts=split(line, v, ",")
+        for (i=1;i<=parts;i++) v[i]=trim(v[i])
+        if (parts<2 || v[1] !~ /^[0-9]+$/ || v[2] !~ /^[0-4]$/) { markbad(); next }
+        idx=v[1]+0
+        state=v[2]+0
+        if (idx>65535 || n>=16) { markbad(); next }
+        for (i=1;i<=n;i++) if (indices[i]==idx) markbad()
+        expect=1
+        next
+    }
+    if (line=="OK") { done=1; next }
+    if (line=="AT+CMGL=4") next
+    markbad()
+}
+END {
+    if (invalid || expect || !done) {
+        print "{\"ok\":false,\"error\":\"invalid_modem_response\"}"
+        exit 1
+    }
+    printf "{\"ok\":true,\"source\":\"on_demand_cmgl_pdu\",\"storage\":\"unknown\",\"count\":%d,\"messages\":[",n
+    for(i=1;i<=n;i++) {
+        if(i>1) printf ","
+        printf "{\"index\":%d,\"status\":%d,\"pdu\":\"%s\"}",indices[i],states[i],pdus[i]
+    }
+    print "]}"
+}
+'

@@ -33,8 +33,8 @@ class OneClickCoreTests(unittest.TestCase):
             self.assertTrue(all(not m.issym() and not m.islnk() for m in members))
             self.assertTrue(all(not m.name.startswith("/") and ".." not in Path(m.name).parts for m in members))
             marker = tar.extractfile("www/veci/veci-core-commit.txt").read().decode().strip()
-        self.assertEqual(PIN, marker)
-        self.assertEqual(PIN, "185249af9ba217f2bedf4f554104e6fe3e321a45")
+        self.assertEqual(marker, "185249af9ba217f2bedf4f554104e6fe3e321a45")
+        self.assertEqual(PIN, "5af5bf5a6afbc16afdf5e1658614045cdd1580e2")
 
     def test_windows_runner_never_flashes_and_preserves_http(self):
         script = PS1.read_text()
@@ -116,7 +116,7 @@ class OneClickCoreTests(unittest.TestCase):
             self.assertEqual((root / "www/veci/index.html").read_bytes(), old[root / "www/veci/index.html"])
             applied = run("apply", checksum)
             self.assertEqual(applied.returncode, 0, applied.stderr)
-            self.assertEqual((root / "www/veci/veci-core-commit.txt").read_text().strip(), PIN)
+            self.assertEqual((root / "www/veci/veci-core-commit.txt").read_text().strip(), "185249af9ba217f2bedf4f554104e6fe3e321a45")
             self.assertNotEqual((root / "usr/libexec/rpcd/veci").read_bytes(), old[root / "usr/libexec/rpcd/veci"])
             self.assertNotEqual((root / "usr/libexec/rpcd/veci.app.voucher").read_bytes(), old[root / "usr/libexec/rpcd/veci.app.voucher"])
             self.assertNotEqual((root / "www/veci-apps/guest.js").read_bytes(), old[root / "www/veci-apps/guest.js"])

@@ -1,0 +1,89 @@
+#!/bin/sh
+# Receive-only SMS on W907. No SMS send/delete/automatic polling or message logging.
+set -eu
+umask 077
+LC_ALL=C
+export LC_ALL
+CFG=veci_sms.main
+error_json() {
+    case "$1" in
+        disabled|modem_port_unavailable|at_tool_unavailable|modem_busy|modem_error|invalid_modem_response|unsupported_method|invalid_state|save_failed) why="$1" ;;
+        *) why='unavailable' ;;
+    esac
+    printf '{"ok":false,"error":"%s"}\n' "$why"
+}
+enabled() { [ "$(uci -q get "$CFG.enabled" 2>/dev/null || true)" = 1 ]; }
+get_config() {
+    . /usr/share/libubox/jshn.sh
+    json_init
+    json_add_boolean ok 1
+    if enabled; then json_add_boolean enabled 1; else json_add_boolean enabled 0; fi
+    json_add_string mode receive_only
+    json_add_string transport w907_at_pdu
+    json_dump
+}
+set_enabled() {
+    input="$(head -c 256)" || { error_json invalid_state; return; }
+    state="$(printf '%s' "$input" | jsonfilter -e '@.state' 2>/dev/null)" || state=''
+    case "$state" in
+        on) value=1 ;;
+        off) value=0 ;;
+        *) error_json invalid_state; return ;;
+    esac
+    uci -q set "$CFG.enabled=$value" || { error_json save_failed; return; }
+    uci -q commit veci_sms || { error_json save_failed; return; }
+    get_config
+}
+# Bind only known AT interface 1.4, or one explicitly configured fallback.
+# W907 function 1.5 / ttyUSB3 must never be probed.
+find_port() {
+    for t in /sys/class/tty/ttyUSB*; do
+        [ -e "$t/device" ] || continue
+        devpath="$(readlink -f "$t/device" 2>/dev/null || true)"
+        case "$devpath" in
+            */1-1:1.4/*)
+                p="/dev/$(basename "$t")"
+                if [ -c "$p" ]; then printf '%s\n' "$p"; return 0; fi ;;
+        esac
+    done
+    fallback="$(uci -q get we5927_lte.main.at_port 2>/dev/null || true)"
+    case "$fallback" in
+        /dev/ttyUSB3) return 1 ;;
+        /dev/ttyUSB[0-9]|/dev/ttyUSB[0-9][0-9])
+            [ -c "$fallback" ] && { printf '%s\n' "$fallback"; return 0; } ;;
+    esac
+    return 1
+}
+read_inbox() {
+    enabled || { error_json disabled; return; }
+    [ -x /usr/sbin/we5927-at ] || { error_json at_tool_unavailable; return; }
+    [ -x /usr/libexec/veci-sms-parse ] || { error_json invalid_modem_response; return; }
+    command -v flock >/dev/null 2>&1 || { error_json modem_busy; return; }
+    PORT="$(find_port)" || { error_json modem_port_unavailable; return; }
+    # Shared lock remains held throughout the PDU-mode and inbox commands.
+    (
+        flock -n -x 9 || { error_json modem_busy; exit 0; }
+        /usr/sbin/we5927-at "$PORT" 'AT+CMGF=0' 2300 >/dev/null 2>&1 || {
+            error_json modem_error; exit 0;
+        }
+        # Explicit inbox only; this may mark unread messages as read.
+        # we5927-at bounds raw AT output at 8192 bytes.
+        response="$(/usr/sbin/we5927-at "$PORT" 'AT+CMGL=4' 8500 2>/dev/null)" || {
+            error_json modem_error; exit 0;
+        }
+        printf '%s\n' "$response" | /usr/libexec/veci-sms-parse || :
+        unset response
+    ) 9>/var/lock/we5927-at.lock
+}
+case "$1" in
+    list)
+        printf '{"getConfig":{},"setEnabled":{"state":"string"},"listMessages":{}}\n' ;;
+    call)
+        case "$2" in
+            getConfig) get_config ;;
+            setEnabled) set_enabled ;;
+            listMessages) read_inbox ;;
+            *) error_json unsupported_method ;;
+        esac ;;
+    *) error_json unsupported_method ;;
+esac

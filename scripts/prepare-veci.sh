@@ -103,6 +103,23 @@ else
 	printf 'development\n' > "$OPENWRT_ROOT/package/veci-default-ui/files/etc/veci-release-channel"
 fi
 
+# Required SMS integration: reject fake frontend-only releases.
+[ -s "$DEST/veci/sms-center.css" ] || {
+    echo "error: VeCI SMS stylesheet missing from pinned Core" >&2; exit 1;
+}
+[ -s "$DEST/veci/js/pages/cellular.js" ] || {
+    echo "error: Cellular page missing from pinned Core" >&2; exit 1;
+}
+[ -x "$OPENWRT_ROOT/package/veci-cellular-we5927/files/usr/libexec/rpcd/veci.sms" ] || {
+    echo "error: veci.sms RPC backend missing" >&2; exit 1;
+}
+[ -x "$OPENWRT_ROOT/package/veci-cellular-we5927/files/usr/libexec/veci-sms-parse" ] || {
+    echo "error: bounded SMS PDU parser missing" >&2; exit 1;
+}
+grep -q '"veci.sms"' "$OPENWRT_ROOT/package/veci-cellular-we5927/files/usr/share/rpcd/acl.d/veci-cellular-we5927.json" || {
+    echo "error: SMS ubus ACL missing" >&2; exit 1;
+}
+
 echo "Prepared VeCI $PIN (edition: $VECI_EDITION)"
 echo "  core:      $DEST"
 echo "  default:   $OPENWRT_ROOT/package/veci-default-ui"
