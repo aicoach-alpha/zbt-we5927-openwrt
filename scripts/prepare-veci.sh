@@ -145,6 +145,21 @@ grep -q 'sendMessage' "$DEST/veci/js/pages/cellular.js" || {
   exit 1
 }
 
+# Release integration gate: frontend and the full performance-safe backend
+# must be present together, never ship a fake performance dashboard.
+[ -s "$DEST/veci/js/pages/home.js" ] || { echo "missing VeCI Home" >&2; exit 1; }
+grep -q 'performanceStatus' "$DEST/veci/js/pages/home.js" || {
+  echo "performance-first UI contract missing" >&2; exit 1;
+}
+grep -q 'performanceStatus' "$OPENWRT_ROOT/package/veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular" || {
+  echo "performance-first backend missing" >&2; exit 1;
+}
+for path in files/usr/sbin/veci-wifi-guardian files/etc/init.d/veci-wifi-guardian files/etc/config/veci_performance; do
+  [ -s "$OPENWRT_ROOT/package/we5927-lte/$path" ] || {
+    echo "missing Wi-Fi reliability agent $path" >&2; exit 1;
+  }
+done
+
 echo "Prepared VeCI $PIN (edition: $VECI_EDITION)"
 echo "  core:      $DEST"
 echo "  default:   $OPENWRT_ROOT/package/veci-default-ui"

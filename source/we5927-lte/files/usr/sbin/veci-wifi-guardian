@@ -1,0 +1,111 @@
+#!/bin/sh
+# VeCI Wi-Fi guardian for single-radio MT7628 / WE5927.
+# NEVER changes SSID, channel, TX power, security, country or passwords.
+# Bounded conditional repair ONLY if configured AP is absent for 3 probes.
+TAG=veci-wifi-guardian
+CFG=veci_performance.wifi
+STATE=/tmp/veci-wifi-performance.state
+cfg() { uci -q get "$CFG.$1" 2>/dev/null || :; }
+number() {
+ case "$1" in ''|*[!0-9]*) echo "$2";return;; esac
+ if [ "$1" -lt "$3" ]; then echo "$3"
+ elif [ "$1" -gt "$4" ]; then echo "$4"
+ else echo "$1"; fi
+}
+radio_wanted() {
+ [ "$(uci -q get wireless.radio0.disabled 2>/dev/null)" != 1 ] || return 1
+ # No unrequested power-on when the primary AP is intentionally disabled.
+ [ "$(uci -q get wireless.default_radio0.mode 2>/dev/null)" = ap ] || return 1
+ [ "$(uci -q get wireless.default_radio0.disabled 2>/dev/null)" != 1 ]
+}
+radio_running() {
+ # Query netifd LOCALLY, not through HTTP RPC affected by session injection.
+ up="$(ubus -S call network.wireless status '{}' 2>/dev/null |
+       jsonfilter -e '@.radio0.up' 2>/dev/null)" || return 1
+ [ "$up" = true ] || return 1
+ # If iw cannot inspect interfaces, do not mistake that for AP failure.
+ command -v iw >/dev/null 2>&1 || return 0
+ iw dev 2>/dev/null | awk '
+   /Interface / { iface=1 }
+   /type AP/ && iface { ap=1; exit }
+   END { exit !ap }
+ '
+}
+station_count() {
+ # Count without logging client MAC addresses or any SSIDs.
+ interfaces="$(iw dev 2>/dev/null | awk '
+  /Interface / {name=$2}
+  /type AP/ {if(name ~ /^[A-Za-z0-9_.-]+$/)print name}
+ ')" || return 1
+ n=0
+ for dev in $interfaces; do
+   add="$(iw dev "$dev" station dump 2>/dev/null | awk '/^Station /{n++}END{print n+0}')" || return 1
+   n=$((n + add))
+ done
+ echo "$n"
+}
+show_state() {
+ if [ -r "$STATE" ]; then cat "$STATE"
+ else printf 'status=not_started\n'; fi
+}
+write_state() {
+ # bounded, tmpfs-only, sanitized counters. No identifying client data.
+ printf 'wifi=%s failures=%s auto_recover=%s timestamp=%s\n' "$phase" "$failures" "$auto" "$(date +%s)" > "$STATE"
+}
+check_once() {
+ if ! radio_wanted; then echo 'wifi=not_configured'; return 0; fi
+ if radio_running; then echo 'wifi=ready'; return 0; fi
+ echo 'wifi=ap_not_ready'; return 1
+}
+daemon() {
+ local failures interval threshold auto last_repair now gap phase n
+ failures=0
+ last_repair=0
+ phase=starting
+ interval="$(number "$(cfg interval)" 30 15 300)"
+ threshold="$(number "$(cfg fail_threshold)" 3 2 20)"
+ auto="$(cfg auto_recover)"
+ [ "$auto" = 1 ] || auto=0
+ logger -t "$TAG" "monitor started: poll $interval s, threshold $threshold, auto_recover $auto"
+ while :; do
+   if ! radio_wanted; then
+     failures=0
+     phase=intentionally_disabled
+   elif radio_running; then
+     failures=0
+     phase=ready
+   else
+     failures=$((failures + 1))
+     phase=ap_not_ready
+     if [ "$failures" -ge "$threshold" ]; then
+       failures=0
+       now="$(date +%s)"
+       case "$now" in ''|*[!0-9]*) now=0 ;; esac
+       gap=$((now - last_repair))
+       if [ "$auto" = 1 ] && { [ "$last_repair" = 0 ] || [ "$gap" -ge 900 ]; }; then
+         # Fail closed if any client remains associated to an AP.
+         n="$(station_count)" || n=unknown
+         if [ "$n" = 0 ]; then
+           last_repair="$now"
+           phase=radio_recovery
+           logger -t "$TAG" "radio0 AP missing; guarded wifi up radio0"
+           wifi up radio0 >/dev/null 2>&1 || true
+         else
+           phase=hold_associated_or_unknown
+           logger -t "$TAG" "radio0 missing but station state uncertain; no restart"
+         fi
+       else
+         phase=cooldown_or_observe
+       fi
+     fi
+   fi
+   write_state
+   sleep "$interval"
+ done
+}
+case "$1" in
+  daemon) daemon ;;
+  check) check_once ;;
+  status) show_state ;;
+  *) echo 'Usage: veci-wifi-guardian daemon|check|status' >&2; exit 2 ;;
+esac

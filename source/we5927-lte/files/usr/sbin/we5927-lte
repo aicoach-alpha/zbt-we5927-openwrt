@@ -89,16 +89,12 @@ at_port() {
 		esac
 	done
 
-	# Safe fallbacks only. Never auto-probe ttyUSB3 (USB interface 1.5).
-	for p in "$preferred" /dev/ttyUSB2 /dev/ttyUSB1 /dev/ttyUSB0; do
-		[ -n "$p" ] || continue
-		[ -c "$p" ] && {
-			echo "$p"
-			return 0
-		}
+	# Only the verified 1.4 interface may be used. On this hardware
+	# ttyUSB3 is function 1.5 and probing it can hang USB I/O.
+	for p in "$preferred" /dev/ttyUSB2; do
+		[ "$p" = /dev/ttyUSB2 ] || continue
+		[ -c "$p" ] && { echo "$p"; return 0; }
 	done
-
-	echo "$preferred"
 	return 1
 }
 
@@ -185,6 +181,13 @@ repair_rndis() {
 }
 
 usb_repair() {
+	# Do not unbind/rebind an already healthy RNDIS+AT pair.
+	# Re-enumeration can interrupt active LTE traffic or SMS transactions.
+	if ip link show usb0 >/dev/null 2>&1; then
+		local live_port
+		live_port="$(at_port)"
+		[ -c "$live_port" ] && return 0
+	fi
 	modprobe usbserial >/dev/null 2>&1 || true
 	modprobe usb_wwan >/dev/null 2>&1 || true
 	modprobe option >/dev/null 2>&1 || true
@@ -229,26 +232,33 @@ wait_at() {
 }
 
 ensure_network() {
-	local dev metric z
+ local dev metric z changed key value spec
+ dev="$(cfg data_if)"
+ metric="$(cfg metric)"
+ [ -n "$dev" ] || dev=usb0
+ [ -n "$metric" ] || metric=5
+ changed=0
+ # Avoid repeated UCI flash writes and avoid changing LAN/Wi-Fi settings.
+ if [ "$(uci -q get network.lte 2>/dev/null)" != interface ]; then
+   uci set network.lte=interface
+   changed=1
+ fi
+ for spec in "device:$dev" "proto:dhcp" "metric:$metric" "peerdns:1"; do
+   key="$(echo "$spec" | cut -d: -f1)"
+   value="$(echo "$spec" | cut -d: -f2-)"
+   if [ "$(uci -q get "network.lte.$key" 2>/dev/null)" != "$value" ]; then
+     uci set "network.lte.$key=$value"
+     changed=1
+   fi
+ done
+ [ "$changed" = 0 ] || uci commit network
 
-	dev="$(cfg data_if)"
-	metric="$(cfg metric)"
-	[ -n "$dev" ] || dev=usb0
-	[ -n "$metric" ] || metric=5
-
-	[ "$(uci -q get network.lte)" = "interface" ] || uci set network.lte=interface
-	uci set network.lte.device="$dev"
-	uci set network.lte.proto=dhcp
-	uci set network.lte.metric="$metric"
-	uci set network.lte.peerdns=1
-	uci commit network
-
-	z="$(uci -q show firewall | sed -n "s/^\(firewall\.@zone\[[0-9]\+\]\)\.name='wan'$/\1/p" | head -n1)"
-	if [ -n "$z" ] && ! uci -q get "$z.network" | grep -qw lte; then
-		uci add_list "$z.network=lte"
-		uci commit firewall
-		/etc/init.d/firewall reload >/dev/null 2>&1 || true
-	fi
+ z="$(uci -q show firewall | sed -n "s/^\(firewall\.@zone\[[0-9]\+\]\)\.name='wan'$/\1/p" | head -n1)"
+ if [ -n "$z" ] && ! uci -q get "$z.network" | grep -qw lte; then
+   uci add_list "$z.network=lte"
+   uci commit firewall
+   /etc/init.d/firewall reload >/dev/null 2>&1 || true
+ fi
 }
 
 set_sim() {
@@ -274,8 +284,12 @@ set_sim() {
 	esac
 
 	gpio_set "$n" "$v" || return 1
-	uci set "$CFG.sim=$slot"
-	uci commit we5927_lte
+	# Always drive the physical GPIO on cold boot, but do not write flash
+	# if the persisted SIM selection is already correct.
+	if [ "$(cfg sim)" != "$slot" ]; then
+		uci set "$CFG.sim=$slot"
+		uci commit we5927_lte
+	fi
 	echo "sim=$slot" > "$STATE"
 	log "SIM selector changed to SIM$slot (GPIO$n value=$v)"
 }
@@ -332,32 +346,99 @@ sim_ready() {
 }
 
 soft_reconnect() {
-	log "Soft reconnect modem (CFUN)"
-	wait_at || return 1
-	apply_apn || true
-
-	at "AT+CFUN=0" 3000 >/dev/null 2>&1 || true
-	sleep 3
-	at "AT+CFUN=1" 8000 >/dev/null 2>&1 || true
-	sleep 6
-
-	usb_repair
-	ifup lte >/dev/null 2>&1 || true
+ local p rc
+ log "Escalated LTE radio reconnect: exclusive AT lock"
+ wait_at || return 1
+ apply_apn || true
+ p="$(at_port)"
+ [ -c "$p" ] || return 1
+ (
+   # Shared lock prevents collision with active SMS send/read/delete.
+   flock -n -x 9 || exit 75
+   /usr/sbin/we5927-at "$p" "AT+CFUN=0" 3000 >/dev/null 2>&1 || exit 1
+   sleep 2
+   /usr/sbin/we5927-at "$p" "AT+CFUN=1" 8000 >/dev/null 2>&1 || exit 1
+ ) 9>/var/lock/we5927-at.lock
+ rc=$?
+ [ "$rc" -eq 0 ] || {
+   log "CFUN reconnect failed or SMS AT channel busy; no forced override"
+   return 1
+ }
+ sleep 4
+ usb_repair
+ ifup lte >/dev/null 2>&1 || true
 }
 
 data_ok() {
-	local dev host
+ local dev host
+ dev="$(cfg data_if)"
+ host="$(cfg ping_host)"
+ [ -n "$dev" ] || dev=usb0
+ [ -n "$host" ] || host=1.1.1.1
+ ip link show "$dev" >/dev/null 2>&1 || return 1
+ ip -4 addr show dev "$dev" | grep -q "inet " || return 1
+ # Two independent remote targets; never reset for one failed ping.
+ ping -I "$dev" -c 1 -W 1 "$host" >/dev/null 2>&1 && return 0
+ [ "$host" = "8.8.8.8" ] || ping -I "$dev" -c 1 -W 1 8.8.8.8 >/dev/null 2>&1
+}
 
-	dev="$(cfg data_if)"
-	host="$(cfg ping_host)"
-	[ -n "$dev" ] || dev=usb0
-	[ -n "$host" ] || host=1.1.1.1
+gateway_ok() {
+ local dev gw
+ dev="$(cfg data_if)"
+ [ -n "$dev" ] || dev=usb0
+ ip link show "$dev" >/dev/null 2>&1 || return 1
+ ip -4 addr show dev "$dev" | grep -q "inet " || return 1
+ gw="$(ip -4 route show default dev "$dev" 2>/dev/null | awk '/^default via /{print $3;exit}')"
+ case "$gw" in ''|*[!0-9.]*) return 1 ;; esac
+ ping -I "$dev" -c 1 -W 1 "$gw" >/dev/null 2>&1
+}
 
-	ip link show "$dev" >/dev/null 2>&1 || return 1
-	ip -4 addr show dev "$dev" | grep -q "inet " || return 1
+# Conservative last-resort guard. If RNDIS+IP remain present and the
+# cellular packet service says "attached", do not toggle modem power for
+# ICMP-only failures. An AT channel busy with SMS is not proof of radio loss.
+radio_or_link_lost() {
+ local dev p state
+ dev="$(cfg data_if)"
+ [ -n "$dev" ] || dev=usb0
+ ip link show "$dev" >/dev/null 2>&1 || return 0
+ ip -4 addr show dev "$dev" | grep -q "inet " || return 0
+ p="$(at_port)" || return 1
+ [ -c "$p" ] || return 1
+ state="$(at 'AT+CGATT?' 1500 2>/dev/null)" || return 1
+ case "$state" in
+   *'+CGATT: 0'*) return 0 ;;
+   *) return 1 ;;
+ esac
+}
 
-	ping -I "$dev" -c 1 -W 2 "$host" >/dev/null 2>&1 && return 0
-	[ "$host" = "8.8.8.8" ] || ping -I "$dev" -c 1 -W 2 8.8.8.8 >/dev/null 2>&1
+renew_lte() {
+ log "LTE fast recovery: renew existing DHCP lease"
+ ubus call network.interface.lte renew '{}' >/dev/null 2>&1 ||
+   ifup lte >/dev/null 2>&1 || true
+ sleep 2
+ data_ok
+}
+
+repair_lte_interface() {
+ log "LTE interface recovery: netifd LTE only, preserve Wi-Fi and modem"
+ ifdown lte >/dev/null 2>&1 || true
+ sleep 1
+ ifup lte >/dev/null 2>&1 || true
+ sleep 3
+ data_ok
+}
+
+clamped_number() {
+ case ${1:-} in ''|*[!0-9]*) echo "$2"; return ;; esac
+ if [ "$1" -lt "$3" ]; then echo "$3"
+ elif [ "$1" -gt "$4" ]; then echo "$4"
+ else echo "$1"; fi
+}
+
+performance_state() {
+ # tmpfs only; bounded metadata without APN, IMSI, SMS, IP or credentials.
+ printf 'failures=%s recoveries=%s stage=%s timestamp=%s
+' "$failures" "$recoveries" "$stage" "$(date +%s)" > /tmp/veci-lte-performance.state
 }
 
 clean_line() {
@@ -726,90 +807,113 @@ auto_switch_sim() {
 }
 
 daemon() {
-	local failures recoveries threshold interval hard_after auto sim_after sim next
+ local failures recoveries threshold interval hard_after auto sim_after sim next
+ local last_hard last_sim now gap stage
+ failures=0
+ recoveries=0
+ last_hard=0
+ last_sim=0
+ stage=starting
+ enabled || exit 0
 
-	failures=0
-	recoveries=0
-	enabled || exit 0
+ ensure_network
+ power_on || true
+ sim="$(cfg sim)"
+ [ "$sim" = 2 ] || sim=1
+ # Restore the selected SIM GPIO on cold boot; only write UCI when changed.
+ set_sim "$sim" >/dev/null 2>&1 || true
+ if data_ok; then
+   # A service reload must NOT flap an already healthy LTE data link.
+   log "LTE already healthy; preserving RNDIS, APN and DHCP session"
+ else
+   usb_repair
+   wait_at || log "AT port not ready yet"
+   if ! sim_ready && [ "$(cfg auto_failover)" = 1 ]; then
+     if [ "$sim" = 1 ]; then next=2; else next=1; fi
+     auto_switch_sim "$sim" "$next" && sim="$next"
+   fi
+   apply_apn || true
+   ifup lte >/dev/null 2>&1 || true
+ fi
 
-	ensure_network
-	power_on || true
+ threshold="$(clamped_number "$(cfg fail_threshold)" 3 2 20)"
+ interval="$(clamped_number "$(cfg ping_interval)" 10 5 120)"
+ hard_after="$(clamped_number "$(cfg hard_reset_after)" 3 2 20)"
+ auto="$(cfg auto_failover)"
+ sim_after="$(clamped_number "$(cfg sim_failover_after)" 3 2 20)"
+ log "LTE performance-first monitor started; checks every $interval sec; threshold $threshold"
 
-	sim="$(cfg sim)"
-	[ "$sim" = "2" ] || sim=1
-	set_sim "$sim" >/dev/null 2>&1 || true
-
-	usb_repair
-	wait_at || log "AT port not ready yet"
-
-	if ! sim_ready && [ "$(cfg auto_failover)" != "0" ]; then
-		if [ "$sim" = "1" ]; then next=2; else next=1; fi
-		auto_switch_sim "$sim" "$next" && sim="$next"
-	fi
-
-	apply_apn || true
-	ifup lte >/dev/null 2>&1 || true
-
-	threshold="$(cfg fail_threshold)"
-	interval="$(cfg ping_interval)"
-	hard_after="$(cfg hard_reset_after)"
-	auto="$(cfg auto_failover)"
-	sim_after="$(cfg sim_failover_after)"
-
-	[ -n "$threshold" ] || threshold=6
-	[ -n "$interval" ] || interval=10
-	[ -n "$hard_after" ] || hard_after=2
-	[ -n "$auto" ] || auto=1
-	[ -n "$sim_after" ] || sim_after=3
-
-	log "service started: RNDIS $(cfg data_if), APN=$(cfg apn), SIM$sim"
-
-	while enabled; do
-		if data_ok; then
-			failures=0
-			recoveries=0
-		else
-			failures=$((failures + 1))
-			log "connectivity failure $failures/$threshold"
-
-			if [ "$failures" -ge "$threshold" ]; then
-				failures=0
-				recoveries=$((recoveries + 1))
-
-				log "Interface-first LTE recovery: ifdown/ifup"
-				ifdown lte >/dev/null 2>&1 || true
-				sleep 2
-				ifup lte >/dev/null 2>&1 || true
-				sleep 8
-
-				if data_ok; then
-					log "LTE interface recovery succeeded"
-					recoveries=0
-					continue
-				fi
-
-				soft_reconnect || true
-				sleep 8
-
-				if ! data_ok && [ $((recoveries % hard_after)) -eq 0 ]; then
-					power_cycle
-				fi
-
-				if ! data_ok && [ "$auto" = "1" ] && [ $((recoveries % sim_after)) -eq 0 ]; then
-					sim="$(cfg sim)"
-					if [ "$sim" = "1" ]; then
-						next=2
-					else
-						next=1
-					fi
-
-					auto_switch_sim "$sim" "$next" || true
-				fi
-			fi
-		fi
-
-		sleep "$interval"
-	done
+ while enabled; do
+   if data_ok; then
+     if [ "$failures" -gt 0 ] || [ "$recoveries" -gt 0 ]; then
+       log "LTE connectivity restored"
+     fi
+     failures=0
+     recoveries=0
+     stage=healthy
+   else
+     failures=$((failures + 1))
+     stage=checking
+     if [ "$failures" -ge "$threshold" ]; then
+       failures=0
+       recoveries=$((recoveries + 1))
+       stage=dhcp_renew
+       if renew_lte; then
+         stage=recovered_dhcp
+         recoveries=0
+       elif gateway_ok; then
+         # Multiple public ICMP failures cannot alone justify a radio reset.
+         stage=upstream_degraded
+         log "LTE gateway responds, external checks failed; modem held steady"
+         recoveries=0
+       else
+         stage=interface_recovery
+         if repair_lte_interface; then
+           stage=recovered_interface
+           recoveries=0
+         else
+           if [ "$recoveries" -ge 2 ]; then
+             stage=modem_soft_reconnect
+             soft_reconnect || true
+             if data_ok; then
+               stage=recovered_soft
+               recoveries=0
+             fi
+           fi
+           # Hard resets have a strict 15-min cooldown and require missing
+           # both public reachability and RNDIS gateway.
+           if [ "$recoveries" -ge "$hard_after" ] && ! data_ok && ! gateway_ok && radio_or_link_lost; then
+             now="$(date +%s)"
+             case "$now" in ''|*[!0-9]*) now=0 ;; esac
+             gap=$((now - last_hard))
+             if [ "$last_hard" -eq 0 ] || [ "$gap" -ge 900 ]; then
+               last_hard="$now"
+               stage=last_resort_power_cycle
+               power_cycle
+             else
+               stage=power_cycle_cooldown
+               log "Suppressing modem power-cycle during 900-second cooldown"
+             fi
+           fi
+           if [ "$auto" = 1 ] && [ "$recoveries" -ge "$sim_after" ] && ! data_ok && ! gateway_ok; then
+             now="$(date +%s)"
+             case "$now" in ''|*[!0-9]*) now=0 ;; esac
+             gap=$((now - last_sim))
+             if [ "$last_sim" -eq 0 ] || [ "$gap" -ge 1800 ]; then
+               last_sim="$now"
+               sim="$(cfg sim)"
+               if [ "$sim" = 1 ]; then next=2; else next=1; fi
+               stage=opt_in_sim_failover
+               auto_switch_sim "$sim" "$next" || true
+             fi
+           fi
+         fi
+       fi
+     fi
+   fi
+   performance_state
+   sleep "$interval"
+ done
 }
 
 case "$1" in
@@ -832,7 +936,8 @@ case "$1" in
 		refresh_status_cache
 		;;
 	reconnect)
-		soft_reconnect
+		# The UI button always tries the least disruptive path first.
+		renew_lte || repair_lte_interface || soft_reconnect
 		;;
 	power-cycle)
 		power_cycle
