@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=we5927-lte
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -31,6 +31,7 @@ endef
 define Package/we5927-lte/conffiles
 /etc/config/we5927_lte
 /etc/config/veci_performance
+/etc/config/veci_reliability
 endef
 
 define Package/we5927-lte/install
@@ -40,12 +41,15 @@ define Package/we5927-lte/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/veci-sms-cmgs $(1)/usr/libexec/veci-sms-cmgs
 	$(INSTALL_BIN) ./files/usr/sbin/we5927-lte $(1)/usr/sbin/we5927-lte
 	$(INSTALL_BIN) ./files/usr/sbin/veci-wifi-guardian $(1)/usr/sbin/veci-wifi-guardian
+	$(INSTALL_BIN) ./files/usr/sbin/veci-reliability $(1)/usr/sbin/veci-reliability
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/we5927-lte $(1)/etc/init.d/we5927-lte
 	$(INSTALL_BIN) ./files/etc/init.d/veci-wifi-guardian $(1)/etc/init.d/veci-wifi-guardian
+	$(INSTALL_BIN) ./files/etc/init.d/veci-reliability $(1)/etc/init.d/veci-reliability
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/etc/config/we5927_lte $(1)/etc/config/we5927_lte
 	$(INSTALL_CONF) ./files/etc/config/veci_performance $(1)/etc/config/veci_performance
+	$(INSTALL_CONF) ./files/etc/config/veci_reliability $(1)/etc/config/veci_reliability
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./files/etc/uci-defaults/98-we5927-websafe $(1)/etc/uci-defaults/98-we5927-websafe
 	$(INSTALL_BIN) ./files/etc/uci-defaults/99-we5927-lte $(1)/etc/uci-defaults/99-we5927-lte

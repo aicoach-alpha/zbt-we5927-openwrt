@@ -1,0 +1,196 @@
+#!/bin/sh
+# Low-write VeCI reliability log, 24/72h. No MAC, SSID, SMS, credentials.
+set -u
+DIR=/overlay/veci-reliability
+WIN=/tmp/veci-rel-window
+STATUS=/tmp/veci-rel-status
+HEADER='epoch,boot,uptime,checks,wan_ok,gw_ok,wifi_ok,rtt_avg_ms,rtt_max_ms,wan_rx_mbps,wan_tx_mbps,wifi_rx_mbps,wifi_tx_mbps,clients,rssi_dbm,wifi_phy_mbps,lte_stage,wifi_stage,mem_available_kb,load_1m,wifi_checks'
+conf() { uci -q get "veci_reliability.main.$1" 2>/dev/null || :; }
+epoch() { date +%s; }
+safe() { case "$1" in ''|*[!0-9]*) echo "$2";;*) echo "$1";;esac; }
+rtt() {
+ case "$1" in ''|*[!0-9.]*) echo -1;return;;esac
+ ping -I usb0 -c 1 -W 1 "$1" 2>/dev/null | awk '
+ {if(match($0,/time[=<][0-9.]+/)){s=substr($0,RSTART,RLENGTH);sub(/^time[=<]/,"",s);printf "%.1f\n",s+0;ok=1;exit}}
+ END{if(!ok)print -1}'
+}
+counter() {
+ case "$1" in ''|*[!a-zA-Z0-9_.-]*) echo -1;return;;esac
+ f="/sys/class/net/$1/statistics/$2"
+ [ -r "$f" ] && head -n 1 "$f" || echo -1
+}
+ap() { iw dev 2>/dev/null | awk '/Interface /{n=$2}/type AP/{if(n~/^[a-zA-Z0-9_.-]+$/){print n;exit}}'; }
+stations() {
+ case "$1" in ''|*[!a-zA-Z0-9_.-]*) echo '0,-1,0';return;;esac
+ iw dev "$1" station dump 2>/dev/null | awk '
+ /^Station /{n++} /signal avg:/{s+=$3;a++} /tx bitrate:/{t+=$3;b++}
+ END{printf "%d,%.0f,%.1f\n",n,(a?s/a:-1),(b?t/b:0)}'
+}
+stage() {
+ [ -r "$1" ] || { echo unknown;return; }
+ s="$(head -c 200 "$1" | tr ' ' '\n' | grep "^$2=" | head -1 | cut -d= -f2-)"
+ case "$s" in ''|*[!A-Za-z0-9_]) echo unknown;;*)printf '%.30s\n' "$s";;esac
+}
+sample() {
+ now="$(epoch)";up="$(awk '{print int($1)}' /proc/uptime)"
+ boot=$((now-up));inet=0;gw_ok=0;ms=-1
+ if ip -4 addr show dev usb0 2>/dev/null | grep -q 'inet ';then
+  gw="$(ip -4 route show default dev usb0 2>/dev/null | awk '/^default via /{print $3;exit}')"
+  [ "$(rtt "$gw")" = -1 ] || gw_ok=1
+  ms="$(rtt 1.1.1.1)"
+  [ "$ms" = -1 ] && ms="$(rtt 8.8.8.8)"
+  [ "$ms" = -1 ] || inet=1
+ fi
+ wifi=-1
+ [ "$(uci -q get wireless.radio0.disabled 2>/dev/null)" = 1 ] || {
+  radio="$(ubus -S call network.wireless status '{}' 2>/dev/null | jsonfilter -e '@.radio0.up' 2>/dev/null)"
+  [ "$radio" = true ] && wifi=1
+  [ "$radio" = false ] && wifi=0
+ }
+ iface="$(ap)";[ -n "$iface" ] || iface=none
+ [ "$wifi" = 1 ] && [ "$iface" = none ] && wifi=0
+ printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+  "$now" "$boot" "$up" "$inet" "$gw_ok" "$wifi" "$ms" \
+  "$(counter usb0 rx_bytes)" "$(counter usb0 tx_bytes)" \
+  "$(counter "$iface" rx_bytes)" "$(counter "$iface" tx_bytes)" \
+  "$(stations "$iface")" "$(stage /tmp/veci-lte-performance.state stage)" \
+  "$(stage /tmp/veci-wifi-performance.state wifi)"   "$(awk '/^MemAvailable:/{print $2;exit}' /proc/meminfo)"   "$(awk '{printf "%.2f",$1}' /proc/loadavg)"
+}
+flush() {
+ [ -s "$WIN" ] || return 0
+ row="$(awk -F, '
+ NR==1{start=$1;boot=$2;rx0=$8;tx0=$9;wrx0=$10;wtx0=$11}
+ {n++;end=$1;up=$3;inet+=$4;gw+=$5;if($6>=0){wifi+=$6;wifi_count++}rx=$8;tx=$9;wrx=$10;wtx=$11;
+  if($7>=0){rtt+=$7;rn++;if($7>maxr)maxr=$7}
+  clients=$12;signal=$13;phy=$14;ls=$15;ws=$16;mem=$17;load=$18}
+ END{
+  sec=end-start;if(sec<1)sec=60
+  d=(rx>=rx0&&rx0>=0)?(rx-rx0)*8/sec/1000000:-1
+  u=(tx>=tx0&&tx0>=0)?(tx-tx0)*8/sec/1000000:-1
+  wd=(wrx>=wrx0&&wrx0>=0)?(wrx-wrx0)*8/sec/1000000:-1
+  wu=(wtx>=wtx0&&wtx0>=0)?(wtx-wtx0)*8/sec/1000000:-1
+  printf "%d,%d,%d,%d,%d,%d,%d,%.1f,%.1f,%.3f,%.3f,%.3f,%.3f,%d,%.0f,%.1f,%s,%s,%d,%.2f,%d\n",
+   end,boot,up,n,inet,gw,wifi,(rn?rtt/rn:-1),(rn?maxr:-1),d,u,wd,wu,clients,signal,phy,ls,ws,mem,load,wifi_count
+ }' "$WIN")" || return 1
+ f="$DIR/samples-$(date +%Y%m%d).csv"
+ [ -s "$f" ] || printf '%s\n' "$HEADER" >> "$f" || return 1
+ printf '%s\n' "$row" >> "$f" || return 1
+ : > "$WIN"
+ printf 'state=logging last_flush=%s\n' "$(epoch)" > "$STATUS"
+ # Finalize one rolling 24h report at midnight; retain an inspectable
+ # 72h readiness report without scanning until the user requests it.
+ prev="$(cat "$DIR/last_day" 2>/dev/null || true)"
+ if [ -n "$prev" ] && [ "$prev" != "$(date +%Y%m%d)" ]; then
+   case "$prev" in *[!0-9]*|'') : ;;
+     *) report 24 > "$DIR/summary-$prev.txt"
+        report 72 > "$DIR/latest-72h-evaluation.txt" ;;
+   esac
+ fi
+ printf '%s\n' "$(date +%Y%m%d)" > "$DIR/last_day"
+}
+probe() {
+ [ "$(conf active_download)" = 1 ] || return 0
+ command -v uclient-fetch >/dev/null 2>&1 || return 0
+ ip -4 route get 1.1.1.1 2>/dev/null | grep -q 'dev usb0' || return 0
+ now="$(epoch)";last="$(cat "$DIR/last_probe" 2>/dev/null || echo 0)"
+ last="$(safe "$last" 0)"
+ [ "$now" -ge "$last" ] && [ $((now-last)) -lt 21600 ] && return 0
+ printf '%s\n' "$now" > "$DIR/last_probe" || return 0
+ before="$(awk '{printf "%.0f",$1*100}' /proc/uptime)"
+ got="$(uclient-fetch -4 -q -T 12 -O - 'https://speed.cloudflare.com/__down?bytes=524288' 2>/dev/null | head -c 524288 | wc -c)"
+ after="$(awk '{printf "%.0f",$1*100}' /proc/uptime)"
+ elapsed=$((after-before));result=failed;mbps=-1
+ got="$(safe "$got" 0)"
+ if [ "$got" -eq 524288 ] && [ "$elapsed" -ge 1 ] && [ "$elapsed" -le 1500 ];then
+  result=ok;mbps="$(awk -v bytes="$got" -v cs="$elapsed" 'BEGIN{printf "%.2f",bytes*8*100/(cs*1000000)}')"
+ fi
+ f="$DIR/probe-$(date +%Y%m%d).csv"
+ [ -s "$f" ] || printf 'epoch,bytes,elapsed_cs,download_mbps,status\n' >> "$f"
+ printf '%s,%s,%s,%s,%s\n' "$now" "$got" "$elapsed" "$mbps" "$result" >> "$f"
+}
+daemon() {
+ [ "$(conf enabled)" = 1 ] || exit 0
+ umask 077;mkdir -p "$DIR" || exit 2;chmod 700 "$DIR"
+ exec 9>/var/lock/veci-reliability.lock
+ flock -n -x 9 || exit 0
+ : > "$WIN"
+ interval="$(safe "$(conf interval_seconds)" 60)"
+ batch="$(safe "$(conf flush_samples)" 5)"
+ [ "$interval" -ge 30 ] && [ "$interval" -le 300 ] || interval=60
+ [ "$batch" -ge 2 ] && [ "$batch" -le 10 ] || batch=5
+ count=0
+ logger -t veci-reliability "monitor running: sample $interval seconds; flush $batch samples"
+ while [ "$(conf enabled)" = 1 ];do
+  start="$(epoch)"
+  if [ "$start" -gt 1760000000 ];then
+   sample >> "$WIN";count=$((count+1))
+   if [ "$count" -ge "$batch" ];then
+    free="$(df -k /overlay | awk 'NR==2{print $4}')";free="$(safe "$free" 0)"
+    if [ "$free" -ge 250 ];then
+     flush || logger -t veci-reliability 'disk append failed'
+     find "$DIR" -maxdepth 1 -type f -name 'samples-*.csv' -mtime +7 -exec rm -f {} \; 2>/dev/null || :
+     find "$DIR" -maxdepth 1 -type f -name 'probe-*.csv' -mtime +7 -exec rm -f {} \; 2>/dev/null || :
+     probe
+    else printf 'state=low_disk_free\n' > "$STATUS";: > "$WIN";fi
+    count=0
+   fi
+  else printf 'state=waiting_for_clock\n' > "$STATUS";fi
+  delay=$((interval - ($(epoch)-start)));[ "$delay" -ge 1 ] || delay=1
+  sleep "$delay"
+ done
+}
+report() {
+ hours="$1";case "$hours" in 24|72):;;*)echo 'Only 24 or 72 hours' >&2;return 2;;esac
+ now="$(epoch)";from=$((now-hours*3600))
+ ls "$DIR"/samples-*.csv >/dev/null 2>&1 || { echo 'RESULT=NO_DATA';return; }
+ awk -F, -v from="$from" -v to="$now" -v hours="$hours" '
+ FNR==1&&$1=="epoch"{next}
+ $1>=from&&$1<=to{
+  n++;if(n==1)first=$1;last=$1
+  checks+=$4;wan+=$5;gw+=$6;wifi+=$7;wifi_checks+=$21
+  if($8>=0){avg+=$8;rn++;if($9>maxr)maxr=$9}
+  if($10>rx)rx=$10;if($11>tx)tx=$11;if($12>wrx)wrx=$12;if($13>wtx)wtx=$13
+  if($14>clients)clients=$14
+  if($16>phymax)phymax=$16
+  if($15<0 && $15>=-120){sigsum+=$15;sign++}
+  if($19>0 && (minmem==0 || $19<minmem))minmem=$19
+  if($20>maxload)maxload=$20
+  if(n>1 && $3+30<prev_uptime)reboots++;prev_uptime=$3
+ }
+ END{
+  span=n?last-first:0
+  coverage=100*n/(hours*12);if(coverage>100)coverage=100
+  printf "PERIOD_HOURS=%d\nSAMPLES_5M=%d\nEXPECTED_5M=%d\n",hours,n,hours*12
+  printf "SPAN_HOURS=%.2f\nCOVERAGE_PCT=%.1f\n",span/3600,coverage
+  printf "INTERNET_ICMP_SUCCESS_PCT=%.2f\nGATEWAY_SUCCESS_PCT=%.2f\nWIFI_AP_READY_PCT=%.2f\n",checks?100*wan/checks:0,checks?100*gw/checks:0,wifi_checks?100*wifi/wifi_checks:-1
+  printf "WAN_RTT_AVG_MS=%.1f\nWAN_RTT_MAX_MS=%.1f\n",rn?avg/rn:-1,maxr
+  printf "WAN_TRAFFIC_PEAK_RX_MBPS=%.3f\nWAN_TRAFFIC_PEAK_TX_MBPS=%.3f\n",rx,tx
+  printf "WIFI_TRAFFIC_PEAK_RX_MBPS=%.3f\nWIFI_TRAFFIC_PEAK_TX_MBPS=%.3f\n",wrx,wtx
+  printf "WIFI_MAX_STATIONS=%d\nREBOOTS_OBSERVED=%d\n",clients,reboots
+  printf "WIFI_PHY_TX_OBSERVED_PEAK_MBPS=%.1f\nWIFI_ASSOCIATED_RSSI_AVG_DBM=%.1f\n",phymax,sign?sigsum/sign:-1
+  printf "ESTIMATED_PUBLIC_PING_FAILURE_MINUTES=%d\n",(checks-wan)
+  printf "MIN_RAM_AVAILABLE_KB=%d\nMAX_LOAD_1M=%.2f\n",minmem,maxload
+  if(span<hours*3600-600)res="WAITING_FULL_WINDOW"
+  else if(coverage<90)res="INSUFFICIENT_COVERAGE"
+  else res="ELIGIBLE_FOR_COMPARISON"
+  printf "RESULT=%s\n",res
+ }' "$DIR"/samples-*.csv
+ if ls "$DIR"/probe-*.csv >/dev/null 2>&1;then
+  awk -F, -v from="$from" -v to="$now" '
+  FNR==1{next}
+  $1>=from&&$1<=to{n++;if($5=="ok"){ok++;sum+=$4;if($4>max)max=$4}}
+  END{printf "SMALL_DOWNLOAD_TESTS=%d\nVALID_DOWNLOAD_TESTS=%d\nSMALL_DOWNLOAD_AVG_MBPS=%.2f\nSMALL_DOWNLOAD_MAX_MBPS=%.2f\n",n,ok,ok?sum/ok:0,max}
+  ' "$DIR"/probe-*.csv
+ fi
+ echo 'SPEED_NOTE=Passive traffic is not maximum speed; 512KiB limited download is not peak capacity.'
+ echo 'WIFI_CAPACITY=REQUIRES_EXTERNAL_WIFI_CLIENT_BENCHMARK'
+ echo 'FASTEST_ROUTER_CLAIM=NOT_PROVEN'
+}
+status() {
+ [ -r "$STATUS" ] && cat "$STATUS" || echo 'state=not_started'
+ echo "persistent_dir=$DIR"
+ df -k /overlay | awk 'NR==2{print "overlay_free_kb="$4}'
+}
+case "${1:-}" in
+ daemon)daemon;;sample)sample;;flush)flush;;probe)probe;;report)report "${2:-24}";;status)status;;*)echo 'Usage: veci-reliability daemon|sample|flush|probe|report 24|report 72|status' >&2;exit 2;;
+esac

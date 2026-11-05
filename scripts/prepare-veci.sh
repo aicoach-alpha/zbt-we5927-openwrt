@@ -160,6 +160,14 @@ for path in files/usr/sbin/veci-wifi-guardian files/etc/init.d/veci-wifi-guardia
   }
 done
 
+# Reliability metrics must exist in both full firmware and overlay builds.
+for path in files/usr/sbin/veci-reliability files/etc/init.d/veci-reliability files/etc/config/veci_reliability; do
+    [ -s "$OPENWRT_ROOT/package/we5927-lte/$path" ] || {
+        echo "error: reliability component missing: $path" >&2
+        exit 1
+    }
+done
+
 echo "Prepared VeCI $PIN (edition: $VECI_EDITION)"
 echo "  core:      $DEST"
 echo "  default:   $OPENWRT_ROOT/package/veci-default-ui"

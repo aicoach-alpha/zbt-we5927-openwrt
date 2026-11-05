@@ -1,0 +1,7 @@
+# VeCI long-running 24h/72h evidence, low bandwidth and low flash wear.
+# 60sec observation, 5min CSV flush, 7day retention, 512KiB probe / 6h.
+config main 'main'
+    option enabled '1'
+    option interval_seconds '60'
+    option flush_samples '5'
+    option active_download '1'
