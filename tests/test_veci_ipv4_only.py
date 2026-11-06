@@ -27,7 +27,7 @@ class IPv4OnlyTest(unittest.TestCase):
             self.assertNotIn(forbidden,script)
         for key in ('default','all','lo'):
             self.assertIn('net.ipv6.conf.'+key+'.disable_ipv6=1',POLICY.read_text())
-        self.assertIn('/usr/sbin/veci-ipv4-only apply',FIRSTBOOT.read_text())
+        self.assertIn('/usr/sbin/veci-ipv4-only apply-boot',FIRSTBOOT.read_text())
         self.assertIn('PKG_RELEASE:=6',PACKAGE.read_text())
         for filename in (TOOL,FIRSTBOOT):
             r=subprocess.run(['sh','-n',str(filename)],capture_output=True,text=True)
@@ -102,6 +102,15 @@ fi
                 self.assertIn(item,writes,item)
             self.assertNotIn('network restart',writes)
             self.assertNotIn('ifdown',writes)
+
+    def test_boot_defaults_do_not_require_ipv4_dhcp_yet(self):
+        with tempfile.TemporaryDirectory() as t:
+            script,env,trace=self.fixture(t,ipv4=False)
+            p=subprocess.run(['sh',str(script),'apply-boot'],env=env,
+                             capture_output=True,text=True,timeout=6)
+            self.assertEqual(p.returncode,0,p.stderr)
+            self.assertIn('IPV4_ONLY=PASS',p.stdout)
+            self.assertIn('network.lan.ipv6=0',trace.read_text())
 
     def test_refuse_when_ipv4_wan_missing(self):
         with tempfile.TemporaryDirectory() as t:

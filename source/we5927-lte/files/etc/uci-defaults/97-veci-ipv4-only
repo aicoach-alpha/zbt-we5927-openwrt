@@ -1,5 +1,5 @@
 #!/bin/sh
 # Firmware first-boot policy. Never restart network or disconnect LTE.
 [ -x /usr/sbin/veci-ipv4-only ] || exit 1
-/usr/sbin/veci-ipv4-only apply || exit 1
+/usr/sbin/veci-ipv4-only apply-boot || exit 1
 exit 0

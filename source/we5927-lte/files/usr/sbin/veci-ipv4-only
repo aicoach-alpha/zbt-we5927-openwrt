@@ -26,7 +26,11 @@ current() {
     else echo no; fi
 }
 apply() {
-    is_ipv4_default_up || { echo 'ERROR=IPv4_LTE_DEFAULT_ROUTE_MISSING' >&2; return 2; }
+    # First boot has no IPv4 route yet; do not require DHCP before defaults.
+    # Interactive live apply always needs a healthy IPv4 route.
+    if [ "$1" != boot ]; then
+        is_ipv4_default_up || { echo 'ERROR=IPv4_LTE_DEFAULT_ROUTE_MISSING' >&2; return 2; }
+    fi
     [ -f "$SYSCTL_FILE" ] && [ ! -L "$SYSCTL_FILE" ] || {
         echo 'ERROR=VERIFIED_SYSCTL_POLICY_MISSING' >&2; return 2;
     }
@@ -64,7 +68,9 @@ apply() {
         /etc/init.d/odhcpd stop >/dev/null 2>&1 || :
         /etc/init.d/odhcpd disable >/dev/null 2>&1 || :
     fi
-    is_ipv4_default_up || { echo 'ERROR=IPV4_ROUTE_LOST' >&2;return 1; }
+    if [ "$1" != boot ]; then
+        is_ipv4_default_up || { echo 'ERROR=IPV4_ROUTE_LOST' >&2;return 1; }
+    fi
     for key in all default lo; do
         [ "$(sysctl -n "net.ipv6.conf.$key.disable_ipv6")" = 1 ] || return 1
     done
@@ -76,7 +82,8 @@ apply() {
     echo 'LTE_WIFI_SMS_SERVICES_RESTARTED=NO'
 }
 case "$1" in
-    apply) apply ;;
+    apply) apply live ;;
+    apply-boot) apply boot ;;
     status) current ;;
     *) echo 'Usage: veci-ipv4-only apply|status' >&2; exit 2 ;;
 esac
