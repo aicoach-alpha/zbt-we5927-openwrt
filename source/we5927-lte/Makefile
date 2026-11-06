@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=we5927-lte
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -42,6 +42,7 @@ define Package/we5927-lte/install
 	$(INSTALL_BIN) ./files/usr/sbin/we5927-lte $(1)/usr/sbin/we5927-lte
 	$(INSTALL_BIN) ./files/usr/sbin/veci-wifi-guardian $(1)/usr/sbin/veci-wifi-guardian
 	$(INSTALL_BIN) ./files/usr/sbin/veci-reliability $(1)/usr/sbin/veci-reliability
+	$(INSTALL_BIN) ./files/usr/sbin/veci-ipv4-only $(1)/usr/sbin/veci-ipv4-only
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/we5927-lte $(1)/etc/init.d/we5927-lte
 	$(INSTALL_BIN) ./files/etc/init.d/veci-wifi-guardian $(1)/etc/init.d/veci-wifi-guardian
@@ -50,7 +51,10 @@ define Package/we5927-lte/install
 	$(INSTALL_CONF) ./files/etc/config/we5927_lte $(1)/etc/config/we5927_lte
 	$(INSTALL_CONF) ./files/etc/config/veci_performance $(1)/etc/config/veci_performance
 	$(INSTALL_CONF) ./files/etc/config/veci_reliability $(1)/etc/config/veci_reliability
+	$(INSTALL_DIR) $(1)/etc/sysctl.d
+	$(INSTALL_CONF) ./files/etc/sysctl.d/99-veci-ipv4-only.conf $(1)/etc/sysctl.d/99-veci-ipv4-only.conf
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/97-veci-ipv4-only $(1)/etc/uci-defaults/97-veci-ipv4-only
 	$(INSTALL_BIN) ./files/etc/uci-defaults/98-we5927-websafe $(1)/etc/uci-defaults/98-we5927-websafe
 	$(INSTALL_BIN) ./files/etc/uci-defaults/99-we5927-lte $(1)/etc/uci-defaults/99-we5927-lte
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/usb

@@ -1,0 +1,82 @@
+#!/bin/sh
+# VeCI WE5927 IPv4-only policy. No network, modem, Wi-Fi, DHCPv4 or SMS restart.
+# Applying is idempotent. Installer MUST back up /etc/config/network and dhcp.
+set -eu
+TAG=veci-ipv4-only
+SYSCTL_FILE=/etc/sysctl.d/99-veci-ipv4-only.conf
+log() { logger -t "$TAG" "$*" || :; }
+get() { uci -q get "$1" 2>/dev/null || :; }
+is_ipv4_default_up() {
+    ip -4 route show default 2>/dev/null | grep -q '^default .* dev usb0'
+}
+current() {
+    printf 'ipv4_default='
+    ip -4 route show default 2>/dev/null | head -n 1 || :
+    printf 'ipv6_default_routes='
+    ip -6 route show default 2>/dev/null | grep -c '^default ' || :
+    printf 'ipv6_assigned_addresses='
+    ip -6 addr show 2>/dev/null | grep -c ' inet6 ' || :
+    for key in all default lo; do
+        value="$(sysctl -n "net.ipv6.conf.$key.disable_ipv6" 2>/dev/null || echo unavailable)"
+        printf 'kernel_ipv6_%s_disabled=%s\n' "$key" "$value"
+    done
+    printf 'odhcpd_main_dhcpv4=%s\n' "$(get dhcp.odhcpd.maindhcp)"
+    printf 'odhcpd_service_enabled='
+    if [ -x /etc/init.d/odhcpd ] && /etc/init.d/odhcpd enabled >/dev/null 2>&1; then echo yes
+    else echo no; fi
+}
+apply() {
+    is_ipv4_default_up || { echo 'ERROR=IPv4_LTE_DEFAULT_ROUTE_MISSING' >&2; return 2; }
+    [ -f "$SYSCTL_FILE" ] && [ ! -L "$SYSCTL_FILE" ] || {
+        echo 'ERROR=VERIFIED_SYSCTL_POLICY_MISSING' >&2; return 2;
+    }
+    for key in all default lo; do
+        grep -q "^net.ipv6.conf.$key.disable_ipv6=1$" "$SYSCTL_FILE" || {
+            echo 'ERROR=INCORRECT_SYSCTL_POLICY' >&2;return 2;
+        }
+    done
+    for section in $(uci -q show network | sed -n 's/^network\.\([^=]*\)=interface$/\1/p'); do
+        case "$section" in ''|*[!A-Za-z0-9_@.\[\]-]*) continue;; esac
+        protocol="$(get "network.$section.proto")"
+        if [ "$protocol" = dhcpv6 ] || [ "$section" = wan6 ]; then
+            uci set "network.$section.disabled=1"
+        else
+            uci set "network.$section.ipv6=0"
+        fi
+        uci -q delete "network.$section.ip6assign" || :
+        uci -q delete "network.$section.ip6hint" || :
+        uci -q delete "network.$section.ip6class" || :
+        uci -q delete "network.$section.delegate" || :
+    done
+    uci -q delete network.globals.ula_prefix || :
+    for section in $(uci -q show dhcp | sed -n 's/^dhcp\.\([^=]*\)=dhcp$/\1/p'); do
+        case "$section" in ''|*[!A-Za-z0-9_@.\[\]-]*) continue;; esac
+        uci set "dhcp.$section.ra=disabled"
+        uci set "dhcp.$section.dhcpv6=disabled"
+        uci set "dhcp.$section.ndp=disabled"
+    done
+    uci commit network
+    uci commit dhcp
+    for key in default all lo; do
+        sysctl -w "net.ipv6.conf.$key.disable_ipv6=1" >/dev/null
+    done
+    if [ "$(get dhcp.odhcpd.maindhcp)" != 1 ] && [ -x /etc/init.d/odhcpd ]; then
+        /etc/init.d/odhcpd stop >/dev/null 2>&1 || :
+        /etc/init.d/odhcpd disable >/dev/null 2>&1 || :
+    fi
+    is_ipv4_default_up || { echo 'ERROR=IPV4_ROUTE_LOST' >&2;return 1; }
+    for key in all default lo; do
+        [ "$(sysctl -n "net.ipv6.conf.$key.disable_ipv6")" = 1 ] || return 1
+    done
+    [ -z "$(ip -6 route show default 2>/dev/null)" ] || {
+        echo 'ERROR=IPV6_DEFAULT_ROUTE_STILL_PRESENT' >&2;return 1;
+    }
+    log 'IPv4-only enabled; RA DHCPv6 NDP and kernel IPv6 disabled; no Wi-Fi or cellular restart'
+    echo 'IPV4_ONLY=PASS'
+    echo 'LTE_WIFI_SMS_SERVICES_RESTARTED=NO'
+}
+case "$1" in
+    apply) apply ;;
+    status) current ;;
+    *) echo 'Usage: veci-ipv4-only apply|status' >&2; exit 2 ;;
+esac
