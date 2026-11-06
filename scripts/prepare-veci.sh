@@ -168,6 +168,15 @@ for path in files/usr/sbin/veci-reliability files/etc/init.d/veci-reliability fi
     }
 done
 
+# IPv4-only policy is a deliberate VE5927 firmware default: never
+# package partial sysctl settings without the guarded UCI initializer.
+for item in files/usr/sbin/veci-ipv4-only files/etc/sysctl.d/99-veci-ipv4-only.conf files/etc/uci-defaults/97-veci-ipv4-only; do
+    [ -s "$OPENWRT_ROOT/package/we5927-lte/$item" ] || {
+        echo "error: incomplete IPv4-only release $item" >&2
+        exit 1
+    }
+done
+
 echo "Prepared VeCI $PIN (edition: $VECI_EDITION)"
 echo "  core:      $DEST"
 echo "  default:   $OPENWRT_ROOT/package/veci-default-ui"
