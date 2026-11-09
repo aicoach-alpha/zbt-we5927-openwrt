@@ -158,7 +158,7 @@ esac
         self.assertIn("option fail_threshold '3'",c)
         self.assertIn("option hard_reset_after '3'",c)
         for required in (
-            'elif gateway_ok; then','last_hard','[ "$gap" -ge 900 ]',
+            'if gateway_ok; then','last_hard','[ "$gap" -ge 900 ]',
             'renew_lte || repair_lte_interface || soft_reconnect',
             'flock -n -x 9','/var/lock/we5927-at.lock',
             'if [ "$(cfg sim)" != "$slot" ]','gpio_set "$n" "$v"',

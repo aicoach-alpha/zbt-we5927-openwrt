@@ -130,6 +130,7 @@ daemon() {
      flush || logger -t veci-reliability 'disk append failed'
      find "$DIR" -maxdepth 1 -type f -name 'samples-*.csv' -mtime +7 -exec rm -f {} \; 2>/dev/null || :
      find "$DIR" -maxdepth 1 -type f -name 'probe-*.csv' -mtime +7 -exec rm -f {} \; 2>/dev/null || :
+     find "$DIR" -maxdepth 1 -type f -name 'wan-health-*.csv' -mtime +7 -exec rm -f {} \; 2>/dev/null || :
      probe
     else printf 'state=low_disk_free\n' > "$STATUS";: > "$WIN";fi
     count=0
@@ -152,7 +153,7 @@ report() {
   if($10>rx)rx=$10;if($11>tx)tx=$11;if($12>wrx)wrx=$12;if($13>wtx)wtx=$13
   if($14>clients)clients=$14
   if($16>phymax)phymax=$16
-  if($15<0 && $15>=-120){sigsum+=$15;sign++}
+  if($14>0 && $15<=-10 && $15>=-120){sigsum+=$15;sign++}
   if($19>0 && (minmem==0 || $19<minmem))minmem=$19
   if($20>maxload)maxload=$20
   if(n>1 && $3+30<prev_uptime)reboots++;prev_uptime=$3
@@ -181,6 +182,25 @@ report() {
   $1>=from&&$1<=to{n++;if($5=="ok"){ok++;sum+=$4;if($4>max)max=$4}}
   END{printf "SMALL_DOWNLOAD_TESTS=%d\nVALID_DOWNLOAD_TESTS=%d\nSMALL_DOWNLOAD_AVG_MBPS=%.2f\nSMALL_DOWNLOAD_MAX_MBPS=%.2f\n",n,ok,ok?sum/ok:0,max}
   ' "$DIR"/probe-*.csv
+ fi
+ if ls "$DIR"/wan-health-*.csv >/dev/null 2>&1; then
+  awk -F, -v from="$from" -v to="$now" '
+   FNR==1 && $1=="epoch"{next}
+   $1>=from && $1<=to {
+      events++
+      if($2=="icmp_failed_https_ok") https_ok++
+      if($2=="icmp_and_https_failed") https_failed++
+      if($3=="dhcp_renew_recovered") dhcp_recovered++
+   }
+   END {
+      printf "WAN_DIAG_EVENTS=%d\n",events
+      printf "WAN_ICMP_FAILED_HTTPS_OK=%d\n",https_ok
+      printf "WAN_ICMP_AND_HTTPS_FAILED=%d\n",https_failed
+      printf "WAN_DHCP_RENEW_RECOVERED=%d\n",dhcp_recovered
+   }' "$DIR"/wan-health-*.csv
+ else
+   echo 'WAN_DIAG_EVENTS=0'
+   echo 'WAN_DIAGNOSTIC_SOURCE=NO_EVENT_LOGS_YET'
  fi
  echo 'SPEED_NOTE=Passive traffic is not maximum speed; 512KiB limited download is not peak capacity.'
  echo 'WIFI_CAPACITY=REQUIRES_EXTERNAL_WIFI_CLIENT_BENCHMARK'

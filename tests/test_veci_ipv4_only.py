@@ -28,7 +28,7 @@ class IPv4OnlyTest(unittest.TestCase):
         for key in ('default','all','lo'):
             self.assertIn('net.ipv6.conf.'+key+'.disable_ipv6=1',POLICY.read_text())
         self.assertIn('/usr/sbin/veci-ipv4-only apply-boot',FIRSTBOOT.read_text())
-        self.assertIn('PKG_RELEASE:=6',PACKAGE.read_text())
+        self.assertRegex(PACKAGE.read_text(),r'PKG_RELEASE:=[67]')
         for filename in (TOOL,FIRSTBOOT):
             r=subprocess.run(['sh','-n',str(filename)],capture_output=True,text=True)
             self.assertEqual(r.returncode,0,r.stderr)

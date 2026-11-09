@@ -382,6 +382,31 @@ data_ok() {
  [ "$host" = "8.8.8.8" ] || ping -I "$dev" -c 1 -W 1 8.8.8.8 >/dev/null 2>&1
 }
 
+# HTTPS is diagnostic only when both public ICMP targets fail.
+# Bounded five-second IPv4 request with normal CA validation.
+https_ok() {
+ command -v uclient-fetch >/dev/null 2>&1 || return 1
+ uclient-fetch -4 -q -T 5 -O /dev/null \
+    'https://www.cloudflare.com/cdn-cgi/trace' >/dev/null 2>&1
+}
+
+wan_diag_event() {
+ # Write on degraded events, never on healthy ten-second polls.
+ # No IP, SIM, MAC, location, APN, or SMS identifiers.
+ local directory file free now
+ directory=/overlay/veci-reliability
+ [ -d "$directory" ] || return 0
+ free="$(df -k /overlay 2>/dev/null | awk 'NR==2{print $4}')"
+ case "$free" in ''|*[!0-9]*) return 0;; esac
+ [ "$free" -ge 300 ] || return 0
+ now="$(date +%s)"
+ file="$directory/wan-health-$(date +%Y%m%d).csv"
+ if [ ! -s "$file" ]; then
+   printf 'epoch,classification,action\n' >> "$file"
+ fi
+ printf '%s,%s,%s\n' "$now" "$1" "$2" >> "$file"
+}
+
 gateway_ok() {
  local dev gw
  dev="$(cfg data_if)"
@@ -808,7 +833,8 @@ auto_switch_sim() {
 
 daemon() {
  local failures recoveries threshold interval hard_after auto sim_after sim next
- local last_hard last_sim now gap stage
+ local last_hard last_sim last_upstream_check now gap stage classification
+ last_upstream_check=0
  failures=0
  recoveries=0
  last_hard=0
@@ -817,15 +843,16 @@ daemon() {
  enabled || exit 0
 
  ensure_network
- power_on || true
  sim="$(cfg sim)"
  [ "$sim" = 2 ] || sim=1
- # Restore the selected SIM GPIO on cold boot; only write UCI when changed.
- set_sim "$sim" >/dev/null 2>&1 || true
  if data_ok; then
-   # A service reload must NOT flap an already healthy LTE data link.
-   log "LTE already healthy; preserving RNDIS, APN and DHCP session"
+   # On a healthy LTE link do not even re-drive GPIOs during a daemon
+   # update. That avoids disturbing the modem or the active SIM channel.
+   log "LTE already healthy; preserving GPIOs, RNDIS, APN and DHCP session"
  else
+   power_on || true
+   # Only restore GPIO selection during actual cold-start/recovery.
+   set_sim "$sim" >/dev/null 2>&1 || true
    usb_repair
    wait_at || log "AT port not ready yet"
    if ! sim_ready && [ "$(cfg auto_failover)" = 1 ]; then
@@ -856,18 +883,39 @@ daemon() {
      stage=checking
      if [ "$failures" -ge "$threshold" ]; then
        failures=0
-       recoveries=$((recoveries + 1))
-       stage=dhcp_renew
-       if renew_lte; then
-         stage=recovered_dhcp
-         recoveries=0
-       elif gateway_ok; then
-         # Multiple public ICMP failures cannot alone justify a radio reset.
+       # A responding IPv4 gateway is not a broken DHCP interface.
+       # Do not renew DHCP or flap modem on public ICMP-only loss.
+       if gateway_ok; then
          stage=upstream_degraded
-         log "LTE gateway responds, external checks failed; modem held steady"
          recoveries=0
+         now="$(date +%s)"
+         case "$now" in ''|*[!0-9]*) now=0;; esac
+         gap=$((now-last_upstream_check))
+         if [ "$last_upstream_check" -eq 0 ] || [ "$gap" -ge 90 ]; then
+           last_upstream_check="$now"
+           if https_ok; then
+             classification=icmp_failed_https_ok
+             stage=icmp_degraded_https_ok
+           else
+             classification=icmp_and_https_failed
+           fi
+           log "LTE gateway OK; $classification; no DHCP renew or radio reset"
+           wan_diag_event "$classification" "hold_gateway_healthy"
+         fi
        else
-         stage=interface_recovery
+         recoveries=$((recoveries + 1))
+         stage=dhcp_renew
+         # Only missing gateway/local LTE IP justifies DHCP renew.
+         if renew_lte; then
+           stage=recovered_dhcp
+           recoveries=0
+           wan_diag_event "local_gateway_failure" "dhcp_renew_recovered"
+         elif gateway_ok; then
+           stage=upstream_degraded
+           recoveries=0
+           wan_diag_event "gateway_recovered" "hold"
+         else
+           stage=interface_recovery
          if repair_lte_interface; then
            stage=recovered_interface
            recoveries=0
@@ -908,6 +956,7 @@ daemon() {
              fi
            fi
          fi
+       fi
        fi
      fi
    fi
