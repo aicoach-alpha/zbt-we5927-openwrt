@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "we2825-2sim",
+  "vendor": "ZBT",
+  "family": "mt7628-cellular",
+  "status": "tested",
+  "build_enabled": true,
+  "aliases": ["WE2825-2SIM", "WE5927"],
+  "openwrt_compatible": ["zbtlink,zbt-we5927", "zbt-we5927"],
+  "target": "ramips/mt76x8",
+  "soc": "MediaTek MT7628AN",
+  "ram_mb": 64,
+  "flash_mb": 8,
+  "network": {
+    "lan_default": "192.168.1.1/24",
+    "lte_default_interface": "usb0"
+  },
+  "cellular": {
+    "sim_slots": 2,
+    "sim_select_gpio": 46,
+    "sim1_value": 1,
+    "sim2_value": 0,
+    "modem_power_gpio": 1,
+    "modem_power_active": 1
+  },
+  "flash_layout": {
+    "u-boot": "0x00030000",
+    "u-boot-env": "0x00010000",
+    "factory": "0x00010000",
+    "firmware": "0x007a0000",
+    "art": "0x00010000"
+  },
+  "notes": [
+    "Profile derived from the tested community WE5927 / WE2825-2SIM unit.",
+    "Do not assume this layout applies to WE5927-A/eSIM variants."
+  ]
+}

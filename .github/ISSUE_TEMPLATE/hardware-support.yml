@@ -1,0 +1,47 @@
+name: Hardware support request
+description: Submit a ZBT board/modem combination for compatibility work
+title: "[HW] "
+labels: ["hardware-support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping expand hardware support. Please do not post router passwords, IMEI, ICCID, IMSI, Wi-Fi passwords, private keys, or calibration dumps.
+  - type: input
+    id: model
+    attributes:
+      label: Router model / label
+      placeholder: WE2825-2SIM / WE5927 / WE5927-A
+    validations:
+      required: true
+  - type: input
+    id: modem
+    attributes:
+      label: Cellular modem model
+      placeholder: CX07E / EC25 / SIM7600 / unknown
+    validations:
+      required: true
+  - type: textarea
+    id: probe
+    attributes:
+      label: Read-only hardware probe output
+      description: Run scripts/probe-zbt-hardware.sh on OpenWrt and paste the output here.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: recovery
+    attributes:
+      label: Recovery access available
+      description: Describe UART, U-Boot web recovery, TFTP, or another known recovery method.
+    validations:
+      required: true
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed passwords, cellular identifiers and other secrets from the pasted output.
+          required: true
+        - label: I understand a new board profile is not considered flash-safe until its layout is independently verified.
+          required: true

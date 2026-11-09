@@ -12,6 +12,21 @@ The final sysupgrade image was copied to the live router and passed OpenWrt's ow
 
 **This is an OpenWrt sysupgrade image, not a vendor-web-UI factory image.**
 
+## Family framework direction
+
+The project is being expanded from one tested WE5927/WE2825-2SIM combination into a profile-driven firmware family for related ZBT cellular routers.
+
+The rule is **one common codebase, separate board-specific images**. Board profiles describe flash/GPIO/Ethernet/calibration facts, while modem profiles describe USB IDs, data mode, AT-port selection and recovery behavior.
+
+Current status:
+
+- WE2825-2SIM / tested WE5927 board profile: **tested**
+- CX07E modem profile: **tested**
+- Quectel, SIMCom and Fibocom profiles found in the inspected ZBT vendor stack: **reference-only until verified on real hardware**
+- WE5927-A/eSIM variants: **discovery only; no image build enabled**
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) and [docs/VENDOR-REFERENCE.md](docs/VENDOR-REFERENCE.md).
+
 ## Tested hardware
 
 - SoC: MediaTek MT7628
