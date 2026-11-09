@@ -846,9 +846,12 @@ daemon() {
  sim="$(cfg sim)"
  [ "$sim" = 2 ] || sim=1
  if data_ok; then
-   # On a healthy LTE link do not even re-drive GPIOs during a daemon
-   # update. That avoids disturbing the modem or the active SIM channel.
+   # On healthy LTE avoid re-driving GPIOs during daemon-only update.
    log "LTE already healthy; preserving GPIOs, RNDIS, APN and DHCP session"
+ elif gateway_ok; then
+   # External ICMP may fail periodically even when RNDIS and DHCP are good.
+   # Do NOT re-drive modem/SIM GPIO or restart netifd on such a restart.
+   log "LTE IPv4 gateway healthy, Internet ICMP degraded; preserving GPIOs and DHCP"
  else
    power_on || true
    # Only restore GPIO selection during actual cold-start/recovery.

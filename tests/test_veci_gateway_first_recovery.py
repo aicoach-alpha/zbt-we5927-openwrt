@@ -97,6 +97,23 @@ sleep() { exit 0; }
             self.assertNotIn('UNEXPECTED_',content)
             self.assertIn('STAGE:healthy',content)
 
+    def test_daemon_restart_gateway_healthy_public_icmp_down_no_gpio(self):
+        with tempfile.TemporaryDirectory() as td:
+            trace=Path(td)/'trace'
+            mock=MOCK+"""
+power_on() { echo UNEXPECTED_MODEM_GPIO >> "$CALLS"; }
+set_sim() { echo UNEXPECTED_SIM_GPIO >> "$CALLS"; }
+data_ok() { return 1; }
+sleep() { exit 0; }
+"""
+            out=subprocess.run(['busybox','ash','-c',mock+'\n'+DAEMON+'\ndaemon\n'],
+                  env={**os.environ,'CALLS':str(trace),'MOCK_GW':'1','MOCK_HTTPS':'0'},
+                  capture_output=True,text=True,timeout=6)
+            self.assertEqual(out.returncode,0,out.stderr)
+            content=trace.read_text()
+            self.assertNotIn('UNEXPECTED_',content)
+            self.assertIn('preserving GPIOs and DHCP',content)
+
     def test_gateway_missing_allows_bounded_recovery(self):
         text=self.case(0,0)
         self.assertIn('RENEW',text)
