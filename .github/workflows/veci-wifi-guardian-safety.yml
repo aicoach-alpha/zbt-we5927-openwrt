@@ -1,0 +1,43 @@
+name: VeCI Wi-Fi guardian observe-only safety
+
+on:
+  push:
+    paths:
+      - 'source/veci-wifi-guardian/**'
+      - 'scripts/tests/test_wifi_guardian_observe_only.py'
+      - 'scripts/stage-veci-wifi-guardian.sh'
+      - '.github/workflows/veci-wifi-guardian-safety.yml'
+  pull_request:
+    paths:
+      - 'source/veci-wifi-guardian/**'
+      - 'scripts/tests/test_wifi_guardian_observe_only.py'
+      - 'scripts/stage-veci-wifi-guardian.sh'
+      - '.github/workflows/veci-wifi-guardian-safety.yml'
+
+jobs:
+  read-only-guardian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell syntax
+        run: sh -n source/veci-wifi-guardian/veci-wifi-guardian
+      - name: Run guard regression
+        run: python3 -m unittest discover -s scripts/tests -p test_wifi_guardian_observe_only.py -v
+      - name: Verify future firmware embeds safe Guardian package
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt"
+          mkdir -p "$root/include"
+          touch "$root/include/toplevel.mk"
+          sh scripts/stage-veci-wifi-guardian.sh "$root"
+          sh scripts/stage-veci-wifi-guardian.sh "$root"
+          cmp source/veci-wifi-guardian/veci-wifi-guardian "$root/package/veci-wifi-guardian/veci-wifi-guardian"
+          cmp source/veci-wifi-guardian/files/etc/init.d/veci-wifi-guardian "$root/package/veci-wifi-guardian/files/etc/init.d/veci-wifi-guardian"
+          test -f "$root/package/veci-wifi-guardian/Makefile"
+          if sh scripts/stage-veci-wifi-guardian.sh "$RUNNER_TEMP/not-openwrt"; then
+            echo 'Invalid build root accepted' >&2
+            exit 1
+          fi
+          echo 'GUARDIAN_FIRMWARE_STAGING=PASS'
