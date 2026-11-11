@@ -65,6 +65,10 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
           make defconfig
+          # Targeted package builds do not bootstrap host tools automatically.
+          make -j2 V=sc tools/install
+          make -j2 V=sc toolchain/install
+          make -j2 V=sc target/linux/prepare
           make -j2 V=sc package/kernel/mt76/compile
           find build_dir -type f -name 'mt7603e.ko' -print
           echo "MT7603_CROSSBUILD=COMPILED_NOT_HARDWARE_TESTED"
