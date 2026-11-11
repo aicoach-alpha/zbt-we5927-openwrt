@@ -70,7 +70,10 @@ jsonfilter() {
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / "reset"
             path.write_text("TX hang: 0\nRX PSE busy stuck: 2\nMCU hang: 0\n")
-            script = "RESET=" + str(path).replace("\\", "/") + "\n"
+            native = str(path).replace("\\", "/")
+            if os.name == "nt" and re.match(r"^[A-Za-z]:/", native):
+                native = "/" + native[0].lower() + native[2:]
+            script = "RESET=" + native + "\n"
             self.assertEqual(self.shell(script, "rx_pse_resets", "rx_pse_resets"), "2")
 
     def test_state_cannot_claim_beacon_verified(self):
