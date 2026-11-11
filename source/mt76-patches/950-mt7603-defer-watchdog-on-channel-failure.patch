@@ -1,0 +1,28 @@
+From: OpenWrt mt76 PR #1166 (viewer-dental)
+Subject: [PATCH] wifi: mt76: mt7603: defer watchdog work after channel failure
+
+On mt7603_set_channel() failure, the mt76 core already holds the
+device mutex. Calling mt7603_mac_work() synchronously recursively takes
+that mutex and can deadlock the entire wireless control path.
+Queue delayed work instead, after the channel callback returns and the
+core releases its mutex.
+
+Upstream: https://github.com/openwrt/mt76/pull/1166
+Upstream status at preparation: pending review, not merged.
+Target mt76 source commit: 39c960c3ada558b4c2e7915772483d3731573d09
+This fixes the error-path deadlock; it does not fix the original
+cause of beacon loss. Requires full image rebuild and hardware UAT.
+Never install as a mismatched .ko on a running router.
+
+--- a/mt7603/main.c
++++ b/mt7603/main.c
+@@ -193,7 +193,8 @@ int mt7603_set_channel(struct mt76_phy *mphy)
+ 	tasklet_enable(&dev->mt76.pre_tbtt_tasklet);
+ 
+ 	if (failed)
+-		mt7603_mac_work(&dev->mphy.mac_work.work);
++		ieee80211_queue_delayed_work(mt76_hw(dev),
++					     &dev->mphy.mac_work, 0);
+ 
+ 	return ret;
+ }
