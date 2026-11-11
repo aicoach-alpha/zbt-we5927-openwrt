@@ -35,3 +35,25 @@ this source as an unattended cron job from a Windows laptop. The user's
 syntax check; exact source/hash staging; atomic on-device install with
 rollback copy; no radio reload or network restart; live check/status
 and a minimum 24–72h counter and external SSID monitoring.
+
+## Live script cutover verified — 2026-11-11 ~16:15 WIB
+
+The **script-only** Guardian mitigation was deployed to the tested router.
+The deployed source matched GitHub blob
+`c74fe19acfe4ba3010b4bff59769dc39d89a3628`, and the existing
+source hash matched the recorded production baseline before replacement.
+Verified backups remain on the office laptop and in router tmpfs.
+Staging and shell syntax passed; an atomic replacement followed by a
+**Guardian daemon-only restart** succeeded. No radio reload, LTE/modem
+reset, router reboot or Windows scheduled task enablement occurred.
+
+Post-check reported
+`wifi=ready failures=0 auto_recover=0 beacon_verified=0 rx_pse_resets=1`.
+At 16:16, independent Windows SSID scans passed 3/3, local gateway and
+public IP pings passed, DNS and HTTPS passed, `hostapd` and `rpcd` remained
+running. Both Linux CI 6/6 and Windows Git Bash 6/6 tests passed after a
+Windows-path and test-PATH compatibility correction.
+
+**Interpretation:** This stops a known dangerous auto-recovery path; it
+does not demonstrate beacon durability or address the root driver failure.
+Keep long-term Wi-Fi and 122-minute LTE acceptance separate.
