@@ -66,3 +66,26 @@ itself identify the initial cause of stalled beacons.
   Wi-Fi passwords, or private device telemetry.
 
 **State:** source candidate only. No kernel image built or flashed.
+## Verified production LTE daemon cutover — 2026-11-11 15:56 WIB
+
+The **script-only** PR #8 LTE watchdog was deployed on the tested WE5927
+via pinned SSH host key and an exact matching GitHub blob
+`9b8c9ad5d7792dac19e1a4dab28cec4678383fac` from commit
+`cbec5a852f7e74f990e14051366a66967764719b`.
+Preflight confirmed local RNDIS carrier, gateway and two public IPs.
+Original file hash was verified and old bytes backed up on the office
+laptop and router RAM. The file was installed atomically; only
+`/etc/init.d/we5927-lte restart` ran. No router reboot, modem reset,
+Wi-Fi reload, SIM switching or APN changes. Post-check PASS: LTE route,
+gateway and public ping, watchdog `stage=healthy`, and active process.
+This is a **point-in-time successful deployment**, not 122-minute cycle UAT.
+
+**Important build regression hazard:** the historical
+`source/openwrt-zbt-we5927-current.patch` still embeds the 826-line
+legacy `we5927-lte` payload. Applying that older board patch and building
+immediately would undo this live fix. After applying the board patch and
+before image build, `sh scripts/reconcile-we5927-lte-build-tree.sh <openwrt-source-root>`
+**must** run. It checks both repository copies, stages the latest script
+into the OpenWrt package tree and verifies byte-for-byte parity. CI tests
+this failure mode with a fake legacy package, plus invalid-path rejection.
+Never flash an image whose package manifest/source audit lacks this step.
