@@ -22,7 +22,8 @@ class GuardianSafety(unittest.TestCase):
         cls.source = SOURCE.read_text(encoding="utf-8")
 
     def shell(self, setup, name, invocation, env=None):
-        script = setup + "\n" + func(self.source, name) + "\n" + invocation + "\n"
+        # PowerShell-launched Git Bash lacks /usr/bin in inherited PATH.
+        script = "PATH=/usr/bin:/bin:$PATH\n" + setup + "\n" + func(self.source, name) + "\n" + invocation + "\n"
         result = subprocess.run([str(SH), "-c", script], text=True, capture_output=True,
                                 timeout=6, env=env)
         self.assertEqual(result.returncode, 0, result.stderr)
