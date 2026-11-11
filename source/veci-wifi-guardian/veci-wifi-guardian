@@ -1,0 +1,94 @@
+#!/bin/sh
+# VeCI MT7628: observe AP services and mt76 reset counters, never mutate radio.
+# A prior 'wifi up radio0' entered mt76 MCU timeout and blocked hostapd/rpcd.
+TAG=veci-wifi-guardian
+CFG=veci_performance.wifi
+STATE=/tmp/veci-wifi-performance.state
+RESET=/sys/kernel/debug/ieee80211/phy0/mt76/reset
+
+cfg() { uci -q get "$CFG.$1" 2>/dev/null || :; }
+number() {
+ case "$1" in ''|*[!0-9]*) echo "$2"; return;; esac
+ if [ "$1" -lt "$3" ]; then echo "$3"
+ elif [ "$1" -gt "$4" ]; then echo "$4"
+ else echo "$1"; fi
+}
+radio_wanted() {
+ [ "$(uci -q get wireless.radio0.disabled 2>/dev/null)" != 1 ] || return 1
+ [ "$(uci -q get wireless.default_radio0.mode 2>/dev/null)" = ap ] || return 1
+ [ "$(uci -q get wireless.default_radio0.disabled 2>/dev/null)" != 1 ]
+}
+radio_running() {
+ # Bounded local ubus calls: never issue iw commands while mt76 may be hung.
+ local up status
+ up="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
+       jsonfilter -e '@.radio0.up' 2>/dev/null)" || return 1
+ [ "$up" = true ] || return 1
+ status="$(ubus -S -t 3 call hostapd.phy0-ap0 get_status '{}' 2>/dev/null |
+           jsonfilter -e '@.status' 2>/dev/null)" || return 1
+ [ "$status" = ENABLED ]
+}
+rx_pse_resets() {
+ [ -r "$RESET" ] || { echo unknown; return 0; }
+ awk '/RX PSE busy stuck:/ {print $NF;found=1;exit}
+      END {if (!found) print "unknown"}' "$RESET" 2>/dev/null
+}
+show_state() {
+ if [ -r "$STATE" ]; then cat "$STATE"; else echo 'wifi=not_started'; fi
+}
+write_state() {
+ # State is tmpfs-only. 'ready' means services are up, not beacon confirmed.
+ printf 'wifi=%s failures=%s auto_recover=0 beacon_verified=0 rx_pse_resets=%s timestamp=%s\n' \
+   "$phase" "$failures" "$rxpse" "$(date +%s)" > "$STATE"
+}
+check_once() {
+ if ! radio_wanted; then echo 'wifi=not_configured beacon_verified=0'; return 0; fi
+ if radio_running; then echo 'wifi=ready beacon_verified=0'; return 0; fi
+ echo 'wifi=ap_not_ready beacon_verified=0'; return 1
+}
+daemon() {
+ local failures interval threshold phase rxpse last_rxpse
+ failures=0
+ phase=starting
+ last_rxpse=unknown
+ interval="$(number "$(cfg interval)" 30 15 300)"
+ threshold="$(number "$(cfg fail_threshold)" 3 2 20)"
+ logger -t "$TAG" "observe-only: poll $interval s, threshold $threshold; radio recovery disabled after mt76 deadlock"
+ while :; do
+   if ! radio_wanted; then
+     failures=0
+     phase=intentionally_disabled
+   elif radio_running; then
+     failures=0
+     phase=ready
+   else
+     failures=$((failures + 1))
+     phase=ap_not_ready
+     if [ "$failures" -ge "$threshold" ]; then
+       failures=0
+       phase=manual_recovery_required
+       logger -t "$TAG" "AP runtime unavailable; no automatic radio reload (mt76 deadlock risk)"
+     fi
+   fi
+   rxpse="$(rx_pse_resets)"
+   case "$rxpse" in ''|*[!0-9]*) rxpse=unknown ;; esac
+   case "$last_rxpse:$rxpse" in
+     *[!0-9:]*|'unknown:'*|*':unknown') : ;;
+     *)
+       if [ "$rxpse" -gt "$last_rxpse" ]; then
+         logger -t "$TAG" "mt76 RX PSE watchdog reset counter advanced; beacon externally unverified"
+         [ "$phase" != ready ] || phase=driver_reset_observed
+       fi
+       ;;
+   esac
+   [ "$rxpse" = unknown ] || last_rxpse="$rxpse"
+   write_state
+   sleep "$interval"
+ done
+}
+case "$1" in
+ daemon) daemon ;;
+ check) check_once ;;
+ status) show_state ;;
+ *) echo 'Usage: veci-wifi-guardian daemon|check|status' >&2; exit 2 ;;
+esac
