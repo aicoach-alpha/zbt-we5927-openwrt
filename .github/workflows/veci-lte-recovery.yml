@@ -1,0 +1,26 @@
+name: VeCI LTE recovery guard
+on:
+  push:
+    paths:
+      - 'files/usr/sbin/we5927-lte'
+      - 'source/we5927-lte/files/usr/sbin/we5927-lte'
+      - 'scripts/tests/test_lte_recovery_guard.py'
+      - '.github/workflows/veci-lte-recovery.yml'
+  pull_request:
+    paths:
+      - 'files/usr/sbin/we5927-lte'
+      - 'source/we5927-lte/files/usr/sbin/we5927-lte'
+      - 'scripts/tests/test_lte_recovery_guard.py'
+      - '.github/workflows/veci-lte-recovery.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell syntax and source parity
+        run: |
+          sh -n files/usr/sbin/we5927-lte
+          sh -n source/we5927-lte/files/usr/sbin/we5927-lte
+          cmp files/usr/sbin/we5927-lte source/we5927-lte/files/usr/sbin/we5927-lte
+      - name: Test bounded DHCP recovery
+        run: python3 -m unittest discover -s scripts/tests -p test_lte_recovery_guard.py -v
