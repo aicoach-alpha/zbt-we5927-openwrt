@@ -83,6 +83,7 @@ EOF
 # files. Snapshots reside in tmpfs; restoration is best-effort but failure
 # must be reported, never represented as an enabled portal.
 portal_snapshot_begin() {
+	GUEST_SERVICES_RECONFIGURED=0
 	GUEST_ROLLBACK_REASON='activation_failed'
 	GUEST_ROLLBACK_DIR="$(mktemp -d /tmp/veci-guest-snapshot.XXXXXX 2>/dev/null)" || {
 		GUEST_ROLLBACK_REASON='snapshot_failed'
@@ -127,10 +128,13 @@ portal_snapshot_restore() {
 			rc=1
 		fi
 	done
-	# Restore listeners and dataplane from the original UCI snapshot.
-	for service in network dnsmasq firewall uhttpd uspot; do
-		service_restart "$service" || rc=1
-	done
+	# If only UCI files were provisioned, no live service was touched.
+	# Avoid restarting the primary LAN/LTE when restoring an inactive guest.
+	if [ "$GUEST_SERVICES_RECONFIGURED" = '1' ]; then
+		for service in network dnsmasq firewall uhttpd uspot; do
+			service_restart "$service" || rc=1
+		done
+	fi
 	if [ "$wifi_reload_needed" = '1' ]; then
 		wifi reload >/dev/null 2>&1 || rc=1
 	fi
@@ -276,6 +280,7 @@ set uspot.veci_guest.idle_timeout='$idle'
 set uspot.veci_guest.session_timeout='$session'
 EOF
 	uci commit uspot || return 1
+	GUEST_SERVICES_RECONFIGURED=1
 	service_restart network || return 1
 	uci set wireless.veci_guest.disabled='0' || return 1
 	uci commit wireless || return 1
@@ -434,15 +439,24 @@ method_save() {
         saved=1
     fi
     if [ "$saved" -eq 1 ] && uci -q get wireless.veci_guest >/dev/null 2>&1; then
-        uci set wireless.veci_guest.ssid="$ssid" &&
-            uci commit wireless &&
-            wifi reload >/dev/null 2>&1 || saved=0
+        if uci set wireless.veci_guest.ssid="$ssid" && uci commit wireless; then
+            # Editing a disabled guest SSID is UCI-only. Do not reload radio0.
+            if [ "$(uci -q get wireless.veci_guest.disabled 2>/dev/null)" = '0' ]; then
+                GUEST_SERVICES_RECONFIGURED=1
+                wifi reload >/dev/null 2>&1 || saved=0
+            fi
+        else
+            saved=0
+        fi
     fi
     if [ "$saved" -eq 1 ] && uci -q get uspot.veci_guest >/dev/null 2>&1; then
         uci set uspot.veci_guest.idle_timeout="$idle" &&
             uci set uspot.veci_guest.session_timeout="$session" &&
-            uci commit uspot &&
+            uci commit uspot || saved=0
+        if [ "$saved" -eq 1 ]; then
+            GUEST_SERVICES_RECONFIGURED=1
             service_restart uspot || saved=0
+        fi
     fi
     if [ "$saved" -eq 1 ]; then
         portal_snapshot_discard
@@ -522,10 +536,15 @@ method_cleanup() {
 	for config in firewall dhcp wireless network uhttpd veci_guest; do
 		uci commit "$config" >/dev/null 2>&1 || rc=1
 	done
+	GUEST_SERVICES_RECONFIGURED=1
 	for service in network dnsmasq firewall uhttpd uspot; do
+		# Removing an inactive guest must not flap LAN/LTE DHCP.
+		[ "$guest_was_active" = '0' ] && [ "$service" = network ] && continue
 		service_restart "$service" || rc=1
 	done
-	wifi reload >/dev/null 2>&1 || rc=1
+	if [ "$guest_was_active" = '1' ]; then
+		wifi reload >/dev/null 2>&1 || rc=1
+	fi
 
 	if [ "$rc" -eq 0 ]; then
 		portal_snapshot_discard
