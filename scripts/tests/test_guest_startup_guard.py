@@ -79,4 +79,20 @@ wifi(){{ wifi_calls=$((wifi_calls+1)); }}
         self.assertIn("wifi_reload_needed=0",rollback)
         self.assertIn('if [ "$wifi_reload_needed" =',rollback)
 
+    def test_disabled_guest_save_does_not_always_reload_wifi(self):
+        saving=fun("method_save")
+        self.assertIn('get wireless.veci_guest.disabled',saving)
+        self.assertIn("Editing a disabled guest SSID is UCI-only",saving)
+
+    def test_rollback_restarts_services_only_after_runtime_activation(self):
+        rollback=fun("portal_snapshot_restore")
+        self.assertIn('if [ "$GUEST_SERVICES_RECONFIGURED" =',rollback)
+        snapshot=fun("portal_snapshot_begin")
+        self.assertIn('GUEST_SERVICES_RECONFIGURED=0',snapshot)
+
+    def test_inactive_guest_cleanup_does_not_restart_network(self):
+        cleanup=fun("method_cleanup")
+        self.assertIn('guest_was_active',cleanup)
+        self.assertIn('Removing an inactive guest must not flap LAN/LTE DHCP',cleanup)
+
 if __name__=="__main__":unittest.main()
