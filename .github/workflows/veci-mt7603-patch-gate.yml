@@ -34,7 +34,10 @@ jobs:
           git -C "$src" apply --check "$GITHUB_WORKSPACE/source/mt76-patches/950-mt7603-defer-watchdog-on-channel-failure.patch"
           git -C "$src" apply "$GITHUB_WORKSPACE/source/mt76-patches/950-mt7603-defer-watchdog-on-channel-failure.patch"
           grep -Fq 'ieee80211_queue_delayed_work(mt76_hw(dev),' "$src/mt7603/main.c"
-          echo 'EXACT_REVISION_APPLICABILITY=PASS'
+          git -C "$src" apply --check "$GITHUB_WORKSPACE/source/mt76-patches/951-mt7603-free-beacon-skb-on-error.patch"
+          git -C "$src" apply "$GITHUB_WORKSPACE/source/mt76-patches/951-mt7603-free-beacon-skb-on-error.patch"
+          test "$(grep -c 'dev_kfree_skb(skb);' "$src/mt7603/beacon.c")" -eq 2
+          echo 'EXACT_REVISION_APPLICABILITY=PASS; BEACON_SKB_LEAK_FIXED=PASS'
       - name: Revision-guarded staging must be idempotent and fail closed
         shell: bash
         run: |
@@ -45,6 +48,7 @@ jobs:
           sh scripts/stage-mt7603-deadlock-fix.sh "$root"
           sh scripts/stage-mt7603-deadlock-fix.sh "$root"
           cmp source/mt76-patches/950-mt7603-defer-watchdog-on-channel-failure.patch "$root/package/kernel/mt76/patches/950-mt7603-defer-watchdog-on-channel-failure.patch"
+          cmp source/mt76-patches/951-mt7603-free-beacon-skb-on-error.patch "$root/package/kernel/mt76/patches/951-mt7603-free-beacon-skb-on-error.patch"
           printf 'PKG_SOURCE_VERSION:=mismatched\n' > "$root/package/kernel/mt76/Makefile"
           if sh scripts/stage-mt7603-deadlock-fix.sh "$root"; then
             echo 'ERROR: script accepted unexpected source revision' >&2
