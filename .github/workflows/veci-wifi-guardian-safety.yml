@@ -1,0 +1,24 @@
+name: VeCI Wi-Fi guardian observe-only safety
+
+on:
+  push:
+    paths:
+      - 'source/veci-wifi-guardian/**'
+      - 'scripts/tests/test_wifi_guardian_observe_only.py'
+      - '.github/workflows/veci-wifi-guardian-safety.yml'
+  pull_request:
+    paths:
+      - 'source/veci-wifi-guardian/**'
+      - 'scripts/tests/test_wifi_guardian_observe_only.py'
+      - '.github/workflows/veci-wifi-guardian-safety.yml'
+
+jobs:
+  read-only-guardian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell syntax
+        run: sh -n source/veci-wifi-guardian/veci-wifi-guardian
+      - name: Run guard regression
+        run: python3 -m unittest discover -s scripts/tests -p test_wifi_guardian_observe_only.py -v
