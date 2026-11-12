@@ -22,4 +22,4 @@ jobs:
       - run: sh -n scripts/veci-link-readonly-snapshot.sh
       - name: Reject disruptive commands in readonly collector
         run: |
-          ! grep -En '(^|[[:space:]])(ifup|ifdown|wifi[[:space:]]+(reload|up|down)|sysupgrade|reboot|uci[[:space:]]+(set|commit)|AT\+CFUN|power-cycle)([[:space:]]|$)' scripts/veci-link-readonly-snapshot.sh
+          ! sed '/^[[:space:]]*#/d' scripts/veci-link-readonly-snapshot.sh | grep -En '(^|[[:space:]])(ifup|ifdown|wifi[[:space:]]+(reload|up|down)|sysupgrade|reboot|uci[[:space:]]+(set|commit)|AT\+CFUN|power-cycle)([[:space:]]|$)'
