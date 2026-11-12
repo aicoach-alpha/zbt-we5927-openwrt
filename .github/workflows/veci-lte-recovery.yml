@@ -1,0 +1,45 @@
+name: VeCI LTE recovery guard
+on:
+  push:
+    paths:
+      - 'files/usr/sbin/we5927-lte'
+      - 'source/we5927-lte/files/usr/sbin/we5927-lte'
+      - 'scripts/tests/test_lte_recovery_guard.py'
+      - 'scripts/reconcile-we5927-lte-build-tree.sh'
+      - '.github/workflows/veci-lte-recovery.yml'
+  pull_request:
+    paths:
+      - 'files/usr/sbin/we5927-lte'
+      - 'source/we5927-lte/files/usr/sbin/we5927-lte'
+      - 'scripts/tests/test_lte_recovery_guard.py'
+      - 'scripts/reconcile-we5927-lte-build-tree.sh'
+      - '.github/workflows/veci-lte-recovery.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell syntax and source parity
+        run: |
+          sh -n files/usr/sbin/we5927-lte
+          sh -n source/we5927-lte/files/usr/sbin/we5927-lte
+          cmp files/usr/sbin/we5927-lte source/we5927-lte/files/usr/sbin/we5927-lte
+      - name: Test bounded DHCP recovery
+        run: python3 -m unittest discover -s scripts/tests -p test_lte_recovery_guard.py -v
+      - name: Verify build image picks up new source, not old board patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt"
+          mkdir -p "$root/include" "$root/package/we5927-lte/files/usr/sbin"
+          touch "$root/include/toplevel.mk" "$root/package/we5927-lte/Makefile"
+          printf '#!/bin/sh\necho OLD_DHCP_RECOVERY\n' > "$root/package/we5927-lte/files/usr/sbin/we5927-lte"
+          sh scripts/reconcile-we5927-lte-build-tree.sh "$root"
+          sh scripts/reconcile-we5927-lte-build-tree.sh "$root"
+          cmp -s source/we5927-lte/files/usr/sbin/we5927-lte "$root/package/we5927-lte/files/usr/sbin/we5927-lte"
+          sh -n "$root/package/we5927-lte/files/usr/sbin/we5927-lte"
+          if sh scripts/reconcile-we5927-lte-build-tree.sh "$RUNNER_TEMP/missing"; then
+            echo 'FAIL: accepted an invalid OpenWrt source tree' >&2
+            exit 1
+          fi
+          echo 'BUILD_SOURCE_RECONCILIATION=PASS'
