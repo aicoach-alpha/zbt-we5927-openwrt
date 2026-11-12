@@ -49,5 +49,30 @@ class Tests(unittest.TestCase):
         self.assertEqual(res["outage_edges"][0]["classification"],"upstream_or_probe_degraded")
         self.assertEqual(res["status"],"observation_only")
 
+    def test_uat_coverage_uses_full_requested_72h_not_only_success_span(self):
+        result=analyzer.analyze([row(0,1),row(0.5,0)],interval=30,expected_hours=72)
+        self.assertEqual(result["expected"],8640)
+        self.assertLess(result["coverage_percent"],1)
+        self.assertEqual(result["unique_valid_slots"],2)
+
+    def test_disconnected_monitor_gap_is_not_a_proven_wan_down_edge(self):
+        result=analyzer.analyze([row(0,1),row(120,0)],interval=30,expected_hours=72)
+        self.assertEqual(result["outage_edges"],[])
+        self.assertEqual(result["disconnected_sample_gaps"],1)
+        self.assertFalse(result["122_minute_pattern_consistent"])
+
+    def test_duplicates_cannot_fake_99_percent_coverage(self):
+        repeated=[row(0,1)]*200
+        result=analyzer.analyze(repeated,interval=30,expected_hours=1)
+        self.assertEqual(result["unique_valid_slots"],1)
+        self.assertLess(result["coverage_percent"],2)
+
+    def test_gap_recovery_must_not_invent_outage_edge(self):
+        a=row(0,1); b=row(122,0); c=row(122.5,1)
+        d=row(244.5,0)
+        result=analyzer.analyze([a,b,c,d],interval=30)
+        self.assertFalse(result["122_minute_pattern_consistent"])
+        self.assertEqual(len(result["outage_edges"]),0)
+
 if __name__=="__main__":
     unittest.main()
