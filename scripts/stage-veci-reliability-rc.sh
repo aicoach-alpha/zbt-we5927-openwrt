@@ -25,6 +25,21 @@ a="$here/files/usr/sbin/we5927-lte"
 b="$here/source/we5927-lte/files/usr/sbin/we5927-lte"
 cmp -s "$a" "$b" || { echo 'LTE_source_mirror_mismatch' >&2; exit 3; }
 sh -n "$a"
+# Validate all boot-path sources and destinations before changing any file.
+# Old historical board patches include a disruptive 'sleep 2; ifup lte'
+# hotplug callback which must never survive the reliability RC staging.
+for rel in etc/init.d/we5927-lte etc/hotplug.d/usb/30-we5927-lte; do
+  live="$here/source/we5927-lte/files/$rel"
+  dest="$root/package/we5927-lte/files/$rel"
+  [ -f "$live" ] && [ -f "$dest" ] && [ ! -L "$dest" ] ||
+    { echo "LTE_boot_source_or_target_missing:$rel" >&2; exit 3; }
+  sh -n "$live"
+done
+grep -Fq 'procd_add_reload_trigger we5927_lte' "$here/source/we5927-lte/files/etc/init.d/we5927-lte" ||
+ { echo 'LTE_procd_safe_trigger_missing' >&2; exit 3; }
+if grep -Eq '^[[:space:]]*(ifup|ifdown|wifi|/usr/sbin/we5927-lte usb-repair)([[:space:]]|$)'   "$here/source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte"; then
+ echo 'LTE_disruptive_hotplug_source' >&2; exit 3
+fi
 grep -Fq 'manual_reconnect() {' "$a" ||
  { echo 'LTE_low_downtime_guard_not_present' >&2; exit 3; }
 grep -Fq '&& radio_or_link_lost; then' "$a" ||
@@ -37,6 +52,22 @@ grep -Fq 'PKG_SOURCE_VERSION:=39c960c3ada558b4c2e7915772483d3731573d09'  "$root/
 sh "$here/scripts/stage-mt7603-deadlock-fix.sh" "$root"
 sh "$here/scripts/reconcile-we5927-lte-build-tree.sh" "$root"
 sh "$here/scripts/stage-veci-wifi-guardian.sh" "$root"
+
+# Reconcile init/hotplug AFTER the historical board patch, not only
+# the daemon binary. Write to the isolated build tree, never the router.
+for rel in etc/init.d/we5927-lte etc/hotplug.d/usb/30-we5927-lte; do
+  live="$here/source/we5927-lte/files/$rel"
+  dest="$root/package/we5927-lte/files/$rel"
+  if ! cmp -s "$live" "$dest"; then
+    tmp="$(mktemp "$dest.next.XXXXXX")"
+    cp "$live" "$tmp"
+    chmod 755 "$tmp"
+    mv -f "$tmp" "$dest"
+  fi
+  cmp -s "$live" "$dest" ||
+    { echo "LTE_boot_tree_not_reconciled:$rel" >&2; exit 4; }
+done
+echo 'LTE_COLD_BOOT_SCRIPTS_STAGED=PASS'
 
 cmp -s "$a" "$root/package/we5927-lte/files/usr/sbin/we5927-lte" ||
  { echo 'LTE_build_tree_stale' >&2; exit 4; }
