@@ -89,7 +89,7 @@ def attest(image: Path, metadata: Path, rootfs: Path, source_lte: Path,
                 line for line in guardian.splitlines()
                 if line.strip() and not line.lstrip().startswith(b"#")
             )
-            if re.search(rb"(?m)(?:^|[;&|[:space:]])wifi[[:space:]]+(?:up|down|reload)\b", commands):
+            if re.search(rb"(?m)(?:^|[;&|\s])wifi\s+(?:up|down|reload)\b", commands):
                 problems.append("guardian_contains_disruptive_wifi_command")
         except (ValueError, OSError) as e:
             problems.append("guardian_check_failed:" + str(e))
