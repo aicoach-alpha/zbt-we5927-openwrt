@@ -647,7 +647,7 @@ imei_read_json() {
 status_fast_json() {
 	. /usr/share/libubox/jshn.sh
 
-	local dev sim p ip4 gateway online
+	local dev sim p ip4 gateway online data_link runtime_stage modem_phase sample_time now
 	local manufacturer model revision imei iccid sim_status operator access_tech
 	local registration eps_registration circuit_registration registration_status
 	local packet_attach packet_status extended_error csq signal_percent signal_dbm registration_denied
@@ -703,8 +703,23 @@ status_fast_json() {
 
 	ip4="$(ip -4 -o addr show dev "$dev" 2>/dev/null | awk '{print $4}' | head -1)"
 	gateway="$(ip route show default dev "$dev" 2>/dev/null | awk '/default via/ {print $3; exit}')"
+	# DHCP gateway means local USB connectivity only. A valid Internet
+	# status requires a recent daemon reachability/HTTPS confirmation.
+	data_link=0
 	online=0
-	[ -n "$ip4" ] && [ -n "$gateway" ] && online=1
+	[ -n "$ip4" ] && [ -n "$gateway" ] && data_link=1
+	runtime_stage="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /^stage=/) {sub(/^stage=/,"",$i);print $i;exit}}' /tmp/veci-lte-performance.state 2>/dev/null)"
+	modem_phase="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /^modem_phase=/) {sub(/^modem_phase=/,"",$i);print $i;exit}}' /tmp/veci-lte-performance.state 2>/dev/null)"
+	sample_time="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /^timestamp=/) {sub(/^timestamp=/,"",$i);print $i;exit}}' /tmp/veci-lte-performance.state 2>/dev/null)"
+	now="$(date +%s 2>/dev/null)"
+	case "$sample_time:$now" in *[!0-9:]*|:*) sample_time=0; now=0;; esac
+	if [ "$data_link" = 1 ] && [ "$sample_time" -gt 0 ] &&
+	   [ "$now" -ge "$sample_time" ] && [ $((now-sample_time)) -le 180 ]; then
+		case "$runtime_stage" in
+			healthy|icmp_degraded_https_ok) online=1;;
+		esac
+	fi
+	[ -n "$modem_phase" ] || modem_phase=unknown
 
 	json_init
 	json_add_boolean enabled "$(enabled && echo 1 || echo 0)"
@@ -744,7 +759,10 @@ status_fast_json() {
 		1|true) json_add_boolean registration_denied 1 ;;
 		*) json_add_boolean registration_denied 0 ;;
 	esac
+	json_add_boolean data_link_up "$data_link"
+	json_add_boolean internet_verified "$online"
 	json_add_boolean online "$online"
+	json_add_string modem_phase "$modem_phase"
 	json_add_string status_source "cached-safe"
 	json_dump
 
