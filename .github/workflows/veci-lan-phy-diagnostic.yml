@@ -1,0 +1,19 @@
+name: VeCI MT7628 LAN PHY read-only diagnosis
+on:
+  pull_request:
+    paths:
+      - 'scripts/veci-lan-phy-readonly.sh'
+      - 'scripts/tests/test_veci_lan_phy_readonly.py'
+      - '.github/workflows/veci-lan-phy-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s scripts/tests -p 'test_veci_lan_phy_readonly.py' -v
+      - run: sh -n scripts/veci-lan-phy-readonly.sh
+      - run: git diff --check
