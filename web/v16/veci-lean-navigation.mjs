@@ -40,7 +40,7 @@ export function planMenu(entries) {
   const byHref = new Map();
   for (const entry of entries) {
     const href = cleanHref(entry?.href);
-    if (!href.startsWith('#/') || /[\\r\\n<>"'\\s]/u.test(href)) continue;
+    if (!href.startsWith('#/') || /[\r\n<>"'\s]/u.test(href)) continue;
     if (!byHref.has(href)) byHref.set(href, entry);
   }
   const found = new Map();
