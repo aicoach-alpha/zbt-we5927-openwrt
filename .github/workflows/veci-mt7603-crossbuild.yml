@@ -19,7 +19,9 @@ permissions:
 
 concurrency:
   group: mt7603-crossbuild-${{ github.ref }}
-  cancel-in-progress: true
+  # Never abort an expensive OpenWrt compile when a follow-up PR commit arrives.
+  # Newer runs may queue; release evidence is always tied to its exact build SHA.
+  cancel-in-progress: false
 
 jobs:
   kernel-compile:

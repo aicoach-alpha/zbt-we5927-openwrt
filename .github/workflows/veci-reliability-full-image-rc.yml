@@ -19,7 +19,9 @@ permissions:
   contents: read
 concurrency:
   group: veci-we5927-rc-${{ github.ref }}
-  cancel-in-progress: true
+  # Never abort an expensive OpenWrt compile when a follow-up PR commit arrives.
+  # Newer runs may queue; release evidence is always tied to its exact build SHA.
+  cancel-in-progress: false
 
 jobs:
   full-image-build:
