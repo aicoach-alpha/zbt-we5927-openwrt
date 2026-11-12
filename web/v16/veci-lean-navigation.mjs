@@ -76,7 +76,7 @@ export function mountLeanMenu(doc) {
   const all = [...doc.querySelectorAll('a[href^="#/"]')];
   const required = all.find(a => a.getAttribute('href')?.toLowerCase() === '#/home');
   const host = required?.closest('aside,.sidebar,#sidebar,[class*="sidebar"]');
-  if (!host || !view.contains(host)) return {status:'source_sidebar_unverified'};
+  if (!host || !doc.body?.contains(host)) return {status:'source_sidebar_unverified'};
   const anchors = all.filter(a => host.contains(a));
   const plan = planMenu(anchors.map(a => ({href:a.getAttribute('href'), node:a})));
   if (!plan.ok) return {status:plan.reason, missing:plan.missing};
