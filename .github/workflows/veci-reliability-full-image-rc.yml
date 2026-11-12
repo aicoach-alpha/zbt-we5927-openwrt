@@ -1,0 +1,103 @@
+name: VeCI WE5927 full firmware RC size and integration gate
+
+on:
+  pull_request:
+    paths:
+      - 'source/openwrt-we5927.config'
+      - 'source/openwrt-source-commit.txt'
+      - 'source/openwrt-zbt-we5927-current.patch'
+      - 'source/mt76-patches/**'
+      - 'source/veci-wifi-guardian/**'
+      - 'source/we5927-lte/files/usr/sbin/we5927-lte'
+      - 'scripts/stage-veci-reliability-rc.sh'
+      - '.github/workflows/veci-reliability-full-image-rc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: veci-we5927-rc-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-image-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build environment
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential clang bison flex gawk gettext git gcc-multilib \
+            libncurses-dev libssl-dev rsync subversion swig unzip wget \
+            zlib1g-dev python3 python3-setuptools file xz-utils zstd
+      - name: Pin OpenWrt and integrate exact-board reliability sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt"
+          mkdir -p "$root"
+          git -C "$root" init -q
+          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git f0a60eee2fe051741c643ea6118718aae1ef17fb
+          git -C "$root" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$root" rev-parse HEAD)" = "$(cat source/openwrt-source-commit.txt)"
+          git -C "$root" apply --check "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          sh scripts/stage-veci-reliability-rc.sh "$root"
+          cp source/openwrt-we5927.config "$root/.config"
+          # Guardian must be built-in, not downloaded later to a nearly full 8 MB NOR.
+          printf '\nCONFIG_PACKAGE_veci-wifi-guardian=y\n' >> "$root/.config"
+          grep -Fxq 'CONFIG_TARGET_ramips_mt76x8_DEVICE_zbtlink_zbt-we5927=y' "$root/.config"
+          grep -Fxq 'CONFIG_TARGET_ROOTFS_SQUASHFS=y' "$root/.config"
+          echo 'RELIABILITY_RELEASE_TREE_STAGED=PASS'
+      - name: Build complete firmware against pinned package ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/openwrt"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+          grep -Fxq 'CONFIG_PACKAGE_veci-wifi-guardian=y' .config
+          make -j2 V=s tools/install
+          make -j2 V=s toolchain/install
+          make -j2 V=s
+          echo 'WE5927_COMPLETE_IMAGE_BUILT_NOT_DEPLOYABLE=PASS'
+      - name: Check image NOR size, board metadata, installed LTE and guardian
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/openwrt"
+          mapfile -t images < <(find bin/targets/ramips/mt76x8 -maxdepth 1 -type f -name '*zbt*we5927*sysupgrade.bin' -print)
+          test "${#images[@]}" -eq 1
+          image="${images[0]}"
+          bytes="$(stat -c %s "$image")"
+          # 0x7a0000 = actual tested hardware's firmware MTD partition length.
+          max=7995392
+          test "$bytes" -le "$max" || {
+            echo "IMAGE_OVERSIZE bytes=$bytes limit=$max" >&2
+            exit 1
+          }
+          fwtool="$(find staging_dir -type f -name fwtool -perm /111 -print -quit)"
+          test -n "$fwtool" && test -x "$fwtool"
+          meta="$RUNNER_TEMP/veci-image-metadata.json"
+          "$fwtool" -i "$meta" "$image"
+          test -s "$meta"
+          grep -Fq 'zbtlink,zbt-we5927' "$meta"
+          rootfs="$(find build_dir -path '*/root-ramips/usr/sbin/we5927-lte' -type f -print -quit)"
+          test -n "$rootfs"
+          cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/usr/sbin/we5927-lte" "$rootfs"
+          rdir="${rootfs%/usr/sbin/we5927-lte}"
+          test -x "$rdir/usr/sbin/veci-wifi-guardian"
+          grep -Fq 'auto_recover=0' "$rdir/usr/sbin/veci-wifi-guardian"
+          printf 'image_bytes=%s\nfirmware_mtd_bytes=%s\n' "$bytes" "$max"
+          sha256sum "$image"
+          echo "IMAGE_SIZE_BOARD_METADATA_LTE_GUARDIAN=PASS"
+          echo "FLASH_PERMISSION=NO"
+      - name: Produce non-deployable candidate evidence only
+        if: always()
+        run: |
+          echo '### WE5927 reliability RC source build' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Source and system-image checks do NOT verify image signing, installed VeCI SPA, rollback, modem/SMS functionality, Wi-Fi beacon visibility, UAT, or 72h LTE availability.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Do not flash from CI. No firmware image artifact uploaded. LuCI is intentionally retained until VeCI full parity is physically verified.' >> "$GITHUB_STEP_SUMMARY"
