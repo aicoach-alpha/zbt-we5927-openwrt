@@ -45,7 +45,7 @@ SSID 2 : Example-Guest
         src = SOURCE.read_text()
         self.assertNotIn('"ssid": args.ssid', src)
         self.assertNotIn('"private_key":', src)
-        self.assertIn('"72_hour_uat_complete": False', src)
+        self.assertIn('report["72_hour_uat_complete"] = False', src)
         self.assertIn('"no_firmware_changes": True', src)
 
 
