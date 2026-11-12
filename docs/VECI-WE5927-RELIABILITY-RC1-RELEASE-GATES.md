@@ -35,5 +35,24 @@ The integration branch includes:
 8. SMS receive/send and AT lock must remain operational; guest disabled boot must not reload radio; VPN/addon installs limited by flash headroom.
 9. Explicitly approve maintenance window and recovery before any production update; until then **keep original firmware live and leave router untouched**.
 
+## Verified CI status (2026-11-12)
+
+Exact PR #16 source at commit `beb31b2c66521459895490b7477f5501c7c0c09b` passed:
+- Complete OpenWrt source and image build: [run 43169286587](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/43169286587), PASS.
+- Exact-source MT7603 kernel build: [run 43169286564](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/43169286564), PASS.
+- Image size: **5,767,458 bytes**, under the tested firmware MTD limit of **7,995,392 bytes**, with **2,227,934 bytes** remaining.
+- Image SHA-256: `3d3f0d3488d08e5b9558b330d876eff7dd493e3d9cf62a9bfd3d6fa83d7db57f`.
+- Board metadata `zbtlink,zbt-we5927`, staged LTE code, and observe-only Guardian integration: CI PASS.
+- **FLASH_PERMISSION=NO**. The original workflow intentionally did **not** export firmware binary artifacts. No physical router acceptance or trustworthy final signing is implied.
+
+The follow-up workflow changes add an artifact containing **JSON build evidence only**, not a flashable image. This new artifact must be verified in its own GitHub Actions run before calling that improvement PASS.
+
 ## Work remaining
-No live 72h/SSID hardware evidence; no verified final signing; current VeCI SPA and guest package ownership unresolved; no full firmware build result until CI completes. The release candidate is a **build candidate**, not a firmware release.
+
+1. **Signing/authorization**: verify the final release signature against the router's trusted image key, independently of signed package feeds. Never treat a transient runner build key as the production trust anchor.
+2. **VeCI image parity**: establish and stage the currently working full VeCI SPA, RPCs, guest owner, access control, and backup/OTA behavior; the current source-only candidate does not prove parity.
+3. **Recovery**: independently verify config/firmware backups, wired access and the UART/U-Boot recovery method.
+4. **External SSID and LTE UAT**: capture hostapd and independent client observations plus MT7603 counters, multiple ~122-minute windows, 72-hour monitor >=99% coverage, and SMS/AT lock.
+5. **On-router read-only preflight**: SSH reachability does not establish authenticated login. Never auto-accept a new SSH host key or bypass pinned known_hosts. Perform `sysupgrade -T` only after a signed, authorized image exists and is made available over an approved wired maintenance path.
+
+**Current gate: NO-GO FOR FLASH**. Keep the existing signed working production firmware and LuCI/VeCI access intact.
