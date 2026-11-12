@@ -232,33 +232,23 @@ wait_at() {
 }
 
 ensure_network() {
- local dev metric z changed key value spec
+ # Inspect only. UCI defaults own one-time network provisioning.
+ # Runtime uci commit/firewall reload can restart the MT7628 Ethernet
+ # switch, delay LAN availability, or restart the LTE interface.
+ local dev configured_device proto
  dev="$(cfg data_if)"
- metric="$(cfg metric)"
  [ -n "$dev" ] || dev=usb0
- [ -n "$metric" ] || metric=5
- changed=0
- # Avoid repeated UCI flash writes and avoid changing LAN/Wi-Fi settings.
  if [ "$(uci -q get network.lte 2>/dev/null)" != interface ]; then
-   uci set network.lte=interface
-   changed=1
+   log "LTE network section missing; refusing auto-provision while router runs"
+   return 1
  fi
- for spec in "device:$dev" "proto:dhcp" "metric:$metric" "peerdns:1"; do
-   key="$(echo "$spec" | cut -d: -f1)"
-   value="$(echo "$spec" | cut -d: -f2-)"
-   if [ "$(uci -q get "network.lte.$key" 2>/dev/null)" != "$value" ]; then
-     uci set "network.lte.$key=$value"
-     changed=1
-   fi
- done
- [ "$changed" = 0 ] || uci commit network
-
- z="$(uci -q show firewall | sed -n "s/^\(firewall\.@zone\[[0-9]\+\]\)\.name='wan'$/\1/p" | head -n1)"
- if [ -n "$z" ] && ! uci -q get "$z.network" | grep -qw lte; then
-   uci add_list "$z.network=lte"
-   uci commit firewall
-   /etc/init.d/firewall reload >/dev/null 2>&1 || true
+ configured_device="$(uci -q get network.lte.device 2>/dev/null)"
+ proto="$(uci -q get network.lte.proto 2>/dev/null)"
+ if [ "$configured_device" != "$dev" ] || [ "$proto" != dhcp ]; then
+   log "LTE network device/protocol mismatch; preserve user config and LAN"
+   return 1
  fi
+ return 0
 }
 
 set_sim() {
