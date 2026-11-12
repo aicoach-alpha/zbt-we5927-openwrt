@@ -1,0 +1,24 @@
+name: VeCI RC image integrity validator
+on:
+  pull_request:
+    paths:
+      - 'scripts/veci-rc-image-integrity.py'
+      - 'scripts/veci-rc-ui-provenance.py'
+      - 'scripts/tests/test_veci_rc_image_integrity.py'
+      - 'scripts/tests/test_veci_rc_ui_provenance.py'
+      - '.github/workflows/veci-rc-image-integrity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fail-closed-artifact-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s scripts/tests -p 'test_veci_rc_*.py' -v
+      - run: python -m py_compile scripts/veci-rc-image-integrity.py scripts/veci-rc-ui-provenance.py
+      - run: git diff --check
