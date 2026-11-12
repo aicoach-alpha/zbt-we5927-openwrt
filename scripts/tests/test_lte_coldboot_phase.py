@@ -130,8 +130,12 @@ class TestColdbootReadiness(unittest.TestCase):
 
     def test_startup_config_validation_never_mutates_network_or_firewall(self):
         source = function("ensure_network")
+        commands = "\n".join(
+            line for line in source.splitlines()
+            if not line.lstrip().startswith("#")
+        )
         self.assertNotRegex(
-            source, r"\b(?:commit|add_list|uci set|reload|ifup|ifdown|wifi)\b")
+            commands, r"\b(?:commit|add_list|uci set|reload|ifup|ifdown|wifi)\b")
         self.assertIn("network.lte", source)
 
     def test_valid_lte_network_does_not_restart_anything(self):
