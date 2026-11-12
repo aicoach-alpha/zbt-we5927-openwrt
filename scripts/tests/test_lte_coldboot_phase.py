@@ -128,5 +128,55 @@ class TestColdbootReadiness(unittest.TestCase):
         self.assertNotIn("/overlay", source)
 
 
+    def test_startup_config_validation_never_mutates_network_or_firewall(self):
+        source = function("ensure_network")
+        self.assertNotRegex(
+            source, r"\b(?:commit|add_list|uci set|reload|ifup|ifdown|wifi)\b")
+        self.assertIn("network.lte", source)
+
+    def test_valid_lte_network_does_not_restart_anything(self):
+        script = (
+            "cfg() { echo usb0; }\n"
+            "log() { :; }\n"
+            "uci() { case \"$3\" in network.lte) echo interface;; "
+            "network.lte.device) echo usb0;; network.lte.proto) echo dhcp;; "
+            "*) return 1;; esac; }\n"
+            + function("ensure_network")
+            + "\nensure_network; echo rc=$?\n"
+        )
+        out = subprocess.run(
+            [SH, "-c", script], capture_output=True, text=True,
+            timeout=4, check=True).stdout.strip()
+        self.assertEqual(out, "rc=0")
+
+    def test_invalid_lte_protocol_fails_closed(self):
+        script = (
+            "cfg() { echo usb0; }\n"
+            "log() { :; }\n"
+            "uci() { case \"$3\" in network.lte) echo interface;; "
+            "network.lte.device) echo usb0;; network.lte.proto) echo ppp;; "
+            "*) return 1;; esac; }\n"
+            + function("ensure_network")
+            + "\nensure_network; echo rc=$?\n"
+        )
+        out = subprocess.run(
+            [SH, "-c", script], capture_output=True, text=True,
+            timeout=4, check=True).stdout.strip()
+        self.assertEqual(out, "rc=1")
+
+    def test_missing_lte_section_is_reported_not_created(self):
+        script = (
+            "cfg() { echo usb0; }\n"
+            "log() { :; }\n"
+            "uci() { return 1; }\n"
+            + function("ensure_network")
+            + "\nensure_network; echo rc=$?\n"
+        )
+        out = subprocess.run(
+            [SH, "-c", script], capture_output=True, text=True,
+            timeout=4, check=True).stdout.strip()
+        self.assertEqual(out, "rc=1")
+
+
 if __name__ == "__main__":
     unittest.main()
