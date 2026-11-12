@@ -1,0 +1,21 @@
+name: VeCI guest radio safety
+on:
+  push:
+    paths:
+      - 'source/veci-guest/**'
+      - 'scripts/tests/test_guest_startup_guard.py'
+      - '.github/workflows/veci-guest-radio-safety.yml'
+  pull_request:
+    paths:
+      - 'source/veci-guest/**'
+      - 'scripts/tests/test_guest_startup_guard.py'
+      - '.github/workflows/veci-guest-radio-safety.yml'
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell syntax
+        run: sh -n source/veci-guest/veci.app.guest
+      - name: Mock portal provisioning and disable/rollback guards
+        run: python3 -m unittest discover -s scripts/tests -p test_guest_startup_guard.py -v
