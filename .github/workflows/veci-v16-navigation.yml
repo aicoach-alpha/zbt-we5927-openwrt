@@ -1,0 +1,23 @@
+name: VeCI minimal navigation and IPv6 factory policy
+on:
+  pull_request:
+    paths:
+      - 'web/v16/**'
+      - 'scripts/veci-ipv6-factory-image-only.sh'
+      - 'scripts/tests/test_veci_ipv6_factory.sh'
+      - '.github/workflows/veci-v16-navigation.yml'
+  workflow_dispatch:
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test web/v16/tests/navigation.test.mjs
+      - run: sh -n scripts/veci-ipv6-factory-image-only.sh
+      - run: sh scripts/tests/test_veci_ipv6_factory.sh
+      - run: git diff --check
