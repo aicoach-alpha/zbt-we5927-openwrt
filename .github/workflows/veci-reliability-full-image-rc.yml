@@ -9,6 +9,8 @@ on:
       - 'source/mt76-patches/**'
       - 'source/veci-wifi-guardian/**'
       - 'source/we5927-lte/files/usr/sbin/we5927-lte'
+      - 'source/we5927-lte/files/etc/init.d/we5927-lte'
+      - 'source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte'
       - 'scripts/stage-veci-reliability-rc.sh'
       - '.github/workflows/veci-reliability-full-image-rc.yml'
   workflow_dispatch:
@@ -79,8 +81,16 @@ jobs:
             echo "IMAGE_OVERSIZE bytes=$bytes limit=$max" >&2
             exit 1
           }
-          fwtool="$(find staging_dir -type f -name fwtool -perm /111 -print -quit)"
-          test -n "$fwtool" && test -x "$fwtool"
+          # Resolve HOST-architecture fwtool explicitly. A generic 'find'
+          # picked staging_dir/target-mipsel_24kc_musl/root-ramips/usr/bin/fwtool
+          # in run 43153710850 and failed with Exec format error (126).
+          fwtool="$PWD/staging_dir/host/bin/fwtool"
+          test -f "$fwtool" && test -x "$fwtool" || {
+            echo "HOST_FWTOOL_MISSING=$fwtool" >&2
+            exit 1
+          }
+          file "$fwtool"
+          printf 'image_bytes=%s\\nfirmware_mtd_bytes=%s\\n' "$bytes" "$max"
           meta="$RUNNER_TEMP/veci-image-metadata.json"
           "$fwtool" -i "$meta" "$image"
           test -s "$meta"
@@ -91,6 +101,9 @@ jobs:
           rdir="${rootfs%/usr/sbin/we5927-lte}"
           test -x "$rdir/usr/sbin/veci-wifi-guardian"
           grep -Fq 'auto_recover=0' "$rdir/usr/sbin/veci-wifi-guardian"
+          cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/etc/init.d/we5927-lte" "$rdir/etc/init.d/we5927-lte"
+          cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte" "$rdir/etc/hotplug.d/usb/30-we5927-lte"
+          echo "LTE_COLD_BOOT_SCRIPTS_INSTALLED=PASS"
           printf 'image_bytes=%s\nfirmware_mtd_bytes=%s\n' "$bytes" "$max"
           sha256sum "$image"
           echo "IMAGE_SIZE_BOARD_METADATA_LTE_GUARDIAN=PASS"
