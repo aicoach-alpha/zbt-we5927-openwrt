@@ -439,6 +439,43 @@ gateway_ok() {
 # Conservative last-resort guard. If RNDIS+IP remain present and the
 # cellular packet service says "attached", do not toggle modem power for
 # ICMP-only failures. An AT channel busy with SMS is not proof of radio loss.
+# Read-only and privacy-preserving. RNDIS IP alone does not prove
+# SIM/operator/PDP readiness. No IMSI, no CFUN, no SIM GPIO, no DHCP.
+modem_readiness_phase() {
+ local dev p response reg
+ dev="$(cfg data_if)"
+ [ -n "$dev" ] || dev=usb0
+ ip link show "$dev" >/dev/null 2>&1 || { echo usb_missing; return 0; }
+ p="$(at_port 2>/dev/null)" || { echo at_unavailable; return 0; }
+ [ -c "$p" ] || { echo at_unavailable; return 0; }
+ response="$(at 'AT+CPIN?' 1500 2>/dev/null)" ||
+   { echo at_busy_or_unavailable; return 0; }
+ case "$response" in
+   *'+CPIN: READY'*) ;;
+   *'+CPIN: SIM PIN'*) echo sim_pin_required; return 0 ;;
+   *'+CPIN: SIM PUK'*) echo sim_puk_required; return 0 ;;
+   *'+CPIN:'*) echo sim_not_ready; return 0 ;;
+   *) echo sim_unknown; return 0 ;;
+ esac
+ response="$(at 'AT+CEREG?' 1500 2>/dev/null)" ||
+   { echo registration_unavailable; return 0; }
+ reg="$(printf '%s\n' "$response" |
+   sed -n 's/.*+CEREG:[[:space:]]*[0-9]*,[[:space:]]*\([0-9]\).*/\1/p' | head -n 1)"
+ case "$reg" in
+   1|5) ;;
+   3) echo registration_denied; return 0 ;;
+   0|2|4) echo searching_for_operator; return 0 ;;
+   *) echo registration_unknown; return 0 ;;
+ esac
+ response="$(at 'AT+CGATT?' 1500 2>/dev/null)" ||
+   { echo packet_attach_unavailable; return 0; }
+ case "$response" in
+   *'+CGATT: 1'*) echo packet_attached; return 0 ;;
+   *'+CGATT: 0'*) echo packet_detached; return 0 ;;
+   *) echo packet_attach_unknown; return 0 ;;
+ esac
+}
+
 radio_or_link_lost() {
  local dev p state carrier
  dev="$(cfg data_if)"
@@ -524,8 +561,8 @@ clamped_number() {
 
 performance_state() {
  # tmpfs only; bounded metadata without APN, IMSI, SMS, IP or credentials.
- printf 'failures=%s recoveries=%s stage=%s timestamp=%s
-' "$failures" "$recoveries" "$stage" "$(date +%s)" > /tmp/veci-lte-performance.state
+ printf 'failures=%s recoveries=%s stage=%s modem_phase=%s timestamp=%s
+' "$failures" "$recoveries" "$stage" "$radio_phase" "$(date +%s)" > /tmp/veci-lte-performance.state
 }
 
 clean_line() {
@@ -895,7 +932,8 @@ auto_switch_sim() {
 
 daemon() {
  local failures recoveries threshold interval hard_after auto sim_after sim next
- local last_hard last_sim last_upstream_check now gap stage classification
+ local last_hard last_sim last_upstream_check now gap stage classification radio_phase
+ radio_phase=unknown
  last_upstream_check=0
  failures=0
  recoveries=0
@@ -908,12 +946,13 @@ daemon() {
  sim="$(cfg sim)"
  [ "$sim" = 2 ] || sim=1
  if data_ok; then
-   # On healthy LTE avoid re-driving GPIOs during daemon-only update.
+   radio_phase=internet_verified
    log "LTE already healthy; preserving GPIOs, RNDIS, APN and DHCP session"
  elif gateway_ok; then
-   # External ICMP may fail periodically even when RNDIS and DHCP are good.
-   # Do NOT re-drive modem/SIM GPIO or restart netifd on such a restart.
-   log "LTE IPv4 gateway healthy, Internet ICMP degraded; preserving GPIOs and DHCP"
+   # RNDIS IP/gateway does not prove carrier registration or packet attach.
+   # This read-only probe does not disturb IPv4, SMS, Wi-Fi or the modem.
+   radio_phase="$(modem_readiness_phase)"
+   log "LTE RNDIS gateway present but Internet unavailable; modem_phase=$radio_phase; holding DHCP and radio"
  else
    power_on || true
    # Only restore GPIO selection during actual cold-start/recovery.
@@ -926,6 +965,8 @@ daemon() {
    fi
    apply_apn || true
    ifup lte >/dev/null 2>&1 || true
+   radio_phase="$(modem_readiness_phase)"
+   log "LTE cold-start readiness: modem_phase=$radio_phase"
  fi
 
  threshold="$(clamped_number "$(cfg fail_threshold)" 3 2 20)"
@@ -943,6 +984,7 @@ daemon() {
      failures=0
      recoveries=0
      stage=healthy
+     radio_phase=internet_verified
    else
      failures=$((failures + 1))
      stage=checking
@@ -961,10 +1003,12 @@ daemon() {
            if https_ok; then
              classification=icmp_failed_https_ok
              stage=icmp_degraded_https_ok
+             radio_phase=internet_verified_https
            else
              classification=icmp_and_https_failed
+             radio_phase="$(modem_readiness_phase)"
            fi
-           log "LTE RNDIS link/IP/route present; $classification; no DHCP renew or radio reset"
+           log "LTE RNDIS link/IP/route present; $classification; modem_phase=$radio_phase; no DHCP renew or radio reset"
            wan_diag_event "$classification" "hold_gateway_healthy"
          fi
        else
