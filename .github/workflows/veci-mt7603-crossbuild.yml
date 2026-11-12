@@ -68,9 +68,17 @@ jobs:
           # Targeted package builds do not bootstrap host tools automatically.
           make -j2 V=sc tools/install
           make -j2 V=sc toolchain/install
-          make -j2 V=sc target/linux/prepare
-          make -j2 V=sc package/kernel/mt76/compile
-          find build_dir -type f -name 'mt7603e.ko' -print
+          # target/linux/prepare alone does not generate linux-6.12.94/.config.
+          # gpio-button-hotplug is a dependency of targeted mt76 compilation.
+          make -j2 V=s target/linux/compile
+          kernel_config="$(find build_dir/target-* -path '*/linux-6.12.94/.config' -type f -print -quit)"
+          test -n "$kernel_config" && test -s "$kernel_config"
+          echo "KERNEL_CONFIG_READY=$kernel_config"
+          make -j2 V=s package/kernel/mt76/compile
+          ko="$(find build_dir -type f -name 'mt7603e.ko' -print -quit)"
+          test -n "$ko" && test -s "$ko"
+          file "$ko"
+          sha256sum "$ko"
           echo "MT7603_CROSSBUILD=COMPILED_NOT_HARDWARE_TESTED"
       - name: Build scope notice
         if: always()
