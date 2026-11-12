@@ -1,0 +1,39 @@
+name: VeCI LTE coldboot and non-disruptive USB hotplug
+on:
+  pull_request:
+    paths:
+      - 'files/usr/sbin/we5927-lte'
+      - 'source/we5927-lte/files/usr/sbin/we5927-lte'
+      - 'source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte'
+      - 'source/we5927-lte/files/etc/init.d/we5927-lte'
+      - 'scripts/tests/test_lte_coldboot_phase.py'
+      - '.github/workflows/veci-lte-coldboot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  modem-boot-safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate staged shell and mirrored sources
+        run: |
+          set -eu
+          sh -n files/usr/sbin/we5927-lte
+          sh -n source/we5927-lte/files/usr/sbin/we5927-lte
+          sh -n source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte
+          sh -n source/we5927-lte/files/etc/init.d/we5927-lte
+          cmp files/usr/sbin/we5927-lte source/we5927-lte/files/usr/sbin/we5927-lte
+      - name: Run read-only AT readiness and boot regression
+        run: python3 -m unittest discover -s scripts/tests -p 'test_lte_coldboot_phase.py' -v
+      - name: Run previous low-downtime guard regression
+        run: python3 -m unittest discover -s scripts/tests -p 'test_lte_recovery_guard.py' -v
+      - name: Ensure hotplug, status and init cannot accidentally down radio
+        run: |
+          set -eu
+          ! sed '/^[[:space:]]*#/d' source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte |
+            grep -E '(^|[[:space:]])(ifup|ifdown|wifi|power_cycle|usb_repair|AT[+]CFUN)([[:space:]]|$)'
+          git diff --check
