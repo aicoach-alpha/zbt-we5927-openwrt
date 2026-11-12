@@ -440,11 +440,15 @@ gateway_ok() {
 # cellular packet service says "attached", do not toggle modem power for
 # ICMP-only failures. An AT channel busy with SMS is not proof of radio loss.
 radio_or_link_lost() {
- local dev p state
+ local dev p state carrier
  dev="$(cfg data_if)"
  [ -n "$dev" ] || dev=usb0
+ # A disappearing USB/RNDIS interface is physical evidence of link loss.
  ip link show "$dev" >/dev/null 2>&1 || return 0
- ip -4 addr show dev "$dev" | grep -q "inet " || return 0
+ carrier="$(cat "/sys/class/net/$dev/carrier" 2>/dev/null || true)"
+ [ "$carrier" = 0 ] && return 0
+ # Missing DHCP IPv4 alone is NOT proof that a healthy PDP session is down.
+ # If modem AT is busy (for example SMS), fail closed: no radio reset.
  p="$(at_port)" || return 1
  [ -c "$p" ] || return 1
  state="$(at 'AT+CGATT?' 1500 2>/dev/null)" || return 1
@@ -488,6 +492,27 @@ repair_lte_interface() {
  ifup lte >/dev/null 2>&1 || true
  sleep 3
  gateway_ok
+}
+
+manual_reconnect() {
+ # User-initiated recovery should never release a healthy DHCP lease or
+ # reset LTE merely because a remote probe is filtered.
+ if data_ok || gateway_ok; then
+   log "LTE datapath is present; manual reconnect suppressed to avoid downtime"
+   return 0
+ fi
+ renew_lte && return 0
+ gateway_ok && return 0
+ repair_lte_interface && return 0
+ gateway_ok && return 0
+ # CFUN changes the cellular registration and can interrupt active SMS.
+ # Only permit it after independent evidence that the modem is detached.
+ if radio_or_link_lost; then
+   soft_reconnect
+ else
+   log "LTE reconnect held: RNDIS/PDP state does not prove radio loss"
+   return 1
+ fi
 }
 
 clamped_number() {
@@ -960,7 +985,7 @@ daemon() {
            stage=recovered_interface
            recoveries=0
          else
-           if [ "$recoveries" -ge 2 ]; then
+           if [ "$recoveries" -ge 2 ] && radio_or_link_lost; then
              stage=modem_soft_reconnect
              soft_reconnect || true
              if data_ok; then
@@ -1025,8 +1050,7 @@ case "$1" in
 		refresh_status_cache
 		;;
 	reconnect)
-		# The UI button always tries the least disruptive path first.
-		renew_lte || repair_lte_interface || soft_reconnect
+		manual_reconnect
 		;;
 	power-cycle)
 		power_cycle
