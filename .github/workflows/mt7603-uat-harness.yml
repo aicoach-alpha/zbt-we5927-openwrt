@@ -1,0 +1,25 @@
+name: MT7603 wired UAT harness safety
+on:
+  push:
+    paths:
+      - 'scripts/uat/**'
+      - 'scripts/tests/test_mt7603_wired_snapshot.py'
+      - '.github/workflows/mt7603-uat-harness.yml'
+  pull_request:
+    paths:
+      - 'scripts/uat/**'
+      - 'scripts/tests/test_mt7603_wired_snapshot.py'
+      - '.github/workflows/mt7603-uat-harness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Python syntax
+        run: python3 -m py_compile scripts/uat/mt7603_wired_snapshot.py
+      - name: Validate independent SSID scan and read-only contract
+        run: python3 -m unittest discover -s scripts/tests -p test_mt7603_wired_snapshot.py -v
