@@ -1,0 +1,66 @@
+name: VeCI WE5927 reliability RC source integration
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/stage-veci-reliability-rc.sh'
+      - 'scripts/reconcile-we5927-lte-build-tree.sh'
+      - 'scripts/stage-veci-wifi-guardian.sh'
+      - 'source/mt76-patches/**'
+      - 'source/veci-wifi-guardian/**'
+      - 'source/we5927-lte/files/usr/sbin/we5927-lte'
+      - 'files/usr/sbin/we5927-lte'
+      - 'scripts/tests/**'
+      - '.github/workflows/veci-reliability-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Offline modem, guardian, guest, Wi-Fi, monitoring regression suites
+        run: |
+          set -eu
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+          sh -n scripts/stage-veci-reliability-rc.sh
+          sh -n scripts/reconcile-we5927-lte-build-tree.sh
+          sh -n scripts/stage-veci-wifi-guardian.sh
+          sh -n scripts/stage-mt7603-deadlock-fix.sh
+          sh -n scripts/veci-link-readonly-snapshot.sh
+          python3 -m py_compile scripts/veci-link-wired-monitor.py scripts/veci-link-analyze.py
+          cmp files/usr/sbin/we5927-lte source/we5927-lte/files/usr/sbin/we5927-lte
+          git diff --check
+      - name: Stage source components into pinned OpenWrt tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt"
+          mkdir -p "$root"
+          git -C "$root" init -q
+          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git f0a60eee2fe051741c643ea6118718aae1ef17fb
+          git -C "$root" checkout -q --detach FETCH_HEAD
+          git -C "$root" apply --check "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          sh scripts/stage-veci-reliability-rc.sh "$root"
+          sh scripts/stage-veci-reliability-rc.sh "$root"
+          cmp source/we5927-lte/files/usr/sbin/we5927-lte "$root/package/we5927-lte/files/usr/sbin/we5927-lte"
+          test -f "$root/package/veci-wifi-guardian/Makefile"
+          test -f "$root/package/kernel/mt76/patches/950-mt7603-defer-watchdog-on-channel-failure.patch"
+          test -f "$root/package/kernel/mt76/patches/951-mt7603-free-beacon-skb-on-error.patch"
+          echo 'INTEGRATED_WE5927_25_12_5_SOURCE=PASS'
+      - name: Reject incorrect mt76 driver revision before staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt"
+          sed -i 's/^PKG_SOURCE_VERSION:=39c960c3ada558b4c2e7915772483d3731573d09$/PKG_SOURCE_VERSION:=wrong/' "$root/package/kernel/mt76/Makefile"
+          if sh scripts/stage-veci-reliability-rc.sh "$root"; then
+            echo 'ERROR: unexpected mt76 revision was accepted' >&2
+            exit 1
+          fi
+          echo 'DRIVER_ABI_REVISION_GUARD=PASS'
