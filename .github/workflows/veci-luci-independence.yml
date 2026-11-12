@@ -1,0 +1,19 @@
+name: VeCI LuCI independence source gate
+on:
+  pull_request:
+    paths:
+      - 'scripts/check-veci-luci-independence.py'
+      - 'scripts/tests/test_veci_luci_independence.py'
+      - '.github/workflows/veci-luci-independence.yml'
+  workflow_dispatch:
+jobs:
+  test-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m unittest discover -s scripts/tests -p 'test_veci_luci_independence.py' -v
