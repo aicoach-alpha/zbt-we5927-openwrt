@@ -1,0 +1,46 @@
+name: VeCI signed-image offline release gate
+
+on:
+  push:
+    paths:
+      - 'scripts/verify_veci_image.py'
+      - 'scripts/tests/test_verify_veci_image.py'
+      - '.github/workflows/veci-rc1-signature-offline.yml'
+  pull_request:
+    paths:
+      - 'scripts/verify_veci_image.py'
+      - 'scripts/tests/test_verify_veci_image.py'
+      - '.github/workflows/veci-rc1-signature-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fail-closed-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile verifier and run negative-path security tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python3 -m py_compile scripts/verify_veci_image.py scripts/tests/test_verify_veci_image.py
+          python3 -m unittest discover -s scripts/tests -p test_verify_veci_image.py -v \
+            2>&1 | tee evidence/signature-rejection-tests.log
+      - name: Upload PASS or FAIL test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-rc1-image-signature-negative-tests-${{ github.run_id }}
+          path: evidence/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Production flash remains prohibited
+        if: always()
+        run: |
+          echo 'Signature-negative tests are NOT real firmware-signature verification.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Existing router trust-anchor parity, firmware signature, sysupgrade -T, rollback and hardware UAT remain mandatory.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'FLASH_PERMISSION=NO'
