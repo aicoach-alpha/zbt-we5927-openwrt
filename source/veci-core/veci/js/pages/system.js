@@ -1,3 +1,4 @@
+import { bindFirmwareUpdates } from '../lib/firmware-updates.js';
 import { badge, escapeHtml, setBusy } from '../lib/dom.js';
 import { formatBytes, formatDuration, formatMemory } from '../lib/format.js';
 
@@ -22,6 +23,7 @@ export default {
 		);
 		const systemSectionId = systemSection?.[0] || null;
 		const configuredHostname = systemSection?.[1]?.hostname || board.hostname || 'OpenWrt';
+		const configuredTimezone = systemSection?.[1]?.zonename || systemSection?.[1]?.timezone || '—';
 
 		root.innerHTML = `
 			<div class="page-intro">
@@ -59,7 +61,7 @@ export default {
 					<div class="detail-list">
 						<div><span>OpenWrt</span><strong>${escapeHtml(firmware)}</strong></div>
 						<div><span>Kernel</span><strong>${escapeHtml(board.kernel || '—')}</strong></div>
-						<div><span>Architecture</span><strong>${escapeHtml(board.system || board.release?.target || '—')}</strong></div>
+						<div><span>Platform</span><strong>${escapeHtml(board.system || board.release?.target || '—')}</strong></div>
 					</div>
 				</article>
 				<article class="panel">
@@ -69,9 +71,39 @@ export default {
 						<div><span>Memory used</span><strong>${formatBytes(memory.used)} / ${formatBytes(memory.total)}</strong></div>
 						<div><span>Load</span><strong>${escapeHtml((info.load || []).map(value => (Number(value) / 65535).toFixed(2)).join(' · ') || '—')}</strong></div>
 						<div><span>Storage</span><strong>${escapeHtml(health.overlay || '—')}</strong></div>
+						<div><span>Timezone</span><strong>${escapeHtml(configuredTimezone)}</strong></div>
 					</div>
 				</article>
 			</div>
+
+			<article class="panel">
+				<div class="panel-heading"><div><p class="eyebrow">FIRMWARE UPDATE</p><h3>Manual upload & OTA</h3></div></div>
+				<p class="panel-copy">Only verified firmware for this exact router may be applied. Uploads are staged in RAM; no automatic flashing occurs.</p>
+				<p class="panel-copy" id="fw-status" role="status">Checking firmware backend…</p>
+				<label class="field"><span>OpenWrt sysupgrade image (.bin)</span><input type="file" id="fw-file" accept=".bin" /></label>
+				<label class="field"><span>Publisher SHA-256 checksum</span><input type="text" id="fw-sha" autocomplete="off" maxlength="64" placeholder="64 hex characters" /></label>
+				<div class="cellular-actions"><button class="button button-secondary" type="button" id="fw-upload">Upload and validate</button></div>
+				<hr />
+				<p class="panel-copy" id="fw-ota-status" role="status">Check the published OTA release channel.</p>
+				<div class="cellular-actions">
+					<button class="button button-secondary" type="button" id="fw-check">Check for OTA updates</button>
+					<button class="button button-secondary" type="button" id="fw-download" disabled>Download and validate</button>
+					<button class="button button-danger" type="button" id="fw-apply" hidden>Flash verified firmware</button>
+				</div>
+			</article>
+
+            <article class="panel system-log-panel">
+                <div class="panel-heading">
+                    <div><p class="eyebrow">LOGS</p><h3>Router events</h3></div>
+                    <div class="log-controls">
+                        <button class="button button-compact button-secondary" data-log-source="system" type="button" aria-pressed="true">System</button>
+                        <button class="button button-compact button-secondary" data-log-source="kernel" type="button" aria-pressed="false">Kernel</button>
+                        <button class="button button-compact button-primary" id="refresh-logs" type="button">Load logs</button>
+                    </div>
+                </div>
+                <pre id="system-log-output" class="system-log-output" role="log" aria-live="polite">Logs are not loaded. Select a source and click Load logs.</pre>
+                <p class="panel-copy">On-demand diagnostic data: at most 150 recent lines, 240 characters per line, and 16 KB per response. No automatic polling.</p>
+            </article>
 
 			<article class="panel danger-panel">
 				<div class="panel-heading">
@@ -81,6 +113,41 @@ export default {
 				<p class="panel-copy">The router will disconnect clients temporarily while OpenWrt restarts.</p>
 			</article>
 		`;
+
+		const logOutput = root.querySelector('#system-log-output');
+		const logButtons = [...root.querySelectorAll('[data-log-source]')];
+		const refreshLogs = root.querySelector('#refresh-logs');
+		let selectedLogSource = 'system';
+		let logLoading = false;
+		const loadLogs = async () => {
+			if (logLoading) return;
+			logLoading = true;
+			setBusy(refreshLogs, true, 'Loading…');
+			try {
+				const result = await api.veci('logs', { source: selectedLogSource, limit: 100 });
+				logOutput.textContent = result.output || 'No log entries returned.';
+			} catch (error) {
+				logOutput.textContent = 'Logs could not be loaded.';
+				toast(error.message || 'Could not read router logs', 'error');
+			} finally {
+				logLoading = false;
+				setBusy(refreshLogs, false);
+			}
+		};
+		logButtons.forEach(button =>
+			button.addEventListener('click', () => {
+				selectedLogSource = button.dataset.logSource === 'kernel' ? 'kernel' : 'system';
+				logButtons.forEach(choice =>
+					choice.setAttribute('aria-pressed', String(choice.dataset.logSource === selectedLogSource))
+				);
+				logOutput.textContent = 'Source changed. Click Load logs.';
+				refreshLogs.textContent = 'Load logs';
+			})
+		);
+		refreshLogs.addEventListener('click', loadLogs);
+
+		const nativeFirmwareCheck = () => api.call('veci.firmware', 'check', {}, { timeout: 20000 });
+		void bindFirmwareUpdates({ api, root, toast, confirm, nativeFirmwareCheck });
 
 		const hostnameForm = root.querySelector('#hostname-form');
 		hostnameForm?.addEventListener('submit', async event => {

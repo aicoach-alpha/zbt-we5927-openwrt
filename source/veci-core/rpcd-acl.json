@@ -8,8 +8,22 @@
 				"network.interface.*": ["status"],
 				"network.wireless": ["status"],
 				"uci": ["get"],
-				"veci": ["capabilities", "clients", "networkInventory", "health", "securityStatus", "diagnostic"],
-				"veci.cellular": ["status"]
+				"veci": [
+					"capabilities",
+					"clients",
+					"networkInventory",
+					"health",
+					"internetStatus",
+					"updateStatus",
+					"apps",
+					"securityStatus",
+					"logs",
+					"diagnostic",
+					"firmwareStatus",
+					"firmwareRemoteCheck"
+				],
+				"veci.cellular": ["status"],
+				"veci.app.*": ["status", "clients"]
 			},
 			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
 		},
@@ -18,8 +32,21 @@
 				"system": ["reboot"],
 				"network.interface.*": ["up", "down"],
 				"uci": ["set", "add", "delete", "commit"],
-				"veci": ["serviceAction", "wifiReload", "setAdminPassword"],
-				"veci.cellular": ["reconnect", "switchSim"]
+				"veci": [
+					"appAction",
+					"serviceAction",
+					"wifiReload",
+					"setAdminPassword",
+					"firmwareUploadStart",
+					"firmwareUploadChunk",
+					"firmwareUploadFinish",
+					"firmwareValidate",
+					"firmwareRemoteDownload",
+					"firmwarePolicySave",
+					"firmwareApply"
+				],
+				"veci.cellular": ["reconnect", "switchSim"],
+				"veci.app.*": ["save", "action", "create", "createBatch", "revoke", "cleanup", "disconnect"]
 			},
 			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
 		}

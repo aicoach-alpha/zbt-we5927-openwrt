@@ -16,6 +16,19 @@ function wifiNetworks(status) {
 	return Object.values(status || {}).flatMap(radio => radio.interfaces || []);
 }
 
+function configuredWireless(configResult, type) {
+	return Object.values(configResult?.values || {}).filter(section => section['.type'] === type);
+}
+
+function wifiInventory(status, configResult) {
+	const runtimeRadios = Object.values(status || {});
+	const runtimeNetworks = wifiNetworks(status);
+	return {
+		radios: runtimeRadios.length ? runtimeRadios : configuredWireless(configResult, 'wifi-device'),
+		networks: runtimeNetworks.length ? runtimeNetworks : configuredWireless(configResult, 'wifi-iface')
+	};
+}
+
 export default {
 	id: 'home',
 	title: 'Home',
@@ -24,12 +37,14 @@ export default {
 	icon: 'home',
 
 	async render({ api, state, root, navigate, toast }) {
-		const [system, interfacesResult, wireless, clients, security] = await Promise.all([
+		const [system, interfacesResult, wireless, wirelessConfig, clients, security, performance] = await Promise.all([
 			api.systemInfo(),
 			api.interfaces(),
 			api.wirelessStatus().catch(() => ({})),
+			api.uciGet('wireless').catch(() => ({ values: {} })),
 			api.veci('clients').catch(() => ({ clients: [] })),
-			api.veci('securityStatus').catch(() => ({ root_password_set: true }))
+			api.veci('securityStatus').catch(() => ({ root_password_set: true })),
+			api.call('veci.cellular', 'performanceStatus', {}, { timeout: 2500 }).catch(() => ({ ok: false }))
 		]);
 
 		const interfaces = interfacesResult.interface || [];
@@ -39,8 +54,8 @@ export default {
 
 		const uplink = defaultRouteInterface(interfaces);
 		const memory = formatMemory(system.memory || {});
-		const radios = Object.values(wireless || {});
-		const networks = wifiNetworks(wireless);
+		const memoryPercent = Math.min(Math.max(memory.percent, 0), 100);
+		const { radios, networks } = wifiInventory(wireless, wirelessConfig);
 		const clientCount = clients.clients?.length || 0;
 		const model = state.board?.model || state.board?.board_name || 'OpenWrt Router';
 		const boardName = state.board?.board_name || '';
@@ -74,10 +89,10 @@ export default {
 						<p>${escapeHtml(boardName || firmware)}</p>
 					</div>
 					<div class="hero-state">
-						<span class="status-dot ${uplink ? 'online' : ''}"></span>
+						<span id="home-connectivity-dot" class="status-dot"></span>
 						<div>
-							<strong>${uplink ? 'Internet connected' : 'Internet unavailable'}</strong>
-							<span>${uplink ? `${escapeHtml(uplink.interface)} · ${escapeHtml(firstAddress(uplink))}` : 'Check the Internet connection'}</span>
+							<strong id="home-connectivity-title">${uplink ? 'Checking Internet…' : 'Uplink unavailable'}</strong>
+							<span id="home-connectivity-detail">${uplink ? `${escapeHtml(uplink.interface)} · ${escapeHtml(firstAddress(uplink))} · uplink active` : 'Check the WAN or mobile data link'}</span>
 						</div>
 					</div>
 				</article>
@@ -94,10 +109,32 @@ export default {
 				</article>
 			</section>
 
+            <section class="content-grid content-grid-2" aria-label="Connection stability">
+                <article class="panel">
+                    <div class="panel-heading"><div><p class="eyebrow">CELLULAR RELIABILITY</p><h3>LTE Recovery</h3></div></div>
+                    <p id="perf-lte-stage">Not monitored</p>
+                    <div class="detail-list compact">
+                        <div><span>Monitor interval</span><strong id="perf-lte-poll">Not available</strong></div>
+                        <div><span>Consecutive failures</span><strong id="perf-lte-fail">—</strong></div>
+                        <div><span>Strategy</span><strong>DHCP first · modem reset last</strong></div>
+                    </div>
+                    <button class="text-link" data-go="cellular" type="button">Mobile connection</button>
+                </article>
+                <article class="panel">
+                    <div class="panel-heading"><div><p class="eyebrow">WI-FI RELIABILITY</p><h3>Wi-Fi Guardian</h3></div></div>
+                    <p id="perf-wifi-stage">Not monitored</p>
+                    <div class="detail-list compact">
+                        <div><span>Monitor interval</span><strong id="perf-wifi-poll">Not available</strong></div>
+                        <div><span>Consecutive failures</span><strong id="perf-wifi-fail">—</strong></div>
+                        <div><span>Strategy</span><strong>Stable channel · guarded AP recovery</strong></div>
+                    </div>
+                    <button class="text-link" data-go="wifi" type="button">Wi-Fi stability</button>
+                </article>
+            </section>
 			<section class="metric-grid">
 				<button class="metric-card metric-link" data-go="internet" type="button">
 					<span class="metric-icon">${icon('globe', 'svg-icon')}</span>
-					<div><span>Internet</span><strong>${uplink ? 'Online' : 'Offline'}</strong><small>${escapeHtml(uplink?.proto?.toUpperCase() || 'No uplink')}</small></div>
+					<div><span>Internet</span><strong id="home-internet-metric">${uplink ? 'Checking…' : 'No uplink'}</strong><small id="home-internet-metric-detail">${uplink ? `${escapeHtml(uplink?.proto?.toUpperCase() || 'UPLINK')} · uplink active` : 'No active uplink'}</small></div>
 				</button>
 				<button class="metric-card metric-link" data-go="wifi" type="button">
 					<span class="metric-icon">${icon('wifi', 'svg-icon')}</span>
@@ -116,8 +153,8 @@ export default {
 			<section class="content-grid content-grid-2">
 				<article class="panel">
 					<div class="panel-heading">
-						<div><p class="eyebrow">INTERNET</p><h3>Connection</h3></div>
-						${uplink ? badge('Online', 'success') : badge('Offline', 'danger')}
+						<div><p class="eyebrow">UPLINK</p><h3>Connection</h3></div>
+						<span id="home-uplink-badge">${uplink ? badge('Checking', 'neutral') : badge('Link down', 'danger')}</span>
 					</div>
 					<div class="detail-list">
 						<div><span>Interface</span><strong>${escapeHtml(uplink?.interface || '—')}</strong></div>
@@ -134,7 +171,7 @@ export default {
 					</div>
 					<div class="resource-row">
 						<div><span>Memory</span><strong>${formatBytes(memory.used)} / ${formatBytes(memory.total)}</strong></div>
-						<div class="progress-track"><span style="width:${memory.percent}%"></span></div>
+						<progress class="memory-progress" max="100" value="${memoryPercent}" aria-label="Memory used"></progress>
 					</div>
 					<div class="detail-list compact">
 						<div><span>Firmware</span><strong>${escapeHtml(firmware)}</strong></div>
@@ -144,6 +181,94 @@ export default {
 				</article>
 			</section>
 		`;
+
+		// Read-only statuses; never claim the connection is healthy when
+		// the tiny /tmp monitor has not actually run.
+		if (performance?.ok === true && performance?.source === 'local_tmpfs_monitors') {
+			const label = {
+				healthy: 'Healthy · monitoring',
+				stale: 'Monitor data stale · state unverified',
+				dhcp_renew: 'Restoring DHCP',
+				recovered_dhcp: 'Restored · DHCP',
+				interface_recovery: 'Repairing LTE interface',
+				recovered_interface: 'Restored · LTE interface',
+				modem_soft_reconnect: 'Recovering modem registration',
+				recovered_soft: 'Restored · cellular modem',
+				upstream_degraded: 'Gateway reachable · Internet degraded',
+				power_cycle_cooldown: 'Reset cooldown active',
+				last_resort_power_cycle: 'Last-resort modem reset',
+				ready: 'Access point operational',
+				radio_recovery: 'Recovering missing access point',
+				ap_not_ready: 'Access point not ready',
+				intentionally_disabled: 'Wi-Fi intentionally disabled',
+				hold_associated_or_unknown: 'Conservative hold · clients may be connected',
+				cooldown_or_observe: 'Monitoring · cooldown'
+			};
+			const updateText = (id, value) => {
+				const element = root.querySelector(id);
+				if (element) element.textContent = String(value);
+			};
+			const lte = performance.lte || {};
+			const wifi = performance.wifi || {};
+			updateText('#perf-lte-stage', label[lte.stage] || 'Not monitored');
+			updateText('#perf-wifi-stage', label[wifi.stage] || 'Not monitored');
+			if (Number.isInteger(lte.check_interval_seconds) && lte.check_interval_seconds > 0)
+				updateText('#perf-lte-poll', String(lte.check_interval_seconds) + ' sec');
+			if (Number.isInteger(wifi.check_interval_seconds) && wifi.check_interval_seconds > 0)
+				updateText('#perf-wifi-poll', String(wifi.check_interval_seconds) + ' sec');
+			if (Number.isInteger(lte.failures) && lte.failures >= 0) updateText('#perf-lte-fail', lte.failures);
+			if (Number.isInteger(wifi.failures) && wifi.failures >= 0) updateText('#perf-wifi-fail', wifi.failures);
+		}
+
+		if (uplink) {
+			api.veci('internetStatus', {}, { timeout: 3000 })
+				.then(status => {
+					const title = root.querySelector('#home-connectivity-title');
+					const detail = root.querySelector('#home-connectivity-detail');
+					const metric = root.querySelector('#home-internet-metric');
+					const metricDetail = root.querySelector('#home-internet-metric-detail');
+					const dot = root.querySelector('#home-connectivity-dot');
+					const badgeHost = root.querySelector('#home-uplink-badge');
+					if (!title || !detail || !metric || !metricDetail || !dot || !badgeHost) return;
+
+					if (status.status === 'reachable' && status.reachable === true) {
+						title.textContent = 'Internet reachable';
+						detail.textContent = `${uplink.interface} · ${firstAddress(uplink)} · verified`;
+						metric.textContent = 'Internet reachable';
+						metricDetail.textContent = `${uplink.proto?.toUpperCase() || 'UPLINK'} · verified`;
+						dot.classList.add('online');
+						badgeHost.innerHTML = badge('Internet reachable', 'success');
+					} else if (status.status === 'unreachable' && status.reachable === false) {
+						title.textContent = 'Internet unavailable';
+						detail.textContent = `${uplink.interface} · ${firstAddress(uplink)} · uplink active`;
+						metric.textContent = 'Internet unavailable';
+						metricDetail.textContent = `${uplink.proto?.toUpperCase() || 'UPLINK'} · uplink active`;
+						dot.classList.remove('online');
+						badgeHost.innerHTML = badge('No Internet', 'danger');
+					} else {
+						title.textContent = 'Uplink active';
+						detail.textContent = `${uplink.interface} · ${firstAddress(uplink)} · Internet not verified`;
+						metric.textContent = 'Uplink active';
+						metricDetail.textContent = `${uplink.proto?.toUpperCase() || 'UPLINK'} · reachability not verified`;
+						dot.classList.remove('online');
+						badgeHost.innerHTML = badge('Link up', 'neutral');
+					}
+				})
+				.catch(() => {
+					const title = root.querySelector('#home-connectivity-title');
+					const detail = root.querySelector('#home-connectivity-detail');
+					const metric = root.querySelector('#home-internet-metric');
+					const metricDetail = root.querySelector('#home-internet-metric-detail');
+					const badgeHost = root.querySelector('#home-uplink-badge');
+					if (title) title.textContent = 'Uplink active';
+					if (detail)
+						detail.textContent = `${uplink.interface} · ${firstAddress(uplink)} · Internet not verified`;
+					if (metric) metric.textContent = 'Uplink active';
+					if (metricDetail)
+						metricDetail.textContent = `${uplink.proto?.toUpperCase() || 'UPLINK'} · reachability not verified`;
+					if (badgeHost) badgeHost.innerHTML = badge('Link up', 'neutral');
+				});
+		}
 
 		const passwordForm = root.querySelector('#admin-password-form');
 		passwordForm?.addEventListener('submit', async event => {

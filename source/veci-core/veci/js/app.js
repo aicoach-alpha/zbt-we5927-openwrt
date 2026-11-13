@@ -2,15 +2,17 @@ import { VeciApi } from './lib/api.js';
 import { escapeHtml, qs, qsa, setBusy } from './lib/dom.js';
 import { hydrateIcons, icon } from './lib/icons.js';
 
-import homePage from './pages/home.js';
+import homePage from './pages/home.js?v=161';
 import internetPage from './pages/internet.js';
 import wifiPage from './pages/wifi.js';
 import devicesPage from './pages/devices.js';
 import securityPage from './pages/security.js';
 import networkPage from './pages/network.js';
 import systemPage from './pages/system.js';
-import cellularPage from './pages/cellular.js';
+import cellularPage from './pages/cellular.js?v=160';
+import updatesPage from './pages/updates.js';
 import appsPage from './pages/apps.js';
+import hotspotPage from './pages/hotspot.js';
 
 const pages = [
 	homePage,
@@ -18,9 +20,11 @@ const pages = [
 	wifiPage,
 	devicesPage,
 	cellularPage,
+	hotspotPage,
 	securityPage,
 	networkPage,
 	systemPage,
+	updatesPage,
 	appsPage
 ];
 const pageMap = new Map(pages.map(page => [page.id, page]));

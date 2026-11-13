@@ -57,7 +57,7 @@ jobs:
           sh scripts/stage-veci-reliability-rc.sh "$root"
           cp source/openwrt-we5927.config "$root/.config"
           # Guardian must be built-in, not downloaded later to a nearly full 8 MB NOR.
-          printf '\nCONFIG_PACKAGE_veci-wifi-guardian=y\nCONFIG_PACKAGE_veci=y\nCONFIG_PACKAGE_veci-default-ui=y\n' >> "$root/.config"
+          printf '\nCONFIG_PACKAGE_veci-wifi-guardian=y\nCONFIG_PACKAGE_veci=y\nCONFIG_PACKAGE_veci-default-ui=y\nCONFIG_PACKAGE_veci-cellular-we5927=y\nCONFIG_PACKAGE_veci-app-catalog-we5927=y\nCONFIG_PACKAGE_veci-update-we5927=y\n' >> "$root/.config"
           grep -Fxq 'CONFIG_TARGET_ramips_mt76x8_DEVICE_zbtlink_zbt-we5927=y' "$root/.config"
           grep -Fxq 'CONFIG_TARGET_ROOTFS_SQUASHFS=y' "$root/.config"
           echo 'RELIABILITY_RELEASE_TREE_STAGED=PASS'
@@ -72,6 +72,11 @@ jobs:
           grep -Fxq 'CONFIG_PACKAGE_veci-wifi-guardian=y' .config
           grep -Fxq 'CONFIG_PACKAGE_veci=y' .config
           grep -Fxq 'CONFIG_PACKAGE_veci-default-ui=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci-cellular-we5927=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci-update-we5927=y' .config
+          ! grep -Fxq 'CONFIG_PACKAGE_veci-app-guest=y' .config
+          ! grep -Fxq 'CONFIG_PACKAGE_veci-app-voucher=y' .config
           make -j2 V=s tools/install
           make -j2 V=s toolchain/install
           make -j2 V=s
@@ -125,6 +130,25 @@ jobs:
           test -x "$rdir/etc/uci-defaults/97-veci-https-defaults"
           test -x "$rdir/etc/uci-defaults/98-veci-default-ui"
           test -e "$rdir/www/cgi-bin/luci" || test -L "$rdir/www/cgi-bin/luci"
+          # Check each file in live-audited VeCI source, not just index.html.
+          while IFS= read -r -d '' f; do
+            rel="$(printf '%s\n' "$f" | sed "s|^$GITHUB_WORKSPACE/source/veci-core/veci/||")"
+            cmp "$f" "$rdir/www/veci/$rel"
+          done < <(find "$GITHUB_WORKSPACE/source/veci-core/veci" -type f -print0)
+          for pair in             'veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular usr/libexec/rpcd/veci.cellular'             'veci-cellular-we5927/files/usr/libexec/rpcd/veci.sms usr/libexec/rpcd/veci.sms'             'veci-app-catalog-we5927/files/usr/libexec/rpcd/veci.apps usr/libexec/rpcd/veci.apps'             'veci-update-we5927/files/usr/sbin/veci-update-agent usr/sbin/veci-update-agent'; do
+            src="$(printf '%s\n' "$pair" | cut -d' ' -f1)"
+            dest="$(printf '%s\n' "$pair" | cut -d' ' -f2)"
+            cmp "$GITHUB_WORKSPACE/source/$src" "$rdir/$dest"
+          done
+          for optional in veci.app.guest veci.app.voucher; do
+            test ! -e "$rdir/usr/libexec/rpcd/$optional"
+          done
+          test -x "$rdir/usr/libexec/veci-sms-cmgs"
+          test -x "$rdir/etc/init.d/veci-update-agent"
+          test -s "$rdir/usr/share/veci/apps/guest.json"
+          test -s "$rdir/usr/share/veci/apps/voucher.json"
+          echo "VECI_WEB_CELLULAR_SMS_APPS_OTA_PARITY_SOURCE=PASS"
+          echo "OPTIONAL_GUEST_VOUCHER_NOT_BUNDLED=PASS"
           echo "BUILTIN_VECI_CORE_RPC_HTTPS_LUCI_FALLBACK=PASS"
           echo "LIVE_VECI_PARITY=NOT_VERIFIED"
           echo "LTE_COLD_BOOT_SCRIPTS_INSTALLED=PASS"
@@ -178,6 +202,8 @@ jobs:
                   "image_partition_fit": "pass",
                   "lte_and_guardian_source_installed": "pass",
                   "builtin_veci_core_rpc_default_ui": "pass",
+                  "veci_web_cellular_sms_catalog_update_source": "pass",
+                  "guest_voucher_optional_not_bundled": "pass",
                   "luci_fallback_retained": "pass",
                   "release_signing_and_trust_anchor": "not_verified",
                   "existing_veci_spa_parity": "not_verified",

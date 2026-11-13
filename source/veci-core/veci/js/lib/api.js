@@ -140,7 +140,7 @@ export class VeciApi {
 		return this.call('veci.cellular', method, params);
 	}
 
-	veci(method, params = {}) {
-		return this.call('veci', method, params);
+	veci(method, params = {}, options = {}) {
+		return this.call('veci', method, params, options);
 	}
 }

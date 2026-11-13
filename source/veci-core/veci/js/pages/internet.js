@@ -79,14 +79,16 @@ export default {
 						escapeHtml(iface.interface) +
 						'" type="button">Internet settings</button>';
 				}
-				actions +=
-					'<button class="button button-secondary" data-iface="' +
-					escapeHtml(iface.interface) +
-					'" data-action="' +
-					(iface.up ? 'down' : 'up') +
-					'" type="button">' +
-					(iface.up ? 'Disconnect' : 'Connect') +
-					'</button>';
+				if (isUplink(iface) && !cellular) {
+					actions +=
+						'<button class="button button-secondary" data-iface="' +
+						escapeHtml(iface.interface) +
+						'" data-action="' +
+						(iface.up ? 'down' : 'up') +
+						'" type="button">' +
+						(iface.up ? 'Disconnect' : 'Connect') +
+						'</button>';
+				}
 
 				return (
 					'<article class="connection-card ' +

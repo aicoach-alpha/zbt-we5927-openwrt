@@ -16,7 +16,7 @@ export default {
 
 		root.innerHTML = `
 			<div class="page-intro">
-				<div><h2>Network layout</h2><p>Interfaces, bridges and physical ports without exposing raw UCI structure first.</p></div>
+				<div><h2>Network layout</h2><p>Interfaces, bridges and hardware-backed network devices without exposing raw UCI structure first.</p></div>
 				<a class="button button-secondary" href="/cgi-bin/luci/admin/network/network">Expert network editor</a>
 			</div>
 
@@ -52,9 +52,9 @@ export default {
 					</div>
 				</article>
 				<article class="panel">
-					<div class="panel-heading"><div><p class="eyebrow">PHYSICAL</p><h3>Ports</h3></div><span class="count-pill">${inventory.ports?.length || 0}</span></div>
+					<div class="panel-heading"><div><p class="eyebrow">HARDWARE</p><h3>Network devices</h3></div><span class="count-pill">${inventory.ports?.length || 0}</span></div>
 					<div class="chip-list">
-						${(inventory.ports || []).length ? inventory.ports.map(port => `<span class="chip mono">${escapeHtml(port)}</span>`).join('') : '<p class="panel-copy">No physical ports were identified.</p>'}
+						${(inventory.ports || []).length ? inventory.ports.map(port => `<span class="chip mono">${escapeHtml(port)}</span>`).join('') : '<p class="panel-copy">No hardware-backed network devices were identified.</p>'}
 					</div>
 				</article>
 			</div>

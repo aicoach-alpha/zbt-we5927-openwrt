@@ -81,3 +81,29 @@ sysupgrade -T, and board/LTE/Wi-Fi/SMS hardware acceptance. GitHub repo
 currently has no signing secrets configured; existing production signing key
 must be supplied only through an approved secure deployment channel, never
 placed in repository source, CI logs or chat.
+
+## 2026-11-13 Live VeCI parity and user-defined optional apps
+
+Inspection of the authenticated physical router over pinned-key SSH found 24
+production VeCI UI assets. All 24 asset hashes, the core rpcd service,
+ACL, cellular provider, SMS RPC, Apps catalog RPC, and OTA checker source
+match audited local worktrees:
+- VeCI Core worktree a1504e607d4b7b32ce9f6a6858cdf59dd777acfb
+- WE5927 package source worktree c62b85cbbb369ed79b69891a05006179b79874d3
+
+The newer candidate must include VeCI Core, cellular/SMS provider, Apps
+catalog, firmware update agent, default UI, LTE recovery, safe Guardian
+and LuCI Expert. The SMS helper veci-sms-cmgs must be compiled for the
+same MIPS ABI or the current SMS send-one service cannot operate.
+
+Guest and Voucher are optional online-installable apps, NOT factory
+firmware dependencies. The base image includes catalog descriptions for
+them but must NOT bundle either veci.app.guest or veci.app.voucher RPC.
+Existing deployments that have these optional apps installed require
+a backup of their configuration, an installed-package inventory, signed
+package feed verification, and a restore/reinstall plan across sysupgrade.
+Do not auto-install optional apps on a clean router.
+
+Production signature, sysupgrade -T, currently installed custom service
+overlays, rollback, and hardware UAT remain independent gates. Only the
+full signed image after real checks may be described as flash-ready.

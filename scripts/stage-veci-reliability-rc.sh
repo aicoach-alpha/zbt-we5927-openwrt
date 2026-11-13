@@ -56,7 +56,7 @@ sh "$here/scripts/stage-veci-wifi-guardian.sh" "$root"
 # Both native admin UI packages are compiled into this *candidate* image.
 # Pinned source is carried in-repo; do not silently fetch a moving branch.
 # This does NOT establish parity with the currently running router overlay.
-for pkg in veci-core veci-default-ui; do
+for pkg in veci-core veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci-update-we5927; do
   [ -f "$here/source/$pkg/Makefile" ] || {
     echo "veci_package_source_missing:$pkg" >&2
     exit 3
@@ -65,7 +65,7 @@ done
 [ -f "$here/source/veci-core/UPSTREAM_COMMIT" ] || {
   echo 'veci_core_pin_missing' >&2; exit 3
 }
-grep -Fxq 'bdf7bcf332c23b625e92fb1e00d1fb30edea88b6' "$here/source/veci-core/UPSTREAM_COMMIT" || {
+grep -Fxq 'a1504e607d4b7b32ce9f6a6858cdf59dd777acfb' "$here/source/veci-core/UPSTREAM_COMMIT" || {
   echo 'veci_core_unreviewed_revision' >&2; exit 3
 }
 [ -f "$here/source/veci-core/veci/index.html" ] &&
@@ -73,7 +73,7 @@ grep -Fxq 'bdf7bcf332c23b625e92fb1e00d1fb30edea88b6' "$here/source/veci-core/UPS
 [ -f "$here/source/veci-core/files/rpcd-veci" ] || {
   echo 'veci_authenticated_frontend_source_missing' >&2; exit 3
 }
-for pair in 'veci-core veci' 'veci-default-ui veci-default-ui'; do
+for pair in 'veci-core veci' 'veci-default-ui veci-default-ui' 'veci-cellular-we5927 veci-cellular-we5927' 'veci-app-catalog-we5927 veci-app-catalog-we5927' 'veci-update-we5927 veci-update-we5927'; do
   set -- $pair
   src="$here/source/$1"
   dst="$root/package/$2"
@@ -82,7 +82,22 @@ for pair in 'veci-core veci' 'veci-default-ui veci-default-ui'; do
   cp -a "$src/." "$dst/"
   cmp -s "$src/Makefile" "$dst/Makefile" || exit 4
 done
-echo 'VECI_CORE_AND_DEFAULT_UI_STAGED=PASS'
+# Preserve reviewed latest LTE recovery while compiling the SMS CMGS helper.
+# This helper is an explicit runtime dependency of SMS send on the live router.
+[ -f "$here/source/we5927-lte/src/veci-sms-cmgs.c" ] || {
+  echo 'sms_cmgs_source_missing' >&2; exit 3
+}
+cp "$here/source/we5927-lte/src/veci-sms-cmgs.c" "$root/package/we5927-lte/src/veci-sms-cmgs.c"
+cp "$here/source/we5927-lte/Makefile" "$root/package/we5927-lte/Makefile"
+grep -Fq '$(PKG_BUILD_DIR)/veci-sms-cmgs' "$root/package/we5927-lte/Makefile" || {
+  echo 'sms_cmgs_package_build_missing' >&2; exit 3
+}
+# Guest and voucher remain online-installable optional packages, not built-in.
+[ ! -d "$root/package/veci-app-guest" ] && [ ! -d "$root/package/veci-app-voucher" ] || {
+  echo 'optional_guest_voucher_must_not_ship_builtin' >&2; exit 3
+}
+echo 'VECI_LIVE_CORE_CELLULAR_SMS_APPS_UPDATES_STAGED=PASS'
+echo 'GUEST_VOUCHER_OPTIONAL_NOT_BUNDLED=PASS'
 
 # Reconcile init/hotplug AFTER the historical board patch, not only
 # the daemon binary. Write to the isolated build tree, never the router.
