@@ -11,25 +11,61 @@ def asnum(row, key):
     value = row.get(key)
     return value if type(value) in (int, float) else None
 
+def parsed_time(sample):
+    """Reject timestamps that cannot locate a sample in an absolute UAT window."""
+    value = sample.get("collected_at")
+    if not isinstance(value, str):
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+        if dt.tzinfo is None or dt.utcoffset() is None:
+            return None
+        return dt.timestamp()
+    except (ValueError, OverflowError, TypeError):
+        return None
+
+
 def analyze(samples, interval=30, expected_hours=None):
-    # Use the requested monitoring duration for release qualification. Computing
-    # expected only from first/last successful SSH polls hides entire outages.
+    # Fixed UAT windows start at the FIRST recorded poll (successful or not).
+    # Using the first successful SSH poll lets an initial multi-hour outage
+    # disappear from the denominator, and late samples can fake 99% coverage.
     if interval < 1 or (expected_hours is not None and expected_hours <= 0):
         raise ValueError("invalid_window")
-    # Do not count a claimed "ok" JSONL line if decisive link/probe
-    # telemetry is absent, malformed, or a JSON boolean.
+    dated = sorted(
+        [(ts, sample) for sample in samples
+         if (ts := parsed_time(sample)) is not None],
+        key=lambda value: value[0])
+    if not dated:
+        return {"status": "insufficient_samples", "count": len(samples),
+                "valid": 0, "coverage_percent": 0.0}
+    start = dated[0][0]
+    end = start + expected_hours * 3600 if expected_hours is not None else None
+    in_window = [(ts, sample) for ts, sample in dated
+                 if end is None or ts < end]
+    # Do not count claimed "ok" records with missing/invalid decisive probes.
+    # Missing usb0_carrier when usb0 is absent is still a valid outage sample.
     required = ("usb0_ipv4", "lte_default_route", "public_ping_ok")
-    good = [s for s in samples
-            if s.get("collection_status") == "ok"
-            and all(type(s.get(k)) is int and s[k] in (0, 1)
-                    for k in required)]
+    good = [(ts, sample) for ts, sample in in_window
+            if sample.get("collection_status") == "ok"
+            and all(type(sample.get(k)) is int and sample[k] in (0, 1)
+                    for k in required)
+            and (sample.get("usb0_carrier") in (0, 1)
+                 or (sample.get("usb0_carrier") is None
+                     and sample["usb0_ipv4"] == 0
+                     and sample["lte_default_route"] == 0))]
+    observed_span = max(0, good[-1][0] - good[0][0]) if good else 0
+    expected = (max(1, ceil(expected_hours * 3600 / interval))
+                if expected_hours is not None
+                else max(1, int(round((dated[-1][0] - start) / interval)) + 1))
     if not good:
-        return {"status": "insufficient_samples", "count": len(samples)}
+        return {"status": "insufficient_samples", "count": len(samples),
+                "valid": 0, "expected": expected,
+                "coverage_percent": 0.0,
+                "out_of_window_samples": len(dated) - len(in_window)}
     events = []
     prev = None
     skipped_gaps = 0
-    for s in good:
-        t = datetime.fromisoformat(s["collected_at"]).timestamp()
+    for t, s in good:
         contiguous = prev is not None and 0 < t - prev[0] <= max(interval * 2.5, 20)
         if prev is not None and not contiguous:
             skipped_gaps += 1
@@ -57,22 +93,14 @@ def analyze(samples, interval=30, expected_hours=None):
     times = [datetime.fromisoformat(x["at"]).timestamp() for x in events]
     gaps = [(b - a) / 60 for a, b in zip(times, times[1:])]
     periodic = len(gaps) >= 2 and all(115 <= d <= 130 for d in gaps)
-    observed_span = max(0, (datetime.fromisoformat(good[-1]["collected_at"]) -
-                            datetime.fromisoformat(good[0]["collected_at"])).total_seconds())
-    expected = (max(1, ceil(expected_hours * 3600 / interval)) if expected_hours is not None
-                else max(1, int(round(observed_span / interval)) + 1))
-    # Duplicate or sub-interval samples do not increase monitoring coverage.
-    timestamps = sorted({int(datetime.fromisoformat(x["collected_at"]).timestamp())
-                         for x in good})
-    unique_slots = set()
-    if timestamps:
-        first = timestamps[0]
-        for t in timestamps:
-            slot = int(round((t - first) / interval))
-            if slot >= 0:
-                unique_slots.add(slot)
+    # Only slots inside the requested window count; duplicate polls cannot
+    # inflate coverage and observations after the deadline cannot repair gaps.
+    unique_slots = {
+        slot for t, _ in good
+        if 0 <= (slot := int(round((t - start) / interval))) < expected
+    }
     covered = min(len(unique_slots), expected)
-    wifi = [x.get("external_ssid_visible") for x in samples]
+    wifi = [x.get("external_ssid_visible") for _, x in in_window]
     ssid_miss = sum(v is False for v in wifi)
     wifi_observed = sum(v is not None for v in wifi)
     return {
@@ -83,6 +111,9 @@ def analyze(samples, interval=30, expected_hours=None):
         "expected": expected,
         "expected_hours": expected_hours,
         "coverage_percent": round(100 * covered / expected, 2),
+        "out_of_window_samples": len(dated) - len(in_window),
+        "invalid_timestamp_samples": len(samples) - len(dated),
+        "observed_span_seconds": round(observed_span, 1),
         "disconnected_sample_gaps": skipped_gaps,
         "outage_edges": events,
         "minutes_between_edges": [round(x, 1) for x in gaps],
@@ -96,6 +127,7 @@ def analyze(samples, interval=30, expected_hours=None):
             "A functioning gateway + RNDIS does not justify modem reset."
         )
     }
+
 
 def main():
     p = argparse.ArgumentParser()

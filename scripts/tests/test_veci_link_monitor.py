@@ -101,6 +101,40 @@ class Tests(unittest.TestCase):
         self.assertEqual(result["unique_valid_slots"],1)
         self.assertLess(result["coverage_percent"],2)
 
+    def test_outside_requested_window_cannot_repair_missing_coverage(self):
+        samples = [row(0, 1)] + [row(120 + i * 0.5, 1) for i in range(120)]
+        result = analyzer.analyze(samples, interval=30, expected_hours=1)
+        self.assertEqual(result["expected"], 120)
+        self.assertEqual(result["valid"], 1)
+        self.assertEqual(result["unique_valid_slots"], 1)
+        self.assertEqual(result["out_of_window_samples"], 120)
+        self.assertEqual(result["external_ssid_scans"], 1)
+        self.assertLess(result["coverage_percent"], 1)
+
+    def test_first_failed_poll_anchors_window_even_if_ssh_recovers_late(self):
+        first = row(0, 1, public_ping_ok=None)
+        later = [row(65 + i * 0.5, 1) for i in range(120)]
+        result = analyzer.analyze([first] + later, interval=30, expected_hours=1)
+        self.assertEqual(result["status"], "insufficient_samples")
+        self.assertEqual(result["coverage_percent"], 0)
+        self.assertEqual(result["out_of_window_samples"], 120)
+
+    def test_unordered_logs_are_sorted_before_outage_classification(self):
+        samples = [row(1, 1), row(0.5, 0), row(0, 1)]
+        result = analyzer.analyze(samples, interval=30, expected_hours=1)
+        self.assertEqual(result["valid"], 3)
+        self.assertEqual(len(result["outage_edges"]), 1)
+        self.assertEqual(result["disconnected_sample_gaps"], 0)
+
+    def test_bad_timestamp_does_not_crash_or_expand_coverage(self):
+        bad = row(0.5, 1)
+        bad["collected_at"] = "not-an-absolute-time"
+        result = analyzer.analyze([row(0, 1), bad], interval=30,
+                                  expected_hours=1)
+        self.assertEqual(result["valid"], 1)
+        self.assertEqual(result["invalid_timestamp_samples"], 1)
+        self.assertEqual(result["unique_valid_slots"], 1)
+
     def test_gap_recovery_must_not_invent_outage_edge(self):
         a=row(0,1); b=row(122,0); c=row(122.5,1)
         d=row(244.5,0)
