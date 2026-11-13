@@ -25,6 +25,24 @@ KEYS = {
 }
 INTEGER = KEYS - {"usb0_operstate"}
 INTPAT = re.compile(r"\d+\Z")
+# A successful SSH exit is not evidence that the core telemetry parsed.
+# A physically missing USB interface reports unknown carrier/operstate,
+# but its absence is itself important outage evidence, not a failed poll.
+BINARY_REQUIRED = ("usb0_ipv4", "lte_default_route", "public_ping_ok")
+
+
+def snapshot_valid(record):
+    return (len(record) >= 12
+            and type(record.get("epoch_s")) is int and record["epoch_s"] > 0
+            and type(record.get("uptime_s")) is int and record["uptime_s"] >= 0
+            and all(type(record.get(k)) is int and record[k] in (0, 1)
+                    for k in BINARY_REQUIRED)
+            and (record.get("usb0_carrier") in (0, 1)
+                 or (record.get("usb0_carrier") is None
+                     and record["usb0_ipv4"] == 0
+                     and record["lte_default_route"] == 0)))
+
+
 SSIDPAT = re.compile(r"^\s*SSID\s+\d+\s*:\s*(.*?)\s*$", re.MULTILINE)
 
 
@@ -73,7 +91,7 @@ def sample(host, key, known_hosts, source, ssid):
                             timeout=16, check=False)
         # Do not save stdout or stderr, even on error.
         record = parse_snapshot(cp.stdout) if cp.returncode == 0 else {}
-        status = "ok" if cp.returncode == 0 and len(record) >= 12 else "unavailable"
+        status = "ok" if cp.returncode == 0 and snapshot_valid(record) else "unavailable"
     except (OSError, subprocess.TimeoutExpired):
         record, status = {}, "unavailable"
     record.update({"collected_at": datetime.now(timezone.utc).isoformat(),
