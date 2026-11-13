@@ -1,6 +1,8 @@
 import importlib.util
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -26,6 +28,38 @@ class Tests(unittest.TestCase):
         out=monitor.parse_snapshot("epoch_s=42\nusb0_carrier=1\nssid=PRIVATE\nimei=SECRET\n"
                                    "usb0_operstate=up\n")
         self.assertEqual(out,{"epoch_s":42,"usb0_carrier":1,"usb0_operstate":"up"})
+    def test_successful_ssh_with_unparsed_metrics_is_not_valid_telemetry(self):
+        malformed="\n".join(f"{k}=?" for k in monitor.KEYS) + "\n"
+        with patch.object(monitor.subprocess, "run",
+                          return_value=SimpleNamespace(returncode=0, stdout=malformed)):
+            with patch.object(monitor, "scan_ssid", return_value=None):
+                result=monitor.sample("192.168.1.1", Path("unused"),
+                                      Path("unused"), "echo ignored", None)
+        self.assertEqual(result["collection_status"], "unavailable")
+        self.assertIsNone(result["public_ping_ok"])
+
+    def test_missing_usb_interface_is_a_valid_observation_not_missing_data(self):
+        data = {k: 0 for k in monitor.KEYS if k != "usb0_operstate"}
+        data.update(epoch_s=1794500000, uptime_s=1200,
+                    usb0_carrier=None, usb0_ipv4=0, lte_default_route=0,
+                    public_ping_ok=0, usb0_operstate="?")
+        self.assertTrue(monitor.snapshot_valid(data))
+        samples = [row(0, 1), row(0.5, 0, usb0_carrier=None,
+                 usb0_ipv4=0, lte_default_route=0)]
+        result = analyzer.analyze(samples, interval=30)
+        self.assertEqual(result["valid"], 2)
+        self.assertEqual(len(result["outage_edges"]), 1)
+        self.assertEqual(result["outage_edges"][0]["classification"],
+                         "lte_local_path_degraded")
+
+    def test_bad_telemetry_cannot_inflate_72h_coverage(self):
+        valid=row(0,1)
+        broken=[row(i*0.5,1,public_ping_ok=None) for i in range(1,120)]
+        result=analyzer.analyze([valid]+broken, interval=30, expected_hours=1)
+        self.assertEqual(result["valid"], 1)
+        self.assertEqual(result["unique_valid_slots"], 1)
+        self.assertLess(result["coverage_percent"], 2)
+
     def test_period_requires_multiple_cycles(self):
         s=[row(0,1),row(2,0),row(4,1),row(124,0),row(125,1),row(246,0)]
         self.assertTrue(analyzer.analyze(s,interval=3600)["122_minute_pattern_consistent"])

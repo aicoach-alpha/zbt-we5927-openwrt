@@ -16,7 +16,13 @@ def analyze(samples, interval=30, expected_hours=None):
     # expected only from first/last successful SSH polls hides entire outages.
     if interval < 1 or (expected_hours is not None and expected_hours <= 0):
         raise ValueError("invalid_window")
-    good = [s for s in samples if s.get("collection_status") == "ok"]
+    # Do not count a claimed "ok" JSONL line if decisive link/probe
+    # telemetry is absent, malformed, or a JSON boolean.
+    required = ("usb0_ipv4", "lte_default_route", "public_ping_ok")
+    good = [s for s in samples
+            if s.get("collection_status") == "ok"
+            and all(type(s.get(k)) is int and s[k] in (0, 1)
+                    for k in required)]
     if not good:
         return {"status": "insufficient_samples", "count": len(samples)}
     events = []
