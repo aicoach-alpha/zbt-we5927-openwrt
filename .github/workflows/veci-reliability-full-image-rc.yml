@@ -12,6 +12,8 @@ on:
       - 'source/we5927-lte/files/etc/init.d/we5927-lte'
       - 'source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte'
       - 'scripts/stage-veci-reliability-rc.sh'
+      - 'scripts/veci_release_evidence.py'
+      - 'scripts/tests/test_veci_release_evidence.py'
       - '.github/workflows/veci-reliability-full-image-rc.yml'
   workflow_dispatch:
     inputs:
@@ -158,6 +160,10 @@ jobs:
           echo "FLASH_PERMISSION=NO"
       - name: Generate validated non-flashable CI evidence
         shell: bash
+        env:
+          REVIEWED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          REVIEWED_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          EXPLICIT_UNSIGNED_EXPORT: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true }}
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/openwrt"
@@ -165,58 +171,18 @@ jobs:
           test "${#images[@]}" -eq 1
           image="${images[0]}"
           bytes="$(stat -c %s "$image")"
-          max=7995392
-          test "$bytes" -gt 0 && test "$bytes" -le "$max"
           sha="$(sha256sum "$image" | awk '{print $1}')"
           out="$RUNNER_TEMP/veci-rc1-evidence"
           mkdir -p "$out"
-          python3 - "$RUNNER_TEMP/veci-image-metadata.json" "$GITHUB_WORKSPACE/source/openwrt-source-commit.txt" "$out/release-gates.json" "$bytes" "$max" "$sha" "$GITHUB_SHA" <<'PY'
-          import json
-          import pathlib
-          import re
-          import sys
-
-          metadata_path, pin_path, output, size, maximum, sha, commit = sys.argv[1:]
-          meta = json.loads(pathlib.Path(metadata_path).read_text())
-          pin = pathlib.Path(pin_path).read_text().strip()
-          assert meta["version"]["target"] == "ramips/mt76x8", "wrong target"
-          assert meta["version"]["version"] == "25.12.5", "wrong release"
-          assert "zbtlink,zbt-we5927" in meta["supported_devices"], "wrong board"
-          assert re.fullmatch(r"[0-9a-f]{64}", sha), "invalid checksum"
-          assert re.fullmatch(r"[0-9a-f]{40}", pin), "invalid source pin"
-          assert 0 < int(size) <= int(maximum), "invalid NOR fit"
-          report = {
-              "schema": "veci.we5927.rc1.ci-evidence.v1",
-              "github_build_sha": commit,
-              "openwrt_source_sha": pin,
-              "board": "zbtlink,zbt-we5927",
-              "target": "ramips/mt76x8",
-              "openwrt_version": "25.12.5",
-              "image_sha256": sha,
-              "image_bytes": int(size),
-              "firmware_mtd_bytes": int(maximum),
-              "remaining_bytes": int(maximum) - int(size),
-              "checks": {
-                  "complete_source_build": "pass",
-                  "board_metadata": "pass",
-                  "image_partition_fit": "pass",
-                  "lte_and_guardian_source_installed": "pass",
-                  "builtin_veci_core_rpc_default_ui": "pass",
-                  "veci_web_cellular_sms_catalog_update_source": "pass",
-                  "guest_voucher_optional_not_bundled": "pass",
-                  "luci_fallback_retained": "pass",
-                  "release_signing_and_trust_anchor": "not_verified",
-                  "existing_veci_spa_parity": "not_verified",
-                  "physical_router_uat": "not_run",
-                  "rollback_recovery": "not_verified",
-                  "long_window_72h": "not_run"
-              },
-              "flash_permission": False,
-              "firmware_binary_uploaded": False,
-          }
-          pathlib.Path(output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
-          print("NONFLASHABLE_CI_EVIDENCE=PASS")
-          PY
+          python3 "$GITHUB_WORKSPACE/scripts/veci_release_evidence.py" \
+            --metadata "$RUNNER_TEMP/veci-image-metadata.json" \
+            --pin "$GITHUB_WORKSPACE/source/openwrt-source-commit.txt" \
+            --out "$out/release-gates.json" --size "$bytes" \
+            --max-size 7995392 --sha "$sha" \
+            --build-sha "$GITHUB_SHA" --reviewed-head "$REVIEWED_HEAD_SHA" \
+            --reviewed-base "$REVIEWED_BASE_SHA" --event "$GITHUB_EVENT_NAME" \
+            --repo "$GITHUB_WORKSPACE" --ref "$GITHUB_REF" \
+            --requested-unsigned-export "$EXPLICIT_UNSIGNED_EXPORT"
       - name: Upload non-flashable CI evidence
         uses: actions/upload-artifact@v4
         with:

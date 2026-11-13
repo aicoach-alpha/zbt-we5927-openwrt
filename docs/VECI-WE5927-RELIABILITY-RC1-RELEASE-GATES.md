@@ -107,3 +107,27 @@ Do not auto-install optional apps on a clean router.
 Production signature, sysupgrade -T, currently installed custom service
 overlays, rollback, and hardware UAT remain independent gates. Only the
 full signed image after real checks may be described as flash-ready.
+
+
+## 2026-11-13 13:28+07 — successful latest-head build and provenance correction
+
+GitHub Actions run 43367049750 **PASS** (PR #16 head
+`3dd5a2b032300a4fd098c7839103757a66022cd2`), artifact
+`veci-we5927-rc1-build-evidence` records a 5,898,530-byte unsigned
+CI image, SHA-256
+`ed588e931540ac61ce2f317791318b3cd7be0f1111cc06979058ef02031f1a87`.
+Firmware partition limit 7,995,392 bytes; headroom 2,096,862 bytes.
+MT7603 exact-source cross-build run 43367049486 **PASS**. The build
+published JSON evidence only; there is no usable signed production image.
+
+**Important:** pull-request builds use GitHub's synthetic merge checkout
+(`GITHUB_SHA`), which can differ from the reviewed PR head commit.
+Historical v1 evidence has `github_build_sha=d38bf6470d5994ad8fda95dc2eb1d42acf25808d`,
+not the actual source-branch head `3dd5a2b...`. It is not evidence
+of source mismatch by itself. The v2 generator now records both SHAs
+and verifies the synthetic merge commit has exactly the reviewed base
+and head as parents. For workflow_dispatch it requires the checked-out
+SHA to equal the reviewed source, and only the RC branch may request
+unsigned export. This is a **CI provenance improvement**, not signing,
+device testing, or authorization to flash. Keep NO-GO until all hard
+release gates are independently satisfied.
