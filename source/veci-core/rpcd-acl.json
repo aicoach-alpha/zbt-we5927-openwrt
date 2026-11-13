@@ -1,0 +1,54 @@
+{
+	"veci": {
+		"description": "VeCI OpenWrt administration access",
+		"read": {
+			"ubus": {
+				"system": ["board", "info"],
+				"network.interface": ["dump"],
+				"network.interface.*": ["status"],
+				"network.wireless": ["status"],
+				"uci": ["get"],
+				"veci": [
+					"capabilities",
+					"clients",
+					"networkInventory",
+					"health",
+					"internetStatus",
+					"updateStatus",
+					"apps",
+					"securityStatus",
+					"logs",
+					"diagnostic",
+					"firmwareStatus",
+					"firmwareRemoteCheck"
+				],
+				"veci.cellular": ["status"],
+				"veci.app.*": ["status", "clients"]
+			},
+			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
+		},
+		"write": {
+			"ubus": {
+				"system": ["reboot"],
+				"network.interface.*": ["up", "down"],
+				"uci": ["set", "add", "delete", "commit"],
+				"veci": [
+					"appAction",
+					"serviceAction",
+					"wifiReload",
+					"setAdminPassword",
+					"firmwareUploadStart",
+					"firmwareUploadChunk",
+					"firmwareUploadFinish",
+					"firmwareValidate",
+					"firmwareRemoteDownload",
+					"firmwarePolicySave",
+					"firmwareApply"
+				],
+				"veci.cellular": ["reconnect", "switchSim"],
+				"veci.app.*": ["save", "action", "create", "createBatch", "revoke", "cleanup", "disconnect"]
+			},
+			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
+		}
+	}
+}

@@ -1,0 +1,94 @@
+#!/bin/sh
+# WE5927 one-shot SMS Submit. Called only from authenticated veci.sms.sendMessage.
+# Must not be invoked automatically. Never log PDU, destination, or content.
+set -eu
+umask 077
+LC_ALL=C; export LC_ALL
+fail(){ printf '{"ok":false,"reason":"send_unavailable"}\n';exit 1; }
+# This parser runs only AFTER the one-shot CMGS invocation. If the transport
+# exited abnormally or returned an unfamiliar receipt, the outcome is unknown:
+# the SMS may already have been accepted, so never suggest a blind retry.
+normalize_cmgs_result() {
+  transport_rc="$1"
+  candidate="$2"
+  case "$candidate" in
+    '{"ok":true,"status":"accepted_by_modem"}')
+      if [ "$transport_rc" -eq 0 ]; then
+        printf '%s\n' '{"ok":true,"status":"accepted_by_modem"}'
+        return 0
+      fi ;;
+    '{"ok":true,"status":"accepted_by_modem","mr":'*',"report_requested":true}')
+      # A modem message reference is NOT evidence of recipient delivery.
+      # Preserve accepted status but intentionally omit MR (not in current UI).
+      if [ "$transport_rc" -eq 0 ]; then
+        mr="${candidate#'{"ok":true,"status":"accepted_by_modem","mr":'}"
+        mr="${mr%',"report_requested":true}'}"
+        case "$mr" in
+          ''|*[!0-9]*) ;;
+          *)
+            if [ "${#mr}" -le 3 ] && [ "$mr" -le 255 ] 2>/dev/null; then
+              printf '%s\n' '{"ok":true,"status":"accepted_by_modem"}'
+              return 0
+            fi ;;
+        esac
+      fi ;;
+    '{"ok":false,"reason":"network_rejected"}'|\
+    '{"ok":false,"reason":"outcome_unknown"}'|\
+    '{"ok":false,"reason":"prompt_unavailable"}')
+      printf '%s\n' "$candidate"
+      return 0 ;;
+  esac
+  printf '%s\n' '{"ok":false,"reason":"outcome_unknown"}'
+}
+
+[ "$#" -eq 0 ] || fail
+[ "$(id -u)" -eq 0 ] || fail
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail
+[ -x /usr/libexec/veci-sms-cmgs ] && [ -x /usr/sbin/we5927-at ] || fail
+[ -f /etc/config/veci_sms ] && [ ! -L /etc/config/veci_sms ] || fail
+[ "$(uci -q get veci_sms.main.enabled 2>/dev/null || :)" = 1 ] || fail
+command -v flock >/dev/null 2>&1 || fail
+# Uppercase hex, no CR/LF AT injection, max single-part TPDU.
+pdu="$(head -c 385)" || fail
+length="$(printf %s "$pdu"|wc -c)" || fail
+[ "$length" -ge 22 ] && [ "$length" -le 384 ] && [ "$((length % 2))" -eq 0 ] || fail
+case "$pdu" in *[!0-9A-F]*)fail;;esac
+(
+  flock -n -x 9 || fail
+  [ "$(uci -q get veci_sms.main.enabled 2>/dev/null || :)" = 1 ] || fail
+  [ -c /dev/ttyUSB2 ] || fail
+  target="$(readlink -f /sys/class/tty/ttyUSB2/device 2>/dev/null || :)"
+  case "$target" in /sys/devices/*:1.4/ttyUSB2);;*)fail;;esac
+  parent="$(dirname "$(dirname "$target")")"
+  [ "$(cat "$parent/idVendor" 2>/dev/null || :)" = 05c6 ] || fail
+  [ "$(cat "$parent/idProduct" 2>/dev/null || :)" = 902e ] || fail
+  # Preserve original modem SMS mode; use PDU only during this transaction.
+  mode="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF?' 1600 2>/dev/null)" || fail
+  old_mode="$(printf '%s\n' "$mode" | awk '
+    {gsub(/\r/,"",$0);if($0=="")next}
+    /^\+CMGF:[ ]*[01][ ]*$/ {gsub(/ /,"",$0);v=substr($0,length($0)); seen++;next}
+    $0=="OK"&&seen==1 {done=1;next}
+    $0=="AT+CMGF?" {next}
+    {bad=1}
+    END{if(done&&!bad&&seen==1)print v;else exit 1}
+  ')" || fail
+  unset mode
+  switched=0
+  if [ "$old_mode" = 1 ]; then
+    /usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF=0' 2500 >/dev/null 2>&1 || fail
+    switched=1
+  fi
+  # Restoration is best effort even when the CMGS response is uncertain.
+  # Never repeat or retry a potentially transmitted SMS.
+  trap 'if [ "$switched" = 1 ]; then
+    /usr/sbin/we5927-at /dev/ttyUSB2 "AT+CMGF=1" 2500 >/dev/null 2>&1 || :
+  fi' EXIT
+
+  # CMGS transaction holds the lock until the final modem disposition.
+  # A timeout after Ctrl-Z means unknown, not safe to auto-retry.
+  transport_rc=0
+  result="$(printf '%s\n' "$pdu" | /usr/libexec/veci-sms-cmgs /dev/ttyUSB2 2>/dev/null)" ||
+    transport_rc=$?
+  normalize_cmgs_result "$transport_rc" "$result"
+  unset pdu result
+) 9>/var/lock/we5927-at.lock

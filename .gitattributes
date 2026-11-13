@@ -1,0 +1,2 @@
+# Preserve byte-for-byte deployed VeCI code; imported live whitespace is intentional.
+source/veci-core/veci/js/pages/cellular.js whitespace=-blank-at-eol

@@ -1,0 +1,89 @@
+name: WE5927 MT7603 exact-source cross-build
+
+on:
+  push:
+    paths:
+      - 'source/mt76-patches/**'
+      - 'source/openwrt-we5927.config'
+      - 'scripts/stage-mt7603-deadlock-fix.sh'
+      - '.github/workflows/veci-mt7603-crossbuild.yml'
+  pull_request:
+    paths:
+      - 'source/mt76-patches/**'
+      - 'source/openwrt-we5927.config'
+      - 'scripts/stage-mt7603-deadlock-fix.sh'
+      - '.github/workflows/veci-mt7603-crossbuild.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mt7603-crossbuild-${{ github.ref }}
+  # Never abort an expensive OpenWrt compile when a follow-up PR commit arrives.
+  # Newer runs may queue; release evidence is always tied to its exact build SHA.
+  cancel-in-progress: false
+
+jobs:
+  kernel-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenWrt build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential clang bison flex gawk gettext git gcc-multilib \
+            libncurses-dev libssl-dev rsync subversion swig unzip wget \
+            zlib1g-dev python3 python3-setuptools file xz-utils zstd
+      - name: Fetch exact historical OpenWrt 25.12.5 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt"
+          mkdir -p "$root"
+          git -C "$root" init -q
+          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git f0a60eee2fe051741c643ea6118718aae1ef17fb
+          git -C "$root" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$root" rev-parse HEAD)" = "$(cat source/openwrt-source-commit.txt)"
+          echo "OPENWRT_SOURCE_COMMIT=VERIFIED"
+      - name: Apply board source patch and staged MT7603 fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt"
+          git -C "$root" apply --check "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          sh scripts/stage-mt7603-deadlock-fix.sh "$root"
+          cp source/openwrt-we5927.config "$root/.config"
+          grep -Fq 'CONFIG_TARGET_ramips_mt76x8_DEVICE_zbtlink_zbt-we5927=y' "$root/.config"
+          grep -Fq '950-mt7603-defer-watchdog-on-channel-failure' <(find "$root/package/kernel/mt76/patches" -type f -printf '%f\n')
+          echo "BOARD_PATCH_AND_MT7603_STAGE=PASS"
+      - name: Build pinned MT7603 kernel package, not a flashable image
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/openwrt"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+          # Targeted package builds do not bootstrap host tools automatically.
+          make -j2 V=sc tools/install
+          make -j2 V=sc toolchain/install
+          # target/linux/prepare alone does not generate linux-6.12.94/.config.
+          # gpio-button-hotplug is a dependency of targeted mt76 compilation.
+          make -j2 V=s target/linux/compile
+          kernel_config="$(find build_dir/target-* -path '*/linux-6.12.94/.config' -type f -print -quit)"
+          test -n "$kernel_config" && test -s "$kernel_config"
+          echo "KERNEL_CONFIG_READY=$kernel_config"
+          make -j2 V=s package/kernel/mt76/compile
+          ko="$(find build_dir -type f -name 'mt7603e.ko' -print -quit)"
+          test -n "$ko" && test -s "$ko"
+          file "$ko"
+          sha256sum "$ko"
+          echo "MT7603_CROSSBUILD=COMPILED_NOT_HARDWARE_TESTED"
+      - name: Build scope notice
+        if: always()
+        run: |
+          echo 'No image or kmod artifacts uploaded. Never flash a kernel from a mismatched build.'
+          echo 'This job validates buildability only; it is not device/UAT acceptance.'

@@ -1,0 +1,242 @@
+name: VeCI WE5927 full firmware RC size and integration gate
+
+on:
+  pull_request:
+    paths:
+      - 'source/openwrt-we5927.config'
+      - 'source/openwrt-source-commit.txt'
+      - 'source/openwrt-zbt-we5927-current.patch'
+      - 'source/mt76-patches/**'
+      - 'source/veci-wifi-guardian/**'
+      - 'source/we5927-lte/files/usr/sbin/we5927-lte'
+      - 'source/we5927-lte/files/etc/init.d/we5927-lte'
+      - 'source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte'
+      - 'scripts/stage-veci-reliability-rc.sh'
+      - 'scripts/veci_release_evidence.py'
+      - 'scripts/tests/test_veci_release_evidence.py'
+      - '.github/workflows/veci-reliability-full-image-rc.yml'
+  workflow_dispatch:
+    inputs:
+      export_unsigned_candidate:
+        description: "Explicitly export UNSIGNED evidence-only image (NOT FLASH APPROVED)"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+concurrency:
+  group: veci-we5927-rc-${{ github.ref }}
+  # Never abort an expensive OpenWrt compile when a follow-up PR commit arrives.
+  # Newer runs may queue; release evidence is always tied to its exact build SHA.
+  cancel-in-progress: false
+
+jobs:
+  full-image-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build environment
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential clang bison flex gawk gettext git gcc-multilib \
+            libncurses-dev libssl-dev rsync subversion swig unzip wget \
+            zlib1g-dev python3 python3-setuptools file xz-utils zstd
+      - name: Pin OpenWrt and integrate exact-board reliability sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt"
+          mkdir -p "$root"
+          git -C "$root" init -q
+          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git f0a60eee2fe051741c643ea6118718aae1ef17fb
+          git -C "$root" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$root" rev-parse HEAD)" = "$(cat source/openwrt-source-commit.txt)"
+          git -C "$root" apply --check "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          sh scripts/stage-veci-reliability-rc.sh "$root"
+          cp source/openwrt-we5927.config "$root/.config"
+          # Guardian must be built-in, not downloaded later to a nearly full 8 MB NOR.
+          printf '\nCONFIG_PACKAGE_veci-wifi-guardian=y\nCONFIG_PACKAGE_veci=y\nCONFIG_PACKAGE_veci-default-ui=y\nCONFIG_PACKAGE_veci-cellular-we5927=y\nCONFIG_PACKAGE_veci-app-catalog-we5927=y\nCONFIG_PACKAGE_veci-update-we5927=y\n' >> "$root/.config"
+          grep -Fxq 'CONFIG_TARGET_ramips_mt76x8_DEVICE_zbtlink_zbt-we5927=y' "$root/.config"
+          grep -Fxq 'CONFIG_TARGET_ROOTFS_SQUASHFS=y' "$root/.config"
+          echo 'RELIABILITY_RELEASE_TREE_STAGED=PASS'
+      - name: Build complete firmware against pinned package ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/openwrt"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+          grep -Fxq 'CONFIG_PACKAGE_veci-wifi-guardian=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci-default-ui=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci-cellular-we5927=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci-update-we5927=y' .config
+          ! grep -Fxq 'CONFIG_PACKAGE_veci-app-guest=y' .config
+          ! grep -Fxq 'CONFIG_PACKAGE_veci-app-voucher=y' .config
+          make -j2 V=s tools/install
+          make -j2 V=s toolchain/install
+          make -j2 V=s
+          echo 'WE5927_COMPLETE_IMAGE_BUILT_NOT_DEPLOYABLE=PASS'
+      - name: Check image NOR size, board metadata, installed LTE and guardian
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/openwrt"
+          mapfile -t images < <(find bin/targets/ramips/mt76x8 -maxdepth 1 -type f -name '*zbt*we5927*sysupgrade.bin' -print)
+          test "${#images[@]}" -eq 1
+          image="${images[0]}"
+          bytes="$(stat -c %s "$image")"
+          # 0x7a0000 = actual tested hardware's firmware MTD partition length.
+          max=7995392
+          test "$bytes" -le "$max" || {
+            echo "IMAGE_OVERSIZE bytes=$bytes limit=$max" >&2
+            exit 1
+          }
+          # Resolve HOST-architecture fwtool explicitly. A generic 'find'
+          # picked staging_dir/target-mipsel_24kc_musl/root-ramips/usr/bin/fwtool
+          # in run 43153710850 and failed with Exec format error (126).
+          fwtool="$PWD/staging_dir/host/bin/fwtool"
+          test -f "$fwtool" && test -x "$fwtool" || {
+            echo "HOST_FWTOOL_MISSING=$fwtool" >&2
+            exit 1
+          }
+          file "$fwtool"
+          printf 'image_bytes=%s\\nfirmware_mtd_bytes=%s\\n' "$bytes" "$max"
+          meta="$RUNNER_TEMP/veci-image-metadata.json"
+          "$fwtool" -i "$meta" "$image"
+          test -s "$meta"
+          grep -Fq 'zbtlink,zbt-we5927' "$meta"
+          rootfs="$(find build_dir -path '*/root-ramips/usr/sbin/we5927-lte' -type f -print -quit)"
+          test -n "$rootfs"
+          cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/usr/sbin/we5927-lte" "$rootfs"
+          rdir="${rootfs%/usr/sbin/we5927-lte}"
+          test -x "$rdir/usr/sbin/veci-wifi-guardian"
+          grep -Fq 'auto_recover=0' "$rdir/usr/sbin/veci-wifi-guardian"
+          cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/etc/init.d/we5927-lte" "$rdir/etc/init.d/we5927-lte"
+          cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte" "$rdir/etc/hotplug.d/usb/30-we5927-lte"
+          # Static VeCI core, authenticated RPC and HTTPS/default-UI components
+          # must be PRESENT in the firmware itself (not only overlay config).
+          test -s "$rdir/www/veci/index.html"
+          cmp "$GITHUB_WORKSPACE/source/veci-core/veci/index.html" "$rdir/www/veci/index.html"
+          test -x "$rdir/usr/libexec/rpcd/veci"
+          cmp "$GITHUB_WORKSPACE/source/veci-core/files/rpcd-veci" "$rdir/usr/libexec/rpcd/veci"
+          cmp "$GITHUB_WORKSPACE/source/veci-core/rpcd-acl.json" "$rdir/usr/share/rpcd/acl.d/veci.json"
+          test -x "$rdir/usr/sbin/veci-default-ui"
+          cmp "$GITHUB_WORKSPACE/source/veci-default-ui/files/usr/sbin/veci-default-ui" "$rdir/usr/sbin/veci-default-ui"
+          test -x "$rdir/etc/uci-defaults/97-veci-https-defaults"
+          test -x "$rdir/etc/uci-defaults/98-veci-default-ui"
+          test -e "$rdir/www/cgi-bin/luci" || test -L "$rdir/www/cgi-bin/luci"
+          # Check each file in live-audited VeCI source, not just index.html.
+          while IFS= read -r -d '' f; do
+            rel="$(printf '%s\n' "$f" | sed "s|^$GITHUB_WORKSPACE/source/veci-core/veci/||")"
+            cmp "$f" "$rdir/www/veci/$rel"
+          done < <(find "$GITHUB_WORKSPACE/source/veci-core/veci" -type f -print0)
+          for pair in             'veci-cellular-we5927/files/usr/libexec/rpcd/veci.cellular usr/libexec/rpcd/veci.cellular'             'veci-cellular-we5927/files/usr/libexec/rpcd/veci.sms usr/libexec/rpcd/veci.sms'             'veci-app-catalog-we5927/files/usr/libexec/rpcd/veci.apps usr/libexec/rpcd/veci.apps'             'veci-update-we5927/files/usr/sbin/veci-update-agent usr/sbin/veci-update-agent'; do
+            src="$(printf '%s\n' "$pair" | cut -d' ' -f1)"
+            dest="$(printf '%s\n' "$pair" | cut -d' ' -f2)"
+            cmp "$GITHUB_WORKSPACE/source/$src" "$rdir/$dest"
+          done
+          for optional in veci.app.guest veci.app.voucher; do
+            test ! -e "$rdir/usr/libexec/rpcd/$optional"
+          done
+          test -x "$rdir/usr/libexec/veci-sms-cmgs"
+          test -x "$rdir/etc/init.d/veci-update-agent"
+          test -s "$rdir/usr/share/veci/apps/guest.json"
+          test -s "$rdir/usr/share/veci/apps/voucher.json"
+          echo "VECI_WEB_CELLULAR_SMS_APPS_OTA_PARITY_SOURCE=PASS"
+          echo "OPTIONAL_GUEST_VOUCHER_NOT_BUNDLED=PASS"
+          echo "BUILTIN_VECI_CORE_RPC_HTTPS_LUCI_FALLBACK=PASS"
+          echo "LIVE_VECI_PARITY=NOT_VERIFIED"
+          echo "LTE_COLD_BOOT_SCRIPTS_INSTALLED=PASS"
+          printf 'image_bytes=%s\nfirmware_mtd_bytes=%s\n' "$bytes" "$max"
+          sha256sum "$image"
+          echo "IMAGE_SIZE_BOARD_METADATA_LTE_GUARDIAN=PASS"
+          echo "FLASH_PERMISSION=NO"
+      - name: Generate validated non-flashable CI evidence
+        shell: bash
+        env:
+          REVIEWED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          REVIEWED_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          EXPLICIT_UNSIGNED_EXPORT: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/openwrt"
+          mapfile -t images < <(find bin/targets/ramips/mt76x8 -maxdepth 1 -type f -name '*zbt*we5927*sysupgrade.bin' -print)
+          test "${#images[@]}" -eq 1
+          image="${images[0]}"
+          bytes="$(stat -c %s "$image")"
+          sha="$(sha256sum "$image" | awk '{print $1}')"
+          out="$RUNNER_TEMP/veci-rc1-evidence"
+          mkdir -p "$out"
+          python3 "$GITHUB_WORKSPACE/scripts/veci_release_evidence.py" \
+            --metadata "$RUNNER_TEMP/veci-image-metadata.json" \
+            --pin "$GITHUB_WORKSPACE/source/openwrt-source-commit.txt" \
+            --out "$out/release-gates.json" --size "$bytes" \
+            --max-size 7995392 --sha "$sha" \
+            --build-sha "$GITHUB_SHA" --reviewed-head "$REVIEWED_HEAD_SHA" \
+            --reviewed-base "$REVIEWED_BASE_SHA" --event "$GITHUB_EVENT_NAME" \
+            --repo "$GITHUB_WORKSPACE" --ref "$GITHUB_REF" \
+            --requested-unsigned-export "$EXPLICIT_UNSIGNED_EXPORT"
+      - name: Upload non-flashable CI evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-we5927-rc1-build-evidence
+          path: ${{ runner.temp }}/veci-rc1-evidence/release-gates.json
+          if-no-files-found: error
+          retention-days: 14
+      # Only an explicit manual run at the reviewed RC source ref can export
+      # the unsigned binary. PR CI continues to publish ONLY JSON evidence.
+      # Artifact possession is NOT authorization to flash a production router.
+      - name: Export unsigned firmware candidate for offline signature review
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/integration/veci-reliability-rc1-20261112' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/openwrt/bin/targets/ramips/mt76x8"
+          mapfile -t images < <(find "$dir" -maxdepth 1 -type f -name '*zbt*we5927*sysupgrade.bin' -print)
+          test "${#images[@]}" -eq 1
+          image="${images[0]}"
+          evidence="$RUNNER_TEMP/veci-rc1-evidence/release-gates.json"
+          python3 - "$image" "$evidence" "$GITHUB_SHA" <<'PYEXPORT'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+          image = pathlib.Path(sys.argv[1])
+          evidence = pathlib.Path(sys.argv[2])
+          commit = sys.argv[3]
+          report = json.loads(evidence.read_text())
+          digest = hashlib.sha256(image.read_bytes()).hexdigest()
+          assert report['github_build_sha'] == commit
+          assert report['image_sha256'] == digest
+          assert report['image_bytes'] == image.stat().st_size
+          assert report['board'] == 'zbtlink,zbt-we5927'
+          assert report['flash_permission'] is False
+          assert report['checks']['release_signing_and_trust_anchor'] == 'not_verified'
+          print('CANDIDATE_BINARY_DIGEST_MATCH=PASS')
+          PYEXPORT
+          { echo 'UNSIGNED IMAGE. NOT APPROVED FOR FLASH.'; echo "Release source commit: $GITHUB_SHA"; echo 'Offline trust, SPA parity, router UAT and recovery gates remain open.'; } > "$dir/UNSIGNED_DO_NOT_FLASH.txt"
+          cp "$evidence" "$dir/CI_BUILD_EVIDENCE.json"
+      - name: Upload explicitly requested UNSIGNED candidate (NOT FLASH APPROVED)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/integration/veci-reliability-rc1-20261112' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-we5927-RC1-UNSIGNED-DO-NOT-FLASH-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/openwrt/bin/targets/ramips/mt76x8/*zbt*we5927*sysupgrade.bin
+            ${{ runner.temp }}/openwrt/bin/targets/ramips/mt76x8/UNSIGNED_DO_NOT_FLASH.txt
+            ${{ runner.temp }}/openwrt/bin/targets/ramips/mt76x8/CI_BUILD_EVIDENCE.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Produce non-deployable candidate evidence only
+        if: always()
+        run: |
+          echo '### WE5927 reliability RC source build' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Source and system-image checks do NOT verify image signing, installed VeCI SPA, rollback, modem/SMS functionality, Wi-Fi beacon visibility, UAT, or 72h LTE availability.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Do not flash from CI. No firmware image artifact uploaded. LuCI is intentionally retained until VeCI full parity is physically verified.' >> "$GITHUB_STEP_SUMMARY"

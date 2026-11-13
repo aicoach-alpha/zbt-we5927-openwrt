@@ -1,0 +1,30 @@
+From: David Bauer <mail@david-bauer.net>
+Subject: [PATCH] wifi: mt76: mt7603: free beacon SKB on error
+
+Backport from upstream Linux commit 965cbdbdfbd37a659a05ff88e49c216975bd9d2e.
+Patch is already accepted upstream; the pinned mt76 source predates it.
+Only free the beacon skb on the two FQCR0 poll failures; success path
+still transfers ownership to the driver TX queue.
+
+This is a memory leak fix, not a proved fix for invisible SSID.
+Target mt76 source commit: 39c960c3ada558b4c2e7915772483d3731573d09
+Upstream: https://git.kernel.org/linus/965cbdbdfbd37a659a05ff88e49c216975bd9d2e
+
+--- a/mt7603/beacon.c
++++ b/mt7603/beacon.c
+@@ -56,6 +56,7 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
+ 		FIELD_PREP(MT_DMA_FQCR0_TARGET_QID, MT_TX_HW_QUEUE_BCN));
+ 	if (!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000)) {
+ 		dev->beacon_check = MT7603_WATCHDOG_TIMEOUT;
++		dev_kfree_skb(skb);
+ 		goto out;
+ 	}
+ 
+@@ -63,6 +64,7 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
+ 		FIELD_PREP(MT_DMA_FQCR0_TARGET_QID, MT_TX_HW_QUEUE_BMC));
+ 	if (!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000)) {
+ 		dev->beacon_check = MT7603_WATCHDOG_TIMEOUT;
++		dev_kfree_skb(skb);
+ 		goto out;
+ 	}
+ 

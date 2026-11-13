@@ -1,0 +1,108 @@
+name: VeCI WE5927 RC1 offline release regression
+
+on:
+  push:
+    branches:
+      - integration/veci-reliability-rc1-20261112
+    paths:
+      - 'scripts/**'
+      - 'source/**'
+      - 'files/usr/sbin/we5927-lte'
+      - '.github/workflows/veci-rc1-offline-regression.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'source/**'
+      - 'files/usr/sbin/we5927-lte'
+      - '.github/workflows/veci-rc1-offline-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veci-rc1-offline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  subsystem-regression:
+    name: ${{ matrix.subsystem }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - subsystem: lte-recovery
+            test: test_lte_recovery_guard.py
+          - subsystem: lte-coldboot-and-sms-lock
+            test: test_lte_coldboot_phase.py
+          - subsystem: wifi-guardian
+            test: test_wifi_guardian_observe_only.py
+          - subsystem: guest-portal
+            test: test_guest_startup_guard.py
+          - subsystem: ethernet-external-ssid
+            test: test_mt7603_wired_snapshot.py
+          - subsystem: lte-wifi-72h-analyzer
+            test: test_veci_link_monitor.py
+          - subsystem: fwtool-selection
+            test: test_veci_host_fwtool_selection.py
+          - subsystem: sms-cmgs-uncertain-outcome
+            test: test_veci_sms_cmgs_result.py
+          - subsystem: release-provenance
+            test: test_veci_release_evidence.py
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run isolated offline regression
+        id: offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-evidence
+          python3 -m unittest discover -s scripts/tests -p '${{ matrix.test }}' -v \
+            2>&1 | tee "test-evidence/${{ matrix.subsystem }}.log"
+      - name: Preserve success and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-rc1-offline-${{ matrix.subsystem }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
+  safety-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell, Python, source mirrors and non-destructive collectors
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh -n scripts/stage-veci-reliability-rc.sh
+          sh -n scripts/stage-mt7603-deadlock-fix.sh
+          sh -n scripts/stage-veci-wifi-guardian.sh
+          sh -n scripts/reconcile-we5927-lte-build-tree.sh
+          sh -n scripts/veci-link-readonly-snapshot.sh
+          sh -n files/usr/sbin/we5927-lte
+          sh -n source/we5927-lte/files/usr/sbin/we5927-lte
+          sh -n source/we5927-lte/files/etc/init.d/we5927-lte
+          sh -n source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte
+          sh -n source/veci-guest/veci.app.guest
+          sh -n source/veci-cellular-we5927/files/usr/libexec/veci-sms-send-one
+          python3 -m py_compile scripts/veci-link-wired-monitor.py scripts/veci-link-analyze.py scripts/uat/mt7603_wired_snapshot.py scripts/veci_wifi_scan.py
+          python3 -m py_compile scripts/veci_release_evidence.py
+          cmp files/usr/sbin/we5927-lte source/we5927-lte/files/usr/sbin/we5927-lte
+          if sed '/^[[:space:]]*#/d' scripts/veci-link-readonly-snapshot.sh |
+            grep -En '(^|[[:space:]])(ifup|ifdown|sysupgrade|reboot|uci[[:space:]]+(set|commit)|wifi[[:space:]]+(reload|up|down))([[:space:]]|$)'; then
+            echo 'FAIL: disruptive command in read-only collector'
+            exit 1
+          fi
+          git diff --check
+          echo 'OFFLINE_SOURCE_SAFETY=PASS'
+      - name: Explicitly forbid automatic flashing
+        run: |
+          echo 'CI_IS_NOT_HARDWARE_UAT=TRUE'
+          echo 'RELEASE_SIGNING=NOT_VERIFIED'
+          echo 'ROUTER_72H_STABILITY=PENDING'
+          echo 'FLASH_PERMISSION=NO'

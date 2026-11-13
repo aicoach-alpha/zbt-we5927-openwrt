@@ -1,0 +1,1220 @@
+#!/bin/sh
+
+clean_token() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9._:-'
+}
+
+clean_text() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9 ._:/()%+-'
+}
+
+json_bool_file() {
+	[ -e "$1" ] && printf true || printf false
+}
+
+method_capabilities() {
+	opennds=$(json_bool_file /etc/config/opennds)
+	sqm=$(json_bool_file /etc/config/sqm)
+	ddns=$(json_bool_file /etc/config/ddns)
+	if command -v wg >/dev/null 2>&1 || grep -qs "option proto 'wireguard'" /etc/config/network; then
+		wireguard=true
+	else
+		wireguard=false
+	fi
+	if ubus list 2>/dev/null | grep -qx 'veci.voucher'; then
+		voucher=true
+	else
+		voucher=false
+	fi
+	if ubus list 2>/dev/null | grep -qx 'veci.cellular'; then
+		cellular=true
+	else
+		cellular=false
+	fi
+	printf '{ "opennds": %s, "sqm": %s, "ddns": %s, "wireguard": %s, "voucher": %s, "cellular": %s }\\n' \
+		"$opennds" "$sqm" "$ddns" "$wireguard" "$voucher" "$cellular"
+}
+
+method_clients() {
+	now=$(date +%s)
+	items=''
+	if [ -f /tmp/dhcp.leases ]; then
+		while read -r expiry mac ip host _; do
+			mac=$(clean_token "$mac")
+			ip=$(clean_token "$ip")
+			host=$(clean_token "$host")
+			[ -n "$ip" ] || continue
+			[ "$host" = "*" ] && host=''
+			if [ "$expiry" -gt 0 ] 2>/dev/null; then
+				remaining=$((expiry - now))
+				[ "$remaining" -lt 0 ] && remaining=0
+			else
+				remaining=0
+			fi
+			item="{ \"expires\": $remaining, \"macaddr\": \"$mac\", \"ipaddr\": \"$ip\", \"hostname\": \"$host\" }"
+			items="${items:+$items, }$item"
+		done < /tmp/dhcp.leases
+	fi
+	printf '{ "clients": [ %s ] }\n' "$items"
+}
+
+method_network_inventory() {
+	bridges=''
+	ports=''
+
+	for path in /sys/class/net/*; do
+		[ -e "$path" ] || continue
+		name=$(clean_token "${path##*/}")
+		[ -n "$name" ] || continue
+
+		if [ -d "$path/bridge" ]; then
+			members=''
+			for member_path in "$path/brif/"*; do
+				[ -e "$member_path" ] || continue
+				member=$(clean_token "${member_path##*/}")
+				[ -n "$member" ] || continue
+				members="${members:+$members, }\"$member\""
+			done
+			bridge="{ \"name\": \"$name\", \"members\": [ $members ] }"
+			bridges="${bridges:+$bridges, }$bridge"
+			continue
+		fi
+
+		[ "$name" = "lo" ] && continue
+		[ -e "$path/phy80211" ] && continue
+		[ -e "$path/device" ] || continue
+		ports="${ports:+$ports, }\"$name\""
+	done
+
+	printf '{ "bridges": [ %s ], "ports": [ %s ] }\n' "$bridges" "$ports"
+}
+
+method_health() {
+	overlay='unavailable'
+	if command -v df >/dev/null 2>&1; then
+		overlay=$(df -h /overlay 2>/dev/null | awk 'NR==2 { printf "%s used / %s total (%s)", $3, $2, $5 }')
+		[ -n "$overlay" ] || overlay='unavailable'
+	fi
+	overlay=$(clean_text "$overlay")
+	printf '{ "overlay": "%s" }\n' "$overlay"
+}
+
+method_internet_status() {
+	cache=/tmp/veci-internet-status
+	now=$(date +%s)
+
+	if [ -r "$cache" ]; then
+		read -r stamp state target < "$cache" || true
+		case "$stamp" in
+			*[!0-9]*|'') ;;
+			*)
+				age=$((now - stamp))
+				if [ "$age" -ge 0 ] && [ "$age" -lt 10 ]; then
+					case "$state" in
+						reachable) printf '{ "status": "reachable", "reachable": true, "probe": "icmp", "target": "%s", "cached": true }\n' "$target"; return ;;
+						unreachable) printf '{ "status": "unreachable", "reachable": false, "probe": "icmp", "cached": true }\n'; return ;;
+					esac
+				fi
+				;;
+		esac
+	fi
+
+	command -v ping >/dev/null 2>&1 || {
+		printf '{ "status": "unknown", "reachable": null, "probe": "unavailable", "cached": false }\n'
+		return
+	}
+
+	for target in 1.1.1.1 8.8.8.8; do
+		if ping -c 1 -W 1 "$target" >/dev/null 2>&1; then
+			printf '%s reachable %s\n' "$now" "$target" > "$cache"
+			printf '{ "status": "reachable", "reachable": true, "probe": "icmp", "target": "%s", "cached": false }\n' "$target"
+			return
+		fi
+	done
+
+	printf '%s unreachable -\n' "$now" > "$cache"
+	printf '{ "status": "unreachable", "reachable": false, "probe": "icmp", "cached": false }\n'
+}
+
+
+method_update_status() {
+	release='unknown'
+	revision='unknown'
+	repository_channel='unknown'
+	package_updates=0
+	sensitive_updates=0
+	kernel_feed_mismatch=false
+	custom_feed_configured=false
+	owut_available=false
+
+	if [ -r /etc/openwrt_release ]; then
+		release=$(sed -n "s/^DISTRIB_RELEASE='\\(.*\\)'/\\1/p" /etc/openwrt_release | head -n 1)
+		revision=$(sed -n "s/^DISTRIB_REVISION='\\(.*\\)'/\\1/p" /etc/openwrt_release | head -n 1)
+		[ -n "$release" ] || release='unknown'
+		[ -n "$revision" ] || revision='unknown'
+	fi
+
+	repositories=''
+	for repo_file in /etc/apk/repositories /etc/apk/repositories.d/*.list; do
+		[ -r "$repo_file" ] || continue
+		repositories="$repositories
+$(cat "$repo_file" 2>/dev/null)"
+	done
+
+	has_release=false
+	has_snapshot=false
+	printf '%s\n' "$repositories" | grep -Eq '/releases/|packages-25\\.12' && has_release=true || true
+	printf '%s\n' "$repositories" | grep -Eq '/snapshots/|25\\.12-SNAPSHOT' && has_snapshot=true || true
+	if [ "$has_release" = true ] && [ "$has_snapshot" = true ]; then
+		repository_channel='mixed'
+	elif [ "$has_snapshot" = true ]; then
+		repository_channel='snapshot'
+	elif [ "$has_release" = true ]; then
+		repository_channel='release'
+	fi
+
+	if command -v apk >/dev/null 2>&1; then
+		tmp="/tmp/veci-upgradeable.$$"
+		apk list --upgradeable > "$tmp" 2>/dev/null || true
+		while IFS= read -r line; do
+			[ -n "$line" ] || continue
+			package_updates=$((package_updates + 1))
+			case "$line" in
+				kernel-*|kmod-*|base-files-*|busybox-*|libc-*|libubox-*|libubus-*|libuci-*|libblobmsg-json-*|procd-*|rpcd-*|netifd-*|ucode-*|uhttpd-*|hostapd-*|wpad-*|firewall4-*|nftables-*|dnsmasq-*|odhcp*|ppp-*|apk-*|fstools-*)
+					sensitive_updates=$((sensitive_updates + 1))
+					;;
+			esac
+		done < "$tmp"
+		rm -f "$tmp"
+	fi
+
+	if command -v apk >/dev/null 2>&1 && apk list --upgradeable kernel 2>/dev/null | grep -q '^kernel-'; then
+		kernel_feed_mismatch=true
+	fi
+
+	for custom_file in /etc/apk/repositories.d/customfeeds.list /etc/apk/repositories.d/customfeeds.dist /etc/apk/repositories.d/veci-apps.list; do
+		[ -r "$custom_file" ] || continue
+		if grep -Eq '^[[:space:]]*https?://' "$custom_file"; then
+			custom_feed_configured=true
+			break
+		fi
+	done
+
+	command -v owut >/dev/null 2>&1 && owut_available=true
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_string release "$(clean_text "$release")"
+	json_add_string revision "$(clean_text "$revision")"
+	json_add_string repository_channel "$repository_channel"
+	json_add_int package_updates "$package_updates"
+	json_add_int sensitive_updates "$sensitive_updates"
+	[ "$kernel_feed_mismatch" = true ] && json_add_boolean kernel_feed_mismatch 1 || json_add_boolean kernel_feed_mismatch 0
+	[ "$custom_feed_configured" = true ] && json_add_boolean custom_feed_configured 1 || json_add_boolean custom_feed_configured 0
+	[ "$owut_available" = true ] && json_add_boolean owut_available 1 || json_add_boolean owut_available 0
+	json_add_string upgrade_policy "firmware_image_only"
+	json_dump
+}
+
+package_manager() {
+	if command -v apk >/dev/null 2>&1; then
+		printf 'apk'
+	elif command -v opkg >/dev/null 2>&1; then
+		printf 'opkg'
+	else
+		printf 'none'
+	fi
+}
+
+package_installed() {
+	case "$(package_manager)" in
+		apk) apk info -e "$1" >/dev/null 2>&1 ;;
+		opkg) opkg status "$1" 2>/dev/null | grep -q '^Status: install ok installed$' ;;
+		*) return 1 ;;
+	esac
+}
+
+app_feed_enabled() {
+	[ "$(uci -q get veci.main.app_feed_enabled 2>/dev/null)" = "1" ] || return 1
+	configured_build="$(uci -q get veci.main.app_feed_build_id 2>/dev/null || true)"
+	running_build="$(firmware_build_id)"
+	[ -n "$configured_build" ] && [ "$configured_build" = "$running_build" ] || return 1
+	[ -r /etc/apk/repositories.d/veci-apps.list ] || return 1
+	grep -Fq "/feeds/$running_build/" /etc/apk/repositories.d/veci-apps.list || return 1
+	# WE5927 requires a successful signed-index verification through veci.apps
+	# before its generic appAction RPC may install any package.
+	if [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || true)" = 'zbtlink,zbt-we5927' ]; then
+		[ "$(uci -q get veci.main.app_feed_verified_build_id 2>/dev/null)" = "$running_build" ] || return 1
+	fi
+	return 0
+}
+
+manifest_packages() {
+	jsonfilter -i "$1" -e '@.packages[*]' 2>/dev/null
+}
+
+manifest_remove_packages() {
+	jsonfilter -i "$1" -e '@.remove_packages[*]' 2>/dev/null
+}
+
+app_resources_ok() {
+  free_kb="$(df -Pk /overlay 2>/dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ {print $4}')"
+  case "$free_kb" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$free_kb" -ge 2048 ] 2>/dev/null || return 1
+  mem_kb="$(awk '/^MemAvailable:/ {print $2; exit}' /proc/meminfo 2>/dev/null)"
+  case "$mem_kb" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$mem_kb" -ge 8192 ] 2>/dev/null
+}
+
+safe_package_words() {
+  [ "$#" -gt 0 ] || return 1
+  for package in "$@"; do
+    case "$package" in
+      ''|[!A-Za-z0-9]*|*[!A-Za-z0-9+_.-]*|kernel|kernel-*|kmod-*|base-files|busybox|libc|procd|rpcd|netifd|uhttpd|firewall4|nftables|dnsmasq|apk-tools|fstools|veci|veci-default-ui|veci-cellular-we5927|veci-update-we5927)
+        return 1 ;;
+    esac
+  done
+  return 0
+}
+
+
+# Parse exact package tokens from APK v3 simulated removal output.
+# Do not match 'veci-app-*' when protecting the core 'veci' package.
+app_removal_has_core_packages() {
+    awk '
+        /^[[:space:]]*\([0-9]+\/[0-9]+\)[[:space:]]+(Purging|Removing)[[:space:]]+/ {
+            pkg=$3
+            if (pkg == "veci" ||
+                pkg ~ /^kmod-/ || pkg ~ /^(kernel|base-files|busybox|libc|libubox|libubus|libuci|procd|rpcd|netifd|uhttpd|firewall4|nftables|dnsmasq|apk-tools|fstools|veci-default-ui|veci-cellular-we5927|veci-update-we5927)(-|$)/)
+                blocked=1
+        }
+        END {exit(blocked ? 0 : 1)}
+    ' "$1"
+}
+
+method_apps() {
+	manager=$(package_manager)
+	feed_enabled=false
+	app_feed_enabled && feed_enabled=true
+	items=''
+
+    # Bound, read-only resource metrics so UI can explain why the router cannot install apps
+    # even when the optional signed-feed provider does not exist.
+    overlay_free_kb="$(df -Pk /overlay 2>/dev/null | awk 'NR==2 && $4 ~ /^[0-9]+$/ {print $4}')"
+    case "$overlay_free_kb" in ''|*[!0-9]*) overlay_free_kb=null;; esac
+    mem_available_kb="$(awk '/^MemAvailable:/ {print $2; exit}' /proc/meminfo 2>/dev/null)"
+    case "$mem_available_kb" in ''|*[!0-9]*) mem_available_kb=null;; esac
+
+	for manifest in /usr/share/veci/apps/*.json; do
+		[ -r "$manifest" ] || continue
+
+		id=$(jsonfilter -i "$manifest" -e '@.id' 2>/dev/null)
+		name=$(jsonfilter -i "$manifest" -e '@.name' 2>/dev/null)
+		description=$(jsonfilter -i "$manifest" -e '@.description' 2>/dev/null)
+		tier=$(jsonfilter -i "$manifest" -e '@.tier' 2>/dev/null)
+		module=$(jsonfilter -i "$manifest" -e '@.module' 2>/dev/null)
+		enabled_value=$(jsonfilter -i "$manifest" -e '@.enabled' 2>/dev/null)
+		id=$(clean_token "$id")
+		name=$(clean_text "$name")
+		description=$(clean_text "$description")
+		tier=$(clean_token "$tier")
+		safe_module=$(printf '%s' "$module" | tr -cd 'A-Za-z0-9._/-')
+		case "$module" in
+			/veci-apps/*.js) [ "$safe_module" = "$module" ] || module='' ;;
+			*) module='' ;;
+		esac
+		case "$enabled_value" in
+			false|0) enabled=false ;;
+			*) enabled=true ;;
+		esac
+		[ -n "$id" ] || continue
+
+		installed=true
+		packages=''
+		while IFS= read -r package; do
+			[ -n "$package" ] || continue
+			safe=$(clean_token "$package")
+			[ "$safe" = "$package" ] || continue
+			packages="${packages:+$packages, }\"$package\""
+			package_installed "$package" || installed=false
+		done <<EOF
+$(manifest_packages "$manifest")
+EOF
+
+		removable=false
+		[ -n "$(manifest_remove_packages "$manifest")" ] && removable=true
+		# Voucher depends on Guest: do not offer removal while the dependent app remains installed.
+		if [ "$id" = guest ] && package_installed veci-app-voucher; then
+			removable=false
+		fi
+
+		installable=false
+		if [ "$enabled" = true ] && [ "$installed" = false ] && [ "$feed_enabled" = true ] && [ "$manager" = "apk" ] && app_resources_ok; then
+			installable=true
+		fi
+
+		item="{ \"id\": \"$id\", \"name\": \"$name\", \"description\": \"$description\", \"tier\": \"$tier\", \"module\": \"$module\", \"packages\": [ $packages ], \"enabled\": $enabled, \"installed\": $installed, \"installable\": $installable, \"removable\": $removable }"
+		items="${items:+$items, }$item"
+	done
+
+	printf '{ "package_manager": "%s", "feed_enabled": %s, "overlay_free_kb": %s, "minimum_overlay_kb": 2048, "memory_available_kb": %s, "minimum_mem_available_kb": 8192, "apps": [ %s ] }\n' "$manager" "$feed_enabled" "$overlay_free_kb" "$mem_available_kb" "$items"
+}
+
+method_app_action() {
+	input=$(cat)
+	id=$(printf '%s' "$input" | jsonfilter -e '@.id' 2>/dev/null)
+	action=$(printf '%s' "$input" | jsonfilter -e '@.action' 2>/dev/null)
+	safe_id=$(clean_token "$id")
+
+	[ -n "$id" ] && [ "$safe_id" = "$id" ] || {
+		printf '{ "ok": false, "error": "invalid_app_id" }\n'
+		return
+	}
+
+	manifest="/usr/share/veci/apps/$id.json"
+	[ -r "$manifest" ] || {
+		printf '{ "ok": false, "error": "app_not_catalogued" }\n'
+		return
+	}
+
+	manager=$(package_manager)
+	[ "$manager" != "none" ] || {
+		printf '{ "ok": false, "error": "package_manager_unavailable" }\n'
+		return
+	}
+
+	case "$action" in
+		install)
+			enabled_value=$(jsonfilter -i "$manifest" -e '@.enabled' 2>/dev/null)
+			case "$enabled_value" in
+				false|0)
+					printf '{ "ok": false, "error": "app_disabled" }\n'
+					return
+					;;
+			esac
+			app_feed_enabled || {
+				printf '{ "ok": false, "error": "app_feed_disabled" }\n'
+				return
+			}
+            [ "$manager" = apk ] && app_resources_ok || {
+                printf '{ "ok": false, "error": "insufficient_router_resources" }\n'
+                return
+            }
+			package_lines=$(manifest_packages "$manifest")
+			;;
+		remove)
+			package_lines=$(manifest_remove_packages "$manifest")
+			[ -n "$package_lines" ] || {
+				printf '{ "ok": false, "error": "app_removal_not_supported" }\n'
+				return
+			}
+			;;
+		*)
+			printf '{ "ok": false, "error": "unsupported_app_action" }\n'
+			return
+			;;
+	esac
+
+	set --
+	while IFS= read -r package; do
+		[ -n "$package" ] || continue
+		set -- "$@" "$package"
+	done <<EOF
+$package_lines
+EOF
+
+	[ "$#" -gt 0 ] && safe_package_words "$@" || {
+		printf '{ "ok": false, "error": "invalid_package_manifest" }\n'
+		return
+	}
+
+	rc=1
+    if [ "$action" = "remove" ] && [ "$id" = guest ] && package_installed veci-app-voucher; then
+        printf '{ "ok": false, "error": "voucher_depends_on_guest" }\n'
+        return
+    fi
+	if [ "$action" = "remove" ]; then
+        if [ "$manager" != apk ] || ! apk --simulate del "$@" >/tmp/veci-app-preflight.log 2>&1; then
+            printf '{ "ok": false, "error": "app_removal_preflight_failed" }\n'
+            return
+        fi
+        if app_removal_has_core_packages /tmp/veci-app-preflight.log; then
+            printf '{ "ok": false, "error": "core_dependency_protected" }\n'
+            return
+        fi
+		provider="veci.app.$id"
+		# Never remove a package until its cleanup provider explicitly
+		# acknowledges success. A missing/busy rpcd provider is not success.
+		ubus list 2>/dev/null | grep -qx "$provider" || {
+			printf '{ "ok": false, "error": "app_cleanup_provider_missing", "id": "%s" }\n' "$id"
+			return
+		}
+		cleanup="$(ubus call "$provider" cleanup '{}' 2>/dev/null)" || {
+			printf '{ "ok": false, "error": "app_cleanup_unavailable", "id": "%s" }\n' "$id"
+			return
+		}
+		cleanup_ok="$(printf '%s' "$cleanup" | jsonfilter -e '@.ok' 2>/dev/null)"
+		[ "$cleanup_ok" = "true" ] || {
+			printf '{ "ok": false, "error": "app_cleanup_failed", "id": "%s" }\n' "$id"
+			return
+		}
+	fi
+
+	case "$manager:$action" in
+		apk:install)
+			repositories='/etc/apk/repositories.d/veci-apps.list'
+			[ -r "$repositories" ] || {
+				printf '{ "ok": false, "error": "app_feed_repositories_missing" }\n'
+				return
+			}
+            if ! apk --simulate add --repositories-file "$repositories" "$@" >/tmp/veci-app-preflight.log 2>&1; then
+                printf '{ "ok": false, "error": "app_dependency_preflight_failed" }\n'
+                return
+            fi
+			apk -U add --repositories-file "$repositories" "$@" >/tmp/veci-app-action.log 2>&1
+			rc=$?
+			;;
+		apk:remove)
+			apk del "$@" >/tmp/veci-app-action.log 2>&1
+			rc=$?
+			;;
+		opkg:install)
+			opkg update >/tmp/veci-app-action.log 2>&1 && opkg install "$@" >>/tmp/veci-app-action.log 2>&1
+			rc=$?
+			;;
+		opkg:remove)
+			opkg remove "$@" >/tmp/veci-app-action.log 2>&1
+			rc=$?
+			;;
+	esac
+
+	if [ "$rc" -eq 0 ]; then
+		printf '{ "ok": true, "id": "%s", "action": "%s" }\n' "$id" "$action"
+	else
+		printf '{ "ok": false, "error": "package_action_failed", "id": "%s", "action": "%s" }\n' "$id" "$action"
+	fi
+}
+
+
+firmware_path='/tmp/veci-firmware.bin'
+firmware_upload_meta='/tmp/veci-firmware-upload.meta'
+firmware_validation_meta='/tmp/veci-firmware-validation.meta'
+firmware_remote_manifest='/tmp/veci-update-manifest.json'
+firmware_max_bytes=$((7808 * 1024))
+
+firmware_board_name() {
+	if [ -r /tmp/sysinfo/board_name ]; then
+		head -n 1 /tmp/sysinfo/board_name | tr -cd 'A-Za-z0-9,._+-'
+		return
+	fi
+	ubus call system board 2>/dev/null | jsonfilter -e '@.board_name' 2>/dev/null | tr -cd 'A-Za-z0-9,._+-'
+}
+
+firmware_build_id() {
+	if [ -r /etc/veci-release.json ]; then
+		jsonfilter -i /etc/veci-release.json -e '@.build_id' 2>/dev/null | tr -cd 'A-Fa-f0-9'
+	fi
+}
+
+# The apply token is short lived and single-use, and bound to the
+# validated image digest plus this board. Clock rollback must fail closed.
+firmware_validation_max_age=600
+firmware_validation_fresh() {
+	issued="$1"
+	case "$issued" in ''|*[!0-9]*) return 1 ;; esac
+	now="$(date +%s 2>/dev/null)" || return 1
+	case "$now" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$issued" -gt 0 ] 2>/dev/null &&
+		[ "$now" -ge "$issued" ] 2>/dev/null &&
+		[ $((now - issued)) -le "$firmware_validation_max_age" ] 2>/dev/null
+}
+
+firmware_token() {
+	if [ -r /dev/urandom ] && command -v sha256sum >/dev/null 2>&1; then
+		head -c 32 /dev/urandom 2>/dev/null | sha256sum | awk '{ print $1 }'
+	else
+		printf '%s-%s-%s' "$$" "$(date +%s)" "$(firmware_board_name)" | sha256sum | awk '{ print $1 }'
+	fi
+}
+
+firmware_safe_https_url() {
+	case "$1" in
+		https://*) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+firmware_tmp_has_space() {
+	required="$1"
+	case "$required" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	available_kb="$(df -Pk /tmp 2>/dev/null | awk 'NR==2 { print $4 }')"
+	case "$available_kb" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	available=$((available_kb * 1024))
+	margin=$((1024 * 1024))
+	[ "$available" -ge $((required + margin)) ] 2>/dev/null
+}
+
+firmware_keys_present() {
+	[ -d /etc/veci/firmware-keys ] || return 1
+	for key in /etc/veci/firmware-keys/*; do
+		[ -f "$key" ] && [ -s "$key" ] && return 0
+	done
+	return 1
+}
+
+firmware_signature_required() {
+	# Published firmware must never silently downgrade to unsigned mode when keys disappear.
+	[ "$(cat /etc/veci-release-channel 2>/dev/null || true)" = "published" ] && return 0
+	firmware_keys_present
+}
+
+firmware_verify_signature() {
+	image="$1"
+	firmware_signature_required || return 2
+	firmware_keys_present || return 1
+	command -v fwtool >/dev/null 2>&1 || return 1
+	command -v ucert >/dev/null 2>&1 || return 1
+
+	cert='/tmp/veci-firmware.ucert'
+	rm -f "$cert"
+	fwtool -q -s "$cert" "$image" >/dev/null 2>&1 || {
+		rm -f "$cert"
+		return 1
+	}
+	fwtool -q -T -s /dev/null "$image" 2>/dev/null | 		ucert -V -m - -c "$cert" -P /etc/veci/firmware-keys >/dev/null 2>&1
+	rc=$?
+	rm -f "$cert"
+	return "$rc"
+}
+
+firmware_fetch() {
+	url="$1"
+	output="$2"
+	firmware_safe_https_url "$url" || return 1
+	rm -f "$output"
+	if command -v uclient-fetch >/dev/null 2>&1; then
+		uclient-fetch -q -O "$output" "$url"
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$output" "$url"
+	else
+		return 1
+	fi
+}
+
+firmware_manifest_field() {
+	jsonfilter -i "$firmware_remote_manifest" -e "@.$1" 2>/dev/null
+}
+
+firmware_manifest_compatible() {
+	board="$(firmware_board_name)"
+	[ -n "$board" ] || return 1
+	for supported in $(jsonfilter -i "$firmware_remote_manifest" -e '@.supported_devices[*]' 2>/dev/null); do
+		[ "$supported" = "$board" ] && return 0
+	done
+	manifest_board="$(firmware_manifest_field board)"
+	[ "$manifest_board" = "$board" ]
+}
+
+firmware_remote_refresh() {
+	manifest_url="$(uci -q get veci.update.manifest_url 2>/dev/null || true)"
+	[ -n "$manifest_url" ] && firmware_safe_https_url "$manifest_url" || return 1
+	firmware_fetch "$manifest_url" "$firmware_remote_manifest" || return 1
+
+	schema="$(firmware_manifest_field schema)"
+	[ "$schema" = "1" ] || return 1
+	available="$(firmware_manifest_field available)"
+	case "$available" in
+		false|0) return 0 ;;
+	esac
+	url="$(firmware_manifest_field firmware_url)"
+	sha="$(firmware_manifest_field sha256)"
+	size="$(firmware_manifest_field size)"
+	firmware_safe_https_url "$url" || return 1
+	case "$sha" in
+		????????????????????????????????????????????????????????????????) ;;
+		*) return 1 ;;
+	esac
+	case "$size" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$size" -gt 0 ] 2>/dev/null && [ "$size" -le "$firmware_max_bytes" ] 2>/dev/null || return 1
+	return 0
+}
+
+method_firmware_status() {
+	staged=false
+	validated=false
+	bytes=0
+	sha=''
+	token_ready=false
+	if [ -f "$firmware_path" ]; then
+		staged=true
+		bytes="$(wc -c < "$firmware_path" | tr -d '[:space:]')"
+		command -v sha256sum >/dev/null 2>&1 && sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
+	fi
+	if [ -r "$firmware_validation_meta" ]; then
+		read -r validation_sha validation_board validation_token validation_signature validation_issued < "$firmware_validation_meta" || true
+		if [ -n "$sha" ] && [ "$validation_sha" = "$sha" ] && [ "$validation_board" = "$(firmware_board_name)" ] && firmware_validation_fresh "$validation_issued"; then
+			validated=true
+			[ -n "$validation_token" ] && token_ready=true
+		fi
+	fi
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_string board "$(firmware_board_name)"
+	json_add_string build_id "$(firmware_build_id)"
+	[ "$staged" = true ] && json_add_boolean staged 1 || json_add_boolean staged 0
+	[ "$validated" = true ] && json_add_boolean validated 1 || json_add_boolean validated 0
+	[ "$token_ready" = true ] && json_add_boolean apply_ready 1 || json_add_boolean apply_ready 0
+	[ "$validation_signature" = "signed" ] && json_add_boolean signature_verified 1 || json_add_boolean signature_verified 0
+	if firmware_signature_required; then
+		json_add_string signature_policy "required"
+		if command -v ucert >/dev/null 2>&1 && command -v fwtool >/dev/null 2>&1; then
+			json_add_boolean automatic_install_supported 1
+		else
+			json_add_boolean automatic_install_supported 0
+		fi
+	else
+		json_add_string signature_policy "development"
+		json_add_boolean automatic_install_supported 0
+	fi
+	json_add_int bytes "$bytes"
+	json_add_string sha256 "$sha"
+	json_add_int max_bytes "$firmware_max_bytes"
+	json_add_string manifest_url "$(uci -q get veci.update.manifest_url 2>/dev/null || true)"
+	[ "$(uci -q get veci.update.auto_check 2>/dev/null)" = "1" ] && json_add_boolean auto_check 1 || json_add_boolean auto_check 0
+	[ "$(uci -q get veci.update.auto_download 2>/dev/null)" = "1" ] && json_add_boolean auto_download 1 || json_add_boolean auto_download 0
+	[ "$(uci -q get veci.update.auto_install 2>/dev/null)" = "1" ] && json_add_boolean auto_install 1 || json_add_boolean auto_install 0
+	check_interval="$(uci -q get veci.update.check_interval 2>/dev/null || printf '21600')"
+	case "$check_interval" in ''|*[!0-9]*) check_interval=21600 ;; esac
+	json_add_int check_interval "$check_interval"
+	if [ -r /tmp/veci-update-agent.status ]; then
+		read -r last_check auto_state auto_detail < /tmp/veci-update-agent.status || true
+		case "$last_check" in ''|*[!0-9]*) last_check=0 ;; esac
+		json_add_int auto_last_check "$last_check"
+		json_add_string auto_state "$(clean_token "$auto_state")"
+		json_add_string auto_detail "$(clean_token "$auto_detail")"
+	else
+		json_add_int auto_last_check 0
+		json_add_string auto_state "not_run"
+		json_add_string auto_detail ""
+	fi
+	json_dump
+}
+
+method_firmware_upload_start() {
+	input="$(cat)"
+	filename="$(printf '%s' "$input" | jsonfilter -e '@.filename' 2>/dev/null)"
+	size="$(printf '%s' "$input" | jsonfilter -e '@.size' 2>/dev/null)"
+	case "$filename" in
+		*.bin) ;;
+		*) printf '{ "ok": false, "error": "firmware_filename_required" }\n'; return ;;
+	esac
+	case "$size" in
+		''|*[!0-9]*) printf '{ "ok": false, "error": "invalid_firmware_size" }\n'; return ;;
+	esac
+	[ "$size" -gt 0 ] 2>/dev/null && [ "$size" -le "$firmware_max_bytes" ] 2>/dev/null || {
+		printf '{ "ok": false, "error": "firmware_too_large" }\n'
+		return
+	}
+	firmware_tmp_has_space "$size" || {
+		printf '{ "ok": false, "error": "insufficient_staging_space" }\n'
+		return
+	}
+
+	upload_id="$(firmware_token)"
+	rm -f "$firmware_path" "$firmware_validation_meta"
+	: > "$firmware_path"
+	printf '%s %s 0\n' "$upload_id" "$size" > "$firmware_upload_meta"
+	printf '{ "ok": true, "upload_id": "%s", "max_bytes": %s }\n' "$upload_id" "$firmware_max_bytes"
+}
+
+method_firmware_upload_chunk() {
+	input="$(cat)"
+	upload_id="$(printf '%s' "$input" | jsonfilter -e '@.upload_id' 2>/dev/null)"
+	sequence="$(printf '%s' "$input" | jsonfilter -e '@.sequence' 2>/dev/null)"
+	data="$(printf '%s' "$input" | jsonfilter -e '@.data' 2>/dev/null)"
+
+	[ -r "$firmware_upload_meta" ] || {
+		printf '{ "ok": false, "error": "upload_not_started" }\n'
+		return
+	}
+	read -r expected_id expected_size expected_sequence < "$firmware_upload_meta" || true
+	[ "$upload_id" = "$expected_id" ] || {
+		printf '{ "ok": false, "error": "upload_id_mismatch" }\n'
+		return
+	}
+	case "$sequence" in
+		''|*[!0-9]*) printf '{ "ok": false, "error": "invalid_sequence" }\n'; return ;;
+	esac
+	[ "$sequence" -eq "$expected_sequence" ] 2>/dev/null || {
+		printf '{ "ok": false, "error": "unexpected_sequence", "expected": %s }\n' "$expected_sequence"
+		return
+	}
+	[ -n "$data" ] || {
+		printf '{ "ok": false, "error": "empty_chunk" }\n'
+		return
+	}
+	[ "${#data}" -le 65536 ] 2>/dev/null || {
+		printf '{ "ok": false, "error": "chunk_too_large" }\n'
+		return
+	}
+	command -v base64 >/dev/null 2>&1 || {
+		printf '{ "ok": false, "error": "base64_unavailable" }\n'
+		return
+	}
+
+	tmp_chunk="/tmp/veci-firmware-chunk.$$"
+	if ! printf '%s' "$data" | base64 -d > "$tmp_chunk" 2>/dev/null; then
+		rm -f "$tmp_chunk"
+		printf '{ "ok": false, "error": "invalid_chunk_encoding" }\n'
+		return
+	fi
+	cat "$tmp_chunk" >> "$firmware_path"
+	rm -f "$tmp_chunk"
+	bytes="$(wc -c < "$firmware_path" | tr -d '[:space:]')"
+	[ "$bytes" -le "$expected_size" ] 2>/dev/null || {
+		rm -f "$firmware_path" "$firmware_upload_meta"
+		printf '{ "ok": false, "error": "upload_exceeds_declared_size" }\n'
+		return
+	}
+	next=$((expected_sequence + 1))
+	printf '%s %s %s\n' "$expected_id" "$expected_size" "$next" > "$firmware_upload_meta"
+	printf '{ "ok": true, "sequence": %s, "bytes": %s }\n' "$sequence" "$bytes"
+}
+
+method_firmware_upload_finish() {
+	input="$(cat)"
+	upload_id="$(printf '%s' "$input" | jsonfilter -e '@.upload_id' 2>/dev/null)"
+	[ -r "$firmware_upload_meta" ] || {
+		printf '{ "ok": false, "error": "upload_not_started" }\n'
+		return
+	}
+	read -r expected_id expected_size expected_sequence < "$firmware_upload_meta" || true
+	[ "$upload_id" = "$expected_id" ] || {
+		printf '{ "ok": false, "error": "upload_id_mismatch" }\n'
+		return
+	}
+	bytes="$(wc -c < "$firmware_path" | tr -d '[:space:]')"
+	[ "$bytes" -eq "$expected_size" ] 2>/dev/null || {
+		printf '{ "ok": false, "error": "upload_size_mismatch", "bytes": %s, "expected": %s }\n' "$bytes" "$expected_size"
+		return
+	}
+	rm -f "$firmware_upload_meta"
+	sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
+	printf '{ "ok": true, "bytes": %s, "sha256": "%s" }\n' "$bytes" "$sha"
+}
+
+method_firmware_validate() {
+	input="$(cat)"
+	expected_sha="$(printf '%s' "$input" | jsonfilter -e '@.expected_sha256' 2>/dev/null)"
+	[ -f "$firmware_path" ] || {
+		printf '{ "ok": false, "error": "firmware_not_staged" }\n'
+		return
+	}
+	bytes="$(wc -c < "$firmware_path" | tr -d '[:space:]')"
+	[ "$bytes" -gt 0 ] 2>/dev/null && [ "$bytes" -le "$firmware_max_bytes" ] 2>/dev/null || {
+		printf '{ "ok": false, "error": "invalid_firmware_size" }\n'
+		return
+	}
+	sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
+	if [ -n "$expected_sha" ] && [ "$expected_sha" != "$sha" ]; then
+		printf '{ "ok": false, "error": "checksum_mismatch", "sha256": "%s" }\n' "$sha"
+		return
+	fi
+	command -v sysupgrade >/dev/null 2>&1 || {
+		printf '{ "ok": false, "error": "sysupgrade_unavailable" }\n'
+		return
+	}
+	if ! sysupgrade -T "$firmware_path" >/tmp/veci-sysupgrade-test.log 2>&1; then
+		printf '{ "ok": false, "error": "sysupgrade_test_failed" }\n'
+		return
+	fi
+
+	signature_state='development'
+	if firmware_signature_required; then
+		if firmware_verify_signature "$firmware_path"; then
+			signature_state='signed'
+		else
+			printf '{ "ok": false, "error": "firmware_signature_invalid" }\n'
+			return
+		fi
+	fi
+
+	board="$(firmware_board_name)"
+	token="$(firmware_token)"
+	issued="$(date +%s 2>/dev/null)"
+	firmware_validation_fresh "$issued" && [ -n "$board" ] && [ -n "$token" ] || {
+		printf '{ "ok": false, "error": "validation_clock_or_identity_unavailable" }\n'
+		return
+	}
+	printf '%s %s %s %s %s\n' "$sha" "$board" "$token" "$signature_state" "$issued" > "$firmware_validation_meta" || {
+		printf '{ "ok": false, "error": "validation_metadata_write_failed" }\n'
+		return
+	}
+	# Do not expose a usable apply token for development/unsigned images.
+	if [ "$signature_state" != signed ]; then token=''; fi
+	printf '{ "ok": true, "validated": true, "signature_verified": %s, "board": "%s", "bytes": %s, "sha256": "%s", "apply_token": "%s" }\n' \
+		"$([ "$signature_state" = signed ] && printf true || printf false)" "$board" "$bytes" "$sha" "$token"
+}
+
+method_firmware_remote_check() {
+	if ! firmware_remote_refresh; then
+		printf '{ "ok": false, "error": "remote_manifest_invalid" }\n'
+		return
+	fi
+
+	compatible=false
+	firmware_manifest_compatible && compatible=true
+	available_value="$(firmware_manifest_field available)"
+	available=true
+	case "$available_value" in false|0) available=false ;; esac
+	remote_build="$(firmware_manifest_field build_id)"
+	local_build="$(firmware_build_id)"
+	update_available=false
+	if [ "$available" = true ]; then
+		update_available=true
+		[ -n "$remote_build" ] && [ "$remote_build" = "$local_build" ] && update_available=false
+	fi
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_boolean ok 1
+	[ "$available" = true ] && json_add_boolean available 1 || json_add_boolean available 0
+	[ "$compatible" = true ] && json_add_boolean compatible 1 || json_add_boolean compatible 0
+	[ "$update_available" = true ] && json_add_boolean update_available 1 || json_add_boolean update_available 0
+	json_add_string channel "$(firmware_manifest_field channel)"
+	json_add_string version "$(firmware_manifest_field version)"
+	json_add_string build_id "$remote_build"
+	json_add_string target "$(firmware_manifest_field target)"
+	json_add_string board "$(firmware_manifest_field board)"
+	json_add_string published_at "$(firmware_manifest_field published_at)"
+	json_add_string firmware_url "$(firmware_manifest_field firmware_url)"
+	json_add_string sha256 "$(firmware_manifest_field sha256)"
+	remote_size="$(firmware_manifest_field size)"
+	case "$remote_size" in ''|*[!0-9]*) remote_size=0 ;; esac
+	json_add_int size "$remote_size"
+	json_add_string notes_url "$(firmware_manifest_field notes_url)"
+	json_dump
+}
+
+method_firmware_remote_download() {
+	if ! firmware_remote_refresh; then
+		printf '{ "ok": false, "error": "remote_manifest_invalid" }\n'
+		return
+	fi
+	case "$(firmware_manifest_field available)" in
+		false|0) printf '{ "ok": false, "error": "no_firmware_published" }\n'; return ;;
+	esac
+	firmware_manifest_compatible || {
+		printf '{ "ok": false, "error": "firmware_not_compatible" }\n'
+		return
+	}
+
+	url="$(firmware_manifest_field firmware_url)"
+	expected_sha="$(firmware_manifest_field sha256)"
+	expected_size="$(firmware_manifest_field size)"
+	firmware_tmp_has_space "$expected_size" || {
+		printf '{ "ok": false, "error": "insufficient_staging_space" }\n'
+		return
+	}
+	rm -f "$firmware_path" "$firmware_validation_meta"
+	if ! firmware_fetch "$url" "$firmware_path"; then
+		rm -f "$firmware_path"
+		printf '{ "ok": false, "error": "firmware_download_failed" }\n'
+		return
+	fi
+	bytes="$(wc -c < "$firmware_path" | tr -d '[:space:]')"
+	[ "$bytes" -eq "$expected_size" ] 2>/dev/null || {
+		rm -f "$firmware_path"
+		printf '{ "ok": false, "error": "download_size_mismatch" }\n'
+		return
+	}
+	sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
+	[ "$sha" = "$expected_sha" ] || {
+		rm -f "$firmware_path"
+		printf '{ "ok": false, "error": "download_checksum_mismatch" }\n'
+		return
+	}
+	printf '{ "ok": true, "bytes": %s, "sha256": "%s" }\n' "$bytes" "$sha"
+}
+
+method_firmware_policy_save() {
+	input="$(cat)"
+	auto_check="$(printf '%s' "$input" | jsonfilter -e '@.auto_check' 2>/dev/null)"
+	auto_download="$(printf '%s' "$input" | jsonfilter -e '@.auto_download' 2>/dev/null)"
+	auto_install="$(printf '%s' "$input" | jsonfilter -e '@.auto_install' 2>/dev/null)"
+	for value in "$auto_check" "$auto_download" "$auto_install"; do
+		case "$value" in true|false|0|1|'') ;; *) printf '{ "ok": false, "error": "invalid_update_policy" }\n'; return ;; esac
+	done
+	[ "$auto_check" = true ] && auto_check=1
+	[ "$auto_download" = true ] && auto_download=1
+	[ "$auto_install" = true ] && auto_install=1
+	[ "$auto_check" = false ] && auto_check=0
+	[ "$auto_download" = false ] && auto_download=0
+	[ "$auto_install" = false ] && auto_install=0
+
+	if [ "$auto_install" = "1" ]; then
+		firmware_signature_required || {
+			printf '{ "ok": false, "error": "automatic_install_requires_firmware_signing_key" }\n'
+			return
+		}
+		command -v ucert >/dev/null 2>&1 && command -v fwtool >/dev/null 2>&1 || {
+			printf '{ "ok": false, "error": "automatic_install_signature_tools_missing" }\n'
+			return
+		}
+		auto_download=1
+		auto_check=1
+	fi
+	[ "$auto_download" = "1" ] && auto_check=1
+
+	uci -q batch <<EOF
+set veci.update=update
+set veci.update.auto_check='$auto_check'
+set veci.update.auto_download='$auto_download'
+set veci.update.auto_install='$auto_install'
+EOF
+	uci commit veci
+	printf '{ "ok": true }\n'
+}
+
+method_firmware_apply() {
+	input="$(cat)"
+	token="$(printf '%s' "$input" | jsonfilter -e '@.apply_token' 2>/dev/null)"
+	keep_settings="$(printf '%s' "$input" | jsonfilter -e '@.keep_settings' 2>/dev/null)"
+	[ -r "$firmware_validation_meta" ] && [ -f "$firmware_path" ] || {
+		printf '{ "ok": false, "error": "firmware_not_validated" }\n'
+		return
+	}
+	read -r validation_sha validation_board validation_token validation_signature validation_issued < "$firmware_validation_meta" || true
+	firmware_validation_fresh "$validation_issued" || {
+		rm -f "$firmware_validation_meta"
+		printf '{ "ok": false, "error": "validation_token_expired" }\n'
+		return
+	}
+	current_sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
+	[ -n "$token" ] && [ "$token" = "$validation_token" ] && [ "$current_sha" = "$validation_sha" ] && [ "$(firmware_board_name)" = "$validation_board" ] || {
+		printf '{ "ok": false, "error": "validation_token_mismatch" }\n'
+		return
+	}
+	# Never permit an unsigned image through the VeCI RPC, even on
+	# development firmware. sysupgrade -T alone is not a trust signature.
+	if [ "$validation_signature" != "signed" ] || ! firmware_keys_present; then
+		printf '{ "ok": false, "error": "signed_validation_required" }\n'
+		return
+	fi
+	case "$keep_settings" in
+		false|0) keep_settings=0 ;;
+		*) keep_settings=1 ;;
+	esac
+	rm -f "$firmware_validation_meta"
+	if [ "$keep_settings" -eq 1 ]; then
+		( sleep 2; sysupgrade "$firmware_path" >/tmp/veci-sysupgrade.log 2>&1 ) &
+	else
+		( sleep 2; sysupgrade -n "$firmware_path" >/tmp/veci-sysupgrade.log 2>&1 ) &
+	fi
+	printf '{ "ok": true, "rebooting": true }\n'
+}
+
+
+method_logs() {
+    input="$(cat)"
+    source="$(printf '%s' "$input" | jsonfilter -e '@.source' 2>/dev/null)"
+    limit="$(printf '%s' "$input" | jsonfilter -e '@.limit' 2>/dev/null)"
+    case "$source" in system|kernel) ;; *) source=system ;; esac
+    case "$limit" in ''|*[!0-9]*) limit=100 ;; esac
+    [ "$limit" -gt 150 ] 2>/dev/null && limit=150
+    [ "$limit" -lt 20 ] 2>/dev/null && limit=20
+    # Bound each line and final payload before shell command substitution.
+    # No files are written, and the service never runs on page load.
+    if [ "$source" = kernel ]; then
+        if command -v dmesg >/dev/null 2>&1; then
+            output="$(dmesg 2>/dev/null | tail -n "$limit" | cut -c1-240 | tail -c 16000)"
+        else
+            output='Kernel logs unavailable'
+        fi
+    elif command -v logread >/dev/null 2>&1; then
+        output="$(logread 2>/dev/null | tail -n "$limit" | cut -c1-240 | tail -c 16000)"
+    else
+        output='System logs unavailable'
+    fi
+    . /usr/share/libubox/jshn.sh
+    json_init
+    json_add_string source "$source"
+    json_add_int limit "$limit"
+    json_add_string output "$output"
+    json_dump
+}
+
+method_diagnostic() {
+	input=$(cat)
+	tool=$(printf '%s' "$input" | jsonfilter -e '@.tool' 2>/dev/null)
+	target=$(printf '%s' "$input" | jsonfilter -e '@.target' 2>/dev/null)
+	safe_target=$(clean_token "$target")
+
+	[ -n "$target" ] && [ "$safe_target" = "$target" ] && [ "${#target}" -le 253 ] || {
+		printf '{ "ok": false, "error": "invalid_target" }\n'
+		return
+	}
+
+	case "$tool" in
+		ping)
+			output=$(ping -c 4 -W 2 "$target" 2>&1)
+			rc=$?
+			;;
+		traceroute)
+			command -v traceroute >/dev/null 2>&1 || {
+				printf '{ "ok": false, "error": "traceroute_not_available" }\n'
+				return
+			}
+			output=$(traceroute -m 10 -w 1 -q 1 "$target" 2>&1)
+			rc=$?
+			;;
+		*)
+			printf '{ "ok": false, "error": "tool_not_allowed" }\n'
+			return
+			;;
+	esac
+
+	output=$(printf '%s\n' "$output" | sed -n '1,30p')
+	. /usr/share/libubox/jshn.sh
+	json_init
+	[ "$rc" -eq 0 ] && json_add_boolean ok 1 || json_add_boolean ok 0
+	json_add_string tool "$tool"
+	json_add_string target "$target"
+	json_add_string output "$output"
+	json_dump
+}
+
+root_password_is_set() {
+	hash=$(awk -F: '$1 == "root" { print $2; exit }' /etc/shadow 2>/dev/null)
+	case "$hash" in
+		''|'!'|'*'|'!!') return 1 ;;
+		*) return 0 ;;
+	esac
+}
+
+method_security_status() {
+	if root_password_is_set; then
+		printf '{ "root_password_set": true }\n'
+	else
+		printf '{ "root_password_set": false }\n'
+	fi
+}
+
+method_set_admin_password() {
+	root_password_is_set && {
+		printf '{ "ok": false, "error": "password_already_set" }\n'
+		return
+	}
+
+	input=$(cat)
+	password=$(printf '%s' "$input" | jsonfilter -e '@.password' 2>/dev/null)
+	length=${#password}
+	flat_password=$(printf '%s' "$password" | tr -d '\r\n')
+
+	[ "$flat_password" = "$password" ] || {
+		printf '{ "ok": false, "error": "password_characters" }\n'
+		return
+	}
+
+	[ "$length" -ge 8 ] && [ "$length" -le 72 ] || {
+		printf '{ "ok": false, "error": "password_length" }\n'
+		return
+	}
+
+	LC_ALL=C printf '%s' "$password" | grep -q '^[ -~]*$' || {
+		printf '{ "ok": false, "error": "password_characters" }\n'
+		return
+	}
+
+	command -v passwd >/dev/null 2>&1 || {
+		printf '{ "ok": false, "error": "passwd_not_available" }\n'
+		return
+	}
+
+	if printf '%s\n%s\n' "$password" "$password" | passwd root >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "password_change_failed" }\n'
+	fi
+}
+
+method_service_action() {
+	input=$(cat)
+	service=$(printf '%s' "$input" | jsonfilter -e '@.service')
+	action=$(printf '%s' "$input" | jsonfilter -e '@.action')
+
+	case "$service" in
+		network|firewall|dnsmasq|uhttpd|opennds) ;;
+		*) printf '{ "ok": false, "error": "service_not_allowed" }\n'; return ;;
+	esac
+
+	case "$action" in
+		start|stop|restart|reload) ;;
+		*) printf '{ "ok": false, "error": "action_not_allowed" }\n'; return ;;
+	esac
+
+	script="/etc/init.d/$service"
+	[ -x "$script" ] || {
+		printf '{ "ok": false, "error": "service_not_installed" }\n'
+		return
+	}
+
+	if "$script" "$action" >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "service_action_failed" }\n'
+	fi
+}
+
+method_wifi_reload() {
+	if ! command -v wifi >/dev/null 2>&1; then
+		printf '{ "ok": false, "error": "wifi_command_not_found" }\n'
+		return
+	fi
+	if wifi reload >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "wifi_reload_failed" }\n'
+	fi
+}
+
+case "$1" in
+	list)
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "logs": { "source": "str", "limit": "int" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		;;
+	call)
+		case "$2" in
+			capabilities) method_capabilities ;;
+			clients) method_clients ;;
+			networkInventory) method_network_inventory ;;
+			health) method_health ;;
+			internetStatus) method_internet_status ;;
+			updateStatus) method_update_status ;;
+			apps) method_apps ;;
+			appAction) method_app_action ;;
+			firmwareStatus) method_firmware_status ;;
+			firmwareUploadStart) method_firmware_upload_start ;;
+			firmwareUploadChunk) method_firmware_upload_chunk ;;
+			firmwareUploadFinish) method_firmware_upload_finish ;;
+			firmwareValidate) method_firmware_validate ;;
+			firmwareRemoteCheck) method_firmware_remote_check ;;
+			firmwareRemoteDownload) method_firmware_remote_download ;;
+			firmwarePolicySave) method_firmware_policy_save ;;
+			firmwareApply) method_firmware_apply ;;
+			securityStatus) method_security_status ;;
+			setAdminPassword) method_set_admin_password ;;
+			logs) method_logs ;;
+			diagnostic) method_diagnostic ;;
+			serviceAction) method_service_action ;;
+			wifiReload) method_wifi_reload ;;
+			*) printf '{ "error": "method_not_found" }\n' ;;
+		esac
+		;;
+esac

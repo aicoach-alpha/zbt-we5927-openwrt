@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=we5927-lte
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -20,10 +20,12 @@ endef
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
 	$(CP) ./src/we5927-at.c $(PKG_BUILD_DIR)/
+	$(CP) ./src/veci-sms-cmgs.c $(PKG_BUILD_DIR)/
 endef
 
 define Build/Compile
 	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -o $(PKG_BUILD_DIR)/we5927-at $(PKG_BUILD_DIR)/we5927-at.c $(TARGET_LDFLAGS)
+	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -o $(PKG_BUILD_DIR)/veci-sms-cmgs $(PKG_BUILD_DIR)/veci-sms-cmgs.c $(TARGET_LDFLAGS)
 endef
 
 define Package/we5927-lte/conffiles
@@ -33,6 +35,8 @@ endef
 define Package/we5927-lte/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/we5927-at $(1)/usr/sbin/we5927-at
+	$(INSTALL_DIR) $(1)/usr/libexec
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/veci-sms-cmgs $(1)/usr/libexec/veci-sms-cmgs
 	$(INSTALL_BIN) ./files/usr/sbin/we5927-lte $(1)/usr/sbin/we5927-lte
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/we5927-lte $(1)/etc/init.d/we5927-lte
