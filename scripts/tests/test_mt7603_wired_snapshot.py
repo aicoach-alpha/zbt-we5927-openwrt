@@ -10,21 +10,48 @@ spec.loader.exec_module(sut)
 
 
 class UatSafety(unittest.TestCase):
-    def test_scan_detects_only_exact_ssid(self):
+    def test_scan_detects_only_matching_ssid_and_bssid(self):
         data = """Interface name : Wi-Fi
-There are 2 networks currently visible.
+There are 3 networks currently visible.
 SSID 1 : Example-Office
     Network type : Infrastructure
-SSID 2 : Example-Guest
+    BSSID 1 : aa:bb:cc:dd:ee:11
+SSID 2 : Example-Office
     Network type : Infrastructure
+    BSSID 1 : aa:bb:cc:dd:ee:22
+SSID 3 : Example-Guest
+    Network type : Infrastructure
+    BSSID 1 : aa:bb:cc:dd:ee:33
 """
-        self.assertTrue(sut.parse_scan(data, "Example-Office")["visible"])
-        self.assertFalse(sut.parse_scan(data, "Example")["visible"])
-        self.assertFalse(sut.parse_scan(data, "Example-Office2")["visible"])
-        self.assertEqual(sut.parse_scan(data, "Example-Office")["networks_seen"], 2)
+        expected = sut.parse_scan(data, "Example-Office", "AA:BB:CC:DD:EE:22")
+        self.assertTrue(expected["visible"])
+        self.assertTrue(expected["identity_pinned"])
+        self.assertEqual(expected["networks_seen"], 3)
+        self.assertFalse(sut.parse_scan(data, "Example-Office",
+                                        "AA:BB:CC:DD:EE:FF")["visible"])
+        self.assertFalse(sut.parse_scan(data, "Example-Office2",
+                                        "AA:BB:CC:DD:EE:22")["visible"])
+        self.assertFalse(sut.parse_scan(data, "Example-Guest",
+                                        "AA:BB:CC:DD:EE:22")["visible"])
+        self.assertIsNone(sut.parse_scan(data, "Example-Office")["visible"])
+        self.assertNotIn("aa:bb:cc:dd:ee", str(expected).lower())
+        self.assertNotIn("Example-Office", str(expected))
 
     def test_empty_scan_is_invalid_not_success(self):
-        self.assertFalse(sut.parse_scan("No networks found.", "Example-Office")["scan_valid"])
+        self.assertFalse(sut.parse_scan("No networks found.", "Example-Office", "aa:bb:cc:dd:ee:ff")["scan_valid"])
+
+    def test_bssid_parser_rejects_invalid_identity(self):
+        with self.assertRaises(ValueError):
+            sut.parse_scan("SSID 1 : Example-Office", "Example-Office", "AA:BB:CC:11")
+        with self.assertRaises(ValueError):
+            sut.parse_scan("SSID 1 : Example-Office", "Example-Office", "AA:BB-CC:DD:EE:FF")
+
+    def test_ssid_without_bssid_is_not_ap_visibility_evidence(self):
+        text = "SSID 1 : Example-Office\n    BSSID 1 : aa:bb:cc:dd:ee:11\n"
+        report = sut.parse_scan(text, "Example-Office")
+        self.assertTrue(report["scan_valid"])
+        self.assertIsNone(report["visible"])
+        self.assertFalse(report["identity_pinned"])
 
     def test_driver_reset_counters(self):
         data = "TX hang: 0\nRX PSE busy stuck: 1\nBeacon stuck: 0\nMCU hang: 0\n"
@@ -47,6 +74,7 @@ SSID 2 : Example-Guest
         self.assertNotIn('"private_key":', src)
         self.assertIn('report["72_hour_uat_complete"] = False', src)
         self.assertIn('"no_firmware_changes": True', src)
+        self.assertIn('ap.add_argument("--bssid", required=True', src)
 
 
 if __name__ == "__main__":

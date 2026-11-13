@@ -60,6 +60,34 @@ class Tests(unittest.TestCase):
         self.assertEqual(result["unique_valid_slots"], 1)
         self.assertLess(result["coverage_percent"], 2)
 
+    def test_long_window_monitor_ignores_same_ssid_from_other_ap(self):
+        from types import SimpleNamespace
+        scan = """SSID 1 : WE5927-Office
+    BSSID 1 : 02:11:22:33:44:55
+SSID 2 : WE5927-Office
+    BSSID 1 : 02:11:22:33:44:66
+"""
+        with patch.object(monitor.sys, "platform", "win32"):
+            with patch.object(monitor.subprocess, "run",
+                              return_value=SimpleNamespace(returncode=0, stdout=scan)):
+                self.assertFalse(monitor.scan_ssid("WE5927-Office",
+                                                   "02:11:22:33:44:77"))
+                self.assertTrue(monitor.scan_ssid("WE5927-Office",
+                                                  "02:11:22:33:44:66"))
+                self.assertIsNone(monitor.scan_ssid("WE5927-Office"))
+        self.assertNotIn("WE5927-Office", str(monitor.parse_snapshot("epoch_s=5")))
+
+    def test_invalid_or_failed_scan_never_claims_router_visible(self):
+        from types import SimpleNamespace
+        with patch.object(monitor.sys, "platform", "win32"):
+            with patch.object(monitor.subprocess, "run",
+                              return_value=SimpleNamespace(returncode=1,
+                                                           stdout="SSID 1 : WE5927-Office")):
+                self.assertIsNone(monitor.scan_ssid("WE5927-Office",
+                                                    "02:11:22:33:44:55"))
+        with self.assertRaises(ValueError):
+            monitor.normalize_bssid("not-a-bssid")
+
     def test_period_requires_multiple_cycles(self):
         s=[row(0,1),row(2,0),row(4,1),row(124,0),row(125,1),row(246,0)]
         self.assertTrue(analyzer.analyze(s,interval=3600)["122_minute_pattern_consistent"])

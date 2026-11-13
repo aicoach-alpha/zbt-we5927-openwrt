@@ -38,10 +38,11 @@ From the project checkout on the **wired laptop**, with PowerShell (provide path
 ```powershell
 python scripts/veci-link-wired-monitor.py --host 192.168.1.1 `
   --key "C:\path\to\existing_key" --known-hosts "C:\path\to\verified_known_hosts" `
-  --ssid "YOUR-SSID" --hours 72 --interval 30 --out ".\veci-link-72h.jsonl"
-python scripts/veci-link-analyze.py .\veci-link-72h.jsonl --interval 30
+  --ssid "YOUR-SSID" --bssid "AA:BB:CC:DD:EE:FF" `
+  --hours 72 --interval 30 --out ".\veci-link-72h.jsonl"
+python scripts/veci-link-analyze.py .\veci-link-72h.jsonl --interval 30 --expected-hours 72
 ```
-`--ssid` is optional and **never written**; external scan only on Windows. The monitor pipes a read-only shell snapshot over SSH stdin; no remote files, no AT commands, no Wi-Fi reload, no service restart. It stores only whitelisted scalar counters on the laptop, not SSID names, IPv4 addresses, MACs, APNs, IMSI/IMEI or SMS content. Router `logread` counters are *ring-window estimates* and can wrap, so negative deltas are inconclusive.
+`--ssid` and `--bssid` must be provided together for Wi-Fi UAT (omit both for LTE-only monitoring). Use a **previously verified** BSSID belonging to this WE5927's physical AP, not a MAC copied from an unidentified scan. A neighbouring AP with the same SSID does not prove MT7603 beacon health. Neither SSID nor BSSID is written to evidence logs; external scans run only on Windows. The three-scan snapshot tool also requires both identifiers. BSSID presence is radio observation, not proof of authentication or 72-hour stability. The monitor pipes a read-only shell snapshot over SSH stdin; no remote files, no AT commands, no Wi-Fi reload, no service restart. It stores only whitelisted scalar counters on the laptop, not SSID names, IPv4 addresses, MACs, APNs, IMSI/IMEI or SMS content. Router `logread` counters are *ring-window estimates* and can wrap, so negative deltas are inconclusive.
 
 Analyze at least three repeated WAN down edges and all independent SSID scans. Verify local reachability, DHCP lease T1/T2/expiry and USB/PDP status using captured timestamps. Public ICMP alone cannot establish a real disconnection. A 72h run is a target, not a guarantee of >99% sample coverage; report actual coverage and collection gaps. If the wired laptop sleeps, UAT is invalid.
 
