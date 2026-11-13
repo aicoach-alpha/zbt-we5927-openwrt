@@ -5,6 +5,42 @@ set -eu
 umask 077
 LC_ALL=C; export LC_ALL
 fail(){ printf '{"ok":false,"reason":"send_unavailable"}\n';exit 1; }
+# This parser runs only AFTER the one-shot CMGS invocation. If the transport
+# exited abnormally or returned an unfamiliar receipt, the outcome is unknown:
+# the SMS may already have been accepted, so never suggest a blind retry.
+normalize_cmgs_result() {
+  transport_rc="$1"
+  candidate="$2"
+  case "$candidate" in
+    '{"ok":true,"status":"accepted_by_modem"}')
+      if [ "$transport_rc" -eq 0 ]; then
+        printf '%s\n' '{"ok":true,"status":"accepted_by_modem"}'
+        return 0
+      fi ;;
+    '{"ok":true,"status":"accepted_by_modem","mr":'*',"report_requested":true}')
+      # A modem message reference is NOT evidence of recipient delivery.
+      # Preserve accepted status but intentionally omit MR (not in current UI).
+      if [ "$transport_rc" -eq 0 ]; then
+        mr="${candidate#'{"ok":true,"status":"accepted_by_modem","mr":'}"
+        mr="${mr%',"report_requested":true}'}"
+        case "$mr" in
+          ''|*[!0-9]*) ;;
+          *)
+            if [ "${#mr}" -le 3 ] && [ "$mr" -le 255 ] 2>/dev/null; then
+              printf '%s\n' '{"ok":true,"status":"accepted_by_modem"}'
+              return 0
+            fi ;;
+        esac
+      fi ;;
+    '{"ok":false,"reason":"network_rejected"}'|\
+    '{"ok":false,"reason":"outcome_unknown"}'|\
+    '{"ok":false,"reason":"prompt_unavailable"}')
+      printf '%s\n' "$candidate"
+      return 0 ;;
+  esac
+  printf '%s\n' '{"ok":false,"reason":"outcome_unknown"}'
+}
+
 [ "$#" -eq 0 ] || fail
 [ "$(id -u)" -eq 0 ] || fail
 [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || :)" = zbtlink,zbt-we5927 ] || fail
@@ -50,17 +86,9 @@ case "$pdu" in *[!0-9A-F]*)fail;;esac
 
   # CMGS transaction holds the lock until the final modem disposition.
   # A timeout after Ctrl-Z means unknown, not safe to auto-retry.
+  transport_rc=0
   result="$(printf '%s\n' "$pdu" | /usr/libexec/veci-sms-cmgs /dev/ttyUSB2 2>/dev/null)" ||
-      {
-        case "$result" in
-          '{"ok":false,"reason":"network_rejected"}'|\
-          '{"ok":false,"reason":"outcome_unknown"}'|\
-          '{"ok":false,"reason":"prompt_unavailable"}')
-            printf '%s\n' "$result";exit 0;;
-          *) fail;;
-        esac
-      }
-  [ "$result" = '{"ok":true,"status":"accepted_by_modem"}' ] || fail
-  printf '%s\n' "$result"
+    transport_rc=$?
+  normalize_cmgs_result "$transport_rc" "$result"
   unset pdu result
 ) 9>/var/lock/we5927-at.lock
