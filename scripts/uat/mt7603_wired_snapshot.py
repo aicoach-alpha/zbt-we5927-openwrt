@@ -15,13 +15,14 @@ import re
 import subprocess
 import sys
 import time
+# Shared parser lives in scripts/ so the standalone Windows UAT entrypoint
+# cannot drift from the long-window read-only monitor's identity checks.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from veci_wifi_scan import normalize_bssid, parse_scan as parse_wifi_scan
 
 
-def parse_scan(output, expected):
-    # Do not serialize SSID names, BSSIDs or other users' network names.
-    entries = re.findall(r"(?mi)^\s*SSID\s+\d+\s*:\s*(.*?)\s*$", output)
-    return {"visible": expected in entries, "networks_seen": len(entries),
-            "scan_valid": len(entries) > 0}
+def parse_scan(output, expected, bssid=None):
+    return parse_wifi_scan(output, expected, bssid)
 
 
 def parse_reset(output):
@@ -128,7 +129,7 @@ def run(args):
     for i in range(args.samples):
         scan = subprocess.run(["netsh.exe", "wlan", "show", "networks", "mode=bssid"],
                               capture_output=True, text=True, errors="replace", timeout=12)
-        item = parse_scan(scan.stdout, args.ssid)
+        item = parse_scan(scan.stdout, args.ssid, args.bssid)
         item["scan_valid"] = item["scan_valid"] and scan.returncode == 0
         scans.append(item)
         print(f"Scan {i + 1}/{args.samples}: visible={item['visible']}, other networks seen={item['networks_seen']}", flush=True)
@@ -161,6 +162,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--host", required=True)
     ap.add_argument("--ssid", required=True)
+    ap.add_argument("--bssid", required=True,
+                    help="preverified router AP BSSID, not a nearby AP with the same SSID")
     ap.add_argument("--host-key-pin", required=True)
     ap.add_argument("--key", required=True, type=Path)
     ap.add_argument("--expected-kernel", default="")
@@ -168,6 +171,10 @@ def main():
     ap.add_argument("--interval", type=float, default=2)
     ap.add_argument("--output", required=True, type=Path)
     a = ap.parse_args()
+    try:
+        normalize_bssid(a.bssid)
+    except ValueError as error:
+        ap.error(str(error))
     if not 1 <= a.samples <= 15 or not 0 <= a.interval <= 30 or not a.key.is_file():
         ap.error("invalid samples, interval, or SSH key path")
     return run(a)

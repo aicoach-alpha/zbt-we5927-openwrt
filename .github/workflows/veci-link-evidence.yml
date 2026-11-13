@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'scripts/veci-link-*.py'
+      - 'scripts/veci_wifi_scan.py'
       - 'scripts/veci-link-readonly-snapshot.sh'
       - 'scripts/tests/test_veci_link_monitor.py'
       - '.github/workflows/veci-link-evidence.yml'
@@ -18,7 +19,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m unittest discover -s scripts/tests -p test_veci_link_monitor.py -v
-      - run: python -m py_compile scripts/veci-link-wired-monitor.py scripts/veci-link-analyze.py
+      - run: python -m py_compile scripts/veci-link-wired-monitor.py scripts/veci-link-analyze.py scripts/veci_wifi_scan.py
       - run: sh -n scripts/veci-link-readonly-snapshot.sh
       - name: Reject disruptive commands in readonly collector
         run: |

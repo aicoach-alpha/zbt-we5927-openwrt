@@ -14,6 +14,9 @@ import subprocess
 import sys
 import time
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from veci_wifi_scan import normalize_bssid, parse_scan as parse_wifi_scan
+
 KEYS = {
     "epoch_s", "uptime_s", "usb0_carrier", "usb0_operstate",
     "usb0_ipv4", "lte_default_route", "gateway_ping_ok",
@@ -43,9 +46,6 @@ def snapshot_valid(record):
                      and record["lte_default_route"] == 0)))
 
 
-SSIDPAT = re.compile(r"^\s*SSID\s+\d+\s*:\s*(.*?)\s*$", re.MULTILINE)
-
-
 def parse_snapshot(stdout):
     result = {}
     for line in stdout.splitlines():
@@ -61,10 +61,10 @@ def parse_snapshot(stdout):
     return result
 
 
-def scan_ssid(ssid):
-    if not ssid:
-        return None
-    if sys.platform != "win32":
+def scan_ssid(ssid, bssid=None):
+    # Without a previously verified BSSID, an identically named neighbour
+    # could falsely appear as proof the router's own MT7603 is beaconing.
+    if not ssid or not bssid or sys.platform != "win32":
         return None
     try:
         cp = subprocess.run(
@@ -74,12 +74,13 @@ def scan_ssid(ssid):
         )
         if cp.returncode:
             return None
-        return any(s == ssid for s in SSIDPAT.findall(cp.stdout))
-    except (OSError, subprocess.TimeoutExpired):
+        info = parse_wifi_scan(cp.stdout, ssid, bssid)
+        return info["visible"] if info["scan_valid"] else None
+    except (ValueError, OSError, subprocess.TimeoutExpired):
         return None
 
 
-def sample(host, key, known_hosts, source, ssid):
+def sample(host, key, known_hosts, source, ssid, bssid=None):
     cmd = [
         "ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
         "-o", "ConnectionAttempts=1", "-o", "StrictHostKeyChecking=yes",
@@ -95,7 +96,7 @@ def sample(host, key, known_hosts, source, ssid):
     except (OSError, subprocess.TimeoutExpired):
         record, status = {}, "unavailable"
     record.update({"collected_at": datetime.now(timezone.utc).isoformat(),
-                   "collection_status": status, "external_ssid_visible": scan_ssid(ssid)})
+                   "collection_status": status, "external_ssid_visible": scan_ssid(ssid, bssid)})
     return record
 
 
@@ -106,7 +107,9 @@ def main():
     p.add_argument("--known-hosts", required=True, type=Path,
                    help="pre-verified pinned SSH host key file")
     p.add_argument("--out", required=True, type=Path, help="local JSONL file")
-    p.add_argument("--ssid", default=None, help="compare locally; never saved in output")
+    p.add_argument("--ssid", default=None, help="verified router SSID (never saved)")
+    p.add_argument("--bssid", default=None,
+                   help="independently verified BSSID of the router AP (never saved)")
     p.add_argument("--hours", type=float, default=72.0)
     p.add_argument("--interval", type=int, default=30)
     args = p.parse_args()
@@ -114,6 +117,13 @@ def main():
         ipaddress.IPv4Address(args.host)
     except ipaddress.AddressValueError:
         p.error("--host must be an IPv4 address")
+    if bool(args.ssid) != bool(args.bssid):
+        p.error("--ssid and --bssid must be supplied together for Wi-Fi UAT")
+    if args.bssid:
+        try:
+            normalize_bssid(args.bssid)
+        except ValueError as error:
+            p.error(str(error))
     if not args.key.is_file() or not args.known_hosts.is_file():
         p.error("existing SSH key and pinned known_hosts are required")
     if not 0 < args.hours <= 168 or not 10 <= args.interval <= 300:
@@ -128,7 +138,7 @@ def main():
     with args.out.open("x", encoding="utf-8") as f:
         while time.monotonic() < end:
             start = time.monotonic()
-            record = sample(args.host, args.key, args.known_hosts, source, args.ssid)
+            record = sample(args.host, args.key, args.known_hosts, source, args.ssid, args.bssid)
             f.write(json.dumps(record, separators=(",", ":")) + "\n")
             f.flush()
             time.sleep(max(0, args.interval - (time.monotonic() - start)))
