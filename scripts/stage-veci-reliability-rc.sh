@@ -53,6 +53,37 @@ sh "$here/scripts/stage-mt7603-deadlock-fix.sh" "$root"
 sh "$here/scripts/reconcile-we5927-lte-build-tree.sh" "$root"
 sh "$here/scripts/stage-veci-wifi-guardian.sh" "$root"
 
+# Both native admin UI packages are compiled into this *candidate* image.
+# Pinned source is carried in-repo; do not silently fetch a moving branch.
+# This does NOT establish parity with the currently running router overlay.
+for pkg in veci-core veci-default-ui; do
+  [ -f "$here/source/$pkg/Makefile" ] || {
+    echo "veci_package_source_missing:$pkg" >&2
+    exit 3
+  }
+done
+[ -f "$here/source/veci-core/UPSTREAM_COMMIT" ] || {
+  echo 'veci_core_pin_missing' >&2; exit 3
+}
+grep -Fxq 'bdf7bcf332c23b625e92fb1e00d1fb30edea88b6' "$here/source/veci-core/UPSTREAM_COMMIT" || {
+  echo 'veci_core_unreviewed_revision' >&2; exit 3
+}
+[ -f "$here/source/veci-core/veci/index.html" ] &&
+[ -f "$here/source/veci-core/rpcd-acl.json" ] &&
+[ -f "$here/source/veci-core/files/rpcd-veci" ] || {
+  echo 'veci_authenticated_frontend_source_missing' >&2; exit 3
+}
+for pair in 'veci-core veci' 'veci-default-ui veci-default-ui'; do
+  set -- $pair
+  src="$here/source/$1"
+  dst="$root/package/$2"
+  [ ! -L "$dst" ] || { echo "veci_package_symlink_refused:$2" >&2; exit 3; }
+  mkdir -p "$dst"
+  cp -a "$src/." "$dst/"
+  cmp -s "$src/Makefile" "$dst/Makefile" || exit 4
+done
+echo 'VECI_CORE_AND_DEFAULT_UI_STAGED=PASS'
+
 # Reconcile init/hotplug AFTER the historical board patch, not only
 # the daemon binary. Write to the isolated build tree, never the router.
 for rel in etc/init.d/we5927-lte etc/hotplug.d/usb/30-we5927-lte; do

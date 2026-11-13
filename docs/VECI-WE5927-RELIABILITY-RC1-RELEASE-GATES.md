@@ -56,3 +56,28 @@ The follow-up workflow changes add an artifact containing **JSON build evidence 
 5. **On-router read-only preflight**: SSH reachability does not establish authenticated login. Never auto-accept a new SSH host key or bypass pinned known_hosts. Perform `sysupgrade -T` only after a signed, authorized image exists and is made available over an approved wired maintenance path.
 
 **Current gate: NO-GO FOR FLASH**. Keep the existing signed working production firmware and LuCI/VeCI access intact.
+
+## 2026-11-13 release-candidate preparation (NOT flash approval)
+
+The follow-up source update vendors the public aicoach-alpha/veci Core at exact
+commit bdf7bcf332c23b625e92fb1e00d1fb30edea88b6, together with the
+reviewed veci-default-ui package, and requires their SPA, authenticated rpcd
+helper and ACL, HTTPS default settings, and LuCI fallback to be present inside
+the built firmware rootfs. This closes a source packaging gap only; the
+running production router has not been shown to contain identical frontend
+and RPC versions. Additional live-only VeCI SMS/guest/OTA functionality remains
+unverified and must not be assumed safe to replace.
+
+The complete-image CI remains evidence-only on normal pushes and PRs. An
+explicit, manually dispatched build with export_unsigned_candidate=true
+may export an UNSIGNED_DO_NOT_FLASH image for offline inspection. The
+artifact is tied to the exact source commit, checked against its evidence
+SHA/size, and must never be treated as a signed production release.
+
+Before flash approval require final image SHA, real image ucert signature
+against the production router's existing trust anchor (not just APK feed signing),
+full live VeCI/RPC parity, pinned SSH login, validated backups/rollback, native
+sysupgrade -T, and board/LTE/Wi-Fi/SMS hardware acceptance. GitHub repo
+currently has no signing secrets configured; existing production signing key
+must be supplied only through an approved secure deployment channel, never
+placed in repository source, CI logs or chat.

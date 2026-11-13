@@ -14,6 +14,12 @@ on:
       - 'scripts/stage-veci-reliability-rc.sh'
       - '.github/workflows/veci-reliability-full-image-rc.yml'
   workflow_dispatch:
+    inputs:
+      export_unsigned_candidate:
+        description: "Explicitly export UNSIGNED evidence-only image (NOT FLASH APPROVED)"
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -51,7 +57,7 @@ jobs:
           sh scripts/stage-veci-reliability-rc.sh "$root"
           cp source/openwrt-we5927.config "$root/.config"
           # Guardian must be built-in, not downloaded later to a nearly full 8 MB NOR.
-          printf '\nCONFIG_PACKAGE_veci-wifi-guardian=y\n' >> "$root/.config"
+          printf '\nCONFIG_PACKAGE_veci-wifi-guardian=y\nCONFIG_PACKAGE_veci=y\nCONFIG_PACKAGE_veci-default-ui=y\n' >> "$root/.config"
           grep -Fxq 'CONFIG_TARGET_ramips_mt76x8_DEVICE_zbtlink_zbt-we5927=y' "$root/.config"
           grep -Fxq 'CONFIG_TARGET_ROOTFS_SQUASHFS=y' "$root/.config"
           echo 'RELIABILITY_RELEASE_TREE_STAGED=PASS'
@@ -64,6 +70,8 @@ jobs:
           ./scripts/feeds install -a
           make defconfig
           grep -Fxq 'CONFIG_PACKAGE_veci-wifi-guardian=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci-default-ui=y' .config
           make -j2 V=s tools/install
           make -j2 V=s toolchain/install
           make -j2 V=s
@@ -105,6 +113,20 @@ jobs:
           grep -Fq 'auto_recover=0' "$rdir/usr/sbin/veci-wifi-guardian"
           cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/etc/init.d/we5927-lte" "$rdir/etc/init.d/we5927-lte"
           cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte" "$rdir/etc/hotplug.d/usb/30-we5927-lte"
+          # Static VeCI core, authenticated RPC and HTTPS/default-UI components
+          # must be PRESENT in the firmware itself (not only overlay config).
+          test -s "$rdir/www/veci/index.html"
+          cmp "$GITHUB_WORKSPACE/source/veci-core/veci/index.html" "$rdir/www/veci/index.html"
+          test -x "$rdir/usr/libexec/rpcd/veci"
+          cmp "$GITHUB_WORKSPACE/source/veci-core/files/rpcd-veci" "$rdir/usr/libexec/rpcd/veci"
+          cmp "$GITHUB_WORKSPACE/source/veci-core/rpcd-acl.json" "$rdir/usr/share/rpcd/acl.d/veci.json"
+          test -x "$rdir/usr/sbin/veci-default-ui"
+          cmp "$GITHUB_WORKSPACE/source/veci-default-ui/files/usr/sbin/veci-default-ui" "$rdir/usr/sbin/veci-default-ui"
+          test -x "$rdir/etc/uci-defaults/97-veci-https-defaults"
+          test -x "$rdir/etc/uci-defaults/98-veci-default-ui"
+          test -e "$rdir/www/cgi-bin/luci" || test -L "$rdir/www/cgi-bin/luci"
+          echo "BUILTIN_VECI_CORE_RPC_HTTPS_LUCI_FALLBACK=PASS"
+          echo "LIVE_VECI_PARITY=NOT_VERIFIED"
           echo "LTE_COLD_BOOT_SCRIPTS_INSTALLED=PASS"
           printf 'image_bytes=%s\nfirmware_mtd_bytes=%s\n' "$bytes" "$max"
           sha256sum "$image"
@@ -155,6 +177,8 @@ jobs:
                   "board_metadata": "pass",
                   "image_partition_fit": "pass",
                   "lte_and_guardian_source_installed": "pass",
+                  "builtin_veci_core_rpc_default_ui": "pass",
+                  "luci_fallback_retained": "pass",
                   "release_signing_and_trust_anchor": "not_verified",
                   "existing_veci_spa_parity": "not_verified",
                   "physical_router_uat": "not_run",
@@ -172,6 +196,50 @@ jobs:
         with:
           name: veci-we5927-rc1-build-evidence
           path: ${{ runner.temp }}/veci-rc1-evidence/release-gates.json
+          if-no-files-found: error
+          retention-days: 14
+      # Only an explicit manual run at the reviewed RC source ref can export
+      # the unsigned binary. PR CI continues to publish ONLY JSON evidence.
+      # Artifact possession is NOT authorization to flash a production router.
+      - name: Export unsigned firmware candidate for offline signature review
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/integration/veci-reliability-rc1-20261112' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/openwrt/bin/targets/ramips/mt76x8"
+          mapfile -t images < <(find "$dir" -maxdepth 1 -type f -name '*zbt*we5927*sysupgrade.bin' -print)
+          test "${#images[@]}" -eq 1
+          image="${images[0]}"
+          evidence="$RUNNER_TEMP/veci-rc1-evidence/release-gates.json"
+          python3 - "$image" "$evidence" "$GITHUB_SHA" <<'PYEXPORT'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+          image = pathlib.Path(sys.argv[1])
+          evidence = pathlib.Path(sys.argv[2])
+          commit = sys.argv[3]
+          report = json.loads(evidence.read_text())
+          digest = hashlib.sha256(image.read_bytes()).hexdigest()
+          assert report['github_build_sha'] == commit
+          assert report['image_sha256'] == digest
+          assert report['image_bytes'] == image.stat().st_size
+          assert report['board'] == 'zbtlink,zbt-we5927'
+          assert report['flash_permission'] is False
+          assert report['checks']['release_signing_and_trust_anchor'] == 'not_verified'
+          print('CANDIDATE_BINARY_DIGEST_MATCH=PASS')
+          PYEXPORT
+          { echo 'UNSIGNED IMAGE. NOT APPROVED FOR FLASH.'; echo "Release source commit: $GITHUB_SHA"; echo 'Offline trust, SPA parity, router UAT and recovery gates remain open.'; } > "$dir/UNSIGNED_DO_NOT_FLASH.txt"
+          cp "$evidence" "$dir/CI_BUILD_EVIDENCE.json"
+      - name: Upload explicitly requested UNSIGNED candidate (NOT FLASH APPROVED)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/integration/veci-reliability-rc1-20261112' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-we5927-RC1-UNSIGNED-DO-NOT-FLASH-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/openwrt/bin/targets/ramips/mt76x8/*zbt*we5927*sysupgrade.bin
+            ${{ runner.temp }}/openwrt/bin/targets/ramips/mt76x8/UNSIGNED_DO_NOT_FLASH.txt
+            ${{ runner.temp }}/openwrt/bin/targets/ramips/mt76x8/CI_BUILD_EVIDENCE.json
           if-no-files-found: error
           retention-days: 14
       - name: Produce non-deployable candidate evidence only

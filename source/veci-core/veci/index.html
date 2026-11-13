@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<base href="/veci/" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="theme-color" content="#071421" />
+		<meta name="color-scheme" content="light" />
+		<meta name="referrer" content="no-referrer" />
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+		/>
+		<title>VeCI · OpenWrt</title>
+		<link rel="manifest" href="./manifest.json" />
+		<link rel="icon" href="./icons/veci.svg" />
+		<link rel="stylesheet" href="./app.css" />
+	</head>
+	<body>
+		<div id="veci-root">
+			<section id="login-view" class="login-shell">
+				<div class="login-brand">
+					<div class="brand-mark">V</div>
+					<div>
+						<strong>VeCI</strong>
+						<span>Easy Configuration Interface</span>
+					</div>
+				</div>
+
+				<form id="login-form" class="login-card" autocomplete="on">
+					<div class="login-heading">
+						<p class="eyebrow">OPENWRT ADMINISTRATION</p>
+						<h1>Welcome back</h1>
+						<p>Sign in with your router administrator account.</p>
+					</div>
+
+					<label class="field">
+						<span>Username</span>
+						<input
+							id="username"
+							name="username"
+							type="text"
+							autocomplete="username"
+							value="root"
+							required
+						/>
+					</label>
+
+					<label class="field">
+						<span>Password</span>
+						<input
+							id="password"
+							name="password"
+							type="password"
+							autocomplete="current-password"
+							placeholder="Leave blank if no admin password is set yet"
+						/>
+					</label>
+
+					<button id="login-submit" class="button button-primary button-block" type="submit">Sign in</button>
+					<p id="login-error" class="form-error" role="alert"></p>
+					<p class="login-note">VeCI does not persist your router password.</p>
+				</form>
+			</section>
+
+			<section id="app-view" class="app-shell hidden">
+				<aside class="sidebar">
+					<div class="sidebar-brand">
+						<div class="brand-mark brand-mark-small">V</div>
+						<div class="sidebar-brand-copy">
+							<strong>VeCI</strong>
+							<span id="sidebar-model">OpenWrt Router</span>
+						</div>
+					</div>
+
+					<nav id="primary-nav" class="primary-nav" aria-label="Primary"></nav>
+
+					<div class="sidebar-footer">
+						<a id="expert-link" class="nav-link nav-link-muted" href="/cgi-bin/luci/">
+							<span class="nav-icon" data-icon="terminal"></span>
+							<span>Expert / LuCI</span>
+						</a>
+						<button id="logout-button" class="nav-link nav-link-button nav-link-muted" type="button">
+							<span class="nav-icon" data-icon="logout"></span>
+							<span>Sign out</span>
+						</button>
+					</div>
+				</aside>
+
+				<div class="main-shell">
+					<header class="topbar">
+						<div class="topbar-left">
+							<button
+								id="mobile-menu-button"
+								class="icon-button mobile-menu-button"
+								type="button"
+								aria-label="Open menu"
+							>
+								<span data-icon="menu"></span>
+							</button>
+							<div>
+								<p id="page-eyebrow" class="eyebrow">ROUTER</p>
+								<h1 id="page-title">Home</h1>
+							</div>
+						</div>
+						<div class="topbar-device">
+							<span id="connection-dot" class="status-dot"></span>
+							<div>
+								<strong id="topbar-model">OpenWrt Router</strong>
+								<span id="topbar-firmware">Detecting firmware…</span>
+							</div>
+						</div>
+					</header>
+
+					<main id="page-content" class="page-content" tabindex="-1"></main>
+				</div>
+			</section>
+		</div>
+
+		<div id="toast-root" class="toast-root" aria-live="polite"></div>
+		<div id="modal-root"></div>
+
+		<script type="module" src="./js/app.js"></script>
+	</body>
+</html>
