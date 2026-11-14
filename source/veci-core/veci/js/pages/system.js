@@ -1,6 +1,6 @@
-import { bindFirmwareUpdates } from '../lib/firmware-updates.js';
-import { badge, escapeHtml, setBusy } from '../lib/dom.js';
-import { formatBytes, formatDuration, formatMemory } from '../lib/format.js';
+import { bindFirmwareUpdates } from '../lib/firmware-updates.js?v=162';
+import { badge, escapeHtml, setBusy } from '../lib/dom.js?v=162';
+import { formatBytes, formatDuration, formatMemory } from '../lib/format.js?v=162';
 
 export default {
 	id: 'system',

@@ -1,5 +1,5 @@
-import { badge, escapeHtml, setBusy } from '../lib/dom.js';
-import { relativeExpiry } from '../lib/format.js';
+import { badge, escapeHtml, setBusy } from '../lib/dom.js?v=162';
+import { relativeExpiry } from '../lib/format.js?v=162';
 
 function normalizeMac(value = '') {
 	return String(value).trim().toLowerCase();

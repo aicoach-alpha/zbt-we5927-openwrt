@@ -22,6 +22,8 @@ define Build/Compile
 endef
 
 define Package/veci-app-catalog-we5927/install
+	$(INSTALL_DIR) $(1)/etc
+	$(INSTALL_DATA) ./files/etc/veci-release.json $(1)/etc/veci-release.json
 	$(INSTALL_DIR) $(1)/usr/share/veci/apps
 	$(INSTALL_DATA) ./files/usr/share/veci/apps/*.json $(1)/usr/share/veci/apps/
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd

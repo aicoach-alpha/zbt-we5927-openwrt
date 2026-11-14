@@ -1,4 +1,4 @@
-import { badge, escapeHtml, setBusy } from '../lib/dom.js';
+import { badge, escapeHtml, setBusy } from '../lib/dom.js?v=162';
 
 function sections(values = {}, type) {
 	return Object.entries(values)

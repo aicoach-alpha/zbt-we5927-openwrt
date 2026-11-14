@@ -34,7 +34,11 @@ class ArtifactExportPolicy(unittest.TestCase):
 
     def test_pr_ci_still_emits_evidence_only(self):
         self.assertIn("name: veci-we5927-rc1-build-evidence", self.workflow)
-        self.assertIn("path: __DOLLAR__{{ runner.temp }}/veci-rc1-evidence/release-gates.json".replace("__DOLLAR__", "$"), self.workflow)
+        self.assertIn("path: |", self.workflow)
+        self.assertIn("__DOLLAR__{{ runner.temp }}/veci-rc1-evidence/release-gates.json".replace("__DOLLAR__", "$"), self.workflow)
+        self.assertIn("__DOLLAR__{{ runner.temp }}/veci-rc1-evidence/native-features.json".replace("__DOLLAR__", "$"), self.workflow)
+        self.assertIn("name: veci-we5927-RC1-UNSIGNED-DO-NOT-FLASH-", self.workflow)
+        self.assertIn("if: ${{ github.event_name == 'workflow_dispatch'", self.workflow)
 
 if __name__ == '__main__':
     unittest.main()

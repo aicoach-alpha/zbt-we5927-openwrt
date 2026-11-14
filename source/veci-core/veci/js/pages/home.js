@@ -1,6 +1,6 @@
-import { badge, escapeHtml, setBusy } from '../lib/dom.js';
-import { formatBytes, formatDuration, formatMemory, firstAddress } from '../lib/format.js';
-import { icon } from '../lib/icons.js';
+import { badge, escapeHtml, setBusy } from '../lib/dom.js?v=162';
+import { formatBytes, formatDuration, formatMemory, firstAddress } from '../lib/format.js?v=162';
+import { icon } from '../lib/icons.js?v=162';
 
 function defaultRouteInterface(interfaces) {
 	return (

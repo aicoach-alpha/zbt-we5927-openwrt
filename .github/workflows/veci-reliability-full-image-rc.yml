@@ -8,6 +8,12 @@ on:
       - 'source/openwrt-zbt-we5927-current.patch'
       - 'source/mt76-patches/**'
       - 'source/veci-wifi-guardian/**'
+      - 'source/veci-core/**'
+      - 'source/veci-default-ui/**'
+      - 'source/veci-data-meter/**'
+      - 'source/veci-app-catalog-we5927/**'
+      - 'scripts/audit_veci_firmware_features.py'
+      - 'scripts/veci_release_manifest.py'
       - 'source/we5927-lte/files/usr/sbin/we5927-lte'
       - 'source/we5927-lte/files/etc/init.d/we5927-lte'
       - 'source/we5927-lte/files/etc/hotplug.d/usb/30-we5927-lte'
@@ -59,7 +65,7 @@ jobs:
           sh scripts/stage-veci-reliability-rc.sh "$root"
           cp source/openwrt-we5927.config "$root/.config"
           # Guardian must be built-in, not downloaded later to a nearly full 8 MB NOR.
-          printf '\nCONFIG_PACKAGE_veci-wifi-guardian=y\nCONFIG_PACKAGE_veci=y\nCONFIG_PACKAGE_veci-default-ui=y\nCONFIG_PACKAGE_veci-cellular-we5927=y\nCONFIG_PACKAGE_veci-app-catalog-we5927=y\nCONFIG_PACKAGE_veci-update-we5927=y\n' >> "$root/.config"
+          printf '\nCONFIG_PACKAGE_veci-wifi-guardian=y\nCONFIG_PACKAGE_veci=y\nCONFIG_PACKAGE_veci-default-ui=y\nCONFIG_PACKAGE_veci-cellular-we5927=y\nCONFIG_PACKAGE_veci-app-catalog-we5927=y\nCONFIG_PACKAGE_veci-update-we5927=y\nCONFIG_PACKAGE_veci-data-meter=y\n' >> "$root/.config"
           grep -Fxq 'CONFIG_TARGET_ramips_mt76x8_DEVICE_zbtlink_zbt-we5927=y' "$root/.config"
           grep -Fxq 'CONFIG_TARGET_ROOTFS_SQUASHFS=y' "$root/.config"
           echo 'RELIABILITY_RELEASE_TREE_STAGED=PASS'
@@ -77,6 +83,7 @@ jobs:
           grep -Fxq 'CONFIG_PACKAGE_veci-cellular-we5927=y' .config
           grep -Fxq 'CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
           grep -Fxq 'CONFIG_PACKAGE_veci-update-we5927=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_veci-data-meter=y' .config
           ! grep -Fxq 'CONFIG_PACKAGE_veci-app-guest=y' .config
           ! grep -Fxq 'CONFIG_PACKAGE_veci-app-voucher=y' .config
           make -j2 V=s tools/install
@@ -123,6 +130,20 @@ jobs:
           # Static VeCI core, authenticated RPC and HTTPS/default-UI components
           # must be PRESENT in the firmware itself (not only overlay config).
           test -s "$rdir/www/veci/index.html"
+          cmp "$GITHUB_WORKSPACE/source/veci-default-ui/files/www/index.html" "$rdir/www/index.html"
+          test -s "$rdir/etc/veci-release.json"
+          test -s "$rdir/www/veci/build.json"
+          python3 - "$rdir/etc/veci-release.json" "$rdir/www/veci/build.json" "$GITHUB_SHA" <<'PYBUILD'
+          import json, pathlib, sys
+          info = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          web = json.loads(pathlib.Path(sys.argv[2]).read_text())
+          assert info == web, "web and on-router build identities must match"
+          assert info['build_id'] == sys.argv[3]
+          assert info['board'] == 'zbtlink,zbt-we5927'
+          assert info['channel'] == 'development'
+          assert info['image_signature'] == 'not_verified'
+          print('VECI_NATIVE_BUILD_ID_AND_LANDING=PASS')
+          PYBUILD
           cmp "$GITHUB_WORKSPACE/source/veci-core/veci/index.html" "$rdir/www/veci/index.html"
           test -x "$rdir/usr/libexec/rpcd/veci"
           cmp "$GITHUB_WORKSPACE/source/veci-core/files/rpcd-veci" "$rdir/usr/libexec/rpcd/veci"
@@ -147,8 +168,22 @@ jobs:
           done
           test -x "$rdir/usr/libexec/veci-sms-cmgs"
           test -x "$rdir/etc/init.d/veci-update-agent"
+          test -x "$rdir/usr/libexec/rpcd/veci.meter"
+          test -s "$rdir/www/veci/data-meter.html"
+          test -s "$rdir/www/veci/data-meter.js"
           test -s "$rdir/usr/share/veci/apps/guest.json"
           test -s "$rdir/usr/share/veci/apps/voucher.json"
+          # Machine-readable actual image audit; do not claim that app cards
+          # imply real installed backend packages or physical acceptance.
+          mkdir -p "$RUNNER_TEMP/veci-rc1-evidence"
+          python3 "$GITHUB_WORKSPACE/scripts/audit_veci_firmware_features.py" --rootfs "$rdir" > "$RUNNER_TEMP/veci-rc1-evidence/native-features.json"
+          python3 - "$RUNNER_TEMP/veci-rc1-evidence/native-features.json" <<'PYAUDIT'
+          import json, pathlib, sys
+          report = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          print('NATIVE_FEATURE_PARITY=' + report['static_feature_parity'])
+          print('MISSING_NATIVE_FEATURES=' + ','.join(report['missing']))
+          assert report['production_flash_permission'] is False
+          PYAUDIT
           echo "VECI_WEB_CELLULAR_SMS_APPS_OTA_PARITY_SOURCE=PASS"
           echo "OPTIONAL_GUEST_VOUCHER_NOT_BUNDLED=PASS"
           echo "BUILTIN_VECI_CORE_RPC_HTTPS_LUCI_FALLBACK=PASS"
@@ -187,7 +222,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: veci-we5927-rc1-build-evidence
-          path: ${{ runner.temp }}/veci-rc1-evidence/release-gates.json
+          path: |
+            ${{ runner.temp }}/veci-rc1-evidence/release-gates.json
+            ${{ runner.temp }}/veci-rc1-evidence/native-features.json
           if-no-files-found: error
           retention-days: 14
       # Only an explicit manual run at the reviewed RC source ref can export

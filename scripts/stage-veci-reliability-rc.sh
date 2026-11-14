@@ -56,7 +56,7 @@ sh "$here/scripts/stage-veci-wifi-guardian.sh" "$root"
 # Both native admin UI packages are compiled into this *candidate* image.
 # Pinned source is carried in-repo; do not silently fetch a moving branch.
 # This does NOT establish parity with the currently running router overlay.
-for pkg in veci-core veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci-update-we5927; do
+for pkg in veci-core veci-default-ui veci-cellular-we5927 veci-app-catalog-we5927 veci-update-we5927 veci-data-meter; do
   [ -f "$here/source/$pkg/Makefile" ] || {
     echo "veci_package_source_missing:$pkg" >&2
     exit 3
@@ -73,7 +73,7 @@ grep -Fxq 'a1504e607d4b7b32ce9f6a6858cdf59dd777acfb' "$here/source/veci-core/UPS
 [ -f "$here/source/veci-core/files/rpcd-veci" ] || {
   echo 'veci_authenticated_frontend_source_missing' >&2; exit 3
 }
-for pair in 'veci-core veci' 'veci-default-ui veci-default-ui' 'veci-cellular-we5927 veci-cellular-we5927' 'veci-app-catalog-we5927 veci-app-catalog-we5927' 'veci-update-we5927 veci-update-we5927'; do
+for pair in 'veci-core veci' 'veci-default-ui veci-default-ui' 'veci-cellular-we5927 veci-cellular-we5927' 'veci-app-catalog-we5927 veci-app-catalog-we5927' 'veci-update-we5927 veci-update-we5927' 'veci-data-meter veci-data-meter'; do
   set -- $pair
   src="$here/source/$1"
   dst="$root/package/$2"
@@ -82,6 +82,30 @@ for pair in 'veci-core veci' 'veci-default-ui veci-default-ui' 'veci-cellular-we
   cp -a "$src/." "$dst/"
   cmp -s "$src/Makefile" "$dst/Makefile" || exit 4
 done
+# The APK feed and VeCI firmwareStatus both require the *actual checked-out*
+# release build ID; the previous image omitted /etc/veci-release.json and
+# rendered all future signed app-feed lookup impossible.
+# This does NOT mark the image signed or flash-approved.
+python3 "$here/scripts/veci_release_manifest.py" \
+  --repo "$here" \
+  --expected-head "$(git -C "$here" rev-parse HEAD)" \
+  --out "$root/package/veci-app-catalog-we5927/files/etc/veci-release.json"
+# Make the *root URL* resolve to VeCI, including on a normal sysupgrade that
+# preserves the uHTTPd index-page order. Keep LuCI as a recovery-only fallback.
+landing="$here/source/veci-default-ui/files/www/index.html"
+[ -r "$landing" ] && grep -Fq 'url=/veci/' "$landing" || {
+  echo 'native_veci_landing_missing' >&2; exit 4
+}
+mkdir -p "$root/files/www/veci" "$root/files/etc"
+if [ -e "$root/files/www/index.html" ] &&
+   ! cmp -s "$landing" "$root/files/www/index.html"; then
+  echo 'existing_custom_landing_conflicts_with_veci' >&2; exit 4
+fi
+cp "$landing" "$root/files/www/index.html"
+cp "$root/package/veci-app-catalog-we5927/files/etc/veci-release.json" \
+  "$root/files/www/veci/build.json"
+printf 'development\n' > "$root/files/etc/veci-release-channel"
+echo 'VECI_NATIVE_LANDING_AND_REAL_RELEASE_ID_STAGED=PASS'
 # Preserve reviewed latest LTE recovery while compiling the SMS CMGS helper.
 # This helper is an explicit runtime dependency of SMS send on the live router.
 [ -f "$here/source/we5927-lte/src/veci-sms-cmgs.c" ] || {

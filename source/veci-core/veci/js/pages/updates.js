@@ -1,4 +1,4 @@
-import { badge, escapeHtml, setBusy } from '../lib/dom.js';
+import { badge, escapeHtml, setBusy } from '../lib/dom.js?v=162';
 
 const UPLOAD_CHUNK_BYTES = 32 * 1024;
 

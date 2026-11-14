@@ -1,5 +1,5 @@
-import { badge, escapeHtml, setBusy } from '../lib/dom.js';
-import { firstAddress, humanProtocol } from '../lib/format.js';
+import { badge, escapeHtml, setBusy } from '../lib/dom.js?v=162';
+import { firstAddress, humanProtocol } from '../lib/format.js?v=162';
 
 function isUplink(iface) {
 	return (

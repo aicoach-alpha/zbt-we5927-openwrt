@@ -1,4 +1,4 @@
-import { badge, escapeHtml, setBusy } from '../lib/dom.js';
+import { badge, escapeHtml, setBusy } from '../lib/dom.js?v=162';
 
 function metric(label, value, suffix = '') {
 	const display = value === undefined || value === null || value === '' ? '—' : `${value}${suffix}`;
@@ -619,6 +619,7 @@ export default {
 						<div id="cellular-internet-status"><span>Internet</span><strong>${online ? 'Checking…' : 'Unavailable'}</strong></div>
 					</div>
 					<div class="cellular-actions">
+						<a class="button button-secondary" id="cellular-data-meter" href="/veci/data-meter.html">Data Meter / LTE usage</a>
 						<button class="button button-secondary" id="cellular-reconnect" type="button">Reconnect data</button>
 						${status.sim !== undefined ? '<button class="button button-secondary" id="cellular-switch-sim" type="button">Switch SIM</button>' : ''}
 					</div>

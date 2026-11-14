@@ -165,3 +165,33 @@ Wi-Fi/bridge/firewall settings without safe service/recovery checks.
   an Expert/failsafe fallback until the native replacement is validated.
 - Verify checksum and sysupgrade -T on target before any single final
   release/deployment. No auto-flash, no --force, no unreviewed build.
+
+
+## 2026-11-14 — Native landing + exact release identity + real LTE meter
+
+Found in actual 4fa427d SquashFS: /www/index.html still pointed
+to LuCI and /etc/veci-release.json did not exist, so the root UI could
+look unchanged and the signed APK feed could not map an installed build.
+The feature integration branch corrects these source issues by staging a
+root /veci/ landing, a SHA-derived /etc/veci-release.json, matching
+/www/veci/build.json, and a visible VeCI build marker with cache-busted
+client assets. The generator never claims the image is signed.
+
+The native LTE Data Meter is now bundled as a base package from pinned
+source. Its read-only interface counters and manual quota baseline are
+NOT an authenticated carrier quota; it expires estimates on boot or
+counter resets. The offline package tests are separate from physical UAT.
+
+True optional app packages Guest, Voucher, SQM, DDNS, WireGuard and
+Indonesia quota registry are staged as source for exact-ABI builds, not
+installed automatically. There are currently no GitHub Actions signing
+secrets configured for an APK feed; app installation cannot be declared
+working until a matching signed release feed exists and is hardware-tested.
+
+The old 4fa427d firmware is definitively not all-features-complete:
+the actual-rootfs inventory fails Guest, Voucher, Data Meter,
+operator quota, release ID and native root landing. Do not re-label
+that image as the final release or claim a green build is enough.
+
+No physical router changed by this source integration. Follow the
+full-native parity checklist in docs/VECI-FULL-NATIVE-PARITY-RELEASE.md.

@@ -51,6 +51,10 @@ jobs:
             test: test_veci_sms_cmgs_result.py
           - subsystem: release-provenance
             test: test_veci_release_evidence.py
+          - subsystem: native-feature-audit
+            test: test_veci_native_firmware_audit.py
+          - subsystem: release-build-id
+            test: test_veci_release_manifest.py
     steps:
       - uses: actions/checkout@v4
       - name: Run isolated offline regression
@@ -91,7 +95,7 @@ jobs:
           sh -n source/veci-guest/veci.app.guest
           sh -n source/veci-cellular-we5927/files/usr/libexec/veci-sms-send-one
           python3 -m py_compile scripts/veci-link-wired-monitor.py scripts/veci-link-analyze.py scripts/uat/mt7603_wired_snapshot.py scripts/veci_wifi_scan.py
-          python3 -m py_compile scripts/veci_release_evidence.py
+          python3 -m py_compile scripts/veci_release_evidence.py scripts/veci_release_manifest.py scripts/audit_veci_firmware_features.py
           cmp files/usr/sbin/we5927-lte source/we5927-lte/files/usr/sbin/we5927-lte
           if sed '/^[[:space:]]*#/d' scripts/veci-link-readonly-snapshot.sh |
             grep -En '(^|[[:space:]])(ifup|ifdown|sysupgrade|reboot|uci[[:space:]]+(set|commit)|wifi[[:space:]]+(reload|up|down))([[:space:]]|$)'; then

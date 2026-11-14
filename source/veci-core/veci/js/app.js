@@ -1,18 +1,18 @@
-import { VeciApi } from './lib/api.js';
-import { escapeHtml, qs, qsa, setBusy } from './lib/dom.js';
-import { hydrateIcons, icon } from './lib/icons.js';
+import { VeciApi } from './lib/api.js?v=162';
+import { escapeHtml, qs, qsa, setBusy } from './lib/dom.js?v=162';
+import { hydrateIcons, icon } from './lib/icons.js?v=162';
 
-import homePage from './pages/home.js?v=161';
-import internetPage from './pages/internet.js';
-import wifiPage from './pages/wifi.js';
-import devicesPage from './pages/devices.js';
-import securityPage from './pages/security.js';
-import networkPage from './pages/network.js';
-import systemPage from './pages/system.js';
-import cellularPage from './pages/cellular.js?v=160';
-import updatesPage from './pages/updates.js';
-import appsPage from './pages/apps.js';
-import hotspotPage from './pages/hotspot.js';
+import homePage from './pages/home.js?v=162';
+import internetPage from './pages/internet.js?v=162';
+import wifiPage from './pages/wifi.js?v=162';
+import devicesPage from './pages/devices.js?v=162';
+import securityPage from './pages/security.js?v=162';
+import networkPage from './pages/network.js?v=162';
+import systemPage from './pages/system.js?v=162';
+import cellularPage from './pages/cellular.js?v=162';
+import updatesPage from './pages/updates.js?v=162';
+import appsPage from './pages/apps.js?v=162';
+import hotspotPage from './pages/hotspot.js?v=162';
 
 const pages = [
 	homePage,
@@ -117,6 +117,22 @@ class VeciApp {
 		qs('#sidebar-model').textContent = model;
 		qs('#topbar-model').textContent = model;
 		qs('#topbar-firmware').textContent = firmware;
+		// Unique build identity is read from the installed rootfs, not guessed
+		// from the unchanged OpenWrt version or browser asset cache.
+		const build = qs('#topbar-build');
+		if (build) {
+			build.textContent = 'Build not identified';
+			try {
+				const response = await fetch('/veci/build.json', { cache: 'no-store' });
+				if (!response.ok) throw new Error('build identity missing');
+				const identity = await response.json();
+				if (!/^[a-f0-9]{40}$/.test(identity?.build_id || '') || identity?.board !== 'zbtlink,zbt-we5927')
+					throw new Error('build identity invalid');
+				build.textContent = 'VeCI source ' + identity.build_id.slice(0, 10) + ' · ' + String(identity.channel || 'unpublished');
+			} catch {
+				build.textContent = 'Build not identified';
+			}
+		}
 		qs('#connection-dot').classList.add('online');
 	}
 

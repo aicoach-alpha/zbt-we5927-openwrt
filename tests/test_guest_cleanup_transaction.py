@@ -10,7 +10,7 @@ def cleanup_source():
     if not match:raise AssertionError('cleanup function missing')
     return match.group()
 
-def run_case(disable=0,commit_fail='',restore=0,delete_fail=''):
+def run_case(disable=0,commit_fail='',restore=0,delete_fail='', active=False):
     with tempfile.TemporaryDirectory() as directory:
         root=pathlib.Path(directory)
         marker=root/'actions'
@@ -19,7 +19,7 @@ def run_case(disable=0,commit_fail='',restore=0,delete_fail=''):
 portal_snapshot_begin() { echo snapshot >> "$AUDIT"; return 0; }
 portal_snapshot_discard() { echo discard >> "$AUDIT"; }
 portal_snapshot_restore() { echo restore >> "$AUDIT"; return RESTORE_RC; }
-disable_portal() { echo disable >> "$AUDIT"; return DISABLE_RC; }
+disable_portal() { echo disable >> "$AUDIT"; guest_was_active=ACTIVE; return DISABLE_RC; }
 service_restart() { echo "restart:$1" >> "$AUDIT"; return 0; }
 wifi() { echo reload >> "$AUDIT"; return 0; }
 uci() {
@@ -28,7 +28,7 @@ uci() {
   if [ "$1" = -q ] && [ "$2" = delete ] && [ "$3" = BAD_DELETE ]; then return 1; fi
   return 0;
 }
-'''.replace('DISABLE_RC',str(disable)).replace('RESTORE_RC',str(restore)).replace('BAD_COMMIT',commit_fail).replace('BAD_DELETE',delete_fail)
+'''.replace('DISABLE_RC',str(disable)).replace('RESTORE_RC',str(restore)).replace('BAD_COMMIT',commit_fail).replace('BAD_DELETE',delete_fail).replace('ACTIVE','1' if active else '0')
         content='AUDIT='+str(marker)+'\n'+stub+'\n'+code+'\nmethod_cleanup\n'
         p=subprocess.run(['sh','-c',content],capture_output=True,text=True,timeout=8)
         return p,json.loads(p.stdout),marker.read_text().splitlines()
@@ -67,7 +67,15 @@ class GuestCleanupSafetyTests(unittest.TestCase):
         self.assertIn('uci:commit network',actions)
         self.assertIn('uci:commit firewall',actions)
         self.assertIn('restart:uspot',actions)
+        self.assertNotIn('reload',actions, "inactive guest must never flap Wi-Fi")
+        self.assertNotIn('restart:network',actions, "inactive guest must not restart LAN/LTE")
+        self.assertEqual(actions[-1],'discard')
+    def test_active_guest_cleanup_reloads_guest_radio_and_network(self):
+        p,data,actions=run_case(active=True)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertTrue(data['ok'])
         self.assertIn('reload',actions)
+        self.assertIn('restart:network',actions)
         self.assertEqual(actions[-1],'discard')
     def test_package_is_uprev_and_shell_parses(self):
         self.assertIn('PKG_RELEASE:=5',PKG.read_text())

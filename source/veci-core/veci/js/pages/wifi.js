@@ -1,4 +1,4 @@
-import { badge, escapeHtml, setBusy } from '../lib/dom.js';
+import { badge, escapeHtml, setBusy } from '../lib/dom.js?v=162';
 
 const PERSONAL_SECURITY = new Set(['psk2', 'psk-mixed', 'sae', 'sae-mixed']);
 

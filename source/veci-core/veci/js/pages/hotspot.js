@@ -1,4 +1,4 @@
-import { badge, escapeHtml } from '../lib/dom.js';
+import { badge, escapeHtml } from '../lib/dom.js?v=162';
 
 const modules = {
 	guest: { path: '/veci-apps/guest.js', name: 'Guest portal' },
