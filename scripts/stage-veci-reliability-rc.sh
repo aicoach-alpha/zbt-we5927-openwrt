@@ -119,7 +119,7 @@ grep -Fq '$(PKG_BUILD_DIR)/veci-sms-cmgs' "$root/package/we5927-lte/Makefile" ||
 # Carry the real optional-app sources into this exact ABI build tree without
 # selecting them in ROM. Installation is deferred until the signed feed for
 # the running firmware's build ID has been published and verified.
-for pkg in veci-app-guest veci-app-voucher veci-app-sqm veci-app-ddns veci-app-wireguard veci-telco-indonesia; do
+for pkg in veci-app-guest veci-app-voucher veci-app-sqm veci-app-ddns veci-app-wireguard; do
   src="$here/source/$pkg"
   dst="$root/package/$pkg"
   [ -f "$src/Makefile" ] || { echo "optional_app_source_missing:$pkg" >&2; exit 3; }

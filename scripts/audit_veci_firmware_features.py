@@ -46,14 +46,18 @@ def inventory(root):
                                  and exists("www/veci-apps/guest.js")),
         "voucher_runtime": (exists("usr/libexec/rpcd/veci.app.voucher")
                             and exists("www/veci-apps/voucher.js")),
-        "operator_quota_backend": exists("usr/libexec/rpcd/veci.quota"),
-         "native_data_meter": (exists("usr/libexec/rpcd/veci.meter")
+        "native_data_meter": (exists("usr/libexec/rpcd/veci.meter")
                                and exists("www/veci/data-meter.html")
                                and exists("www/veci/data-meter.js")),
         "firmware_update_agent": exists("usr/sbin/veci-update-agent"),
         "app_catalog": exists("usr/libexec/rpcd/veci.apps"),
     }
-    missing = sorted(k for k, v in checks.items() if not v)
+    # Guest and Voucher are optional add-ons. Their absent runtime MUST NOT
+    # block the base firmware or be represented as installed applications.
+    optional_keys = ("guest_portal_runtime", "voucher_runtime")
+    missing = sorted(k for k, v in checks.items()
+                     if k not in optional_keys and not v)
+    optional_missing = sorted(k for k in optional_keys if not checks[k])
     return {
         "scope": "offline_filesystem_only",
         "board": "zbtlink,zbt-we5927",
@@ -61,6 +65,8 @@ def inventory(root):
         "veci_page_count": len(pages),
         "checks": checks,
         "missing": missing,
+        "optional_missing": optional_missing,
+        "optional_hardware_uat": "NOT_REQUIRED_FOR_BASE_RELEASE",
         "static_feature_parity": "PASS" if not missing else "FAIL",
         "physical_uat": "NOT_VERIFIED",
         "firmware_signature": "NOT_VERIFIED",

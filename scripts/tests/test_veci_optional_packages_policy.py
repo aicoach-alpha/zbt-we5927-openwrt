@@ -13,11 +13,20 @@ class OptionalAppsPolicyTests(unittest.TestCase):
 
     def test_optional_app_source_is_packaged_but_not_preinstalled(self):
         for pkg in ("veci-app-guest", "veci-app-voucher", "veci-app-sqm",
-                    "veci-app-ddns", "veci-app-wireguard",
-                    "veci-telco-indonesia"):
+                    "veci-app-ddns", "veci-app-wireguard"):
             self.assertTrue((ROOT / "source" / pkg / "Makefile").is_file())
             self.assertIn("for pkg in veci-app-guest veci-app-voucher", STAGER)
         self.assertIn("OPTIONAL_APP_SOURCE_STAGED=PASS", STAGER)
+
+    def test_retired_operator_quota_cannot_reenter_firmware(self):
+        self.assertFalse((ROOT / "source/veci-telco-indonesia").exists())
+        self.assertFalse((ROOT / "source/veci-quota").exists())
+        self.assertFalse((ROOT / "source/veci-core/veci/js/lib/quota.js").exists())
+        self.assertNotIn("veci-telco-indonesia", STAGER)
+        self.assertNotIn("CONFIG_PACKAGE_veci-telco-indonesia=y", BUILD)
+        # Local LTE byte counters are unrelated to carrier API quota.
+        self.assertTrue((ROOT / "source/veci-data-meter/Makefile").exists())
+        self.assertIn("CONFIG_PACKAGE_veci-data-meter=y", BUILD)
 
     def test_catalog_lists_optional_apps(self):
         for name in ("guest", "voucher"):

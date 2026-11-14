@@ -27,8 +27,9 @@ class NativeFeatureTests(unittest.TestCase):
         out = module.inventory(self.root)
         self.assertEqual(out["static_feature_parity"], "FAIL")
         self.assertFalse(out["production_flash_permission"])
-        self.assertIn("guest_portal_runtime", out["missing"])
-        self.assertIn("operator_quota_backend", out["missing"])
+        self.assertNotIn("guest_portal_runtime", out["missing"])
+        self.assertIn("guest_portal_runtime", out["optional_missing"])
+        self.assertNotIn("operator_quota_backend", out["checks"])
 
     def test_catalog_does_not_substitute_for_voucher_or_guest_runtime(self):
         self.put("www/veci/js/pages/hotspot.js")
@@ -37,6 +38,41 @@ class NativeFeatureTests(unittest.TestCase):
         out = module.inventory(self.root)
         self.assertFalse(out["checks"]["guest_portal_runtime"])
         self.assertFalse(out["checks"]["voucher_runtime"])
+        self.assertNotIn("guest_portal_runtime", out["missing"])
+        self.assertNotIn("voucher_runtime", out["missing"])
+        self.assertEqual(set(out["optional_missing"]),
+                         {"guest_portal_runtime", "voucher_runtime"})
+
+    def test_base_image_passes_optional_gate_without_guest_voucher(self):
+        for path in (
+            "www/index.html", "etc/veci-release.json",
+            "usr/libexec/rpcd/veci", "usr/sbin/we5927-lte",
+            "etc/init.d/we5927-lte", "usr/sbin/veci-wifi-guardian",
+            "usr/libexec/rpcd/veci.sms", "usr/libexec/veci-sms-send-one",
+            "usr/libexec/veci-sms-drafts", "usr/libexec/rpcd/veci.meter",
+            "www/veci/data-meter.html", "www/veci/data-meter.js",
+            "usr/sbin/veci-update-agent", "usr/libexec/rpcd/veci.apps",
+        ):
+            self.put(path, '<meta http-equiv="refresh" content="0; url=/veci/">'
+                     if path == "www/index.html" else "present")
+        self.put("etc/veci-release.json",
+                 json.dumps({"board": "zbtlink,zbt-we5927", "build_id": "a"*40}))
+        for page in module.PAGES:
+            self.put(f"www/veci/js/pages/{page}.js")
+        result = module.inventory(self.root)
+        self.assertEqual(result["missing"], [])
+        self.assertEqual(result["static_feature_parity"], "PASS")
+        self.assertEqual(set(result["optional_missing"]),
+                         {"guest_portal_runtime", "voucher_runtime"})
+        self.assertEqual(result["optional_hardware_uat"], "NOT_REQUIRED_FOR_BASE_RELEASE")
+        self.assertFalse(result["production_flash_permission"])
+
+    def test_retired_carrier_quota_never_a_release_gate(self):
+        for suspect in ("operator_quota_backend", "carrier_quota", "ussd"):
+            self.assertNotIn(suspect, module.inventory(self.root)["checks"])
+            self.assertNotIn(suspect, module.inventory(self.root)["missing"])
+        self.assertEqual(module.inventory(self.root)["optional_hardware_uat"],
+                         "NOT_REQUIRED_FOR_BASE_RELEASE")
 
     def test_native_entrypoint_cannot_redirect_to_luci(self):
         self.put("www/index.html", '<meta http-equiv="refresh" content="0; URL=cgi-bin/luci/">')

@@ -141,12 +141,12 @@ LTE/SMS, cellular RPC, apps catalog, update agent and LuCI fallback exist.
 The full Guest/Voucher/SQM/DDNS/WireGuard implementations were not bundled.
 The native VeCI screen intentionally uses a horizontal top navigation
 (CSS override), so the menu position is not proof of hardware upgrade.
-The operator quota registry is a read-only prototype with no authenticated
-live carrier client. Do not report it as live quota retrieval.
+Historical attempts at authenticated operator quota failed. This feature is
+now retired; do not add provider registry or carrier API code to the release.
 
 The feature integration branch now includes the existing source and offline
-tests for six independently developed optional application packages: Guest
-Portal, Voucher, SQM, DDNS, WireGuard and Indonesia quota registry. Source
+tests for five independently developed optional application packages: Guest
+Portal, Voucher, SQM, DDNS and WireGuard. Source
 staging in the exact OpenWrt package ABI **does not** install those apps:
 firmware only becomes app-ready when a real, signed, matching-build APK feed,
 sufficient overlay/storage and successful on-router validation are proven.
@@ -154,12 +154,12 @@ Guest and voucher must never be automatically enabled on startup or migrate
 Wi-Fi/bridge/firewall settings without safe service/recovery checks.
 
 **Outstanding before claiming full feature completion:**
-- Working authenticated operator quota retrieval (not placeholder registry).
 - A tested matching-release signed APK feed and online app installation with
   dependencies, rollback and flash/overlay headroom checks.
-- Guest/voucher physical isolation and captive-portal acceptance, including
-  the no-guest normal-boot path.
-- LAN/Wi-Fi/LTE/SMS/USSD end-to-end verification on a pinned router connection;
+- Guest/Voucher physical acceptance is OPTIONAL and does not block the
+  base release. Guest disabled at boot and no unintended radio reload remain
+  mandatory source/runtime safety properties.
+- LAN/Wi-Fi/LTE/SMS end-to-end verification on a pinned router connection;
   72-hour stability evidence is missing.
 - Full native VeCI parity with backup/restore and safe OTA. LuCI remains only
   an Expert/failsafe fallback until the native replacement is validated.
@@ -182,16 +182,42 @@ source. Its read-only interface counters and manual quota baseline are
 NOT an authenticated carrier quota; it expires estimates on boot or
 counter resets. The offline package tests are separate from physical UAT.
 
-True optional app packages Guest, Voucher, SQM, DDNS, WireGuard and
-Indonesia quota registry are staged as source for exact-ABI builds, not
+True optional app packages Guest, Voucher, SQM, DDNS and WireGuard
+are staged as source for exact-ABI builds, not
 installed automatically. There are currently no GitHub Actions signing
 secrets configured for an APK feed; app installation cannot be declared
 working until a matching signed release feed exists and is hardware-tested.
 
 The old 4fa427d firmware is definitively not all-features-complete:
 the actual-rootfs inventory fails Guest, Voucher, Data Meter,
-operator quota, release ID and native root landing. Do not re-label
+release ID and native root landing. Retired operator quota is not a gate.
+Do not re-label
 that image as the final release or claim a green build is enough.
 
 No physical router changed by this source integration. Follow the
 full-native parity checklist in docs/VECI-FULL-NATIVE-PARITY-RELEASE.md.
+
+
+## 2026-11-14 — Owner scope correction (authoritative)
+
+REMOVE: Authenticated actual operator quota (XL, AXIS, Telkomsel, or
+other carrier API). Prior integration attempts failed and the user retired
+this objective. It is no longer a requirement, blocker, feature in progress,
+or future integration target for the VeCI release. Removed the carrier quota
+RPC, obsolete provider registry, quota UI helper/adapter, and their tests
+from active source. No API login, OTP, USSD, quota scraping or speculation.
+
+RETAIN: Local LTE usb0 traffic Data Meter. Optional manually entered
+remaining-data estimate is not an authenticated operator quota and must never
+be shown as such. No carrier network calls are permitted from this meter.
+
+OPTIONAL: Physical UAT of the separately installable Guest Portal and
+Voucher modules. Do not require on-router Guest/Voucher testing or successful
+Guest/Voucher installation to approve the base firmware. Source-level safety,
+disabled-by-default behavior, package isolation, and non-disruptive
+provisioning remain mandatory. Mark physical acceptance NOT_TESTED_OPTIONAL
+until actually executed; never claim these optional modules are verified.
+
+UNCHANGED CORE SAFETY: firmware board/size/checksum, signed-image policy
+if required on the actual router, sysupgrade -T, backups/recovery and
+physical LAN/primary Wi-Fi/MT7603/LTE/SMS reliability acceptance.

@@ -183,6 +183,11 @@ jobs:
           print('NATIVE_FEATURE_PARITY=' + report['static_feature_parity'])
           print('MISSING_NATIVE_FEATURES=' + ','.join(report['missing']))
           assert report['production_flash_permission'] is False
+          # Built-in native services must exist. Guest/Voucher remain
+          # optional add-ons; neither can fail base-image static parity.
+          assert report['static_feature_parity'] == 'PASS', report['missing']
+          assert report['optional_hardware_uat'] == 'NOT_REQUIRED_FOR_BASE_RELEASE'
+          assert 'operator_quota_backend' not in report['checks']
           PYAUDIT
           echo "VECI_WEB_CELLULAR_SMS_APPS_OTA_PARITY_SOURCE=PASS"
           echo "OPTIONAL_GUEST_VOUCHER_NOT_BUNDLED=PASS"
