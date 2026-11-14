@@ -11,11 +11,11 @@ define Package/veci-app-ddns
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI Dynamic DNS
-  DEPENDS:=+veci +ddns-scripts +luci-app-ddns +curl +ca-bundle
+  DEPENDS:=+veci +ddns-scripts +curl +ca-bundle
 endef
 
 define Package/veci-app-ddns/description
- Installs Dynamic DNS and its LuCI expert fallback from the matched VeCI feed.
+ Installs Dynamic DNS using native VeCI controls from the matched VeCI feed.
 endef
 
 define Build/Compile

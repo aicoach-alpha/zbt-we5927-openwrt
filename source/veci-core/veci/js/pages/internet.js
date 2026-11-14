@@ -128,7 +128,7 @@ export default {
 			.join('');
 
 		root.innerHTML =
-			'<div class="page-intro"><div><h2>Internet connections</h2><p>See how this router reaches the Internet. Normal DHCP and static uplinks can be edited here; modem-managed links stay on Cellular.</p></div><a class="button button-secondary" href="/cgi-bin/luci/admin/network/network">Advanced interfaces</a></div>' +
+			'<div class="page-intro"><div><h2>Internet connections</h2><p>See how this router reaches the Internet. Normal DHCP and static uplinks can be edited here; modem-managed links stay on Cellular.</p></div><a class="button button-secondary" href="#/advanced">Advanced interfaces</a></div>' +
 			'<div class="card-list">' +
 			cards +
 			'</div>' +

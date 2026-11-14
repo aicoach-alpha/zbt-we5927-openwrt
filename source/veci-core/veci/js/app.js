@@ -13,6 +13,7 @@ import cellularPage from './pages/cellular.js?v=162';
 import updatesPage from './pages/updates.js?v=162';
 import appsPage from './pages/apps.js?v=162';
 import hotspotPage from './pages/hotspot.js?v=162';
+import advancedPage from './pages/advanced.js?v=163';
 
 const pages = [
 	homePage,
@@ -93,7 +94,6 @@ class VeciApp {
 		qs('#app-view').classList.remove('hidden');
 		await this.refreshIdentity();
 		this.renderNavigation();
-		await this.detectExpertUi();
 		if (!window.location.hash || window.location.hash === '#/') {
 			this.navigate('home');
 			return;
@@ -149,17 +149,6 @@ class VeciApp {
 			`
 			)
 			.join('');
-	}
-
-	async detectExpertUi() {
-		const link = qs('#expert-link');
-		if (!link) return;
-		try {
-			const response = await fetch('/cgi-bin/luci/', { method: 'HEAD', cache: 'no-store', redirect: 'manual' });
-			link.classList.toggle('hidden', response.status === 404);
-		} catch {
-			link.classList.add('hidden');
-		}
 	}
 
 	navigate(pageId) {

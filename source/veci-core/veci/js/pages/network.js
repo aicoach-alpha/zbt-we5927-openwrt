@@ -17,7 +17,7 @@ export default {
 		root.innerHTML = `
 			<div class="page-intro">
 				<div><h2>Network layout</h2><p>Interfaces, bridges and hardware-backed network devices without exposing raw UCI structure first.</p></div>
-				<a class="button button-secondary" href="/cgi-bin/luci/admin/network/network">Expert network editor</a>
+				<a class="button button-secondary" href="#/advanced">Advanced network</a>
 			</div>
 
 			<div class="panel table-panel">

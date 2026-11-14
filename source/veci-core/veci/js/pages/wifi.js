@@ -128,9 +128,9 @@ export default {
 			<div class="page-intro">
 				<div>
 					<h2>Wi-Fi networks</h2>
-					<p>Manage everyday SSID and security settings here. Radio tuning, 802.11 details and unusual enterprise modes remain available in Expert.</p>
+					<p>Manage everyday SSID and security settings here. For advanced mode status and network details open the native Advanced page.</p>
 				</div>
-				<a class="button button-secondary" href="/cgi-bin/luci/admin/network/wireless">Advanced Wi-Fi</a>
+				<a class="button button-secondary" href="#/advanced">Advanced Wi-Fi</a>
 			</div>
 
 			${
@@ -159,7 +159,7 @@ export default {
 											${
 												(network.config.mode || 'ap') === 'ap'
 													? `<button class="button button-secondary" data-edit-wifi="${escapeHtml(network.section)}" type="button">Edit Wi-Fi</button>`
-													: '<span class="readonly-note">Expert-only mode</span>'
+													: '<span class="readonly-note">Mode unavailable in this VeCI radio editor</span>'
 											}
 										</div>
 									</article>
@@ -199,7 +199,7 @@ export default {
 							<div class="editor-actions"><button id="remove-guest-wifi" class="button button-danger" type="button">Remove Guest Wi-Fi</button></div>
 						`
 						: guestArtifactsPresent
-							? '<div class="editor-warning">Some VeCI guest-network sections already exist but the expected Wi-Fi section is missing. Use Expert to review them before VeCI changes anything.</div>'
+							? '<div class="editor-warning">Some VeCI guest-network sections already exist but the expected Wi-Fi section is missing. Review network status in Advanced before VeCI changes anything.</div>'
 							: `
 							<form id="guest-wifi-form">
 								<div class="editor-grid">

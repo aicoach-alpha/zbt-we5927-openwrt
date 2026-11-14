@@ -28,7 +28,7 @@ export default {
 		root.innerHTML = `
 			<div class="page-intro">
 				<div><h2>System</h2><p>Hardware identity comes directly from OpenWrt. VeCI never substitutes a hardcoded router model.</p></div>
-				<a class="button button-secondary" href="/cgi-bin/luci/admin/system/system">Advanced system settings</a>
+				<a class="button button-secondary" href="#/advanced">Advanced system</a>
 			</div>
 
 			<section class="device-profile">

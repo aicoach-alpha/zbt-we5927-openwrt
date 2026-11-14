@@ -25,7 +25,6 @@ feed_contract_valid() {
     base="https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/feeds/$id"
     for suffix in targets/ramips/mt76x8/packages/packages.adb \
                   packages/mipsel_24kc/base/packages.adb \
-                  packages/mipsel_24kc/luci/packages.adb \
                   packages/mipsel_24kc/packages/packages.adb; do
         grep -Fxq "$base/$suffix" "$repo_file" || return 1
     done
@@ -76,7 +75,6 @@ method_verify() {
     failure=''
     for suffix in targets/ramips/mt76x8/packages/packages.adb \
                   packages/mipsel_24kc/base/packages.adb \
-                  packages/mipsel_24kc/luci/packages.adb \
                   packages/mipsel_24kc/packages/packages.adb; do
         # Fixed HTTPS URL allowlist; no arbitrary package/index download.
         if ! uclient-fetch -T 30 -O "$dir/index.adb" "$base/$suffix" >/dev/null 2>&1; then

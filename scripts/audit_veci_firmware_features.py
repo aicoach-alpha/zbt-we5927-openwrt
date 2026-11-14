@@ -34,6 +34,10 @@ def inventory(root):
              exists(f"www/veci/js/pages/{name}.js")]
     checks = {
         "veci_native_home": native_home,
+        "luci_excluded": not any((root / path).exists() for path in (
+            "www/cgi-bin/luci", "www/luci-static", "usr/share/ucode/luci",
+            "usr/lib/lua/luci", "usr/libexec/rpcd/luci")),
+        "native_advanced_ui": exists("www/veci/js/pages/advanced.js"),
         "veci_native_pages": len(pages) == len(PAGES),
         "veci_core_rpc": exists("usr/libexec/rpcd/veci"),
         "release_identity": bool(build_id),

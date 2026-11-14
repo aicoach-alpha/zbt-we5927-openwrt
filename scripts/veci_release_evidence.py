@@ -41,7 +41,7 @@ def make_report(meta, pin, size, maximum, image_sha, build_sha,
         require(reviewed_head == build_sha and not reviewed_base,
                 "manual checkout mismatches source ref")
         require(not export_requested or
-                ref == "refs/heads/integration/veci-reliability-rc1-20261112",
+                ref == "refs/heads/integration/veci-feature-complete-20261114",
                 "unsigned export requires reviewed RC branch")
     else:
         raise ValueError("unsupported build event")

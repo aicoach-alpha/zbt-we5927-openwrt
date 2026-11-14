@@ -11,11 +11,11 @@ define Package/veci-app-wireguard
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI WireGuard
-  DEPENDS:=+veci +wireguard-tools +luci-proto-wireguard
+  DEPENDS:=+veci +wireguard-tools
 endef
 
 define Package/veci-app-wireguard/description
- Installs WireGuard tooling and LuCI protocol support from the exact VeCI firmware feed.
+ Installs WireGuard tooling with native VeCI configuration from the exact VeCI firmware feed.
 endef
 
 define Build/Compile

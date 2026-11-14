@@ -84,6 +84,9 @@ jobs:
           grep -Fxq 'CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
           grep -Fxq 'CONFIG_PACKAGE_veci-update-we5927=y' .config
           grep -Fxq 'CONFIG_PACKAGE_veci-data-meter=y' .config
+          # LuCI must NOT re-enter as default, dependency or auto-selected
+          # package. Never interpret firmware build PASS as native UI parity.
+          ! grep -Eq '^CONFIG_(DEFAULT_luci|PACKAGE_luci([-A-Za-z0-9_]*)?|PACKAGE_liblucihttp([-A-Za-z0-9_]*)?|PACKAGE_rpcd-mod-luci)=y$' .config
           ! grep -Fxq 'CONFIG_PACKAGE_veci-app-guest=y' .config
           ! grep -Fxq 'CONFIG_PACKAGE_veci-app-voucher=y' .config
           make -j2 V=s tools/install
@@ -152,7 +155,12 @@ jobs:
           cmp "$GITHUB_WORKSPACE/source/veci-default-ui/files/usr/sbin/veci-default-ui" "$rdir/usr/sbin/veci-default-ui"
           test -x "$rdir/etc/uci-defaults/97-veci-https-defaults"
           test -x "$rdir/etc/uci-defaults/98-veci-default-ui"
-          test -e "$rdir/www/cgi-bin/luci" || test -L "$rdir/www/cgi-bin/luci"
+          test ! -e "$rdir/www/cgi-bin/luci"
+          test ! -L "$rdir/www/cgi-bin/luci"
+          test ! -e "$rdir/www/luci-static"
+          test ! -e "$rdir/usr/share/ucode/luci"
+          test -s "$rdir/www/veci/js/pages/advanced.js"
+          cmp "$GITHUB_WORKSPACE/source/veci-core/veci/js/pages/advanced.js" "$rdir/www/veci/js/pages/advanced.js"
           # Check each file in live-audited VeCI source, not just index.html.
           while IFS= read -r -d '' f; do
             rel="$(printf '%s\n' "$f" | sed "s|^$GITHUB_WORKSPACE/source/veci-core/veci/||")"
@@ -191,7 +199,7 @@ jobs:
           PYAUDIT
           echo "VECI_WEB_CELLULAR_SMS_APPS_OTA_PARITY_SOURCE=PASS"
           echo "OPTIONAL_GUEST_VOUCHER_NOT_BUNDLED=PASS"
-          echo "BUILTIN_VECI_CORE_RPC_HTTPS_LUCI_FALLBACK=PASS"
+          echo "BUILTIN_VECI_CORE_RPC_HTTPS_NO_LUCI=PASS"
           echo "LIVE_VECI_PARITY=NOT_VERIFIED"
           echo "LTE_COLD_BOOT_SCRIPTS_INSTALLED=PASS"
           printf 'image_bytes=%s\nfirmware_mtd_bytes=%s\n' "$bytes" "$max"
@@ -236,7 +244,7 @@ jobs:
       # the unsigned binary. PR CI continues to publish ONLY JSON evidence.
       # Artifact possession is NOT authorization to flash a production router.
       - name: Export unsigned firmware candidate for offline signature review
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/integration/veci-reliability-rc1-20261112' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/integration/veci-feature-complete-20261114' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -266,7 +274,7 @@ jobs:
           { echo 'UNSIGNED IMAGE. NOT APPROVED FOR FLASH.'; echo "Release source commit: $GITHUB_SHA"; echo 'Offline trust, SPA parity, router UAT and recovery gates remain open.'; } > "$dir/UNSIGNED_DO_NOT_FLASH.txt"
           cp "$evidence" "$dir/CI_BUILD_EVIDENCE.json"
       - name: Upload explicitly requested UNSIGNED candidate (NOT FLASH APPROVED)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/integration/veci-reliability-rc1-20261112' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/integration/veci-feature-complete-20261114' }}
         uses: actions/upload-artifact@v4
         with:
           name: veci-we5927-RC1-UNSIGNED-DO-NOT-FLASH-${{ github.sha }}
@@ -281,4 +289,4 @@ jobs:
         run: |
           echo '### WE5927 reliability RC source build' >> "$GITHUB_STEP_SUMMARY"
           echo 'Source and system-image checks do NOT verify image signing, installed VeCI SPA, rollback, modem/SMS functionality, Wi-Fi beacon visibility, UAT, or 72h LTE availability.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Do not flash from CI. No firmware image artifact uploaded. LuCI is intentionally retained until VeCI full parity is physically verified.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Do not flash from CI without on-router validation. VeCI-only native UI image, LuCI excluded from base firmware.' >> "$GITHUB_STEP_SUMMARY"

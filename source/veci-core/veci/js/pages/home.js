@@ -291,7 +291,7 @@ export default {
 				const result = await api.veci('setAdminPassword', { password });
 				if (result.ok === false && result.error === 'password_already_set') {
 					root.querySelector('#admin-password-setup')?.remove();
-					toast('Administrator password is already configured. Use Expert / LuCI to change it.', 'info');
+					toast('Administrator password is already configured. Manage settings in VeCI System.', 'info');
 					return;
 				}
 				if (result.ok === false) throw new Error(result.error || 'Password change failed');

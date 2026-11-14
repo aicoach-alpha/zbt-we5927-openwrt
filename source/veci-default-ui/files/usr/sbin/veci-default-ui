@@ -51,23 +51,18 @@ enable() {
 	uci set $CFG.enabled='1'
 	uci commit veci_default_ui
 	reload_uhttpd
-	echo "VeCI is the default web UI. LuCI remains at /cgi-bin/luci/."
+	echo "VeCI is the only installed web administration UI."
 }
 
 disable() {
-	capture_original
-	apply_pages disable
-	uci set $CFG.enabled='0'
-	uci commit veci_default_ui
-	reload_uhttpd
-	echo "Restored the original uHTTPd index page order."
+	echo "error: VeCI is the only installed web UI; cannot disable admin access" >&2
+	exit 1
 }
 
 status() {
 	echo "enabled=$(uci -q get $CFG.enabled || echo 0)"
 	echo "index_page=$(uci -q get uhttpd.main.index_page || echo index.html)"
 	echo "veci=$(test -f /www/veci/index.html && echo present || echo missing)"
-	echo "luci=$(test -e /www/cgi-bin/luci && echo present || echo unknown)"
 }
 
 case "${1:-status}" in

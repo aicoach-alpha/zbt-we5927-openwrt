@@ -17,7 +17,7 @@ class ArtifactExportPolicy(unittest.TestCase):
     def test_binary_export_has_three_independent_conditions(self):
         guard = ("github.event_name == 'workflow_dispatch' && "
                  "inputs.export_unsigned_candidate == true && "
-                 "github.ref == 'refs/heads/integration/veci-reliability-rc1-20261112'")
+                 "github.ref == 'refs/heads/integration/veci-feature-complete-20261114'")
         self.assertEqual(self.workflow.count(guard), 2)
 
     def test_artifact_has_do_not_flash_notice(self):
@@ -26,7 +26,7 @@ class ArtifactExportPolicy(unittest.TestCase):
         self.assertIn("report['flash_permission'] is False", self.workflow)
 
     def test_builtin_veci_installation_checked_in_rootfs(self):
-        self.assertIn("BUILTIN_VECI_CORE_RPC_HTTPS_LUCI_FALLBACK=PASS", self.workflow)
+        self.assertIn("BUILTIN_VECI_CORE_RPC_HTTPS_NO_LUCI=PASS", self.workflow)
         self.assertIn("LIVE_VECI_PARITY=NOT_VERIFIED", self.workflow)
         self.assertIn("source/veci-core/veci/index.html", self.workflow)
         self.assertIn("source/veci-core/rpcd-acl.json", self.workflow)

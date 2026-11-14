@@ -18,6 +18,17 @@ class OptionalAppsPolicyTests(unittest.TestCase):
             self.assertIn("for pkg in veci-app-guest veci-app-voucher", STAGER)
         self.assertIn("OPTIONAL_APP_SOURCE_STAGED=PASS", STAGER)
 
+    def test_no_luci_in_base_and_optional_sources(self):
+        cfg = (ROOT / "source/openwrt-we5927.config").read_text()
+        self.assertNotRegex(cfg, r"(?m)^CONFIG_PACKAGE_luci(?:-[^=]+)?=y$")
+        self.assertNotIn("CONFIG_DEFAULT_luci=y", cfg)
+        for package in ("veci-app-sqm", "veci-app-ddns", "veci-app-wireguard"):
+            source = (ROOT / "source" / package / "Makefile").read_text()
+            self.assertNotIn("+luci-", source, package)
+        native = (ROOT / "source/veci-core/veci/index.html").read_text()
+        self.assertNotIn("expert-link", native)
+        self.assertNotIn("/cgi-bin/luci", native)
+
     def test_retired_operator_quota_cannot_reenter_firmware(self):
         self.assertFalse((ROOT / "source/veci-telco-indonesia").exists())
         self.assertFalse((ROOT / "source/veci-quota").exists())

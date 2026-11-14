@@ -1112,7 +1112,11 @@ method_set_admin_password() {
 		printf '{ "ok": false, "error": "password_already_set" }\n'
 		return
 	}
+	method_change_admin_password
+}
 
+# Native authenticated password change replaces the LuCI passwd form.
+method_change_admin_password() {
 	input=$(cat)
 	password=$(printf '%s' "$input" | jsonfilter -e '@.password' 2>/dev/null)
 	length=${#password}
@@ -1143,6 +1147,76 @@ method_set_admin_password() {
 	else
 		printf '{ "ok": false, "error": "password_change_failed" }\n'
 	fi
+}
+
+# Native VeCI sysupgrade configuration download. Access is restricted to
+# authenticated rpcd/ubus WRITE ACLs and never exposed as unprotected CGI.
+method_backup_start() {
+    command -v sysupgrade >/dev/null 2>&1 || {
+        printf '{ "ok": false, "error": "sysupgrade_unavailable" }\n'; return
+    }
+    dir="$(mktemp -d /tmp/veci-conf-XXXXXXXX 2>/dev/null)" || {
+        printf '{ "ok": false, "error": "temporary_directory_unavailable" }\n'; return
+    }
+    chmod 700 "$dir" || { rmdir "$dir"; printf '{ "ok": false, "error": "permissions_failed" }\n'; return; }
+    (umask 077; sysupgrade -b "$dir/config.tar.gz" >/dev/null 2>&1) || {
+        rm -f "$dir/config.tar.gz"; rmdir "$dir"
+        printf '{ "ok": false, "error": "backup_failed" }\n'; return
+    }
+    bytes="$(wc -c < "$dir/config.tar.gz" | tr -d '[:space:]')"
+    case "$bytes" in ''|*[!0-9]*) bytes=0 ;; esac
+    if [ "$bytes" -le 0 ] || [ "$bytes" -gt 2097152 ]; then
+        rm -f "$dir/config.tar.gz"; rmdir "$dir"
+        printf '{ "ok": false, "error": "backup_size_unsupported" }\n'; return
+    fi
+    chmod 600 "$dir/config.tar.gz"
+    id="$(basename "$dir" | sed 's/^veci-conf-//')"
+    printf '{ "ok": true, "id": "%s", "size": %s, "chunk_size": 12288 }\n' "$id" "$bytes"
+}
+
+safe_backup_id() {
+    case "$1" in ????????) ;; *) return 1 ;; esac
+    printf '%s' "$1" | LC_ALL=C grep -Eq '^[A-Za-z0-9]{8}$'
+}
+
+method_backup_read() {
+    input="$(cat)"
+    id="$(printf '%s' "$input" | jsonfilter -e '@.id' 2>/dev/null)"
+    sequence="$(printf '%s' "$input" | jsonfilter -e '@.sequence' 2>/dev/null)"
+    safe_backup_id "$id" || { printf '{ "ok": false, "error": "invalid_backup_id" }\n'; return; }
+    case "$sequence" in ''|*[!0-9]*) printf '{ "ok": false, "error": "invalid_sequence" }\n'; return;; esac
+    [ "$sequence" -le 170 ] || { printf '{ "ok": false, "error": "sequence_out_of_range" }\n'; return; }
+    dir="/tmp/veci-conf-$id"
+    file="$dir/config.tar.gz"
+    [ -d "$dir" ] && [ ! -L "$dir" ] && [ -f "$file" ] && [ ! -L "$file" ] || {
+        printf '{ "ok": false, "error": "backup_missing" }\n'; return
+    }
+    bytes="$(wc -c < "$file" | tr -d '[:space:]')"
+    case "$bytes" in ''|*[!0-9]*) bytes=0 ;; esac
+    [ "$bytes" -gt 0 ] && [ "$bytes" -le 2097152 ] || {
+        printf '{ "ok": false, "error": "invalid_backup_size" }\n'; return
+    }
+    [ $((sequence * 12288)) -lt "$bytes" ] || {
+        printf '{ "ok": false, "error": "sequence_out_of_range" }\n'; return
+    }
+    encoded="$(dd if="$file" bs=12288 skip="$sequence" count=1 2>/dev/null | base64 | tr -d '\r\n')" || {
+        printf '{ "ok": false, "error": "backup_read_failed" }\n'; return
+    }
+    [ -n "$encoded" ] || { printf '{ "ok": false, "error": "backup_read_failed" }\n'; return; }
+    printf '{ "ok": true, "sequence": %s, "data": "%s" }\n' "$sequence" "$encoded"
+}
+
+method_backup_clear() {
+    input="$(cat)"
+    id="$(printf '%s' "$input" | jsonfilter -e '@.id' 2>/dev/null)"
+    safe_backup_id "$id" || { printf '{ "ok": false, "error": "invalid_backup_id" }\n'; return; }
+    dir="/tmp/veci-conf-$id"
+    [ -d "$dir" ] && [ ! -L "$dir" ] || {
+        printf '{ "ok": false, "error": "backup_missing" }\n'; return
+    }
+    rm -f "$dir/config.tar.gz"
+    rmdir "$dir" 2>/dev/null && printf '{ "ok": true }\n' ||
+        printf '{ "ok": false, "error": "cleanup_failed" }\n'
 }
 
 method_service_action() {
@@ -1187,7 +1261,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "logs": { "source": "str", "limit": "int" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" },  "securityStatus": {}, "setAdminPassword": { "password": "str" }, "changeAdminPassword": { "password": "str" }, "backupStart": {}, "backupRead": { "id": "str", "sequence": "int" }, "backupClear": { "id": "str" }, "logs": { "source": "str", "limit": "int" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -1210,6 +1284,10 @@ case "$1" in
 			firmwareApply) method_firmware_apply ;;
 			securityStatus) method_security_status ;;
 			setAdminPassword) method_set_admin_password ;;
+			changeAdminPassword) method_change_admin_password ;;
+			backupStart) method_backup_start ;;
+			backupRead) method_backup_read ;;
+			backupClear) method_backup_clear ;;
 			logs) method_logs ;;
 			diagnostic) method_diagnostic ;;
 			serviceAction) method_service_action ;;

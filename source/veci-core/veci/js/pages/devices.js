@@ -49,9 +49,9 @@ export default {
 			<div class="page-intro">
 				<div>
 					<h2>Connected devices</h2>
-					<p>See active DHCP clients and reserve their current address without opening the expert interface.</p>
+					<p>See active DHCP clients and reserve their current address in the native VeCI interface.</p>
 				</div>
-				<a class="button button-secondary" href="/cgi-bin/luci/admin/network/dhcp">Advanced DHCP</a>
+				<a class="button button-secondary" href="#/advanced">Advanced DHCP</a>
 			</div>
 
 			<div class="summary-strip">

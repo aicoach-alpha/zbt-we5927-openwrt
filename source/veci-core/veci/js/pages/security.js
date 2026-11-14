@@ -51,7 +51,7 @@ export default {
 		root.innerHTML = `
 			<div class="page-intro">
 				<div><h2>Security center</h2><p>A simpler view of firewall protection, exposed services and traffic rules.</p></div>
-				<a class="button button-secondary" href="/cgi-bin/luci/admin/network/firewall">Advanced firewall</a>
+				<a class="button button-secondary" href="#/advanced">Advanced firewall</a>
 			</div>
 
 			<div class="security-summary">

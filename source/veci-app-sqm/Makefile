@@ -11,11 +11,11 @@ define Package/veci-app-sqm
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI Smart Queue
-  DEPENDS:=+veci +sqm-scripts +luci-app-sqm
+  DEPENDS:=+veci +sqm-scripts
 endef
 
 define Package/veci-app-sqm/description
- Installs SQM and its LuCI expert fallback from the exact VeCI firmware feed.
+ Installs SQM using native VeCI controls from the exact VeCI firmware feed.
 endef
 
 define Build/Compile

@@ -45,7 +45,7 @@ class NativeFeatureTests(unittest.TestCase):
 
     def test_base_image_passes_optional_gate_without_guest_voucher(self):
         for path in (
-            "www/index.html", "etc/veci-release.json",
+            "www/index.html", "www/veci/js/pages/advanced.js", "etc/veci-release.json",
             "usr/libexec/rpcd/veci", "usr/sbin/we5927-lte",
             "etc/init.d/we5927-lte", "usr/sbin/veci-wifi-guardian",
             "usr/libexec/rpcd/veci.sms", "usr/libexec/veci-sms-send-one",
@@ -73,6 +73,20 @@ class NativeFeatureTests(unittest.TestCase):
             self.assertNotIn(suspect, module.inventory(self.root)["missing"])
         self.assertEqual(module.inventory(self.root)["optional_hardware_uat"],
                          "NOT_REQUIRED_FOR_BASE_RELEASE")
+
+    def test_luci_binaries_are_a_hard_static_failure(self):
+        self.put("www/cgi-bin/luci", "legacy handler")
+        out = module.inventory(self.root)
+        self.assertFalse(out["checks"]["luci_excluded"])
+        self.assertIn("luci_excluded", out["missing"])
+        self.assertFalse(out["production_flash_permission"])
+
+    def test_native_advanced_ui_exists_and_old_luci_links_absent(self):
+        core = ROOT / "source/veci-core/veci"
+        self.assertTrue((core / "js/pages/advanced.js").exists())
+        self.assertIn("advancedPage", (core / "js/app.js").read_text())
+        for path in (core / "index.html", *(core / "js/pages").glob("*.js")):
+            self.assertNotIn("/cgi-bin/luci", path.read_text(), str(path))
 
     def test_native_entrypoint_cannot_redirect_to_luci(self):
         self.put("www/index.html", '<meta http-equiv="refresh" content="0; URL=cgi-bin/luci/">')

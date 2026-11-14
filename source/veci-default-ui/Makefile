@@ -13,7 +13,7 @@ define Package/veci-default-ui
 endef
 
 define Package/veci-default-ui/description
- Makes VeCI the default web landing page while retaining LuCI under /cgi-bin/luci/.
+ Makes VeCI the default web landing page.
  The change is reversible with /usr/sbin/veci-default-ui disable.
 endef
 

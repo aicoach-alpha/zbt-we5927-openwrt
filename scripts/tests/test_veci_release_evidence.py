@@ -63,7 +63,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
                       export_requested=True)
         with self.assertRaisesRegex(ValueError, "requires reviewed RC"):
             pr_report(**values)
-        values["ref"] = "refs/heads/integration/veci-reliability-rc1-20261112"
+        values["ref"] = "refs/heads/integration/veci-feature-complete-20261114"
         result = pr_report(**values)
         self.assertTrue(result["unsigned_candidate_export_requested"])
         self.assertFalse(result["flash_permission"])
