@@ -11,6 +11,14 @@ class OptionalAppsPolicyTests(unittest.TestCase):
         self.assertIn("! grep -Fxq 'CONFIG_PACKAGE_veci-app-guest=y'", BUILD)
         self.assertIn("! grep -Fxq 'CONFIG_PACKAGE_veci-app-voucher=y'", BUILD)
 
+    def test_optional_app_source_is_packaged_but_not_preinstalled(self):
+        for pkg in ("veci-app-guest", "veci-app-voucher", "veci-app-sqm",
+                    "veci-app-ddns", "veci-app-wireguard",
+                    "veci-telco-indonesia"):
+            self.assertTrue((ROOT / "source" / pkg / "Makefile").is_file())
+            self.assertIn("for pkg in veci-app-guest veci-app-voucher", STAGER)
+        self.assertIn("OPTIONAL_APP_SOURCE_STAGED=PASS", STAGER)
+
     def test_catalog_lists_optional_apps(self):
         for name in ("guest", "voucher"):
             self.assertTrue((ROOT / "source/veci-app-catalog-we5927/files/usr/share/veci/apps" / (name+".json")).is_file())

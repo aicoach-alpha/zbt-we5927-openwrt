@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "edition": "indonesia",
+  "integration_state": "research_only",
+  "families": [
+    {
+      "id": "xlsmart",
+      "name": "XLSMART",
+      "brands": [
+        "xl",
+        "axis",
+        "smartfren"
+      ]
+    },
+    {
+      "id": "telkomsel",
+      "name": "Telkomsel",
+      "brands": [
+        "telkomsel",
+        "byu",
+        "orbit"
+      ]
+    },
+    {
+      "id": "ioh",
+      "name": "Indosat Ooredoo Hutchison",
+      "brands": [
+        "im3",
+        "tri"
+      ]
+    }
+  ],
+  "providers": [
+    {
+      "id": "xl",
+      "name": "XL",
+      "app": "myXL",
+      "family": "xlsmart",
+      "engine": "xl_ciam",
+      "shared_lib": "xl_axis_candidate",
+      "account_types": [
+        "prepaid",
+        "prioritas"
+      ],
+      "status": "not_implemented",
+      "source": "community_reference_only"
+    },
+    {
+      "id": "axis",
+      "name": "AXIS",
+      "app": "AXISNET",
+      "family": "xlsmart",
+      "engine": "axisnet",
+      "shared_lib": "xl_axis_candidate",
+      "account_types": [
+        "prepaid"
+      ],
+      "status": "not_implemented",
+      "source": "community_reference_only"
+    },
+    {
+      "id": "smartfren",
+      "name": "Smartfren",
+      "app": "mySF",
+      "family": "xlsmart",
+      "engine": "smartfren_unknown",
+      "shared_lib": "common",
+      "account_types": [
+        "prepaid",
+        "postpaid"
+      ],
+      "status": "not_implemented",
+      "source": "official_app_only"
+    },
+    {
+      "id": "telkomsel",
+      "name": "Telkomsel",
+      "app": "MyTelkomsel",
+      "family": "telkomsel",
+      "engine": "telkomsel",
+      "shared_lib": "common",
+      "account_types": [
+        "prepaid",
+        "halo"
+      ],
+      "status": "not_implemented",
+      "source": "community_wrapper_requires_telbot"
+    },
+    {
+      "id": "byu",
+      "name": "by.U",
+      "app": "by.U",
+      "family": "telkomsel",
+      "engine": "byu_cxos",
+      "shared_lib": "common",
+      "account_types": [
+        "prepaid"
+      ],
+      "status": "not_implemented",
+      "source": "web_session_reference_only"
+    },
+    {
+      "id": "orbit",
+      "name": "Telkomsel Orbit",
+      "app": "MyOrbit / MyTelkomsel",
+      "family": "telkomsel",
+      "engine": "orbit",
+      "shared_lib": "common",
+      "account_types": [
+        "wireless_broadband"
+      ],
+      "status": "not_implemented",
+      "source": "official_app_only",
+      "optional": true
+    },
+    {
+      "id": "im3",
+      "name": "IM3",
+      "app": "myIM3",
+      "family": "ioh",
+      "engine": "im3_api",
+      "shared_lib": "ioh_request_crypto_candidate",
+      "account_types": [
+        "prepaid",
+        "postpaid"
+      ],
+      "status": "not_implemented",
+      "source": "community_reference_only"
+    },
+    {
+      "id": "tri",
+      "name": "Tri",
+      "app": "bima+",
+      "family": "ioh",
+      "engine": "tri_api",
+      "shared_lib": "ioh_request_crypto_candidate",
+      "account_types": [
+        "prepaid"
+      ],
+      "status": "not_implemented",
+      "source": "community_reference_only"
+    }
+  ],
+  "notes": "Registry only; no authorization, quota fetch, token store, remote control or modem changes. Brand grouping never implies identical login endpoints."
+}

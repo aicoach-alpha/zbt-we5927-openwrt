@@ -1,0 +1,5 @@
+#!/bin/sh
+while true; do
+	ubus call veci.app.voucher cleanupExpired '{}' >/dev/null 2>&1 || true
+	sleep 60
+done

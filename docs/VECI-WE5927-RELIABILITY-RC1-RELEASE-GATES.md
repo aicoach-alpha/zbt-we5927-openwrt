@@ -131,3 +131,37 @@ SHA to equal the reviewed source, and only the RC branch may request
 unsigned export. This is a **CI provenance improvement**, not signing,
 device testing, or authorization to flash. Keep NO-GO until all hard
 release gates are independently satisfied.
+
+
+## 2026-11-14 — Feature-completeness integration (development only)
+
+The 2026-11-13 image (source 4fa427d) is **not** the all-features image.
+Verified by unsquashing its actual 5,898,530-byte firmware: native VeCI Core,
+LTE/SMS, cellular RPC, apps catalog, update agent and LuCI fallback exist.
+The full Guest/Voucher/SQM/DDNS/WireGuard implementations were not bundled.
+The native VeCI screen intentionally uses a horizontal top navigation
+(CSS override), so the menu position is not proof of hardware upgrade.
+The operator quota registry is a read-only prototype with no authenticated
+live carrier client. Do not report it as live quota retrieval.
+
+The feature integration branch now includes the existing source and offline
+tests for six independently developed optional application packages: Guest
+Portal, Voucher, SQM, DDNS, WireGuard and Indonesia quota registry. Source
+staging in the exact OpenWrt package ABI **does not** install those apps:
+firmware only becomes app-ready when a real, signed, matching-build APK feed,
+sufficient overlay/storage and successful on-router validation are proven.
+Guest and voucher must never be automatically enabled on startup or migrate
+Wi-Fi/bridge/firewall settings without safe service/recovery checks.
+
+**Outstanding before claiming full feature completion:**
+- Working authenticated operator quota retrieval (not placeholder registry).
+- A tested matching-release signed APK feed and online app installation with
+  dependencies, rollback and flash/overlay headroom checks.
+- Guest/voucher physical isolation and captive-portal acceptance, including
+  the no-guest normal-boot path.
+- LAN/Wi-Fi/LTE/SMS/USSD end-to-end verification on a pinned router connection;
+  72-hour stability evidence is missing.
+- Full native VeCI parity with backup/restore and safe OTA. LuCI remains only
+  an Expert/failsafe fallback until the native replacement is validated.
+- Verify checksum and sysupgrade -T on target before any single final
+  release/deployment. No auto-flash, no --force, no unreviewed build.

@@ -92,11 +92,21 @@ cp "$here/source/we5927-lte/Makefile" "$root/package/we5927-lte/Makefile"
 grep -Fq '$(PKG_BUILD_DIR)/veci-sms-cmgs' "$root/package/we5927-lte/Makefile" || {
   echo 'sms_cmgs_package_build_missing' >&2; exit 3
 }
-# Guest and voucher remain online-installable optional packages, not built-in.
-[ ! -d "$root/package/veci-app-guest" ] && [ ! -d "$root/package/veci-app-voucher" ] || {
-  echo 'optional_guest_voucher_must_not_ship_builtin' >&2; exit 3
-}
+# Carry the real optional-app sources into this exact ABI build tree without
+# selecting them in ROM. Installation is deferred until the signed feed for
+# the running firmware's build ID has been published and verified.
+for pkg in veci-app-guest veci-app-voucher veci-app-sqm veci-app-ddns veci-app-wireguard veci-telco-indonesia; do
+  src="$here/source/$pkg"
+  dst="$root/package/$pkg"
+  [ -f "$src/Makefile" ] || { echo "optional_app_source_missing:$pkg" >&2; exit 3; }
+  [ ! -L "$dst" ] || { echo "optional_app_symlink_refused:$pkg" >&2; exit 3; }
+  mkdir -p "$dst"
+  cp -a "$src/." "$dst/"
+  cmp -s "$src/Makefile" "$dst/Makefile" || exit 4
+done
+# Presence of source != installation or availability in the signed feed.
 echo 'VECI_LIVE_CORE_CELLULAR_SMS_APPS_UPDATES_STAGED=PASS'
+echo 'OPTIONAL_APP_SOURCE_STAGED=PASS'
 echo 'GUEST_VOUCHER_OPTIONAL_NOT_BUNDLED=PASS'
 
 # Reconcile init/hotplug AFTER the historical board patch, not only
