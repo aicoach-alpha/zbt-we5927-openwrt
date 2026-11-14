@@ -116,6 +116,18 @@ cp "$here/source/we5927-lte/Makefile" "$root/package/we5927-lte/Makefile"
 grep -Fq '$(PKG_BUILD_DIR)/veci-sms-cmgs' "$root/package/we5927-lte/Makefile" || {
   echo 'sms_cmgs_package_build_missing' >&2; exit 3
 }
+# Historical board patches used to inject LuCI through we5927-lte itself,
+# even when all CONFIG_PACKAGE_luci symbols were deliberately deselected.
+# Enforce the true native-only firmware property at its dependency source.
+if grep -Eq 'luci-base|luci-static|luci-app-|/share/luci/' "$root/package/we5927-lte/Makefile"; then
+  echo 'native_only_lte_package_still_installs_luci' >&2; exit 4
+fi
+if awk '/^define Device\/zbtlink_zbt-we5927$/,/^endef$/' "$root/target/linux/ramips/image/mt76x8.mk" |
+  grep -E '^[[:space:]]*DEVICE_PACKAGES[[:space:]]*:=' |
+  grep -Eq '(^|[[:space:]])luci([[:space:]]|$)'; then
+  echo 'native_only_device_profile_still_selects_luci' >&2; exit 4
+fi
+echo 'NO_LEGACY_LUCI_LTE_DEPENDENCIES=PASS'
 # Carry the real optional-app sources into this exact ABI build tree without
 # selecting them in ROM. Installation is deferred until the signed feed for
 # the running firmware's build ID has been published and verified.

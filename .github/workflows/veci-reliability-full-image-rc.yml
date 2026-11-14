@@ -96,7 +96,8 @@ jobs:
       - name: Check image NOR size, board metadata, installed LTE and guardian
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'echo "::error::NATIVE_FIRMWARE_VERIFY_FAILED step_line=$LINENO command=$BASH_COMMAND" >&2' ERR
           cd "$RUNNER_TEMP/openwrt"
           mapfile -t images < <(find bin/targets/ramips/mt76x8 -maxdepth 1 -type f -name '*zbt*we5927*sysupgrade.bin' -print)
           test "${#images[@]}" -eq 1
@@ -147,6 +148,7 @@ jobs:
           assert info['image_signature'] == 'not_verified'
           print('VECI_NATIVE_BUILD_ID_AND_LANDING=PASS')
           PYBUILD
+          echo 'GATE_NATIVE_VECI_PACKAGE_BEGIN'
           cmp "$GITHUB_WORKSPACE/source/veci-core/veci/index.html" "$rdir/www/veci/index.html"
           test -x "$rdir/usr/libexec/rpcd/veci"
           cmp "$GITHUB_WORKSPACE/source/veci-core/files/rpcd-veci" "$rdir/usr/libexec/rpcd/veci"
@@ -155,10 +157,15 @@ jobs:
           cmp "$GITHUB_WORKSPACE/source/veci-default-ui/files/usr/sbin/veci-default-ui" "$rdir/usr/sbin/veci-default-ui"
           test -x "$rdir/etc/uci-defaults/97-veci-https-defaults"
           test -x "$rdir/etc/uci-defaults/98-veci-default-ui"
-          test ! -e "$rdir/www/cgi-bin/luci"
-          test ! -L "$rdir/www/cgi-bin/luci"
-          test ! -e "$rdir/www/luci-static"
-          test ! -e "$rdir/usr/share/ucode/luci"
+          echo 'GATE_NO_LUCI_RUNTIME_BEGIN'
+          for forbidden in www/cgi-bin/luci www/luci-static usr/share/ucode/luci usr/share/luci usr/lib/lua/luci usr/libexec/rpcd/luci; do
+            if test -e "$rdir/$forbidden" || test -L "$rdir/$forbidden"; then
+              echo "::error::LEGACY_LUCI_CONTENT_PRESENT=$forbidden" >&2
+              find "$rdir/$forbidden" -maxdepth 2 -type f | head -20 || true
+              exit 1
+            fi
+          done
+          echo 'GATE_NO_LUCI_RUNTIME_PASS'
           test -s "$rdir/www/veci/js/pages/advanced.js"
           cmp "$GITHUB_WORKSPACE/source/veci-core/veci/js/pages/advanced.js" "$rdir/www/veci/js/pages/advanced.js"
           # Check each file in live-audited VeCI source, not just index.html.
@@ -206,6 +213,28 @@ jobs:
           sha256sum "$image"
           echo "IMAGE_SIZE_BOARD_METADATA_LTE_GUARDIAN=PASS"
           echo "FLASH_PERMISSION=NO"
+      - name: Collect binary for offline diagnosis if integration gate failed
+        if: ${{ failure() && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/veci-failed-validation"
+          mkdir -p "$out"
+          find "$RUNNER_TEMP/openwrt/bin/targets/ramips/mt76x8" -maxdepth 1 -type f -name '*zbt*we5927*sysupgrade.bin' -exec cp {} "$out/" \; -exec sha256sum {} \; > "$out/sha256sum.txt" 2>/dev/null || true
+          {
+            echo "FAILED VERIFICATION: DEBUG ONLY, UNAPPROVED FOR FLASH"
+            echo "Source: $GITHUB_SHA"
+            echo "Do not flash or bypass image compatibility checks."
+          } > "$out/DEBUG_ONLY_DO_NOT_FLASH.txt"
+          find "$RUNNER_TEMP/openwrt/build_dir" -path '*/root-ramips/usr/sbin/we5927-lte' -print | head -10 > "$out/rootfs-path.txt" || true
+      - name: Upload failed validation diagnostic binary
+        if: ${{ failure() && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-we5927-DEBUG-NOT-FLASH-${{ github.sha }}
+          path: ${{ runner.temp }}/veci-failed-validation/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Generate validated non-flashable CI evidence
         shell: bash
         env:

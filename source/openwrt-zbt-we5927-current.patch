@@ -15,7 +15,7 @@ index 0000000..aa974c0
 +  SECTION:=net
 +  CATEGORY:=Network
 +  TITLE:=ZBT WE5927 LTE / Dual-SIM manager
-+  DEPENDS:=+luci-base +rpcd +uhttpd +jsonfilter +kmod-usb-core +kmod-usb2 +kmod-usb-ohci +kmod-usb-net +kmod-usb-net-cdc-ether +kmod-usb-net-rndis +kmod-usb-serial +kmod-usb-serial-wwan +kmod-usb-serial-option
++  DEPENDS:=+rpcd +uhttpd +jsonfilter +kmod-usb-core +kmod-usb2 +kmod-usb-ohci +kmod-usb-net +kmod-usb-net-cdc-ether +kmod-usb-net-rndis +kmod-usb-serial +kmod-usb-serial-wwan +kmod-usb-serial-option
 +endef
 +
 +define Package/we5927-lte/description
@@ -1572,7 +1572,7 @@ index 96b3aeb..032770b 100644
 +  DEVICE_VENDOR := Zbtlink
 +  DEVICE_MODEL := ZBT-WE5927
 +  SUPPORTED_DEVICES += zbt-we5927
-+  DEVICE_PACKAGES := luci we5927-lte kmod-usb2 kmod-usb-ohci kmod-usb-net-rndis kmod-usb-serial-option
++  DEVICE_PACKAGES := we5927-lte kmod-usb2 kmod-usb-ohci kmod-usb-net-rndis kmod-usb-serial-option
 +endef
 +TARGET_DEVICES += zbtlink_zbt-we5927
 +
