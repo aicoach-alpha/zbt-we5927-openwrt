@@ -486,16 +486,24 @@ radio_or_link_lost() {
 }
 
 renew_lte() {
- local n
+ local n now previous
+ # Restrict automatic renew retries to once every two minutes.
+ # Manual reconnect runs in a separate process with fresh counters.
+ now="$(date +%s)"
+ case "$now" in ''|*[!0-9]*) return 1 ;; esac
+ previous="$last_renew_attempt"
+ if [ "$previous" -gt 0 ] 2>/dev/null &&
+    [ "$now" -ge "$previous" ] && [ $((now-previous)) -lt 120 ]; then
+   log "LTE DHCP renew cooldown: keeping netifd lease/route untouched"
+   return 3
+ fi
+ last_renew_attempt="$now"
  log "LTE fast recovery: renew existing DHCP lease"
- # A failed ubus renew is not permission to run ifup, which may release
- # a still-valid DHCP lease and briefly remove the default route.
+ # Failed renew must not grant permission to tear down a valid route.
  if ! ubus call network.interface.lte renew '{}' >/dev/null 2>&1; then
    log "LTE DHCP renew request failed; keeping interface unchanged"
    return 1
  fi
- # The modem needs time after a renew. Public ICMP/HTTPS failure is
- # upstream-only evidence and must never trigger an immediate ifdown.
  n=0
  while [ "$n" -lt 5 ]; do
    sleep 2
@@ -506,13 +514,23 @@ renew_lte() {
 }
 
 repair_lte_interface() {
- # Recheck the local gateway before any disruptive interface teardown.
- # A brief RNDIS carrier blip must not immediately release the lease.
+ local now previous
+ # A flapping modem must not lose its LTE route every 30-60 seconds.
+ # Maximum one netifd LTE teardown every five minutes.
  sleep 3
  if gateway_ok; then
    log "LTE local gateway recovered; skipping interface teardown"
    return 0
  fi
+ now="$(date +%s)"
+ case "$now" in ''|*[!0-9]*) return 1 ;; esac
+ previous="$last_repair_attempt"
+ if [ "$previous" -gt 0 ] 2>/dev/null &&
+    [ "$now" -ge "$previous" ] && [ $((now-previous)) -lt 300 ]; then
+   log "LTE interface teardown cooldown: preserving network and USB state"
+   return 3
+ fi
+ last_repair_attempt="$now"
  log "LTE interface recovery: netifd LTE only, preserve Wi-Fi and modem"
  ifdown lte >/dev/null 2>&1 || true
  sleep 1
@@ -941,8 +959,11 @@ auto_switch_sim() {
 daemon() {
  local failures recoveries threshold interval hard_after auto sim_after sim next
  local last_hard last_sim last_upstream_check now gap stage classification radio_phase
+ local last_renew_attempt last_repair_attempt renew_rc repair_rc
  radio_phase=unknown
  last_upstream_check=0
+ last_renew_attempt=0
+ last_repair_attempt=0
  failures=0
  recoveries=0
  last_hard=0
@@ -1027,16 +1048,26 @@ daemon() {
            stage=recovered_dhcp
            recoveries=0
            wan_diag_event "local_gateway_failure" "dhcp_renew_recovered"
-         elif gateway_ok; then
-           stage=upstream_degraded
-           recoveries=0
-           wan_diag_event "gateway_recovered" "hold"
          else
-           stage=interface_recovery
-         if repair_lte_interface; then
-           stage=recovered_interface
-           recoveries=0
-         else
+           renew_rc=$?
+           if [ "$renew_rc" -eq 3 ]; then
+             stage=dhcp_cooldown
+             recoveries=0
+           elif gateway_ok; then
+             stage=upstream_degraded
+             recoveries=0
+             wan_diag_event "gateway_recovered" "hold"
+           else
+             stage=interface_recovery
+             if repair_lte_interface; then
+               stage=recovered_interface
+               recoveries=0
+             else
+               repair_rc=$?
+               if [ "$repair_rc" -eq 3 ]; then
+                 stage=interface_cooldown
+                 recoveries=0
+               else
            if [ "$recoveries" -ge 2 ] && radio_or_link_lost; then
              stage=modem_soft_reconnect
              soft_reconnect || true
@@ -1072,8 +1103,10 @@ daemon() {
                auto_switch_sim "$sim" "$next" || true
              fi
            fi
+               fi
+             fi
+           fi
          fi
-       fi
        fi
      fi
    fi
