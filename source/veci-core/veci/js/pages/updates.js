@@ -116,7 +116,7 @@ export default {
 							<div><span>Staged</span><strong>${staged ? formatBytes(firmware.bytes) : '—'}</strong></div>
 							<div><span>SHA256</span><strong>${escapeHtml(firmware.sha256 ? firmware.sha256.slice(0, 16) + '…' : '—')}</strong></div>
 							<div><span>Signature policy</span><strong>${escapeHtml(firmware.signature_policy || 'development')}</strong></div>
-							<div><span>Trusted signature</span><strong>${firmware.signature_verified ? 'Verified' : firmware.signature_policy === 'required' ? 'Not verified' : 'Development image'}</strong></div>
+							<div><span>Trusted signature</span><strong>${!staged ? '— (no staged image)' : firmware.signature_verified ? 'Verified' : firmware.signature_policy === 'required' ? 'Not verified' : 'Development image'}</strong></div>
 							<div><span>Image budget</span><strong>${maxBytes ? formatBytes(maxBytes) : '—'}</strong></div>
 						</div>
 						${staged && !installUnlocked ? `<button id="validate-staged" class="button button-secondary" type="button">${serverValidated ? 'Revalidate for install' : 'Validate staged image'}</button>` : ''}

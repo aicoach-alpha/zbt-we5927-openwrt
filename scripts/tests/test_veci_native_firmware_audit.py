@@ -49,8 +49,7 @@ class NativeFeatureTests(unittest.TestCase):
             "usr/libexec/rpcd/veci", "usr/sbin/we5927-lte",
             "etc/init.d/we5927-lte", "usr/sbin/veci-wifi-guardian",
             "usr/libexec/rpcd/veci.sms", "usr/libexec/veci-sms-send-one",
-            "usr/libexec/veci-sms-drafts", "usr/libexec/rpcd/veci.meter",
-            "www/veci/data-meter.html", "www/veci/data-meter.js",
+            "usr/libexec/veci-sms-drafts",
             "usr/sbin/veci-update-agent", "usr/libexec/rpcd/veci.apps",
         ):
             self.put(path, '<meta http-equiv="refresh" content="0; url=/veci/">'
@@ -113,12 +112,12 @@ class NativeFeatureTests(unittest.TestCase):
     def test_native_js_cache_bust_and_build_marker(self):
         html = (ROOT / "source/veci-core/veci/index.html").read_text()
         app = (ROOT / "source/veci-core/veci/js/app.js").read_text()
-        self.assertIn('app.js?v=162', html)
+        self.assertIn('app.js?v=164', html)
         self.assertIn('app.css?v=162', html)
         self.assertIn('id="topbar-build"', html)
         self.assertIn('/veci/build.json', app)
         self.assertIn('home.js?v=162', app)
-        self.assertIn('cellular.js?v=162', app)
+        self.assertIn('cellular.js?v=164', app)
 
     def test_static_check_can_never_authorize_flash(self):
         self.assertFalse(module.inventory(self.root)["production_flash_permission"])

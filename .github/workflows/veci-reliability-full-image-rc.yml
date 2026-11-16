@@ -10,7 +10,6 @@ on:
       - 'source/veci-wifi-guardian/**'
       - 'source/veci-core/**'
       - 'source/veci-default-ui/**'
-      - 'source/veci-data-meter/**'
       - 'source/veci-app-catalog-we5927/**'
       - 'scripts/audit_veci_firmware_features.py'
       - 'scripts/veci_release_manifest.py'
@@ -65,7 +64,7 @@ jobs:
           sh scripts/stage-veci-reliability-rc.sh "$root"
           cp source/openwrt-we5927.config "$root/.config"
           # Guardian must be built-in, not downloaded later to a nearly full 8 MB NOR.
-          printf '\nCONFIG_PACKAGE_veci-wifi-guardian=y\nCONFIG_PACKAGE_veci=y\nCONFIG_PACKAGE_veci-default-ui=y\nCONFIG_PACKAGE_veci-cellular-we5927=y\nCONFIG_PACKAGE_veci-app-catalog-we5927=y\nCONFIG_PACKAGE_veci-update-we5927=y\nCONFIG_PACKAGE_veci-data-meter=y\n' >> "$root/.config"
+          printf '\nCONFIG_PACKAGE_veci-wifi-guardian=y\nCONFIG_PACKAGE_veci=y\nCONFIG_PACKAGE_veci-default-ui=y\nCONFIG_PACKAGE_veci-cellular-we5927=y\nCONFIG_PACKAGE_veci-app-catalog-we5927=y\nCONFIG_PACKAGE_veci-update-we5927=y\n' >> "$root/.config"
           grep -Fxq 'CONFIG_TARGET_ramips_mt76x8_DEVICE_zbtlink_zbt-we5927=y' "$root/.config"
           grep -Fxq 'CONFIG_TARGET_ROOTFS_SQUASHFS=y' "$root/.config"
           echo 'RELIABILITY_RELEASE_TREE_STAGED=PASS'
@@ -83,7 +82,7 @@ jobs:
           grep -Fxq 'CONFIG_PACKAGE_veci-cellular-we5927=y' .config
           grep -Fxq 'CONFIG_PACKAGE_veci-app-catalog-we5927=y' .config
           grep -Fxq 'CONFIG_PACKAGE_veci-update-we5927=y' .config
-          grep -Fxq 'CONFIG_PACKAGE_veci-data-meter=y' .config
+          ! grep -Fxq 'CONFIG_PACKAGE_veci-data-meter=y' .config
           # LuCI must NOT re-enter as default, dependency or auto-selected
           # package. Never interpret firmware build PASS as native UI parity.
           ! grep -Eq '^CONFIG_(DEFAULT_luci|PACKAGE_luci([-A-Za-z0-9_]*)?|PACKAGE_liblucihttp([-A-Za-z0-9_]*)?|PACKAGE_rpcd-mod-luci)=y$' .config
@@ -183,9 +182,11 @@ jobs:
           done
           test -x "$rdir/usr/libexec/veci-sms-cmgs"
           test -x "$rdir/etc/init.d/veci-update-agent"
-          test -x "$rdir/usr/libexec/rpcd/veci.meter"
-          test -s "$rdir/www/veci/data-meter.html"
-          test -s "$rdir/www/veci/data-meter.js"
+          for retired in usr/libexec/rpcd/veci.meter www/veci/data-meter.html www/veci/data-meter.js; do
+            test ! -e "$rdir/$retired"
+          done
+          ! grep -Fq '/veci/data-meter.html' "$rdir/www/veci/js/pages/cellular.js"
+          ! grep -Fq 'bindFirmwareUpdates' "$rdir/www/veci/js/pages/system.js"
           test -s "$rdir/usr/share/veci/apps/guest.json"
           test -s "$rdir/usr/share/veci/apps/voucher.json"
           # Machine-readable actual image audit; do not claim that app cards

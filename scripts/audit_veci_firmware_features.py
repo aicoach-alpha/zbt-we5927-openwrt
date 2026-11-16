@@ -50,9 +50,13 @@ def inventory(root):
                                  and exists("www/veci-apps/guest.js")),
         "voucher_runtime": (exists("usr/libexec/rpcd/veci.app.voucher")
                             and exists("www/veci-apps/voucher.js")),
-        "native_data_meter": (exists("usr/libexec/rpcd/veci.meter")
-                               and exists("www/veci/data-meter.html")
-                               and exists("www/veci/data-meter.js")),
+        "legacy_data_meter_absent": (
+            not any(exists(path) for path in (
+                "usr/libexec/rpcd/veci.meter", "www/veci/data-meter.html",
+                "www/veci/data-meter.js"))
+            and (not (root / "www/veci/js/pages/cellular.js").is_file()
+                 or "/veci/data-meter.html" not in
+                 (root / "www/veci/js/pages/cellular.js").read_text(errors="replace"))),
         "firmware_update_agent": exists("usr/sbin/veci-update-agent"),
         "app_catalog": exists("usr/libexec/rpcd/veci.apps"),
     }

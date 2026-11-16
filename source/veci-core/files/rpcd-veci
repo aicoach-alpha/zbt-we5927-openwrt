@@ -620,9 +620,16 @@ firmware_manifest_compatible() {
 }
 
 firmware_remote_refresh() {
+	firmware_remote_error=remote_manifest_invalid
 	manifest_url="$(uci -q get veci.update.manifest_url 2>/dev/null || true)"
-	[ -n "$manifest_url" ] && firmware_safe_https_url "$manifest_url" || return 1
-	firmware_fetch "$manifest_url" "$firmware_remote_manifest" || return 1
+	[ -n "$manifest_url" ] && firmware_safe_https_url "$manifest_url" || {
+		firmware_remote_error=manifest_url_invalid
+		return 1
+	}
+	firmware_fetch "$manifest_url" "$firmware_remote_manifest" || {
+		firmware_remote_error=manifest_fetch_failed
+		return 1
+	}
 
 	schema="$(firmware_manifest_field schema)"
 	[ "$schema" = "1" ] || return 1
@@ -865,7 +872,7 @@ method_firmware_validate() {
 
 method_firmware_remote_check() {
 	if ! firmware_remote_refresh; then
-		printf '{ "ok": false, "error": "remote_manifest_invalid" }\n'
+		printf '{ "ok": false, "error": "%s" }\n' "$firmware_remote_error"
 		return
 	fi
 
@@ -905,7 +912,7 @@ method_firmware_remote_check() {
 
 method_firmware_remote_download() {
 	if ! firmware_remote_refresh; then
-		printf '{ "ok": false, "error": "remote_manifest_invalid" }\n'
+		printf '{ "ok": false, "error": "%s" }\n' "$firmware_remote_error"
 		return
 	fi
 	case "$(firmware_manifest_field available)" in

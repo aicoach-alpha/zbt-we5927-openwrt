@@ -1,4 +1,3 @@
-import { bindFirmwareUpdates } from '../lib/firmware-updates.js?v=162';
 import { badge, escapeHtml, setBusy } from '../lib/dom.js?v=162';
 import { formatBytes, formatDuration, formatMemory } from '../lib/format.js?v=162';
 
@@ -76,22 +75,6 @@ export default {
 				</article>
 			</div>
 
-			<article class="panel">
-				<div class="panel-heading"><div><p class="eyebrow">FIRMWARE UPDATE</p><h3>Manual upload & OTA</h3></div></div>
-				<p class="panel-copy">Only verified firmware for this exact router may be applied. Uploads are staged in RAM; no automatic flashing occurs.</p>
-				<p class="panel-copy" id="fw-status" role="status">Checking firmware backend…</p>
-				<label class="field"><span>OpenWrt sysupgrade image (.bin)</span><input type="file" id="fw-file" accept=".bin" /></label>
-				<label class="field"><span>Publisher SHA-256 checksum</span><input type="text" id="fw-sha" autocomplete="off" maxlength="64" placeholder="64 hex characters" /></label>
-				<div class="cellular-actions"><button class="button button-secondary" type="button" id="fw-upload">Upload and validate</button></div>
-				<hr />
-				<p class="panel-copy" id="fw-ota-status" role="status">Check the published OTA release channel.</p>
-				<div class="cellular-actions">
-					<button class="button button-secondary" type="button" id="fw-check">Check for OTA updates</button>
-					<button class="button button-secondary" type="button" id="fw-download" disabled>Download and validate</button>
-					<button class="button button-danger" type="button" id="fw-apply" hidden>Flash verified firmware</button>
-				</div>
-			</article>
-
             <article class="panel system-log-panel">
                 <div class="panel-heading">
                     <div><p class="eyebrow">LOGS</p><h3>Router events</h3></div>
@@ -145,9 +128,6 @@ export default {
 			})
 		);
 		refreshLogs.addEventListener('click', loadLogs);
-
-		const nativeFirmwareCheck = () => api.call('veci.firmware', 'check', {}, { timeout: 20000 });
-		void bindFirmwareUpdates({ api, root, toast, confirm, nativeFirmwareCheck });
 
 		const hostnameForm = root.querySelector('#hostname-form');
 		hostnameForm?.addEventListener('submit', async event => {

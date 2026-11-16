@@ -35,9 +35,11 @@ class OptionalAppsPolicyTests(unittest.TestCase):
         self.assertFalse((ROOT / "source/veci-core/veci/js/lib/quota.js").exists())
         self.assertNotIn("veci-telco-indonesia", STAGER)
         self.assertNotIn("CONFIG_PACKAGE_veci-telco-indonesia=y", BUILD)
-        # Local LTE byte counters are unrelated to carrier API quota.
-        self.assertTrue((ROOT / "source/veci-data-meter/Makefile").exists())
-        self.assertIn("CONFIG_PACKAGE_veci-data-meter=y", BUILD)
+        # Operator quota and LTE-usage estimators are now explicitly retired.
+        self.assertFalse((ROOT / "source/veci-data-meter").exists())
+        self.assertIn("! grep -Fxq 'CONFIG_PACKAGE_veci-data-meter=y'", BUILD)
+        cellular = (ROOT / "source/veci-core/veci/js/pages/cellular.js").read_text()
+        self.assertNotIn("/veci/data-meter.html", cellular)
 
     def test_catalog_lists_optional_apps(self):
         for name in ("guest", "voucher"):

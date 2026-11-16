@@ -41,7 +41,12 @@ check_once() {
 	update_available="$(printf '%s' "$result" | jsonfilter -e '@.update_available' 2>/dev/null)"
 
 	[ "$ok" = "true" ] || {
-		record_status error invalid_manifest
+		reason="$(printf '%s' "$result" | jsonfilter -e '@.error' 2>/dev/null || true)"
+		case "$reason" in
+			manifest_fetch_failed) record_status error network_or_manifest_fetch_failed ;;
+			manifest_url_invalid) record_status error invalid_manifest_url ;;
+			*) record_status error invalid_manifest ;;
+		esac
 		return
 	}
 	[ "$available" = "true" ] || {
