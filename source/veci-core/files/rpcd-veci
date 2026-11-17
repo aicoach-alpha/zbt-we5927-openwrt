@@ -1166,6 +1166,12 @@ method_service_action() {
 		return
 	}
 
+	# Emit bounded, credential-free evidence BEFORE administrator-triggered
+	# network reconfiguration, so AP fault snapshots can attribute VeCI calls.
+	if [ "$service" = network ]; then
+		logger -t veci-rpc-net "network_service_${action}_requested" 2>/dev/null || :
+	fi
+
 	if "$script" "$action" >/dev/null 2>&1; then
 		printf '{ "ok": true }\n'
 	else
@@ -1210,9 +1216,12 @@ method_wifi_reload() {
 		printf '{ "ok": false, "error": "wifi_command_not_found" }\n'
 		return
 	fi
+	logger -t veci-rpc-net 'wifi_reload_requested' 2>/dev/null || :
 	if wifi reload >/dev/null 2>&1; then
+		logger -t veci-rpc-net 'wifi_reload_succeeded' 2>/dev/null || :
 		printf '{ "ok": true }\n'
 	else
+		logger -t veci-rpc-net 'wifi_reload_failed' 2>/dev/null || :
 		printf '{ "ok": false, "error": "wifi_reload_failed" }\n'
 	fi
 }
