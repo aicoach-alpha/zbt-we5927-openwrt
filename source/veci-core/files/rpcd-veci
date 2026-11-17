@@ -1166,6 +1166,12 @@ method_service_action() {
 		return
 	}
 
+	# Emit bounded, credential-free evidence BEFORE administrator-triggered
+	# network reconfiguration, so AP fault snapshots can attribute VeCI calls.
+	if [ "$service" = network ]; then
+		logger -t veci-rpc-net "network_service_${action}_requested" 2>/dev/null || :
+	fi
+
 	if "$script" "$action" >/dev/null 2>&1; then
 		printf '{ "ok": true }\n'
 	else
@@ -1173,21 +1179,56 @@ method_service_action() {
 	fi
 }
 
+# Authoritative read-only AP evidence: netifd may retain stale ifname.
+# Never call iw or modify hostapd, radio, UCI, modem or passwords.
+method_wifi_runtime_evidence() {
+ local path ifname objects object status count
+ . /usr/share/libubox/jshn.sh || return 1
+ json_init
+ json_add_array kernel_ifnames
+ for path in /sys/class/net/*; do
+  [ -e "$path/phy80211" ] || continue
+  ifname="${path##*/}"
+  case "$ifname" in ''|*[!A-Za-z0-9_.-]*) continue ;; esac
+  json_add_string "" "$ifname"
+ done
+ json_close_array
+ json_add_array hostapd_ready_ifnames
+ objects="$(ubus -S -t 2 list 'hostapd.*' 2>/dev/null || true)"
+ count=0
+ for object in $objects; do
+  case "$object" in hostapd.*) ;; *) continue ;; esac
+  count=$((count + 1))
+  [ "$count" -le 6 ] || break
+  ifname="${object#hostapd.}"
+  case "$ifname" in ''|*[!A-Za-z0-9_.-]*) continue ;; esac
+  [ -e "/sys/class/net/$ifname/phy80211" ] || continue
+  status="$(ubus -S -t 1 call "$object" get_status '{}' 2>/dev/null |
+            jsonfilter -e '@.status' 2>/dev/null || true)"
+  [ "$status" = ENABLED ] && json_add_string "" "$ifname"
+ done
+ json_close_array
+ json_dump
+}
+
 method_wifi_reload() {
 	if ! command -v wifi >/dev/null 2>&1; then
 		printf '{ "ok": false, "error": "wifi_command_not_found" }\n'
 		return
 	fi
+	logger -t veci-rpc-net 'wifi_reload_requested' 2>/dev/null || :
 	if wifi reload >/dev/null 2>&1; then
+		logger -t veci-rpc-net 'wifi_reload_succeeded' 2>/dev/null || :
 		printf '{ "ok": true }\n'
 	else
+		logger -t veci-rpc-net 'wifi_reload_failed' 2>/dev/null || :
 		printf '{ "ok": false, "error": "wifi_reload_failed" }\n'
 	fi
 }
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "logs": { "source": "str", "limit": "int" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "wifiRuntimeEvidence": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "logs": { "source": "str", "limit": "int" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -1195,6 +1236,7 @@ case "$1" in
 			clients) method_clients ;;
 			networkInventory) method_network_inventory ;;
 			health) method_health ;;
+			wifiRuntimeEvidence) method_wifi_runtime_evidence ;;
 			internetStatus) method_internet_status ;;
 			updateStatus) method_update_status ;;
 			apps) method_apps ;;
