@@ -38,3 +38,11 @@ separately tested from a device actually routing through 192.168.1.1.
 
 If the script cannot establish SSH with existing verified host keys, stop and
 check the laptop's SSH trust configuration. Never bypass host-key verification.
+
+## Wi-Fi AP triage when ubus says radio0.up but Guardian says ap_not_ready
+
+Additional read-only observations distinguish hostapd_ubus_registered,
+wpad_service_running, and hostapd_enabled. An AP can be configured/up
+in network.wireless status without a responsive hostapd BSS; this does
+not establish a driver fault. The script does not expose SSID or key.
+Do not restart Wi-Fi or rebind MT7603 while preserving working LTE.

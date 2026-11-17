@@ -77,6 +77,9 @@ function New-Observation {
     $lte = Read-RouterJson "ubus -S -t 4 call network.interface.lte status '{}'"
     $wireless = Read-RouterJson "ubus -S -t 4 call network.wireless status '{}'"
     $ap = Read-RouterJson "ubus -S -t 4 call hostapd.phy0-ap0 get_status '{}'"
+    # Distinguish radio configuration UP from real hostapd ubus registration.
+    $hostapdObject = Read-Router 'ubus -S -t 3 list hostapd.phy0-ap0'
+    $wpadService = Read-Router '/etc/init.d/wpad status'
     $route = Read-Router 'ip -4 route show default dev usb0'
     $gatewayPing = Read-Router 'ping -I usb0 -c 2 -W 2 192.168.7.1'
     $internetPing = Read-Router 'ping -I usb0 -c 2 -W 2 1.1.1.1'
@@ -106,6 +109,9 @@ function New-Observation {
         dns_resolution_pass = $(if ($dns) { $dns -match 'Name:[ ]*cloudflare.com' } else { $null })
         wireless_control_plane_up = $apState
         hostapd_enabled = $hostapdState
+        hostapd_ubus_registered = $(if ($null -ne $hostapdObject) { $hostapdObject -match 'hostapd[.]phy0-ap0' } else { $false })
+        wpad_service_running = $(if ($null -ne $wpadService) { $wpadService -match 'running' } else { $null })
+        radio_and_ap_status_conflict = ($apState -eq $true -and $hostapdState -ne $true)
         wifi_guardian_observe_only = $(if ($guardian) { $guardian -match 'auto_recover=0' } else { $null })
         external_verified_bssid_visible = $externalSeen
         lan_connected_port_count = $cablePorts.Count
@@ -125,8 +131,9 @@ $observations = @()
 for ($i = 1; $i -le $Samples; $i++) {
     $item = New-Observation
     $observations += $item
-    Write-Host ("Sample {0}/{1}: Router-LTE-uplink={2} Wi-Fi runtime={3} Wi-Fi beacon={4} netifd={5} connected LAN ports={6}" -f
+    Write-Host ("Sample {0}/{1}: Router-LTE-uplink={2} Wi-Fi runtime={3} hostapd-object={4} wpad-running={5} Wi-Fi beacon={6} netifd={7} LAN-links={8}" -f
         $i, $Samples, $item.internet_pass, $item.wifi_runtime_pass,
+        $item.hostapd_ubus_registered, $item.wpad_service_running,
         $item.wifi_beacon_pass, $item.netifd_instance_count, $item.lan_connected_port_count)
     if ($i -lt $Samples) { Start-Sleep -Seconds $IntervalSeconds }
 }

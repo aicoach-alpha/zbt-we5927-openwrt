@@ -49,6 +49,14 @@ class OfficeUatContract(unittest.TestCase):
         self.assertIn("Router-LTE-uplink=",SOURCE)
         self.assertNotIn("wifi_beacon_pass = $apState",SOURCE)
 
+    def test_ap_service_diagnostics_cannot_confuse_radio_up_with_beacon(self):
+        self.assertIn("Read-Router 'ubus -S -t 3 list hostapd.phy0-ap0'", SOURCE)
+        self.assertIn("Read-Router '/etc/init.d/wpad status'", SOURCE)
+        self.assertIn("hostapd_ubus_registered =", SOURCE)
+        self.assertIn("wpad_service_running =", SOURCE)
+        self.assertIn("radio_and_ap_status_conflict =", SOURCE)
+        self.assertIn("wifi_beacon_pass = $externalSeen", SOURCE)
+
     def test_report_excludes_secret_telemetry(self):
         # Only safe summaries/port flags are output: avoid raw passwords, SSID,
         # host fingerprint, IMEI or carrier APN in persisted observations.
