@@ -125,8 +125,10 @@ export function canActivateGuestOnRadio(networks, radioName, evidence) {
 	});
 }
 
-async function reloadGuestServices(api, { reloadWireless = true } = {}) {
-	await api.veci('serviceAction', { service: 'network', action: 'reload' });
+async function reloadGuestServices(api, { reloadWireless = true, reloadNetwork = true } = {}) {
+	// If a guest AP is already disabled, no active guest network needs to be torn down.
+	// Avoid unnecessarily reloading netifd and the primary Wi-Fi while removing dormant UCI sections.
+	if (reloadNetwork) await api.veci('serviceAction', { service: 'network', action: 'reload' });
 	await api.veci('serviceAction', { service: 'firewall', action: 'reload' });
 	await api.veci('serviceAction', { service: 'dnsmasq', action: 'reload' });
 	// Removing a disabled guest never needs a potentially hazardous MT76 radio reload.
@@ -449,7 +451,11 @@ export default {
 				])
 					await api.uciDelete(config, section).catch(() => {});
 				for (const config of ['network', 'dhcp', 'firewall', 'wireless']) await api.uciCommit(config);
-				await reloadGuestServices(api, { reloadWireless: !boolOption(managedGuest?.disabled) });
+				// Only skip full network and radio reload when the managed guest AP was already disabled.
+				await reloadGuestServices(api, {
+					reloadWireless: !boolOption(managedGuest?.disabled),
+					reloadNetwork: !boolOption(managedGuest?.disabled)
+				});
 				toast('Guest Wi-Fi removed.', 'success');
 				setTimeout(() => window.dispatchEvent(new HashChangeEvent('hashchange')), 1600);
 			} catch (error) {
