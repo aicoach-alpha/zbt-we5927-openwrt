@@ -16,7 +16,7 @@ import tempfile
 
 BOARD = "zbtlink,zbt-we5927"
 TARGET = "ramips/mt76x8"
-VERSION = "25.12.5"
+VERSION = "25.12.6"
 MTD_MAX = 0x7A0000
 
 

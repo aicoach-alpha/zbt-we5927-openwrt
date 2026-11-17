@@ -56,7 +56,7 @@ jobs:
           root="$RUNNER_TEMP/openwrt"
           mkdir -p "$root"
           git -C "$root" init -q
-          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git f0a60eee2fe051741c643ea6118718aae1ef17fb
+          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git 64900e756efa667774214f9c6b17c113222e01f7
           git -C "$root" checkout -q --detach FETCH_HEAD
           test "$(git -C "$root" rev-parse HEAD)" = "$(cat source/openwrt-source-commit.txt)"
           git -C "$root" apply --check "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
@@ -104,6 +104,13 @@ jobs:
           bytes="$(stat -c %s "$image")"
           # 0x7a0000 = actual tested hardware's firmware MTD partition length.
           max=7995392
+          # Raw image headroom is not a measured overlay capacity.
+          # A nearly full 8 MB NOR image is not acceptable for 24/7.
+          MIN_FIRMWARE_HEADROOM_BYTES=1048576
+          test "$bytes" -le "$((max-MIN_FIRMWARE_HEADROOM_BYTES))" || {
+            echo "INSUFFICIENT_RAW_FIRMWARE_HEADROOM bytes=$bytes reserve=$MIN_FIRMWARE_HEADROOM_BYTES" >&2
+            exit 1
+          }
           test "$bytes" -le "$max" || {
             echo "IMAGE_OVERSIZE bytes=$bytes limit=$max" >&2
             exit 1
@@ -126,6 +133,14 @@ jobs:
           test -n "$rootfs"
           cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/usr/sbin/we5927-lte" "$rootfs"
           rdir="${rootfs%/usr/sbin/we5927-lte}"
+          # Components present != AP alive. Physical hostapd/BSS UAT is separate.
+          test -x "$rdir/usr/sbin/wpad"
+          test -e "$rdir/usr/sbin/hostapd"
+          test -x "$rdir/etc/init.d/wpad"
+          test -x "$rdir/lib/netifd/wireless/mac80211.sh"
+          find "$rdir/lib/modules" -type f -name 'mt7603e.ko' -size +0c -print -quit |
+            grep -q 'mt7603e.ko'
+          echo "WIFI_WPAD_MT7603_PRESENT_NOT_RUNTIME_VERIFIED=PASS"
           test -x "$rdir/usr/sbin/veci-wifi-guardian"
           grep -Fq 'auto_recover=0' "$rdir/usr/sbin/veci-wifi-guardian"
           cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/etc/init.d/we5927-lte" "$rdir/etc/init.d/we5927-lte"

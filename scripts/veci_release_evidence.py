@@ -27,7 +27,7 @@ def make_report(meta, pin, size, maximum, image_sha, build_sha,
     require(type(size) is int and type(maximum) is int and 0 < size <= maximum == 7995392,
             "invalid firmware MTD fit")
     require(meta.get("version", {}).get("target") == "ramips/mt76x8" and
-            meta["version"].get("version") == "25.12.5" and
+            meta["version"].get("version") == "25.12.6" and
             "zbtlink,zbt-we5927" in meta.get("supported_devices", []),
             "wrong board or OpenWrt version")
     if event == "pull_request":
@@ -55,7 +55,7 @@ def make_report(meta, pin, size, maximum, image_sha, build_sha,
         "openwrt_source_sha": pin,
         "board": "zbtlink,zbt-we5927",
         "target": "ramips/mt76x8",
-        "openwrt_version": "25.12.5",
+        "openwrt_version": "25.12.6",
         "image_sha256": image_sha,
         "image_bytes": size,
         "firmware_mtd_bytes": maximum,
@@ -69,7 +69,7 @@ def make_report(meta, pin, size, maximum, image_sha, build_sha,
             "builtin_veci_core_rpc_default_ui": "pass",
             "veci_web_cellular_sms_catalog_update_source": "pass",
             "guest_voucher_optional_not_bundled": "pass",
-            "luci_fallback_retained": "pass",
+            "native_ui_without_luci": "pass",
             "release_signing_and_trust_anchor": "not_verified",
             "existing_veci_spa_parity": "not_verified",
             "physical_router_uat": "not_run",

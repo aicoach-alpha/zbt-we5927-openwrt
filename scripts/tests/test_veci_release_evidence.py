@@ -14,7 +14,7 @@ HEAD = "b" * 40
 BASE = "c" * 40
 IMAGE = "d" * 64
 PIN = "e" * 40
-META = {"version": {"target": "ramips/mt76x8", "version": "25.12.5"},
+META = {"version": {"target": "ramips/mt76x8", "version": "25.12.6"},
         "supported_devices": ["zbtlink,zbt-we5927"]}
 
 
@@ -71,7 +71,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
     def test_bad_metadata_and_partition_fit_rejected(self):
         with self.assertRaisesRegex(ValueError, "wrong board"):
             pr_report(meta={"version": {"target":"ramips/mt76x8",
-                                        "version": "25.12.6"},
+                                        "version": "25.12.5"},
                             "supported_devices": ["zbtlink,zbt-we5927"]})
         with self.assertRaisesRegex(ValueError, "invalid firmware MTD"):
             pr_report(size=8000000)

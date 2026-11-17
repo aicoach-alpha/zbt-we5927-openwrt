@@ -58,7 +58,7 @@ class FailClosedImageTests(unittest.TestCase):
         with self.assertRaisesRegex(gate.GateError, "release"):
             gate.check_metadata({
                 "supported_devices": [gate.BOARD],
-                "version": {"target": gate.TARGET, "version": "25.12.6"},
+                "version": {"target": gate.TARGET, "version": "25.12.5"},
             })
 
     def test_missing_trust_anchor_refused(self):
@@ -76,7 +76,7 @@ class FailClosedImageTests(unittest.TestCase):
         dummy = self.root / "stub-fwtool"
         dummy.write_text("""#!/bin/sh
 if [ "$1" = "-i" ]; then
-  echo '{"supported_devices":["zbtlink,zbt-we5927"],"version":{"target":"ramips/mt76x8","version":"25.12.5"}}' > "$2"
+  echo '{"supported_devices":["zbtlink,zbt-we5927"],"version":{"target":"ramips/mt76x8","version":"25.12.6"}}' > "$2"
   exit 0
 fi
 # Certificate intentionally absent; fail closed.

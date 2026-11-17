@@ -170,7 +170,7 @@ if grep -Eq '(^|[[:space:]])wifi[[:space:]]+(up|reload|down)'  "$root/package/ve
  exit 4
 fi
 echo 'WE5927_RELIABILITY_SOURCE_STAGED=PASS'
-echo 'PINNED_OPENWRT=25.12.5'
+echo 'PINNED_OPENWRT=25.12.6'
 echo 'MT7603_PATCHES=2'
 echo 'LTE_MANUAL_RECOVERY_GUARDED=PASS'
 echo 'WIFI_GUARDIAN_OBSERVE_ONLY=PASS'

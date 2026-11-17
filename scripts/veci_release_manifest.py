@@ -10,7 +10,7 @@ import sys
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
 BOARD = "zbtlink,zbt-we5927"
 TARGET = "ramips/mt76x8"
-OPENWRT_VERSION = "25.12.5"
+OPENWRT_VERSION = "25.12.6"
 
 
 def create_manifest(source_commit, openwrt_pin):

@@ -42,7 +42,7 @@ jobs:
           root="$RUNNER_TEMP/openwrt"
           mkdir -p "$root"
           git -C "$root" init -q
-          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git f0a60eee2fe051741c643ea6118718aae1ef17fb
+          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git 64900e756efa667774214f9c6b17c113222e01f7
           git -C "$root" checkout -q --detach FETCH_HEAD
           git -C "$root" apply --check "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
           git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
@@ -56,7 +56,7 @@ jobs:
           test -f "$root/package/veci-wifi-guardian/Makefile"
           test -f "$root/package/kernel/mt76/patches/950-mt7603-defer-watchdog-on-channel-failure.patch"
           test -f "$root/package/kernel/mt76/patches/951-mt7603-free-beacon-skb-on-error.patch"
-          echo 'INTEGRATED_WE5927_25_12_5_SOURCE=PASS'
+          echo 'INTEGRATED_WE5927_25_12_6_SOURCE=PASS'
       - name: Reject incorrect mt76 driver revision before staging
         shell: bash
         run: |

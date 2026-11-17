@@ -36,14 +36,14 @@ jobs:
             build-essential clang bison flex gawk gettext git gcc-multilib \
             libncurses-dev libssl-dev rsync subversion swig unzip wget \
             zlib1g-dev python3 python3-setuptools file xz-utils zstd
-      - name: Fetch exact historical OpenWrt 25.12.5 source
+      - name: Fetch exact historical OpenWrt 25.12.6 source
         shell: bash
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/openwrt"
           mkdir -p "$root"
           git -C "$root" init -q
-          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git f0a60eee2fe051741c643ea6118718aae1ef17fb
+          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git 64900e756efa667774214f9c6b17c113222e01f7
           git -C "$root" checkout -q --detach FETCH_HEAD
           test "$(git -C "$root" rev-parse HEAD)" = "$(cat source/openwrt-source-commit.txt)"
           echo "OPENWRT_SOURCE_COMMIT=VERIFIED"
@@ -70,10 +70,10 @@ jobs:
           # Targeted package builds do not bootstrap host tools automatically.
           make -j2 V=sc tools/install
           make -j2 V=sc toolchain/install
-          # target/linux/prepare alone does not generate linux-6.12.94/.config.
+          # target/linux/prepare alone does not generate linux-6.12.112/.config.
           # gpio-button-hotplug is a dependency of targeted mt76 compilation.
           make -j2 V=s target/linux/compile
-          kernel_config="$(find build_dir/target-* -path '*/linux-6.12.94/.config' -type f -print -quit)"
+          kernel_config="$(find build_dir/target-* -path '*/linux-6.12.112/.config' -type f -print -quit)"
           test -n "$kernel_config" && test -s "$kernel_config"
           echo "KERNEL_CONFIG_READY=$kernel_config"
           make -j2 V=s package/kernel/mt76/compile
