@@ -96,6 +96,9 @@ export class VeciApi {
 	wirelessStatus() {
 		return this.call('network.wireless', 'status', {});
 	}
+	wifiRuntimeEvidence() {
+		return this.call('veci', 'wifiRuntimeEvidence', {}, { timeout: 12000 });
+	}
 	interfaceStatus(name) {
 		return this.call(`network.interface.${name}`, 'status', {});
 	}
