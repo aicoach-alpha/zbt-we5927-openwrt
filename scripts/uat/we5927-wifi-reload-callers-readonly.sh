@@ -16,17 +16,22 @@ if [ -r /proc/uptime ]; then
   esac
 fi
 printf '%s\n' '===== PHY_DRIVER ====='
+phy0_driver=unknown
 if [ -e /sys/class/ieee80211/phy0/device/driver ]; then
-  readlink /sys/class/ieee80211/phy0/device/driver 2>/dev/null |
-    awk -F/ '{print "phy0_driver=" $NF}'
-else
-  echo 'phy0_driver=unknown'
+  phy0_driver="$(readlink /sys/class/ieee80211/phy0/device/driver 2>/dev/null |
+    awk -F/ '{print $NF}')"
 fi
+printf 'phy0_driver=%s\n' "$phy0_driver"
 printf '%s\n' '===== ATH12K_HOTPLUG_GATE ====='
 ath=/etc/hotplug.d/ieee80211/11-ath12k-trigger
 if [ -f "$ath" ]; then
   if grep -Fq 'DRIVER=ath12k_pci' "$ath"; then
     echo 'ath12k_trigger_has_driver_gate=1'
+    if [ "$phy0_driver" != unknown ] && [ "$phy0_driver" != ath12k_pci ]; then
+      echo 'ath12k_trigger_for_phy0=excluded_driver_mismatch'
+    else
+      echo 'ath12k_trigger_for_phy0=needs_review'
+    fi
   else
     echo 'ath12k_trigger_has_driver_gate=0_review_exact_local_script'
   fi
