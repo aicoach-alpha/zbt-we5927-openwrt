@@ -10,6 +10,9 @@ define Package/veci-v2-ipv6
   TITLE:=VeCI v2 guarded IPv6 (off by default)
   DEPENDS:=+rpcd +jsonfilter +uci +flock
 endef
+# Shell/config-only package: do not invoke make in the empty build directory.
+define Build/Compile
+endef
 define Package/veci-v2-ipv6/description
   Explicit IPv6 saved preference; only applies on admin-initiated reboot.
 endef
