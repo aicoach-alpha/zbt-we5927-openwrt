@@ -111,10 +111,26 @@ function findInternetZone(firewallValues = {}) {
 	return preferred?.config?.name || preferred?.section || 'wan';
 }
 
-async function reloadGuestServices(api) {
+// Prevent guest AP activation when the parent radio's existing AP is
+// already unavailable. netifd may report stale iface names after teardown.
+export function canActivateGuestOnRadio(networks, radioName, evidence) {
+	if (!Array.isArray(evidence?.kernel_ifnames) || !Array.isArray(evidence?.hostapd_ready_ifnames)) return false;
+	return networks.some(network => {
+		if (network.radio !== radioName || (network.config.mode || 'ap') !== 'ap') return false;
+		if (boolOption(network.config.disabled)) return false;
+		const ifname = network.runtime?.iface?.ifname || network.runtime?.iface?.data?.ifname;
+		return Boolean(
+			ifname && evidence.kernel_ifnames.includes(ifname) && evidence.hostapd_ready_ifnames.includes(ifname)
+		);
+	});
+}
+
+async function reloadGuestServices(api, { reloadWireless = true } = {}) {
 	await api.veci('serviceAction', { service: 'network', action: 'reload' });
 	await api.veci('serviceAction', { service: 'firewall', action: 'reload' });
 	await api.veci('serviceAction', { service: 'dnsmasq', action: 'reload' });
+	// Removing a disabled guest never needs a potentially hazardous MT76 radio reload.
+	if (!reloadWireless) return;
 	const wifi = await api.veci('wifiReload');
 	if (wifi.ok === false) throw new Error(wifi.error || 'Wireless reload failed');
 }
@@ -302,6 +318,15 @@ export default {
 				toast('No Wi-Fi radio is available for a guest network.', 'error');
 				return;
 			}
+			// Read-only runtime preflight; do not mutate UCI or cycle the radio on a stale netifd AP.
+			const latestEvidence = await api.wifiRuntimeEvidence().catch(() => null);
+			if (!canActivateGuestOnRadio(networks, radioCandidate, latestEvidence)) {
+				toast(
+					'Guest Wi-Fi cannot be activated: existing AP is unavailable or unverified. No changes were made.',
+					'error'
+				);
+				return;
+			}
 			const ssidLength = new TextEncoder().encode(ssid).length;
 			if (!ssid || ssidLength > 32) {
 				toast('Guest SSID must be between 1 and 32 bytes.', 'error');
@@ -424,7 +449,7 @@ export default {
 				])
 					await api.uciDelete(config, section).catch(() => {});
 				for (const config of ['network', 'dhcp', 'firewall', 'wireless']) await api.uciCommit(config);
-				await reloadGuestServices(api);
+				await reloadGuestServices(api, { reloadWireless: !boolOption(managedGuest?.disabled) });
 				toast('Guest Wi-Fi removed.', 'success');
 				setTimeout(() => window.dispatchEvent(new HashChangeEvent('hashchange')), 1600);
 			} catch (error) {
