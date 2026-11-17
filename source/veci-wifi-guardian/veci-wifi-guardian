@@ -119,7 +119,7 @@ capture_first_fault() {
        else if ($0 ~ /mt76.*[Tt]imeout|mt76.*[Ee]rror|mt76.*[Ff]ailed/) category="mt76_error"
        if (category != "") {
          stamp="unknown"
-         if (match($0, /^\\[[[:space:]]*[0-9]+\\.[0-9]+\\]/))
+         if (match($0, /^\[[[:space:]]*[0-9]+\.[0-9]+\]/))
            stamp=substr($0, RSTART+1, RLENGTH-2)
          print "kernel_uptime_s=" stamp " class=" category
        }
