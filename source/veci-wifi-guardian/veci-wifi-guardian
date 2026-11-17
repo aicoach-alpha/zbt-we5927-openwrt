@@ -18,15 +18,46 @@ radio_wanted() {
  [ "$(uci -q get wireless.default_radio0.mode 2>/dev/null)" = ap ] || return 1
  [ "$(uci -q get wireless.default_radio0.disabled 2>/dev/null)" != 1 ]
 }
+phy_available() {
+ [ -d /sys/class/ieee80211/phy0 ]
+}
+wifi_netdev_present() {
+ # A loaded module and phy0 do not prove that an AP interface exists.
+ local dev
+ for dev in /sys/class/net/*; do
+   [ -e "$dev/phy80211" ] && return 0
+ done
+ return 1
+}
 radio_running() {
- # Bounded local ubus calls: never issue iw commands while mt76 may be hung.
- local up status
+ # Bounded ubus/sysfs inspection only. Never call iw in this watchdog.
+ # Look up the live hostapd object instead of assuming phy0-ap0 forever.
+ local up objects object status
  up="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
        jsonfilter -e '@.radio0.up' 2>/dev/null)" || return 1
  [ "$up" = true ] || return 1
- status="$(ubus -S -t 3 call hostapd.phy0-ap0 get_status '{}' 2>/dev/null |
-           jsonfilter -e '@.status' 2>/dev/null)" || return 1
- [ "$status" = ENABLED ]
+ wifi_netdev_present || return 1
+ objects="$(ubus -S -t 3 list 'hostapd.*' 2>/dev/null)" || return 1
+ [ -n "$objects" ] || return 1
+ for object in $objects; do
+   case "$object" in hostapd.*) ;; *) continue ;; esac
+   status="$(ubus -S -t 3 call "$object" get_status '{}' 2>/dev/null |
+             jsonfilter -e '@.status' 2>/dev/null)" || continue
+   [ "$status" = ENABLED ] && return 0
+ done
+ return 1
+}
+ap_failure_reason() {
+ # Safe coarse diagnosis. Never include SSID, MAC, address, or credentials.
+ local up objects
+ phy_available || { echo phy_missing; return 0; }
+ up="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
+       jsonfilter -e '@.radio0.up' 2>/dev/null)" || up=unknown
+ [ "$up" = true ] || { echo radio_not_up; return 0; }
+ wifi_netdev_present || { echo wifi_netdev_missing; return 0; }
+ objects="$(ubus -S -t 3 list 'hostapd.*' 2>/dev/null)" || objects=
+ [ -n "$objects" ] || { echo hostapd_rpc_missing; return 0; }
+ echo hostapd_not_enabled
 }
 rx_pse_resets() {
  [ -r "$RESET" ] || { echo unknown; return 0; }
@@ -37,20 +68,23 @@ show_state() {
  if [ -r "$STATE" ]; then cat "$STATE"; else echo 'wifi=not_started'; fi
 }
 write_state() {
- # State is tmpfs-only. 'ready' means services are up, not beacon confirmed.
- printf 'wifi=%s failures=%s auto_recover=0 beacon_verified=0 rx_pse_resets=%s timestamp=%s\n' \
-   "$phase" "$failures" "$rxpse" "$(date +%s)" > "$STATE"
+ # Volatile evidence only. 'ready' is control-plane, NEVER external beacon proof.
+ printf 'wifi=%s failures=%s reason=%s auto_recover=0 beacon_verified=0 rx_pse_resets=%s timestamp=%s\n' \
+   "$phase" "$failures" "$reason" "$rxpse" "$(date +%s)" > "$STATE"
 }
 check_once() {
  if ! radio_wanted; then echo 'wifi=not_configured beacon_verified=0'; return 0; fi
  if radio_running; then echo 'wifi=ready beacon_verified=0'; return 0; fi
- echo 'wifi=ap_not_ready beacon_verified=0'; return 1
+ echo "wifi=ap_not_ready reason=$(ap_failure_reason) beacon_verified=0"
+ return 1
 }
 daemon() {
- local failures interval threshold phase rxpse last_rxpse
+ local failures interval threshold phase rxpse last_rxpse reason last_alert
  failures=0
  phase=starting
+ reason=none
  last_rxpse=unknown
+ last_alert=none
  interval="$(number "$(cfg interval)" 30 15 300)"
  threshold="$(number "$(cfg fail_threshold)" 3 2 20)"
  logger -t "$TAG" "observe-only: poll $interval s, threshold $threshold; radio recovery disabled after mt76 deadlock"
@@ -58,16 +92,29 @@ daemon() {
    if ! radio_wanted; then
      failures=0
      phase=intentionally_disabled
+     reason=none
+     last_alert=none
    elif radio_running; then
+     [ "$last_alert" = none ] || logger -t "$TAG" "AP runtime available again (beacon externally unverified)"
      failures=0
      phase=ready
+     reason=none
+     last_alert=none
    else
      failures=$((failures + 1))
+     [ "$failures" -le "$threshold" ] || failures="$threshold"
+     reason="$(ap_failure_reason)"
+     case "$reason" in
+       phy_missing|radio_not_up|wifi_netdev_missing|hostapd_rpc_missing|hostapd_not_enabled) ;;
+       *) reason=unknown ;;
+     esac
      phase=ap_not_ready
      if [ "$failures" -ge "$threshold" ]; then
-       failures=0
        phase=manual_recovery_required
-       logger -t "$TAG" "AP runtime unavailable; no automatic radio reload (mt76 deadlock risk)"
+       if [ "$last_alert" != "$reason" ]; then
+         logger -t "$TAG" "AP runtime unavailable (reason=$reason); no automatic radio reload (mt76 deadlock risk)"
+         last_alert="$reason"
+       fi
      fi
    fi
    rxpse="$(rx_pse_resets)"
