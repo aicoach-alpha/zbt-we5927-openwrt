@@ -111,9 +111,21 @@ jobs:
           assert m.get("version",{}).get("version")=="25.12.6"
           print("EXACT_BOARD_IMAGE_METADATA=PASS")
           PY
-          f="$(find build_dir -path '*/root-ramips/usr/libexec/rpcd/veci.v2' -type f -print -quit)"
-          test -n "$f"
-          rom="$(printf %s "$f" | sed 's|/usr/libexec/rpcd/veci.v2$||')"
+          # Check the exact filesystem passed to mksquashfs4, not an
+          # unconstrained find across build_dir (which hid the missing path).
+          rom="$PWD/build_dir/target-mipsel_24kc_musl/root-ramips"
+          test -d "$rom" || { echo "IMAGE_ROOT_MISSING:$rom" >&2; exit 1; }
+          if [ ! -s "$rom/usr/libexec/rpcd/veci.v2" ]; then
+            echo "IMAGE_ROOT_MISSING_RPCD_V2:$rom/usr/libexec/rpcd/veci.v2" >&2
+            for dir in "$rom/usr/libexec/rpcd" "$PWD/staging_dir/target-mipsel_24kc_musl/root-ramips/usr/libexec/rpcd"; do
+              if [ -d "$dir" ]; then
+                echo "DIAGNOSTIC_RPCD_DIR:$dir" >&2
+                find "$dir" -maxdepth 1 -type f -printf '%f\\n' | sort >&2
+              fi
+            done
+            exit 1
+          fi
+          echo 'EXACT_COMPILED_IMAGE_ROOT_RPCD_V2=PASS'
           for path in usr/libexec/rpcd/veci.v2 \
                       usr/libexec/rpcd/veci.v2.pkg \
                       usr/libexec/rpcd/veci.sms \
