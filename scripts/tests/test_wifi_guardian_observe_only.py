@@ -146,6 +146,7 @@ logger() {{ :; }}
 logread() {{
   printf '%s\\n' 'Mon Nov 16 12:05:43 router daemon.err hostapd: Failed to setup interface secretSSID wifi_password=SENSITIVE' \\
     'Mon Nov 16 12:05:44 router daemon.notice veci-rpc-net: wifi_reload_requested' \\
+    'Mon Nov 16 12:05:44 router daemon.notice veci-rpc-net: network_service_restart_requested' \\
     'Mon Nov 16 12:05:45 router daemon.notice netifd: Wireless device radio0 is down'
 }}
 dmesg() {{
@@ -162,6 +163,7 @@ dmesg() {{
             self.assertIn("first_observed_stage=lost_after_ready", data)
             self.assertIn("class=hostapd_error", data)
             self.assertIn("class=veci_wifi_reload_requested", data)
+            self.assertIn("class=veci_network_service_change_requested", data)
             self.assertIn("class=netifd_wifi_event", data)
             self.assertIn("class=bridge_wifi_disabled", data)
             self.assertIn("class=mt76_wifi_unregistering", data)
