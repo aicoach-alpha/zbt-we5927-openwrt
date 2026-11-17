@@ -5,6 +5,12 @@ on:
     paths:
       - '.github/workflows/veci-v2-lab-image.yml'
   workflow_dispatch:
+    inputs:
+      export_unsigned_candidate:
+        description: "Explicitly export verified UNSIGNED candidate to private artifact (NOT flash approved)"
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -136,6 +142,48 @@ jobs:
           echo 'PHYSICAL_AP_OR_LTE_UAT=NOT_RUN'
           echo 'SIGNATURE_TRUST=NOT_VERIFIED'
           echo 'FLASH_PERMISSION=NO'
+
+      # Deliberately restricted to an explicitly requested, reviewed build
+      # branch. No image leaves CI on ordinary pushes or PR runs.
+      - name: Prepare verified unsigned VeCI v2 image for offline signing
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/openwrt-v2/bin/targets/ramips/mt76x8"
+          mapfile -t images < <(find "$dir" -maxdepth 1 -type f -name '*zbt*we5927*sysupgrade.bin' -print)
+          test "${#images[@]}" -eq 1
+          image="${images[0]}"
+          bytes="$(stat -c %s "$image")"
+          test "$bytes" -gt 0 && test "$bytes" -le 6946816
+          meta="$RUNNER_TEMP/v2-offline-verify.json"
+          "$RUNNER_TEMP/openwrt-v2/staging_dir/host/bin/fwtool" -i "$meta" "$image"
+          python3 - "$meta" "$GITHUB_SHA" <<'PYV2'
+          import json, pathlib, sys
+          meta = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert "zbtlink,zbt-we5927" in meta.get("supported_devices", [])
+          assert meta.get("version", {}).get("version") == "25.12.6"
+          assert meta.get("version", {}).get("target") == "ramips/mt76x8"
+          assert len(sys.argv[2]) == 40
+          print("V2_UNSIGNED_EXACT_BOARD_METADATA=PASS")
+          PYV2
+          out="$RUNNER_TEMP/veci-v2-candidate"
+          mkdir -p "$out"
+          cp "$image" "$out/openwrt-25.12.6-veci-v2-WE5927-2SIM-UNSIGNED.bin"
+          cp "$meta" "$out/OPENWRT_METADATA.json"
+          cp source/openwrt-source-commit.txt "$out/OPENWRT_PIN.txt"
+          printf 'build_sha=%s\\n' "$GITHUB_SHA" > "$out/BUILD_PROVENANCE.txt"
+          sha256sum "$out/openwrt-25.12.6-veci-v2-WE5927-2SIM-UNSIGNED.bin" > "$out/SHA256SUMS"
+          printf '%s\\n' 'UNSIGNED LABORATORY IMAGE. DO NOT FLASH.' 'Hardware UAT, offline signing, router trust anchor, recovery validation still required.' > "$out/DO_NOT_FLASH.txt"
+
+      - name: Upload explicit unsigned image for independent offline verification
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-v2-we5927-2sim-unsigned-${{ github.sha }}
+          path: ${{ runner.temp }}/veci-v2-candidate/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Production flash prohibited even on green CI
         if: always()
