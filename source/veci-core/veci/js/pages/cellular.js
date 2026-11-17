@@ -548,7 +548,11 @@ export default {
 
 		const signalPercent = Number.isFinite(Number(status.signal_percent)) ? Number(status.signal_percent) : null;
 		const signalDbm = Number.isFinite(Number(status.signal_dbm)) ? Number(status.signal_dbm) : null;
-		const online = status.online === true || status.online === 1 || status.online === '1';
+		// A stale daemon ICMP result must not turn a valid RNDIS route into link down.
+		// Legacy providers without data_link_up fall back to live IPv4 + gateway.
+		const dataLinkActive =
+			status.data_link_up === true || status.data_link_up === 1 || status.data_link_up === '1' ||
+			(status.data_link_up === undefined && Boolean(status.ipv4 && status.gateway));
 		const sim = status.sim || '—';
 		const model = status.model || status.manufacturer || 'Cellular modem';
 		const operator = normalizeOperator(status.operator);
@@ -571,7 +575,7 @@ export default {
 					<h2>Mobile connection</h2>
 					<p>Signal, SIM and modem health from the cellular integration installed on this router. Data-link state does not by itself verify Internet reachability.</p>
 				</div>
-				${badge(online ? 'Data link active' : 'Data link down', online ? 'success' : 'danger')}
+				${badge(dataLinkActive ? 'LTE data link active' : 'LTE data link unavailable', dataLinkActive ? 'success' : 'danger')}
 			</div>
 
 			<div class="cellular-hero">
@@ -616,7 +620,7 @@ export default {
 						${metric('Gateway', status.gateway)}
 						${metric('Data interface', status.data_interface)}
 						${metric('Mode', status.mode)}
-						<div id="cellular-internet-status"><span>Internet</span><strong>${online ? 'Checking…' : 'Unavailable'}</strong></div>
+						<div id="cellular-internet-status"><span>Router Internet</span><strong>${dataLinkActive ? 'Checking reachability…' : 'No LTE data route'}</strong></div>
 					</div>
 					<div class="cellular-actions">
 						<button class="button button-secondary" id="cellular-reconnect" type="button">Reconnect data</button>
@@ -695,14 +699,14 @@ export default {
 			</div>
 		`;
 
-		if (online) {
-			api.veci('internetStatus', {}, { timeout: 3000 })
+		if (dataLinkActive) {
+			// Independent read-only router Internet probe. Never gate it on
+			// the stale watchdog "online" field or force a modem reconnect.
+			api.veci('internetStatus', {}, { timeout: 6500 })
 				.then(internet => {
 					const value = root.querySelector('#cellular-internet-status strong');
 					if (!value) return;
-					if (internet.status === 'reachable' && internet.reachable === true) value.textContent = 'Reachable';
-					else if (internet.status === 'unreachable' && internet.reachable === false)
-						value.textContent = 'Unavailable';
+					if (internet.status === 'reachable' && internet.reachable === true) value.textContent = 'Reachable (router)';
 					else value.textContent = 'Not verified';
 				})
 				.catch(() => {

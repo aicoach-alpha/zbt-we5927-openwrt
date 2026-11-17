@@ -33,6 +33,9 @@ class OfficeUatContract(unittest.TestCase):
         self.assertIn("router_configuration_modified = $false",SOURCE)
         self.assertIn("firmware_flash_authorized = $false",SOURCE)
         self.assertIn("all_lan_ports_physical_tested = $false",SOURCE)
+        self.assertIn("wired_client_internet_verified = $null",SOURCE)
+        self.assertIn("wifi_client_internet_verified = $null",SOURCE)
+        self.assertIn("Router-LTE-uplink=",SOURCE)
 
     def test_never_claims_wifi_beacon_from_router_control_plane(self):
         self.assertIn("external_verified_bssid_visible",SOURCE)
@@ -41,6 +44,9 @@ class OfficeUatContract(unittest.TestCase):
         self.assertIn("all_samples_wifi_beacon_pass",SOURCE)
         self.assertIn("if (-not $ExpectedBSSID) { $null }",SOURCE)
         self.assertIn("all_lan_ports_physical_tested = $false",SOURCE)
+        self.assertIn("wired_client_internet_verified = $null",SOURCE)
+        self.assertIn("wifi_client_internet_verified = $null",SOURCE)
+        self.assertIn("Router-LTE-uplink=",SOURCE)
         self.assertNotIn("wifi_beacon_pass = $apState",SOURCE)
 
     def test_report_excludes_secret_telemetry(self):

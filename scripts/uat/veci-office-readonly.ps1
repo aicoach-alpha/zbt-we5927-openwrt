@@ -125,7 +125,7 @@ $observations = @()
 for ($i = 1; $i -le $Samples; $i++) {
     $item = New-Observation
     $observations += $item
-    Write-Host ("Sample {0}/{1}: LTE={2} Wi-Fi runtime={3} Wi-Fi beacon={4} netifd={5} connected LAN ports={6}" -f
+    Write-Host ("Sample {0}/{1}: Router-LTE-uplink={2} Wi-Fi runtime={3} Wi-Fi beacon={4} netifd={5} connected LAN ports={6}" -f
         $i, $Samples, $item.internet_pass, $item.wifi_runtime_pass,
         $item.wifi_beacon_pass, $item.netifd_instance_count, $item.lan_connected_port_count)
     if ($i -lt $Samples) { Start-Sleep -Seconds $IntervalSeconds }
@@ -136,6 +136,9 @@ $report = [ordered]@{
     router_configuration_modified = $false
     firmware_flash_authorized = $false
     independent_wifi_beacon_evidence = ([bool]$ExpectedSSID -and [bool]$ExpectedBSSID)
+    # Router-originated ICMP does not prove NAT/forwarding from a LAN client.
+    wired_client_internet_verified = $null
+    wifi_client_internet_verified = $null
     all_lan_ports_physical_tested = $false
     all_samples_lte_pass = (@($observations | Where-Object { $_.internet_pass -ne $true }).Count -eq 0)
     all_samples_wifi_runtime_pass = (@($observations | Where-Object { $_.wifi_runtime_pass -ne $true }).Count -eq 0)

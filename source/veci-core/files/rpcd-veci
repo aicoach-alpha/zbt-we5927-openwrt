@@ -113,6 +113,7 @@ method_internet_status() {
 					case "$state" in
 						reachable) printf '{ "status": "reachable", "reachable": true, "probe": "icmp", "target": "%s", "cached": true }\n' "$target"; return ;;
 						unreachable) printf '{ "status": "unreachable", "reachable": false, "probe": "icmp", "cached": true }\n'; return ;;
+						unknown) printf '{ "status": "unknown", "reachable": null, "probe": "icmp", "reason": "not_confirmed", "cached": true }\n'; return ;;
 					esac
 				fi
 				;;
@@ -125,15 +126,17 @@ method_internet_status() {
 	}
 
 	for target in 1.1.1.1 8.8.8.8; do
-		if ping -c 1 -W 1 "$target" >/dev/null 2>&1; then
+		if ping -c 1 -W 2 "$target" >/dev/null 2>&1; then
 			printf '%s reachable %s\n' "$now" "$target" > "$cache"
 			printf '{ "status": "reachable", "reachable": true, "probe": "icmp", "target": "%s", "cached": false }\n' "$target"
 			return
 		fi
 	done
 
-	printf '%s unreachable -\n' "$now" > "$cache"
-	printf '{ "status": "unreachable", "reachable": false, "probe": "icmp", "cached": false }\n'
+	# Two failed ICMP probes do not prove Internet is down: LTE upstream
+	# can filter ICMP or have brief latency spikes. Report unverified.
+	printf '%s unknown -\n' "$now" > "$cache"
+	printf '{ "status": "unknown", "reachable": null, "probe": "icmp", "reason": "not_confirmed", "cached": false }\n'
 }
 
 

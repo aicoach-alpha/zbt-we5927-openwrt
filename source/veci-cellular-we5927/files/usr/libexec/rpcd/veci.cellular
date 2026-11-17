@@ -25,6 +25,8 @@ status() {
 
 	json_get_var enabled enabled
 	json_get_var online online
+	json_get_var data_link_up data_link_up
+	json_get_var internet_verified internet_verified
 	json_get_var mode mode
 	json_get_var data_interface data_interface
 	json_get_var ipv4 ipv4
@@ -46,7 +48,10 @@ status() {
 
 	json_init
 	case "$enabled" in 1|true) json_add_boolean enabled 1 ;; *) json_add_boolean enabled 0 ;; esac
+	# The legacy daemon verification is not physical RNDIS link state.
 	case "$online" in 1|true) json_add_boolean online 1 ;; *) json_add_boolean online 0 ;; esac
+	case "$data_link_up" in 1|true) json_add_boolean data_link_up 1 ;; *) json_add_boolean data_link_up 0 ;; esac
+	case "$internet_verified" in 1|true) json_add_boolean internet_verified 1 ;; *) json_add_boolean internet_verified 0 ;; esac
 	json_add_string mode "$mode"
 	json_add_string data_interface "$data_interface"
 	json_add_string ipv4 "$ipv4"

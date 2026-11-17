@@ -221,7 +221,7 @@ export default {
 		}
 
 		if (uplink) {
-			api.veci('internetStatus', {}, { timeout: 3000 })
+			api.veci('internetStatus', {}, { timeout: 6500 })
 				.then(status => {
 					const title = root.querySelector('#home-connectivity-title');
 					const detail = root.querySelector('#home-connectivity-detail');

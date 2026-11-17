@@ -31,7 +31,10 @@ LAN port separately and repeat the readings; this cannot be automated remotely.
 The JSON report contains only booleans, counts, port numbers and timestamps;
 it does not persist SSIDs, BSSIDs, IP addresses, device MACs, credentials,
 modem IDs or raw log contents. Repeated ping success is only a short snapshot,
-not 72-hour availability evidence.
+not 72-hour availability evidence. Router-LTE-uplink=True means the router's
+own USB0 ICMP test passed; it does NOT prove wired clients get NAT forwarding
+or that Wi-Fi clients can associate and browse. Client paths remain null until
+separately tested from a device actually routing through 192.168.1.1.
 
 If the script cannot establish SSH with existing verified host keys, stop and
 check the laptop's SSH trust configuration. Never bypass host-key verification.

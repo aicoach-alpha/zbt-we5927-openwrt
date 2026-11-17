@@ -42,9 +42,10 @@ class NativeUXGate(unittest.TestCase):
         self.assertIn("— (no staged image)",stable)
         html=(WEB/"index.html").read_text()
         app=(WEB/"js/app.js").read_text()
-        self.assertIn("app.js?v=164",html)
-        for name in ("system","cellular","updates"):
+        self.assertIn("app.js?v=165",html)
+        for name in ("system","updates"):
             self.assertIn(name+".js?v=164",app)
+        self.assertIn("cellular.js?v=165",app)
 
     def test_lte_modem_and_sms_preserved(self):
         self.assertIn("cellular-reconnect", (WEB/"js/pages/cellular.js").read_text())

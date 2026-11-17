@@ -2,14 +2,14 @@ import { VeciApi } from './lib/api.js?v=162';
 import { escapeHtml, qs, qsa, setBusy } from './lib/dom.js?v=162';
 import { hydrateIcons, icon } from './lib/icons.js?v=162';
 
-import homePage from './pages/home.js?v=162';
+import homePage from './pages/home.js?v=163';
 import internetPage from './pages/internet.js?v=162';
 import wifiPage from './pages/wifi.js?v=162';
 import devicesPage from './pages/devices.js?v=162';
 import securityPage from './pages/security.js?v=162';
 import networkPage from './pages/network.js?v=162';
 import systemPage from './pages/system.js?v=164';
-import cellularPage from './pages/cellular.js?v=164';
+import cellularPage from './pages/cellular.js?v=165';
 import updatesPage from './pages/updates.js?v=164';
 import appsPage from './pages/apps.js?v=162';
 import hotspotPage from './pages/hotspot.js?v=162';
