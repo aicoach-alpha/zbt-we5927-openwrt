@@ -78,6 +78,25 @@ for rel in $sms_files; do
   cmp -s "$sms_origin/$rel" "$sms_dst/$rel" ||
     { echo "sms_transport_mismatch:$rel" >&2; exit 4; }
 done
+# The legacy reliability stager owns a /veci/ landing used by previous builds.
+# This exact-board v2 image must ship the v2 landing (/veci2/) instead.
+# Reject unfamiliar overlay content rather than silently replacing it.
+legacy_landing="$here/../../source/veci-default-ui/files/www/index.html"
+v2_landing="$here/packages/veci-v2-ui/files/www/index.html"
+overlay_landing="$root/files/www/index.html"
+[ -f "$legacy_landing" ] && [ -f "$v2_landing" ] &&
+grep -Fq '/veci2/' "$v2_landing" &&
+[ -f "$overlay_landing" ] &&
+cmp -s "$legacy_landing" "$overlay_landing" || {
+  echo 'unexpected_legacy_landing_overlay_refuse_to_replace' >&2
+  exit 4
+}
+cp "$v2_landing" "$overlay_landing"
+cmp -s "$v2_landing" "$overlay_landing" || {
+  echo 'v2_landing_overlay_mismatch' >&2
+  exit 4
+}
+echo VECI_V2_ROOT_LANDING=PASS
 echo VECI_V2_SMS_TRANSPORT_SINGLE_SOURCE=PASS
 echo VECI_V2_EXACT_BOARD_PACKAGES_STAGED=PASS
 echo NOT_A_FINISHED_IMAGE_NOT_SIGNED_NOT_FLASHABLE
