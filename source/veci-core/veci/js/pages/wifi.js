@@ -39,11 +39,7 @@ export function wifiRuntimeState(config, radioConfig, runtime, evidence = null) 
 		return { label: 'AP unavailable', tone: 'warning' };
 	}
 	const ifname = runtime.iface.ifname || runtime.iface.data?.ifname;
-	if (
-		!ifname ||
-		!Array.isArray(evidence?.kernel_ifnames) ||
-		!Array.isArray(evidence?.hostapd_ready_ifnames)
-	) {
+	if (!ifname || !Array.isArray(evidence?.kernel_ifnames) || !Array.isArray(evidence?.hostapd_ready_ifnames)) {
 		return { label: 'AP status unverified', tone: 'warning' };
 	}
 	if (!evidence.kernel_ifnames.includes(ifname)) {
