@@ -68,8 +68,9 @@ class GuardianLogDebounce(unittest.TestCase):
 
     def test_disabled_and_running_rearm_flags_and_no_radio_reload(self):
         daemon=daemon_body()
-        self.assertIn('alerted=0',daemon)
-        self.assertIn('if [ "$alerted" -eq 0 ]',daemon)
+        self.assertIn('last_alert=none',daemon)
+        self.assertIn('if [ "$last_alert" != "$reason" ]',daemon)
+        self.assertIn('ever_ready=1',daemon)
         self.assertNotRegex(daemon,r"\b(?:wifi|ifup|ifdown|reboot|power_cycle|usb_repair)\s")
         self.assertIn('auto_recover=0',SOURCE)
 
