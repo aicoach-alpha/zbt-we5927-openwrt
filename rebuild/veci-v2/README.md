@@ -35,7 +35,9 @@ reused as a proven low-level interface. Vendor LEDE binaries are NOT reused.
   assumption and no false Wi-Fi radio-up equals AP-ready assumption.
 - packages/veci-v2-sms: full SMS transport from the previously tested
   canonical AT/PDU code, with ONE serial lock and no duplicate modem daemon.
-  Native v2 SMS UI is not yet feature complete.
+  Native v2 SMS UI now includes inbox/on-demand read, send with
+  explicit confirmation, sent history, draft management, PDU decoding and
+  deletion. These are source-tested, NOT modem-verified on hardware.
 - packages/veci-v2-package-manager: signed APK feed only, exact board/release,
   hardware-critical package blacklist, space/RAM check and explicit manual
   confirmation. No arbitrary URLs or unsigned installs.
@@ -50,7 +52,7 @@ reused as a proven low-level interface. Vendor LEDE binaries are NOT reused.
 |---|---|---|
 | Entire current LuCI | Native core + optional modules, source-verified parity | 11+107 inventory; NOT migrated |
 | Entire stock ZBT features | Exact OEM feature mapping, modern dual-SIM and watchdog | OEM inventory complete; migration pending |
-| SMS Center | Dedicated AT/PDU provider, send/receive/drafts/history/encoding, native UI | Transport staged; UI not complete |
+| SMS Center | Dedicated AT/PDU provider, send/receive/drafts/history/encoding, native UI | Source-tested SMS UI, hardware UAT pending |
 | Live addons from OpenWrt/GitHub | APK 3 signed repository + exact-build packages, extroot if needed | Protected package API implemented; hardware pending |
 | Manual and GitHub OTA | Signed manifest, SHA256, board lock, sysupgrade -T, explicit install, rollback | Previous VeCI reference exists; v2 pending |
 | Tiny core firmware | Optional heavyweight services removed from ROM | Not built in full image yet |

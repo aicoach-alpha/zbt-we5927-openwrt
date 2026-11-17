@@ -4,6 +4,16 @@
   "firmware_slots": 1,
   "flash_authorized": false,
   "flash_mtd_bytes": 7995392,
+  "ipv6_policy": {
+    "apply": "separately approved manual reboot; never background network reload",
+    "first_boot": "off",
+    "hardware_uat": "not_run",
+    "lan_ra_dhcpv6_default": "disabled",
+    "settings_toggle": "authenticated explicit confirmation; saves UCI only",
+    "sysctl": "disable_ipv6=1 on all/default",
+    "upstream_ipv6": "not guaranteed; depends on modem/carrier",
+    "wan6_default": "disabled"
+  },
   "kernel_version": "6.12.112",
   "luci_revision": "53312862521a4b02d7e45ae483537132dbcf63ad",
   "mandatory_gates": [
@@ -18,6 +28,28 @@
     "fuzz_and_security_review",
     "image_size_and_flash_headroom",
     "continuous_72h_and_reboot_recovery"
+  ],
+  "navigation": [
+    {
+      "id": "overview",
+      "label": "Beranda",
+      "scope": "status kesehatan dan akses cepat"
+    },
+    {
+      "id": "network",
+      "label": "Koneksi",
+      "scope": "LTE 2SIM, Wi-Fi, WAN/LAN, DHCP, devices"
+    },
+    {
+      "id": "sms",
+      "label": "SMS Center",
+      "scope": "inbox, kirim, sent, draft, delete"
+    },
+    {
+      "id": "settings",
+      "label": "Pengaturan",
+      "scope": "IPv6, addons, updates, backup, firewall dan advanced"
+    }
   ],
   "oem_sha256": "80529b8e9c31d686eb7f63a1517d6dbcf781f26cb4aceb7b8b1ff27c2d51d1f9",
   "openwrt_pin": "64900e756efa667774214f9c6b17c113222e01f7",
@@ -143,35 +175,35 @@
       "origin": "SMS Center",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "sms_sent_and_drafts",
       "origin": "SMS Center",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "sms_send_and_delete",
       "origin": "SMS Center",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "sms_multipart_pdu",
       "origin": "SMS Center",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "sms_security_and_storage",
       "origin": "SMS Center",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "system_services_startup",
@@ -307,37 +339,5 @@
       "v2_state": "source_implemented_not_hardware_verified"
     }
   ],
-  "schema": "veci.v2.rebuild-contract.v1",
-  "ipv6_policy": {
-    "first_boot": "off",
-    "sysctl": "disable_ipv6=1 on all/default",
-    "wan6_default": "disabled",
-    "lan_ra_dhcpv6_default": "disabled",
-    "settings_toggle": "authenticated explicit confirmation; saves UCI only",
-    "apply": "separately approved manual reboot; never background network reload",
-    "upstream_ipv6": "not guaranteed; depends on modem/carrier",
-    "hardware_uat": "not_run"
-  },
-  "navigation": [
-    {
-      "id": "overview",
-      "label": "Beranda",
-      "scope": "status kesehatan dan akses cepat"
-    },
-    {
-      "id": "network",
-      "label": "Koneksi",
-      "scope": "LTE 2SIM, Wi-Fi, WAN/LAN, DHCP, devices"
-    },
-    {
-      "id": "sms",
-      "label": "SMS Center",
-      "scope": "inbox, kirim, sent, draft, delete"
-    },
-    {
-      "id": "settings",
-      "label": "Pengaturan",
-      "scope": "IPv6, addons, updates, backup, firewall dan advanced"
-    }
-  ]
+  "schema": "veci.v2.rebuild-contract.v1"
 }
