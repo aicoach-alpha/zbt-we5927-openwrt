@@ -69,7 +69,7 @@ rx_pse_resets() {
 # Classify syslog and kernel events instead of copying raw lines: no SSID, MAC,
 # IP address, password, SIM ID or payload is written. At most once per boot.
 capture_first_fault() {
- local why="$1" stage="$2" tmp="$FIRST_FAULT.$"
+ local why="$1" stage="$2" tmp="$FIRST_FAULT.tmp"
  [ ! -e "$FIRST_FAULT" ] || return 0
  case "$why" in
    phy_missing|radio_not_up|wifi_netdev_missing|hostapd_rpc_missing|hostapd_not_enabled|unknown) ;;
