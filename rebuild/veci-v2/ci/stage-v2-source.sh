@@ -85,12 +85,23 @@ legacy_landing="$here/../../source/veci-default-ui/files/www/index.html"
 v2_landing="$here/packages/veci-v2-ui/files/www/index.html"
 overlay_landing="$root/files/www/index.html"
 [ -f "$legacy_landing" ] && [ -f "$v2_landing" ] &&
-grep -Fq '/veci2/' "$v2_landing" &&
-[ -f "$overlay_landing" ] &&
-cmp -s "$legacy_landing" "$overlay_landing" || {
-  echo 'unexpected_legacy_landing_overlay_refuse_to_replace' >&2
+grep -Fq '/veci2/' "$v2_landing" || {
+  echo 'invalid_v2_landing_source' >&2
   exit 4
 }
+# A standalone v2 stage starts without a root landing; a full firmware stage
+# starts with the reviewed /veci/ landing. A second stage is idempotent.
+[ ! -L "$overlay_landing" ] || {
+  echo 'symlink_landing_overlay_refused' >&2
+  exit 4
+}
+if [ -e "$overlay_landing" ] &&
+   ! cmp -s "$legacy_landing" "$overlay_landing" &&
+   ! cmp -s "$v2_landing" "$overlay_landing"; then
+  echo 'unexpected_landing_overlay_refuse_to_replace' >&2
+  exit 4
+fi
+mkdir -p "$(dirname "$overlay_landing")"
 cp "$v2_landing" "$overlay_landing"
 cmp -s "$v2_landing" "$overlay_landing" || {
   echo 'v2_landing_overlay_mismatch' >&2
