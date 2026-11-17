@@ -106,7 +106,7 @@ capture_first_fault() {
        else if ($0 ~ /hostapd/ && $0 ~ /[Ff]ailed|[Ee]rror|[Uu]nable|[Tt]eardown/) category="hostapd_error"
        else if ($0 ~ /netifd/ && $0 ~ /[Ww]ireless|phy0|radio0|hostapd/) category="netifd_wifi_event"
        else if ($0 ~ /netifd/ && $0 ~ /br-lan|eth0/) category="netifd_ethernet_or_bridge_event"
-       if (category != "") print $1 " " $2 " " $3 " class=" category
+       if (category != "") print $1 " " $2 " " $3 " " $4 " class=" category
      }' | tail -n 28
    echo '===== RECENT_KERNEL_EVENT_CLASSES ====='
    dmesg 2>/dev/null | tail -n 350 | awk '
@@ -121,6 +121,7 @@ capture_first_fault() {
          stamp="unknown"
          if (match($0, /^\[[[:space:]]*[0-9]+\.[0-9]+\]/))
            stamp=substr($0, RSTART+1, RLENGTH-2)
+         sub(/^[[:space:]]+/, "", stamp)
          print "kernel_uptime_s=" stamp " class=" category
        }
      }' | tail -n 32
