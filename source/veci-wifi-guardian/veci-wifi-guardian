@@ -102,7 +102,7 @@ capture_first_fault() {
      {
        category=""
        if ($0 ~ /veci-rpc-net:.*wifi_reload_requested/) category="veci_wifi_reload_requested"
-       else if ($0 ~ /veci-rpc-net:.*network_service_reload_requested/) category="veci_network_reload_requested"
+       else if ($0 ~ /veci-rpc-net:.*network_service_(reload|restart)_requested/) category="veci_network_service_change_requested"
        else if ($0 ~ /hostapd/ && $0 ~ /[Ff]ailed|[Ee]rror|[Uu]nable|[Tt]eardown/) category="hostapd_error"
        else if ($0 ~ /netifd/ && $0 ~ /[Ww]ireless|phy0|radio0|hostapd/) category="netifd_wifi_event"
        else if ($0 ~ /netifd/ && $0 ~ /br-lan|eth0/) category="netifd_ethernet_or_bridge_event"
