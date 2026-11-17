@@ -31,24 +31,38 @@ function findRuntime(wireless, section, config) {
 
 // A configured SSID is not evidence that a kernel AP interface exists or
 // that clients can see its beacon. Do not claim Broadcasting from radio0.up.
-export function wifiRuntimeState(config, radioConfig, runtime) {
+export function wifiRuntimeState(config, radioConfig, runtime, evidence = null) {
 	if (boolOption(config.disabled) || boolOption(radioConfig.disabled)) {
 		return { label: 'Disabled', tone: 'neutral' };
 	}
 	if (!runtime?.iface || runtime.radio?.up !== true) {
 		return { label: 'AP unavailable', tone: 'warning' };
 	}
-	return { label: 'AP configured · beacon unverified', tone: 'warning' };
+	const ifname = runtime.iface.ifname || runtime.iface.data?.ifname;
+	if (
+		!ifname ||
+		!Array.isArray(evidence?.kernel_ifnames) ||
+		!Array.isArray(evidence?.hostapd_ready_ifnames)
+	) {
+		return { label: 'AP status unverified', tone: 'warning' };
+	}
+	if (!evidence.kernel_ifnames.includes(ifname)) {
+		return { label: 'AP interface missing', tone: 'warning' };
+	}
+	if (!evidence.hostapd_ready_ifnames.includes(ifname)) {
+		return { label: 'AP not ready', tone: 'warning' };
+	}
+	return { label: 'AP running · beacon unverified', tone: 'warning' };
 }
 
-function buildNetworks(configResult, wireless) {
+function buildNetworks(configResult, wireless, evidence) {
 	const values = configResult.values || {};
 	return Object.entries(values)
 		.filter(([, config]) => config['.type'] === 'wifi-iface')
 		.map(([section, config]) => {
 			const runtime = findRuntime(wireless, section, config);
 			const radioConfig = values[config.device] || {};
-			const status = wifiRuntimeState(config, radioConfig, runtime);
+			const status = wifiRuntimeState(config, radioConfig, runtime, evidence);
 			return {
 				section,
 				config,
@@ -116,14 +130,15 @@ export default {
 	icon: 'wifi',
 
 	async render({ api, root, toast, confirm }) {
-		const [wireless, configResult, networkConfig, dhcpConfig, firewallConfig] = await Promise.all([
+		const [wireless, evidence, configResult, networkConfig, dhcpConfig, firewallConfig] = await Promise.all([
 			api.wirelessStatus().catch(() => ({})),
+			api.wifiRuntimeEvidence().catch(() => null),
 			api.uciGet('wireless').catch(() => ({ values: {} })),
 			api.uciGet('network').catch(() => ({ values: {} })),
 			api.uciGet('dhcp').catch(() => ({ values: {} })),
 			api.uciGet('firewall').catch(() => ({ values: {} }))
 		]);
-		const networks = buildNetworks(configResult, wireless);
+		const networks = buildNetworks(configResult, wireless, evidence);
 		const networkMap = new Map(networks.map(network => [network.section, network]));
 		const wirelessValues = configResult.values || {};
 		const managedGuest =
