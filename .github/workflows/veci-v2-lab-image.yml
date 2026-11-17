@@ -30,7 +30,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential clang bison flex gawk gettext git gcc-multilib \
             libncurses-dev libssl-dev rsync subversion swig unzip wget \
-            zlib1g-dev python3 python3-setuptools file xz-utils zstd
+            zlib1g-dev python3 python3-setuptools file xz-utils zstd squashfs-tools
 
       - name: Pin, stage and verify exact 2SIM board sources
         shell: bash
@@ -111,21 +111,50 @@ jobs:
           assert m.get("version",{}).get("version")=="25.12.6"
           print("EXACT_BOARD_IMAGE_METADATA=PASS")
           PY
-          # Check the exact filesystem passed to mksquashfs4, not an
-          # unconstrained find across build_dir (which hid the missing path).
-          rom="$PWD/build_dir/target-mipsel_24kc_musl/root-ramips"
-          test -d "$rom" || { echo "IMAGE_ROOT_MISSING:$rom" >&2; exit 1; }
-          if [ ! -s "$rom/usr/libexec/rpcd/veci.v2" ]; then
-            echo "IMAGE_ROOT_MISSING_RPCD_V2:$rom/usr/libexec/rpcd/veci.v2" >&2
-            for dir in "$rom/usr/libexec/rpcd" "$PWD/staging_dir/target-mipsel_24kc_musl/root-ramips/usr/libexec/rpcd"; do
-              if [ -d "$dir" ]; then
-                echo "DIAGNOSTIC_RPCD_DIR:$dir" >&2
-                find "$dir" -maxdepth 1 -type f -printf '%f\\n' | sort >&2
-              fi
+          # Prove the compiled package payload was installed into the
+          # precise image root and is present in the image's real SquashFS.
+          # A successful package compile or APK installation log alone is
+          # insufficient; do not mask an absent runtime with a source overlay.
+          for pkg in veci-v2-runtime veci-v2-package-manager veci-v2-sms veci-v2-ipv6 veci-v2-ui; do
+            test -s "bin/packages/mipsel_24kc/base/${pkg}-0.1-r1.apk" || {
+              echo "MISSING_COMPILED_APK:$pkg" >&2; exit 1;
+            }
+          done
+          compiled_rom="$PWD/build_dir/target-mipsel_24kc_musl/root-ramips"
+          test -d "$compiled_rom" || { echo "IMAGE_ROOT_MISSING:$compiled_rom" >&2; exit 1; }
+          if [ ! -s "$compiled_rom/usr/libexec/rpcd/veci.v2" ]; then
+            echo "IMAGE_ROOT_MISSING_RPCD_V2:$compiled_rom/usr/libexec/rpcd/veci.v2" >&2
+            for dir in "$compiled_rom/usr/libexec/rpcd" "$PWD/staging_dir/target-mipsel_24kc_musl/root-ramips/usr/libexec/rpcd"; do
+              echo "DIAGNOSTIC_RPCD_DIR:$dir" >&2
+              if [ -d "$dir" ]; then ls -la "$dir" >&2; else echo NOT_A_DIRECTORY >&2; fi
             done
+            echo "DIAGNOSTIC_PACKAGE_PAYLOAD:" >&2
+            ls -la "$PWD/build_dir/target-mipsel_24kc_musl/veci-v2-runtime-0.1/ipkg-mipsel_24kc/veci-v2-runtime/usr/libexec/rpcd/" >&2 || true
+            echo "DIAGNOSTIC_INSTALLED_MANIFEST:" >&2
+            ls -la "$compiled_rom/lib/apk/db/" >&2 || true
             exit 1
           fi
           echo 'EXACT_COMPILED_IMAGE_ROOT_RPCD_V2=PASS'
+          squash="$PWD/build_dir/target-mipsel_24kc_musl/linux-ramips_mt76x8/root.squashfs"
+          kernel="$PWD/build_dir/target-mipsel_24kc_musl/linux-ramips_mt76x8/zbtlink_zbt-we5927-kernel.bin"
+          test -s "$squash" && test -s "$kernel" || {
+            echo 'MISSING_FINAL_KERNEL_OR_SQUASHFS' >&2; exit 1;
+          }
+          kernel_bytes="$(stat -c %s "$kernel")"
+          squash_bytes="$(stat -c %s "$squash")"
+          cmp -s -n "$squash_bytes" -i "$kernel_bytes:0" "$image" "$squash" || {
+            echo 'IMAGE_EMBEDDED_SQUASHFS_MISMATCH' >&2; exit 1;
+          }
+          rom="$RUNNER_TEMP/veci-v2-verified-squashfs"
+          mkdir -p "$rom"
+          unsquashfs -no-progress -d "$rom" "$squash"
+          test -s "$rom/usr/libexec/rpcd/veci.v2" || {
+            echo 'FINAL_SQUASHFS_MISSING_RPCD_V2' >&2; exit 1;
+          }
+          cmp -s "$compiled_rom/usr/libexec/rpcd/veci.v2" "$rom/usr/libexec/rpcd/veci.v2" || {
+            echo 'FINAL_SQUASHFS_RPCD_V2_DIFFERENT_FROM_BUILD_ROOT' >&2; exit 1;
+          }
+          echo 'EXACT_EMBEDDED_SQUASHFS_AND_RPCD_V2=PASS'
           for path in usr/libexec/rpcd/veci.v2 \
                       usr/libexec/rpcd/veci.v2.pkg \
                       usr/libexec/rpcd/veci.sms \
@@ -156,9 +185,9 @@ jobs:
           echo 'FLASH_PERMISSION=NO'
 
       # Deliberately restricted to an explicitly requested, reviewed build
-      # branch. No image leaves CI on ordinary pushes or PR runs.
+      # branch. Only manual explicit export or a marked build commit exports; ordinary pushes/PR runs cannot.
       - name: Prepare verified unsigned VeCI v2 image for offline signing
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' }}
+        if: ${{ github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]'))) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -189,7 +218,7 @@ jobs:
           printf '%s\\n' 'UNSIGNED LABORATORY IMAGE. DO NOT FLASH.' 'Hardware UAT, offline signing, router trust anchor, recovery validation still required.' > "$out/DO_NOT_FLASH.txt"
 
       - name: Upload explicit unsigned image for independent offline verification
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true && github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' }}
+        if: ${{ github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]'))) }}
         uses: actions/upload-artifact@v4
         with:
           name: veci-v2-we5927-2sim-unsigned-${{ github.sha }}
@@ -201,6 +230,6 @@ jobs:
         if: always()
         run: |
           echo 'V2 IS A LABORATORY SOURCE/IMAGE PROTOTYPE.'
-          echo 'NO UNSIGNED IMAGE UPLOADED OR RELEASED.'
+          echo 'SIGNED RELEASE NOT PRODUCED. ONLY CONDITIONALLY EXPORTED UNSIGNED LAB IMAGE.'
           echo 'PRODUCTION ROUTER NOT MODIFIED.'
           echo 'FULL LUCI/OEM PARITY AND 72h PHYSICAL UAT NOT COMPLETE.'
