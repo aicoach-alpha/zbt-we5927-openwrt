@@ -5,9 +5,9 @@ let sid = '';
 let verifiedPackage = '';
 const el = id => document.getElementById(id);
 
-async function rpc(object, method, args = {}, session = sid) {
+async function rpc(object, method, args = {}, session = sid, durationMs = 8500) {
   const timeout = new AbortController();
-  const timer = setTimeout(() => timeout.abort(), 8500);
+  const timer = setTimeout(() => timeout.abort(), durationMs);
   try {
     const response = await fetch('/ubus', {
       method: 'POST', cache: 'no-store', credentials: 'same-origin',
@@ -44,11 +44,13 @@ function binaryStatus(value, trueLabel = 'Aktif', falseLabel = 'Tidak aktif') {
   return ['Belum diverifikasi', 'warn'];
 }
 function showWorkspace() {
+  globalThis.VeciSmsCenter.activate();
   el('login').hidden = true;
   el('workspace').hidden = false;
   el('logout').hidden = false;
 }
 function showLogin() {
+  globalThis.VeciSmsCenter.logout();
   sid = '';
   verifiedPackage = '';
   el('logout').hidden = true;
@@ -59,9 +61,14 @@ function showLogin() {
 function showPage(id) {
   for (const page of document.querySelectorAll('.page'))
     page.hidden = page.id !== id;
-  for (const tab of document.querySelectorAll('.tab'))
-    tab.classList.toggle('active', tab.dataset.page === id);
+  for (const tab of document.querySelectorAll('.tab')) {
+    const selected = tab.dataset.page === id || (id === 'apps' && tab.dataset.page === 'settings');
+    tab.classList.toggle('active', selected);
+    tab.setAttribute('aria-current', selected ? 'page' : 'false');
+  }
+  if (id === 'network') refreshNetwork();
   if (id === 'sms') refreshSMS();
+  if (id === 'settings') refreshIPv6();
   if (id === 'apps') refreshPackages();
 }
 async function refreshOverview() {
@@ -90,20 +97,77 @@ async function refreshOverview() {
       Math.round(data.memory_available_kb / 1024) + ' MiB' : 'Unknown'));
   el('status-grid').replaceChildren(...cards);
 }
-async function refreshSMS() {
-  const out = el('sms-status');
-  out.textContent = 'Memeriksa penyedia SMS...';
+async function refreshNetwork() {
+  const root = el('network-status');
+  root.replaceChildren(metric('Koneksi', 'Memeriksa...', 'warn'));
   try {
-    const provider = await rpc('veci.v2', 'smsProvider');
-    if (provider.available !== true) {
-      out.textContent = 'Layanan SMS belum terdaftar. Tidak ada perintah AT yang dijalankan.';
-      return;
-    }
-    const sms = await rpc('veci.sms', 'getConfig');
-    out.textContent = 'SMS provider: tersedia · ' +
-      (sms.enabled === true ? 'Diaktifkan' : 'Nonaktif') +
-      ' · Mode: ' + String(sms.mode || 'unknown');
-  } catch (error) { out.textContent = 'SMS belum dapat diverifikasi: ' + error.message; }
+    const data = await rpc('veci.v2', 'status');
+    const lte = data.lte_ipv4 === true && data.lte_default_route === true;
+    const ap = data.wifi_ap_enabled === true;
+    root.replaceChildren(
+      metric('LTE / Gateway', lte ? 'Alamat IPv4 dan gateway tersedia' : 'Belum siap', lte ? 'good' : 'warn'),
+      metric('Wi-Fi AP', ap ? 'hostapd aktif — beacon belum teruji' : 'AP belum aktif', ap ? 'warn' : 'bad'),
+      metric('Netifd', data.netifd_count === 1 ? 'Satu proses normal' : 'Perlu pemeriksaan',
+        data.netifd_count === 1 ? 'good' : 'warn')
+    );
+  } catch (error) {
+    root.replaceChildren(metric('Koneksi', 'Status belum tersedia: ' + error.message, 'warn'));
+  }
+}
+let savedIPv6 = null;
+async function refreshIPv6() {
+  const toggle = el('ipv6-enabled');
+  const save = el('ipv6-save');
+  toggle.disabled = true;
+  save.disabled = true;
+  savedIPv6 = null;
+  el('ipv6-status').textContent = 'Memeriksa mode IPv6 router...';
+  try {
+    const data = await rpc('veci.v2.ipv6', 'status');
+    if (data.ok !== true || typeof data.enabled !== 'boolean')
+      throw Error(String(data.error || 'mode IPv6 tidak dikenal'));
+    savedIPv6 = data.enabled;
+    toggle.checked = savedIPv6;
+    toggle.disabled = false;
+    const live = data.runtime_enabled === true ? 'On' :
+      data.runtime_enabled === false ? 'Off' : 'Belum terverifikasi';
+    el('ipv6-status').textContent = 'Konfigurasi: ' +
+      (savedIPv6 ? 'On' : 'Off') + ' · Mode kernel saat ini: ' + live +
+      (data.reboot_required === true ? ' · Reboot diperlukan' : '');
+  } catch (error) {
+    el('ipv6-status').textContent = 'IPv6 tidak dapat diubah: ' + error.message;
+  }
+}
+async function saveIPv6() {
+  const toggle = el('ipv6-enabled');
+  const button = el('ipv6-save');
+  if (savedIPv6 === null || toggle.disabled || toggle.checked === savedIPv6) return;
+  const desired = toggle.checked;
+  const confirmation = window.confirm(
+    (desired ? 'Aktifkan' : 'Nonaktifkan') +
+    ' IPv6? Pilihan hanya disimpan. Tidak ada network reload, dan perubahan baru berlaku setelah reboot router manual.'
+  );
+  if (!confirmation) {
+    toggle.checked = savedIPv6;
+    button.disabled = true;
+    return;
+  }
+  button.disabled = true;
+  toggle.disabled = true;
+  try {
+    const result = await rpc('veci.v2.ipv6', 'save', {
+      enabled: desired,
+      confirm: desired ? 'IPV6_ENABLE' : 'IPV6_DISABLE'
+    });
+    if (result.ok !== true) throw Error(String(result.error || 'Gagal menyimpan IPv6'));
+    await refreshIPv6();
+  } catch (error) {
+    el('ipv6-status').textContent = 'Pilihan belum disimpan: ' + error.message;
+    await refreshIPv6();
+  }
+}
+async function refreshSMS() {
+  await globalThis.VeciSmsCenter.refresh();
 }
 async function refreshPackages() {
   el('package-install').hidden = true;
@@ -159,6 +223,11 @@ async function onPackageInstall() {
   finally { button.disabled = false; }
 }
 document.addEventListener('DOMContentLoaded', () => {
+  globalThis.VeciSmsCenter.init((object, method, args = {}) => {
+    const duration = method === 'sendMessage' ? 46000 :
+      method === 'listMessages' ? 13000 : 8500;
+    return rpc(object, method, args, sid, duration);
+  });
   el('login-form').addEventListener('submit', async event => {
     event.preventDefault();
     notify('');
@@ -180,9 +249,12 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) { notify(error.message || 'Login gagal'); }
   });
   el('logout').addEventListener('click', async () => {
-    try { await rpc('session', 'destroy', {ubus_rpc_session: sid}); }
-    catch { /* Local logout is always enforced. */ }
+    const old = sid;
+    globalThis.VeciSmsCenter.logout();
+    sid = '';
     showLogin();
+    try { await rpc('session', 'destroy', {ubus_rpc_session: old}, old); }
+    catch { /* Local logout is already enforced. */ }
   });
   el('refresh').addEventListener('click', async () => {
     notify('');
@@ -190,6 +262,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   for (const tab of document.querySelectorAll('.tab'))
     tab.addEventListener('click', () => showPage(tab.dataset.page));
+  el('ipv6-enabled').addEventListener('change', () => {
+    el('ipv6-save').disabled = savedIPv6 === null ||
+      el('ipv6-enabled').checked === savedIPv6;
+  });
+  el('ipv6-save').addEventListener('click', saveIPv6);
+  el('open-addons').addEventListener('click', () => showPage('apps'));
+  el('back-settings').addEventListener('click', () => showPage('settings'));
   el('package-form').addEventListener('submit', onPackagePreflight);
   el('package-install').addEventListener('click', onPackageInstall);
 });

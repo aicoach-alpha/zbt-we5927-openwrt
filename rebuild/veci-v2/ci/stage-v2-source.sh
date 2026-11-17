@@ -20,7 +20,7 @@ pin='64900e756efa667774214f9c6b17c113222e01f7'
 [ "$(git -C "$root" rev-parse HEAD)" = "$pin" ] || {
   echo wrong_openwrt_source_commit >&2; exit 3
 }
-for name in veci-v2-runtime veci-v2-package-manager veci-v2-ui veci-v2-sms; do
+for name in veci-v2-runtime veci-v2-package-manager veci-v2-ui veci-v2-sms veci-v2-ipv6; do
   src="$here/packages/$name"
   dst="$root/package/$name"
   [ -f "$src/Makefile" ] && [ ! -L "$src" ] &&
@@ -56,7 +56,7 @@ for rel in $sms_files; do
   fi
 done
 # Validation succeeded before any modifications.
-for name in veci-v2-runtime veci-v2-package-manager veci-v2-ui veci-v2-sms; do
+for name in veci-v2-runtime veci-v2-package-manager veci-v2-ui veci-v2-sms veci-v2-ipv6; do
   src="$here/packages/$name"
   dst="$root/package/$name"
   if [ ! -d "$dst" ]; then

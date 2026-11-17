@@ -41,3 +41,26 @@ label { font-size:13px; font-weight:600; display:block; margin:12px 0 5px }
 footer { text-align:center; color:var(--muted); padding:18px; font-size:11px }
 [hidden] { display:none!important }
 @media(max-width:580px) { main { padding:20px 14px } .header { padding:12px 14px } .intro { align-items:flex-start } .intro button { flex-shrink:0 } .panel { padding:16px } }
+
+/* VeCI v2: four primary groups, details only inside the selected section. */
+.tabs { justify-content:space-between; gap:4px; }
+.tab { flex:1; text-align:center; font-size:14px; }
+.toggle-line { display:flex; align-items:center; gap:12px; font-size:15px; margin:18px 0; }
+.toggle-line input { width:20px; height:20px; margin:0; }
+.page > .panel + .panel { margin-top:16px; }
+@media (max-width:580px) {
+  .tab { padding:10px 8px; font-size:12px; }
+  .tabs { gap:0; }
+}
+
+
+.sms-actions { display:flex; flex-wrap:wrap; gap:9px; margin:12px 0; align-items:center }
+.sms-actions button { flex:0 0 auto }
+#sms-compose-form { max-width:610px; border:1px solid var(--line); border-radius:10px; padding:14px; margin:14px 0 }
+#sms-compose-form input,#sms-compose-form textarea { display:block; width:100%; margin-bottom:12px }
+#sms-compose-form textarea { resize:vertical; min-height:110px; line-height:1.5 }
+.sms-card { border:1px solid var(--line); border-radius:10px; padding:14px; margin:9px 0; background:#fff }
+.sms-card strong { display:block; font-size:13px }
+.sms-card small { display:block; color:var(--muted); margin:5px 0 }
+.sms-card p { white-space:pre-wrap; overflow-wrap:anywhere; margin:9px 0; color:var(--ink) }
+.sms-card button { font-size:12px; padding:7px 11px; margin:3px 5px 3px 0 }

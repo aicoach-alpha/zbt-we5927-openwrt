@@ -284,7 +284,60 @@
       "physical_uat": "not_run",
       "required": true,
       "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "system_ipv6_off_by_default",
+      "origin": "User requirement 2026-11-17",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_implemented_not_hardware_verified"
+    },
+    {
+      "id": "system_ipv6_guarded_settings_toggle",
+      "origin": "User requirement 2026-11-17",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_implemented_not_hardware_verified"
+    },
+    {
+      "id": "ui_four_group_navigation",
+      "origin": "User requirement 2026-11-17",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_implemented_not_hardware_verified"
     }
   ],
-  "schema": "veci.v2.rebuild-contract.v1"
+  "schema": "veci.v2.rebuild-contract.v1",
+  "ipv6_policy": {
+    "first_boot": "off",
+    "sysctl": "disable_ipv6=1 on all/default",
+    "wan6_default": "disabled",
+    "lan_ra_dhcpv6_default": "disabled",
+    "settings_toggle": "authenticated explicit confirmation; saves UCI only",
+    "apply": "separately approved manual reboot; never background network reload",
+    "upstream_ipv6": "not guaranteed; depends on modem/carrier",
+    "hardware_uat": "not_run"
+  },
+  "navigation": [
+    {
+      "id": "overview",
+      "label": "Beranda",
+      "scope": "status kesehatan dan akses cepat"
+    },
+    {
+      "id": "network",
+      "label": "Koneksi",
+      "scope": "LTE 2SIM, Wi-Fi, WAN/LAN, DHCP, devices"
+    },
+    {
+      "id": "sms",
+      "label": "SMS Center",
+      "scope": "inbox, kirim, sent, draft, delete"
+    },
+    {
+      "id": "settings",
+      "label": "Pengaturan",
+      "scope": "IPv6, addons, updates, backup, firewall dan advanced"
+    }
+  ]
 }

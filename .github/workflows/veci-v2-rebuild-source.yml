@@ -29,7 +29,10 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
           for script in rebuild/veci-v2/packages/veci-v2-runtime/veci2-status \
                         rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk \
-                        rebuild/veci-v2/ci/stage-v2-source.sh; do
+                        rebuild/veci-v2/ci/stage-v2-source.sh \
+                        rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/init.d/veci2-ipv6 \
+                        rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/uci-defaults/90-veci2-ipv6-initial \
+                        rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6; do
             sh -n "$script"
           done
           node --check rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js
@@ -51,7 +54,7 @@ jobs:
           import json
           x=json.load(open('/tmp/release-approval.json'))
           assert x['flash_allowed'] is False
-          assert x['required_modules'] == 37
+          assert x['required_modules'] == 40
           assert x['hardware_accepted'] == 0
           print('FLASH_PERMISSION=DENIED_AS_DESIGNED')
           PY
@@ -78,12 +81,17 @@ jobs:
           git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
           sh rebuild/veci-v2/ci/stage-v2-source.sh "$root"
           sh rebuild/veci-v2/ci/stage-v2-source.sh "$root"
-          for p in veci-v2-runtime veci-v2-package-manager veci-v2-ui veci-v2-sms; do
+          for p in veci-v2-runtime veci-v2-package-manager veci-v2-ui veci-v2-sms veci-v2-ipv6; do
             test -s "$root/package/$p/Makefile"
           done
           cmp source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.sms \
             "$root/package/veci-v2-sms/files/usr/libexec/rpcd/veci.sms"
           test ! -e "$root/package/veci-v2-sms/files/usr/libexec/rpcd/veci.cellular"
+          grep -Fq "option enabled '0'" "$root/package/veci-v2-ipv6/files/etc/config/veci2_ipv6"
+          test -s "$root/package/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6"
+          test -s "$root/package/veci-v2-ipv6/files/etc/init.d/veci2-ipv6"
+          grep -Fq "START=16" "$root/package/veci-v2-ipv6/files/etc/init.d/veci2-ipv6"
+          echo "IPV6_OFF_DEFAULT_WITH_MANUAL_SETTINGS_GATE=PASS"
           echo 'WE5927_DSIM_V2_STAGED_SOURCE_ONLY=PASS'
           echo 'FIRMWARE_BUILT=NO'
           echo 'FIRMWARE_SIGNED=NO'

@@ -8,6 +8,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'">
   <title>VeCI v2 — WE5927-DSIM Engineering Preview</title>
   <link rel="stylesheet" href="/veci2/app.css">
+  <script src="/veci2/sms-codec.js" defer></script>
+  <script src="/veci2/sms-center.js" defer></script>
   <script src="/veci2/app.js" defer></script>
 </head>
 <body>
@@ -30,25 +32,77 @@
       </section>
       <section id="workspace" hidden>
         <div class="intro"><div><h1>Router health</h1><p>Berbasis kondisi sistem yang terbaca, bukan perkiraan atau indikator cache.</p></div><button id="refresh" type="button">Perbarui</button></div>
-        <nav class="tabs" aria-label="Menu VeCI">
-          <button class="tab active" type="button" data-page="overview">Ringkasan</button>
+        <nav class="tabs" aria-label="Menu utama VeCI">
+          <button class="tab active" type="button" data-page="overview">Beranda</button>
+          <button class="tab" type="button" data-page="network">Koneksi</button>
           <button class="tab" type="button" data-page="sms">SMS Center</button>
-          <button class="tab" type="button" data-page="apps">Addons</button>
+          <button class="tab" type="button" data-page="settings">Pengaturan</button>
         </nav>
         <section id="overview" class="page" aria-label="Status koneksi">
           <div id="status-grid" class="grid"></div>
           <p class="notice">Status internet yang belum diuji ditampilkan sebagai belum terverifikasi, bukan dipaksa menjadi offline. Beacon Wi-Fi tidak dianggap hidup hanya karena radio up.</p>
+        </section>
+        <section id="network" class="page" aria-label="Koneksi dan perangkat" hidden>
+          <article class="panel">
+            <h2>Koneksi</h2>
+            <p>Satu tempat untuk LTE dua SIM, Wi-Fi, LAN/WAN, DHCP dan perangkat. Fitur detail mengikuti modul yang benar-benar tersedia.</p>
+            <div id="network-status" class="grid" aria-live="polite"></div>
+            <p class="notice">Munculnya alamat IP tidak membuktikan akses internet dari klien. AP Wi-Fi harus memiliki hostapd/BSSID dan koneksi klien yang teruji.</p>
+          </article>
+        </section>
+        <section id="settings" class="page" aria-label="Pengaturan router" hidden>
+          <article class="panel">
+            <h2>IPv6</h2>
+            <p>Default <strong>Off</strong> untuk WE5927-DSIM. IPv4, LTE dan koneksi LAN tetap dipertahankan. Aktifkan IPv6 hanya jika diperlukan.</p>
+            <div id="ipv6-status" class="result" role="status" aria-live="polite">Memuat status IPv6...</div>
+            <label class="toggle-line" for="ipv6-enabled">
+              <input id="ipv6-enabled" type="checkbox" disabled>
+              <span>Aktifkan IPv6</span>
+            </label>
+            <button id="ipv6-save" type="button" disabled>Simpan pilihan</button>
+            <p class="notice">Perubahan disimpan tanpa memutus jaringan. IPv6 baru berubah setelah Anda melakukan reboot secara sadar. Mengaktifkan IPv6 tidak menjamin modem/operator memberikan koneksi IPv6 internet.</p>
+          </article>
+          <article class="panel">
+            <h2>Aplikasi &amp; firmware</h2>
+            <p>Addon, pembaruan, backup dan pengaturan lanjutan dikelompokkan di sini—tidak memenuhi menu utama.</p>
+            <button id="open-addons" type="button">Kelola Addon</button>
+            <p class="notice">Menu firmware/backup akan diaktifkan setelah modul aman dan UAT-nya selesai; tidak ditampilkan sebagai tombol palsu.</p>
+          </article>
         </section>
         <section id="sms" class="page" aria-label="SMS Center" hidden>
           <article class="panel">
             <h2>SMS Center — kesiapan modem</h2>
             <p>Transport SMS menggunakan layanan modem yang ada dan satu kunci akses AT, bukan koneksi paralel yang berisiko membuat modem macet.</p>
             <div id="sms-status" class="result" aria-live="polite"></div>
-            <p class="notice">Tampilan inbox, multipart SMS, draft, sent, delete dan konfirmasi kirim masih dalam proses porting dari modul yang sudah diuji. Mode percobaan ini tidak mengirim SMS.</p>
+            <div class="sms-actions">
+              <button id="sms-enable" type="button" hidden>Aktifkan SMS</button>
+              <button id="sms-inbox-open" type="button" disabled>Buka Inbox</button>
+              <button id="sms-sent-open" type="button" disabled>Sent</button>
+              <button id="sms-drafts-open" type="button" disabled>Drafts</button>
+              <button id="sms-compose-open" type="button" disabled>Tulis SMS</button>
+              <button id="sms-clear" class="quiet" type="button">Bersihkan layar</button>
+            </div>
+            <form id="sms-compose-form" hidden autocomplete="off">
+              <h3>Pesan baru</h3>
+              <label for="sms-number">Nomor tujuan</label>
+              <input id="sms-number" type="tel" inputmode="tel" placeholder="+628123456789" pattern="\\+?[0-9]{3,15}" required autocomplete="off" maxlength="16">
+              <label for="sms-text">Pesan</label>
+              <textarea id="sms-text" required rows="5" maxlength="612" autocomplete="off" placeholder="Tulis SMS…"></textarea>
+              <p id="sms-parts" class="notice">Maksimal 4 bagian; biaya operator mungkin berlaku per bagian.</p>
+              <div class="sms-actions">
+                <button id="sms-send" type="submit">Kirim dengan konfirmasi</button>
+                <button id="sms-save-draft" type="button">Simpan draft</button>
+                <button id="sms-close-compose" class="quiet" type="button">Tutup</button>
+              </div>
+              <p id="sms-send-state" role="status" aria-live="polite">Belum dikirim.</p>
+            </form>
+            <div id="sms-results" class="sms-results" aria-live="polite"></div>
+            <p class="notice">Pesan hanya dibaca saat diminta. Buka Inbox dapat menandai SMS belum dibaca sebagai dibaca. Hasil “diterima modem” belum berarti diterima penerima; pengiriman gagal/tidak pasti tidak dicoba ulang otomatis.</p>
           </article>
         </section>
         <section id="apps" class="page" aria-label="Pengelola addon" hidden>
           <article class="panel">
+            <button id="back-settings" class="quiet" type="button">Kembali ke Pengaturan</button>
             <h2>Addon APK</h2>
             <p>Hanya feed resmi OpenWrt 25.12.6 atau feed VeCI dengan signature dan build ID cocok. Paket inti dan driver tidak boleh diganti secara live.</p>
             <div id="apk-status" class="result" aria-live="polite"></div>

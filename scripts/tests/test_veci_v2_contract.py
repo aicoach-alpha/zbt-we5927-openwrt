@@ -29,8 +29,8 @@ class FeatureContract(unittest.TestCase):
         self.assertEqual(LUCI["application_count"], 107)
         self.assertEqual(len(LUCI["applications"]), 107)
         self.assertEqual(len(LUCI["core_modules"]), 11)
-        self.assertEqual(len(CONTRACT["required_core"]), 37)
-        self.assertEqual(len({f["id"] for f in CONTRACT["required_core"]}), 37)
+        self.assertEqual(len(CONTRACT["required_core"]), 40)
+        self.assertEqual(len({f["id"] for f in CONTRACT["required_core"]}), 40)
 
     def test_no_false_claim_about_luci_full_migration(self):
         self.assertTrue(all(x["migration"] == "not_ported" for x in LUCI["applications"]))
