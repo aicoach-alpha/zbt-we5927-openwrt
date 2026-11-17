@@ -47,6 +47,26 @@ jobs:
           git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
           sh scripts/stage-veci-reliability-rc.sh "$root"
           sh rebuild/veci-v2/ci/stage-v2-source.sh "$root"
+          # The legacy catalog prepares this exact source identity, but the
+          # catalog itself is deliberately NOT bundled into VeCI v2 ROM.
+          # Without this overlay, veci.v2.pkg cannot verify a build-specific
+          # signed app feed even though its APK compiles successfully.
+          release_src="$root/package/veci-app-catalog-we5927/files/etc/veci-release.json"
+          release_dst="$root/files/etc/veci-release.json"
+          test -s "$release_src" && test ! -L "$release_src"
+          test ! -L "$release_dst"
+          mkdir -p "$root/files/etc"
+          cp "$release_src" "$release_dst"
+          python3 - "$release_dst" "$GITHUB_SHA" <<'PYRELEASE'
+          import json, pathlib, sys
+          m=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert m["build_id"] == sys.argv[2]
+          assert m["board"] == "zbtlink,zbt-we5927"
+          assert m["target"] == "ramips/mt76x8"
+          assert m["version"] == "25.12.6"
+          assert m["image_signature"] == "not_verified"
+          print("V2_BUILD_ID_MANIFEST_STAGED=PASS")
+          PYRELEASE
           cp source/openwrt-we5927.config "$root/.config"
           cat >> "$root/.config" <<'PKGS'
           CONFIG_PACKAGE_veci-v2-runtime=y
@@ -155,6 +175,18 @@ jobs:
             echo 'FINAL_SQUASHFS_RPCD_V2_DIFFERENT_FROM_BUILD_ROOT' >&2; exit 1;
           }
           echo 'EXACT_EMBEDDED_SQUASHFS_AND_RPCD_V2=PASS'
+          python3 - "$rom/etc/veci-release.json" "$GITHUB_SHA" <<'PYRELEASE'
+          import json, pathlib, sys
+          path=pathlib.Path(sys.argv[1])
+          assert path.is_file() and path.stat().st_size > 0
+          m=json.loads(path.read_text())
+          assert m["build_id"] == sys.argv[2]
+          assert m["board"] == "zbtlink,zbt-we5927"
+          assert m["target"] == "ramips/mt76x8"
+          assert m["version"] == "25.12.6"
+          assert m["image_signature"] == "not_verified"
+          print("V2_EXTRACTED_RELEASE_MANIFEST=PASS")
+          PYRELEASE
           for path in usr/libexec/rpcd/veci.v2 \
                       usr/libexec/rpcd/veci.v2.pkg \
                       usr/libexec/rpcd/veci.sms \
