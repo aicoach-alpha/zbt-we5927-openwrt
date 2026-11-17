@@ -29,6 +29,18 @@ function findRuntime(wireless, section, config) {
 	return null;
 }
 
+// A configured SSID is not evidence that a kernel AP interface exists or
+// that clients can see its beacon. Do not claim Broadcasting from radio0.up.
+export function wifiRuntimeState(config, radioConfig, runtime) {
+	if (boolOption(config.disabled) || boolOption(radioConfig.disabled)) {
+		return { label: 'Disabled', tone: 'neutral' };
+	}
+	if (!runtime?.iface || runtime.radio?.up !== true) {
+		return { label: 'AP unavailable', tone: 'warning' };
+	}
+	return { label: 'AP configured · beacon unverified', tone: 'warning' };
+}
+
 function buildNetworks(configResult, wireless) {
 	const values = configResult.values || {};
 	return Object.entries(values)
@@ -36,6 +48,7 @@ function buildNetworks(configResult, wireless) {
 		.map(([section, config]) => {
 			const runtime = findRuntime(wireless, section, config);
 			const radioConfig = values[config.device] || {};
+			const status = wifiRuntimeState(config, radioConfig, runtime);
 			return {
 				section,
 				config,
@@ -43,7 +56,7 @@ function buildNetworks(configResult, wireless) {
 				radio: config.device || runtime?.radioName || 'radio',
 				channel: radioConfig.channel || runtime?.radio?.config?.channel || 'auto',
 				htmode: radioConfig.htmode || runtime?.radio?.config?.htmode || '',
-				up: !boolOption(config.disabled) && runtime?.radio?.up !== false,
+				status,
 				hasKey: Boolean(config.key)
 			};
 		});
@@ -147,7 +160,7 @@ export default {
 												<p class="eyebrow">${escapeHtml(network.radio)}</p>
 												<h3>${escapeHtml(network.config.ssid || 'Unnamed Wi-Fi')}</h3>
 											</div>
-											${badge(network.up ? 'Broadcasting' : 'Disabled', network.up ? 'success' : 'neutral')}
+											${badge(network.status.label, network.status.tone)}
 										</div>
 										<div class="detail-list">
 											<div><span>Mode</span><strong>${escapeHtml((network.config.mode || 'ap').toUpperCase())}</strong></div>
