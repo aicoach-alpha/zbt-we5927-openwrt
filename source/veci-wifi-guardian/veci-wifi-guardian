@@ -4,6 +4,7 @@
 TAG=veci-wifi-guardian
 CFG=veci_performance.wifi
 STATE=/tmp/veci-wifi-performance.state
+FIRST_FAULT=/tmp/veci-wifi-first-fault.txt
 RESET=/sys/kernel/debug/ieee80211/phy0/mt76/reset
 
 cfg() { uci -q get "$CFG.$1" 2>/dev/null || :; }
@@ -64,6 +65,69 @@ rx_pse_resets() {
  awk '/RX PSE busy stuck:/ {print $NF;found=1;exit}
       END {if (!found) print "unknown"}' "$RESET" 2>/dev/null
 }
+# Preserve the first observable AP failure in tmpfs before circular logread wraps.
+# Classify syslog and kernel events instead of copying raw lines: no SSID, MAC,
+# IP address, password, SIM ID or payload is written. At most once per boot.
+capture_first_fault() {
+ local why="$1" stage="$2" tmp="$FIRST_FAULT.$"
+ [ ! -e "$FIRST_FAULT" ] || return 0
+ case "$why" in
+   phy_missing|radio_not_up|wifi_netdev_missing|hostapd_rpc_missing|hostapd_not_enabled|unknown) ;;
+   *) why=unknown ;;
+ esac
+ case "$stage" in lost_after_ready|startup_unavailable) ;; *) stage=unknown ;; esac
+ umask 077
+ {
+   printf 'schema=veci_wifi_first_fault_v1\n'
+   printf 'capture_epoch=%s\n' "$(date +%s)"
+   printf 'capture_uptime_s=%s\n' "$(cut -d. -f1 /proc/uptime 2>/dev/null)"
+   printf 'reason=%s\nfirst_observed_stage=%s\n' "$why" "$stage"
+   if [ -d /sys/class/ieee80211/phy0 ]; then
+     echo 'phy0=present'
+   else
+     echo 'phy0=missing'
+   fi
+   if wifi_netdev_present; then
+     echo 'kernel_wifi_netdev=present'
+   else
+     echo 'kernel_wifi_netdev=missing'
+   fi
+   if [ -n "$(ubus -S -t 2 list 'hostapd.*' 2>/dev/null)" ]; then
+     echo 'hostapd_rpc=present'
+   else
+     echo 'hostapd_rpc=missing_or_timeout'
+   fi
+   echo '===== RECENT_SYSLOG_EVENT_CLASSES ====='
+   logread 2>/dev/null | tail -n 320 | awk '
+     {
+       category=""
+       if ($0 ~ /veci-rpc-net:.*wifi_reload_requested/) category="veci_wifi_reload_requested"
+       else if ($0 ~ /veci-rpc-net:.*network_service_reload_requested/) category="veci_network_reload_requested"
+       else if ($0 ~ /hostapd/ && $0 ~ /[Ff]ailed|[Ee]rror|[Uu]nable|[Tt]eardown/) category="hostapd_error"
+       else if ($0 ~ /netifd/ && $0 ~ /[Ww]ireless|phy0|radio0|hostapd/) category="netifd_wifi_event"
+       else if ($0 ~ /netifd/ && $0 ~ /br-lan|eth0/) category="netifd_ethernet_or_bridge_event"
+       if (category != "") print $1 " " $2 " " $3 " class=" category
+     }' | tail -n 28
+   echo '===== RECENT_KERNEL_EVENT_CLASSES ====='
+   dmesg 2>/dev/null | tail -n 350 | awk '
+     {
+       category=""
+       if ($0 ~ /br-lan: port .*phy0-ap[0-9]+.*entered disabled state/) category="bridge_wifi_disabled"
+       else if ($0 ~ /br-lan: port .*phy0-ap[0-9]+.*entered forwarding state/) category="bridge_wifi_forwarding"
+       else if ($0 ~ /br-lan: port .*eth0.*entered disabled state/) category="bridge_ethernet_disabled"
+       else if ($0 ~ /mt76_wmac.*unregistering/) category="mt76_wifi_unregistering"
+       else if ($0 ~ /mt76.*[Tt]imeout|mt76.*[Ee]rror|mt76.*[Ff]ailed/) category="mt76_error"
+       if (category != "") {
+         stamp="unknown"
+         if (match($0, /^\\[[[:space:]]*[0-9]+\\.[0-9]+\\]/))
+           stamp=substr($0, RSTART+1, RLENGTH-2)
+         print "kernel_uptime_s=" stamp " class=" category
+       }
+     }' | tail -n 32
+ } > "$tmp" 2>/dev/null || { rm -f "$tmp"; return 1; }
+ mv "$tmp" "$FIRST_FAULT" || { rm -f "$tmp"; return 1; }
+ logger -t "$TAG" "First AP failure evidence captured in volatile memory (no radio action)"
+}
 show_state() {
  if [ -r "$STATE" ]; then cat "$STATE"; else echo 'wifi=not_started'; fi
 }
@@ -79,8 +143,9 @@ check_once() {
  return 1
 }
 daemon() {
- local failures interval threshold phase rxpse last_rxpse reason last_alert
+ local failures interval threshold phase rxpse last_rxpse reason last_alert ever_ready boot_age
  failures=0
+ ever_ready=0
  phase=starting
  reason=none
  last_rxpse=unknown
@@ -96,6 +161,7 @@ daemon() {
      last_alert=none
    elif radio_running; then
      [ "$last_alert" = none ] || logger -t "$TAG" "AP runtime available again (beacon externally unverified)"
+     ever_ready=1
      failures=0
      phase=ready
      reason=none
@@ -104,6 +170,19 @@ daemon() {
      failures=$((failures + 1))
      [ "$failures" -le "$threshold" ] || failures="$threshold"
      reason="$(ap_failure_reason)"
+     # Do not mistake normal early boot AP setup for an incident.
+     # A real loss after previously being ready is captured immediately.
+     if [ ! -e "$FIRST_FAULT" ]; then
+       if [ "$ever_ready" = 1 ]; then
+         capture_first_fault "$reason" lost_after_ready
+       elif [ "$failures" -ge "$threshold" ]; then
+         boot_age="$(cut -d. -f1 /proc/uptime 2>/dev/null)"
+         case "$boot_age" in
+           ''|*[!0-9]*) : ;;
+           *) [ "$boot_age" -lt 240 ] || capture_first_fault "$reason" startup_unavailable ;;
+         esac
+       fi
+     fi
      case "$reason" in
        phy_missing|radio_not_up|wifi_netdev_missing|hostapd_rpc_missing|hostapd_not_enabled) ;;
        *) reason=unknown ;;
@@ -137,5 +216,6 @@ case "$1" in
  daemon) daemon ;;
  check) check_once ;;
  status) show_state ;;
- *) echo 'Usage: veci-wifi-guardian daemon|check|status' >&2; exit 2 ;;
+ evidence) if [ -r "$FIRST_FAULT" ]; then cat "$FIRST_FAULT"; else echo 'first_fault=not_captured'; fi ;;
+ *) echo 'Usage: veci-wifi-guardian daemon|check|status|evidence' >&2; exit 2 ;;
 esac
