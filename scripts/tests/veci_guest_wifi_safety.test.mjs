@@ -28,7 +28,9 @@ test('guest creation cannot use another radio as evidence', () => {
 
 test('guest removal skips wireless reload when already disabled', () => {
 	const source = readFileSync(new URL('../../source/veci-core/veci/js/pages/wifi.js', import.meta.url), 'utf8');
-	assert.match(source, /reloadGuestServices\(api, \{ reloadWireless: !boolOption\(managedGuest\?\.disabled\) \}\)/);
+	assert.match(source, /reloadWireless: !boolOption\(managedGuest\?\.disabled\)/);
+	assert.match(source, /reloadNetwork: !boolOption\(managedGuest\?\.disabled\)/);
+	assert.match(source, /if \(reloadNetwork\) await api\.veci\('serviceAction', \{ service: 'network', action: 'reload' \}\)/);
 	assert.match(source, /if \(!reloadWireless\) return/);
 	assert.match(source, /Guest Wi-Fi cannot be activated: existing AP is unavailable or unverified/);
 });
