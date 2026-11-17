@@ -5,12 +5,14 @@ on:
     paths:
       - 'source/veci-wifi-guardian/**'
       - 'scripts/tests/test_wifi_guardian_observe_only.py'
+      - 'scripts/tests/test_wifi_guardian_single_alert.py'
       - 'scripts/stage-veci-wifi-guardian.sh'
       - '.github/workflows/veci-wifi-guardian-safety.yml'
   pull_request:
     paths:
       - 'source/veci-wifi-guardian/**'
       - 'scripts/tests/test_wifi_guardian_observe_only.py'
+      - 'scripts/tests/test_wifi_guardian_single_alert.py'
       - 'scripts/stage-veci-wifi-guardian.sh'
       - '.github/workflows/veci-wifi-guardian-safety.yml'
 
@@ -23,7 +25,9 @@ jobs:
       - name: Validate shell syntax
         run: sh -n source/veci-wifi-guardian/veci-wifi-guardian
       - name: Run guard regression
-        run: python3 -m unittest discover -s scripts/tests -p test_wifi_guardian_observe_only.py -v
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_wifi_guardian_observe_only.py -v
+          python3 -m unittest discover -s scripts/tests -p test_wifi_guardian_single_alert.py -v
       - name: Verify future firmware embeds safe Guardian package
         shell: bash
         run: |

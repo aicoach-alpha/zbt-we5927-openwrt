@@ -200,6 +200,8 @@ export default {
 				ready: 'Access point operational',
 				radio_recovery: 'Recovering missing access point',
 				ap_not_ready: 'Access point not ready',
+				manual_recovery_required: 'Access point missing · diagnosis required',
+				driver_reset_observed: 'Wi-Fi driver reset observed',
 				intentionally_disabled: 'Wi-Fi intentionally disabled',
 				hold_associated_or_unknown: 'Conservative hold · clients may be connected',
 				cooldown_or_observe: 'Monitoring · cooldown'

@@ -47,8 +47,9 @@ check_once() {
  echo 'wifi=ap_not_ready beacon_verified=0'; return 1
 }
 daemon() {
- local failures interval threshold phase rxpse last_rxpse
+ local failures alerted interval threshold phase rxpse last_rxpse
  failures=0
+ alerted=0
  phase=starting
  last_rxpse=unknown
  interval="$(number "$(cfg interval)" 30 15 300)"
@@ -57,17 +58,23 @@ daemon() {
  while :; do
    if ! radio_wanted; then
      failures=0
+     alerted=0
      phase=intentionally_disabled
    elif radio_running; then
      failures=0
+     alerted=0
      phase=ready
    else
-     failures=$((failures + 1))
+     # Keep the AP failure visible without repeating the same warning every
+     # threshold*interval seconds and evicting the original hostapd error.
+     [ "$failures" -ge "$threshold" ] || failures=$((failures + 1))
      phase=ap_not_ready
      if [ "$failures" -ge "$threshold" ]; then
-       failures=0
        phase=manual_recovery_required
-       logger -t "$TAG" "AP runtime unavailable; no automatic radio reload (mt76 deadlock risk)"
+       if [ "$alerted" -eq 0 ]; then
+         alerted=1
+         logger -t "$TAG" "AP runtime unavailable; one alert per outage; no automatic radio reload (mt76 deadlock risk)"
+       fi
      fi
    fi
    rxpse="$(rx_pse_resets)"
