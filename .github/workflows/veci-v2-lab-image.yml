@@ -1,0 +1,146 @@
+name: VeCI v2 WE5927-DSIM laboratory full image (NEVER FLASH)
+
+on:
+  push:
+    paths:
+      - '.github/workflows/veci-v2-lab-image.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-laboratory-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OpenWrt host dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential clang bison flex gawk gettext git gcc-multilib \
+            libncurses-dev libssl-dev rsync subversion swig unzip wget \
+            zlib1g-dev python3 python3-setuptools file xz-utils zstd
+
+      - name: Pin, stage and verify exact 2SIM board sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt-v2"
+          mkdir -p "$root"
+          git -C "$root" init -q
+          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git 64900e756efa667774214f9c6b17c113222e01f7
+          git -C "$root" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$root" rev-parse HEAD)" = "$(cat source/openwrt-source-commit.txt)"
+          grep -Fq 'LINUX_VERSION-6.12 = .112' "$root/target/linux/generic/kernel-6.12"
+          git -C "$root" apply --check "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          sh scripts/stage-veci-reliability-rc.sh "$root"
+          sh rebuild/veci-v2/ci/stage-v2-source.sh "$root"
+          cp source/openwrt-we5927.config "$root/.config"
+          cat >> "$root/.config" <<'PKGS'
+          CONFIG_PACKAGE_veci-v2-runtime=y
+          CONFIG_PACKAGE_veci-v2-package-manager=y
+          CONFIG_PACKAGE_veci-v2-sms=y
+          CONFIG_PACKAGE_veci-v2-ipv6=y
+          CONFIG_PACKAGE_veci-v2-ui=y
+          CONFIG_PACKAGE_veci-wifi-guardian=y
+          CONFIG_PACKAGE_we5927-lte=y
+          CONFIG_PACKAGE_libustream-mbedtls=y
+          CONFIG_PACKAGE_px5g-mbedtls=y
+          PKGS
+          echo 'EXACT_TWO_SIM_SOURCE_STAGED=PASS'
+          echo 'NOT_SIGNED_NOT_FLASH_APPROVED=TRUE'
+
+      - name: Compile minimal VeCI v2 complete image
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/openwrt-v2"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+          for name in veci-v2-runtime veci-v2-package-manager veci-v2-sms veci-v2-ipv6 veci-v2-ui veci-wifi-guardian; do
+            grep -Fxq "CONFIG_PACKAGE_$name=y" .config
+          done
+          ! grep -Eq '^CONFIG_(DEFAULT_luci|PACKAGE_luci([-A-Za-z0-9_]*)?|PACKAGE_rpcd-mod-luci)=y$' .config
+          ! grep -Fxq 'CONFIG_PACKAGE_veci=y' .config
+          ! grep -Fxq 'CONFIG_PACKAGE_veci-cellular-we5927=y' .config
+          ! grep -Fxq 'CONFIG_PACKAGE_veci-data-meter=y' .config
+          ! grep -Fxq 'CONFIG_PACKAGE_veci-app-guest=y' .config
+          ! grep -Fxq 'CONFIG_PACKAGE_veci-app-voucher=y' .config
+          make -j2 V=s tools/install
+          make -j2 V=s toolchain/install
+          make -j2 V=s
+          echo 'COMPLETE_WE5927_DSIM_V2_UNVERIFIED_IMAGE_BUILT=PASS'
+
+      - name: Exact image metadata, size, security and core contents gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/openwrt-v2"
+          count="$(find bin/targets/ramips/mt76x8 -maxdepth 1 -name '*zbt*we5927*sysupgrade.bin' -type f | wc -l)"
+          test "$count" -eq 1
+          image="$(find bin/targets/ramips/mt76x8 -maxdepth 1 -name '*zbt*we5927*sysupgrade.bin' -type f -print -quit)"
+          bytes="$(stat -c %s "$image")"
+          max=7995392
+          reserve=1048576
+          test "$bytes" -gt 0
+          test "$bytes" -le "$((max-reserve))" || {
+            echo "SIZE_GATE_FAILED bytes=$bytes max=$max reserve=$reserve" >&2
+            exit 1
+          }
+          fwtool="$PWD/staging_dir/host/bin/fwtool"
+          test -x "$fwtool"
+          "$fwtool" -i "$RUNNER_TEMP/veci-v2-image-meta.json" "$image"
+          python3 - "$RUNNER_TEMP/veci-v2-image-meta.json" <<'PY'
+          import json,sys
+          m=json.load(open(sys.argv[1]))
+          assert "zbtlink,zbt-we5927" in m.get("supported_devices",[])
+          assert m.get("version",{}).get("target")=="ramips/mt76x8"
+          assert m.get("version",{}).get("version")=="25.12.6"
+          print("EXACT_BOARD_IMAGE_METADATA=PASS")
+          PY
+          f="$(find build_dir -path '*/root-ramips/usr/libexec/rpcd/veci.v2' -type f -print -quit)"
+          test -n "$f"
+          rom="$(printf %s "$f" | sed 's|/usr/libexec/rpcd/veci.v2$||')"
+          for path in usr/libexec/rpcd/veci.v2 \
+                      usr/libexec/rpcd/veci.v2.pkg \
+                      usr/libexec/rpcd/veci.sms \
+                      usr/libexec/rpcd/veci.v2.ipv6 \
+                      usr/sbin/we5927-lte \
+                      usr/sbin/veci-wifi-guardian \
+                      usr/sbin/wpad \
+                      usr/sbin/px5g \
+                      www/veci2/index.html \
+                      www/veci2/app.js \
+                      www/veci2/sms-codec.js \
+                      www/veci2/sms-center.js \
+                      www/index.html; do
+            test -s "$rom/$path" || { echo "MISSING:$path" >&2; exit 1; }
+          done
+          find "$rom/lib/modules" -type f -name 'mt7603e.ko' -size +0c -print -quit | grep -q mt7603e.ko
+          for forbidden in www/cgi-bin/luci www/luci-static usr/share/luci usr/lib/lua/luci usr/libexec/rpcd/veci.meter; do
+            test ! -e "$rom/$forbidden" || { echo "UNWANTED:$forbidden"; exit 1; }
+          done
+          grep -Fq '/veci2/' "$rom/www/index.html"
+          sha256sum "$image"
+          echo "LAB_IMAGE_BYTES=$bytes"
+          echo "FIRMWARE_PARTITION_BYTES=$max"
+          echo "RAW_IMAGE_HEADROOM_BYTES=$((max-bytes))"
+          echo 'V2_CORE_COMPONENTS_PRESENT=PASS'
+          echo 'PHYSICAL_AP_OR_LTE_UAT=NOT_RUN'
+          echo 'SIGNATURE_TRUST=NOT_VERIFIED'
+          echo 'FLASH_PERMISSION=NO'
+
+      - name: Production flash prohibited even on green CI
+        if: always()
+        run: |
+          echo 'V2 IS A LABORATORY SOURCE/IMAGE PROTOTYPE.'
+          echo 'NO UNSIGNED IMAGE UPLOADED OR RELEASED.'
+          echo 'PRODUCTION ROUTER NOT MODIFIED.'
+          echo 'FULL LUCI/OEM PARITY AND 72h PHYSICAL UAT NOT COMPLETE.'

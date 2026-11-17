@@ -1,0 +1,13 @@
+#!/bin/sh
+# Only UCI data, no radio/network/service restart. The built-in uhttpd init
+# generates an ECC certificate with px5g-mbedtls at first service start.
+set -eu
+[ -f /www/veci2/index.html ] || exit 0
+[ "$(uci -q get uhttpd.main)" = uhttpd ] || exit 0
+uci -q set uhttpd.main.redirect_https='1'
+uci -q set uhttpd.defaults.organization='VeCI'
+uci -q set uhttpd.defaults.commonname='we5927.lan'
+uci -q set uhttpd.defaults.key_type='ec'
+uci -q set uhttpd.defaults.ec_curve='P-256'
+uci -q commit uhttpd
+exit 0

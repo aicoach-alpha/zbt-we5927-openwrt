@@ -10,7 +10,7 @@ define Package/veci-v2-ui
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI v2 lightweight native UI (development preview)
-  DEPENDS:=+veci-v2-runtime +veci-v2-package-manager +veci-v2-sms +veci-v2-ipv6 +uhttpd +uhttpd-mod-ubus
+  DEPENDS:=+veci-v2-runtime +veci-v2-package-manager +veci-v2-sms +veci-v2-ipv6 +uhttpd +uhttpd-mod-ubus +libustream-mbedtls +px5g-mbedtls
 endef
 
 define Package/veci-v2-ui/description
@@ -22,6 +22,10 @@ define Build/Compile
 endef
 
 define Package/veci-v2-ui/install
+	$(INSTALL_DIR) $(1)/www
+	$(INSTALL_DATA) ./files/www/index.html $(1)/www/index.html
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/97-veci-v2-https $(1)/etc/uci-defaults/97-veci-v2-https
 	$(INSTALL_DIR) $(1)/www/veci2
 	$(INSTALL_DATA) ./files/www/veci2/index.html $(1)/www/veci2/index.html
 	$(INSTALL_DATA) ./files/www/veci2/app.js $(1)/www/veci2/app.js
