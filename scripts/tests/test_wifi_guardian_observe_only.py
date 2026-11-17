@@ -40,12 +40,16 @@ class GuardianSafety(unittest.TestCase):
     def test_runtime_status_uses_bounded_ubus_not_iw(self):
         body = func(self.source, "radio_running")
         self.assertIn("ubus -S -t 3", body)
-        self.assertIn("hostapd.phy0-ap0", body)
+        self.assertIn("hostapd.*", body)
+        self.assertIn("wifi_netdev_present", body)
         self.assertNotIn("iw dev", body)
 
     def test_checks_services_up(self):
         mocks = """
-ubus() { :; }
+wifi_netdev_present() { return 0; }
+ubus() {
+ if [ "$4" = list ]; then echo hostapd.phy0-ap0; else echo '{}'; fi
+}
 jsonfilter() {
  case "$2" in
    '@.radio0.up') echo true ;;
@@ -57,7 +61,10 @@ jsonfilter() {
 
     def test_detects_disabled_hostapd(self):
         mocks = """
-ubus() { :; }
+wifi_netdev_present() { return 0; }
+ubus() {
+ if [ "$4" = list ]; then echo hostapd.phy0-ap0; else echo '{}'; fi
+}
 jsonfilter() {
  case "$2" in
    '@.radio0.up') echo true ;;
@@ -66,6 +73,50 @@ jsonfilter() {
 }
 """
         self.assertEqual(self.shell(mocks, "radio_running", "radio_running; echo rc=$?"), "rc=1")
+
+    def test_rejects_missing_wifi_netdev_even_when_radio_is_up(self):
+        mocks = """
+wifi_netdev_present() { return 1; }
+ubus() { if [ "$4" = list ]; then echo hostapd.phy0-ap0; else echo '{}'; fi; }
+jsonfilter() { case "$2" in '@.radio0.up') echo true;; '@.status') echo ENABLED;; esac; }
+"""
+        self.assertEqual(self.shell(mocks, "radio_running", "radio_running; echo rc=$?"), "rc=1")
+
+    def test_accepts_actual_hostapd_object_without_hardcoded_ifname(self):
+        mocks = """
+wifi_netdev_present() { return 0; }
+ubus() { if [ "$4" = list ]; then echo hostapd.wlan0; else echo '{}'; fi; }
+jsonfilter() { case "$2" in '@.radio0.up') echo true;; '@.status') echo ENABLED;; esac; }
+"""
+        self.assertEqual(self.shell(mocks, "radio_running", "radio_running; echo rc=$?"), "rc=0")
+
+    def test_rejects_missing_hostapd_object(self):
+        mocks = """
+wifi_netdev_present() { return 0; }
+ubus() { echo '{}'; }
+jsonfilter() { case "$2" in '@.radio0.up') echo true;; '@.status') echo ENABLED;; esac; }
+"""
+        self.assertEqual(self.shell(mocks, "radio_running", "radio_running; echo rc=$?"), "rc=1")
+
+    def test_failure_reason_distinguishes_missing_interface(self):
+        mocks = """
+phy_available() { return 0; }
+wifi_netdev_present() { return 1; }
+ubus() { echo '{}'; }
+jsonfilter() { echo true; }
+"""
+        self.assertEqual(self.shell(mocks, "ap_failure_reason", "ap_failure_reason"),
+                         "wifi_netdev_missing")
+
+    def test_persistent_failure_status_and_alert_suppression(self):
+        daemon = func(self.source, "daemon")
+        self.assertIn("last_alert", daemon)
+        self.assertIn('failures="$threshold"', daemon)
+        self.assertIn("manual_recovery_required", daemon)
+        self.assertIn('reason=$reason', daemon)
+        state = func(self.source, "write_state")
+        self.assertIn("reason=%s", state)
+        self.assertIn("beacon_verified=0", state)
 
     def test_rx_pse_is_read_only(self):
         with tempfile.TemporaryDirectory() as root:
