@@ -83,7 +83,8 @@ jobs:
           sh -n scripts/stage-mt7603-deadlock-fix.sh
           sh -n scripts/stage-veci-wifi-guardian.sh
           sh -n scripts/uat/we5927-wifi-runtime-readonly.sh
-          node --test scripts/tests/veci_wifi_runtime.test.mjs
+          sh -n source/veci-core/files/rpcd-veci
+          node --test scripts/tests/veci_wifi_runtime.test.mjs scripts/tests/veci_wifi_rpc.test.mjs
           sh -n scripts/reconcile-we5927-lte-build-tree.sh
           sh -n scripts/veci-link-readonly-snapshot.sh
           sh -n files/usr/sbin/we5927-lte
