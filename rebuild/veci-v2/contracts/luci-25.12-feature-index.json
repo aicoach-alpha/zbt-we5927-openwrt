@@ -1,0 +1,559 @@
+{
+  "application_count": 107,
+  "applications": [
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-acl",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-acme",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-adblock",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-adblock-fast",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-adguardhome",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-advanced-reboot",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-alist",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-antiblock",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-apinger",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-aria2",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-attendedsysupgrade",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-babeld",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-banip",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-bcp38",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-bmx7",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-chrony",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-clamav",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-cloudflared",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-commands",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-coovachilli",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-crowdsec-firewall-bouncer",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-csshnpd",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-dawn",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-dcwapd",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-ddns",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-dockerman",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-dump1090",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-email",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-eoip",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-example",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-filebrowser",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-filemanager",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-firewall",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-frpc",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-frps",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-fwknopd",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-hd-idle",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-https-dns-proxy",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-irqbalance",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-keepalived",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-ksmbd",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-ledtrig-rssi",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-ledtrig-switch",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-ledtrig-usbport",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-librespeed",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-libreswan",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-lldpd",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-lorawan-basicstation",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-lxc",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-minidlna",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-mosquitto",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-mwan3",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-natmap",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-nextdns",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-nlbwmon",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-nut",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-ocserv",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-olsr",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-olsr-services",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-olsr-viz",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-omcproxy",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-openlist",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-openvpn",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-openwisp",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-opkg",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-p910nd",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-package-manager",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-pagekitec",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-pbr",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-polipo",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-privoxy",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-qos",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-radicale3",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-rp-pppoe-server",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-rustdesk-server",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-samba4",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-ser2net",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-smartdns",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-snmpd",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-softether",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-splash",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-sqm",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-squid",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-sshtunnel",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-statistics",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-strongswan-swanctl",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-tailscale-community",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-tinyproxy",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-tor",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-transmission",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-travelmate",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-ttyd",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-udpxy",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-uhttpd",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-unbound",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-upnp",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-usteer",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-ustreamer",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-v2raya",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-vnstat2",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-watchcat",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-weechat",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-wifihistory",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-wifischedule",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-wol",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-xfrpc",
+      "migration": "not_ported"
+    },
+    {
+      "compatibility": "not_assessed",
+      "id": "luci-app-xinetd",
+      "migration": "not_ported"
+    }
+  ],
+  "core_modules": [
+    "luci-base",
+    "luci-compat",
+    "luci-lua-runtime",
+    "luci-mod-admin-full",
+    "luci-mod-battstatus",
+    "luci-mod-dashboard",
+    "luci-mod-dsl",
+    "luci-mod-network",
+    "luci-mod-rpc",
+    "luci-mod-status",
+    "luci-mod-system"
+  ],
+  "evidence": "PUBLIC_UPSTREAM_REPOSITORY_TREE_NOT_RUNTIME_SUPPORT",
+  "interpretation": "Every item is a source inventory, not a claim that app runs on the 8MB WE5927",
+  "schema": "veci.luci-parity-source.v1",
+  "source": "openwrt/luci",
+  "source_branch": "openwrt-25.12",
+  "source_revision": "53312862521a4b02d7e45ae483537132dbcf63ad"
+}

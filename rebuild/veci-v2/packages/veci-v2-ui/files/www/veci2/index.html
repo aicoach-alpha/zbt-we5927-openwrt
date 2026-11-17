@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'">
+  <title>VeCI v2 — WE5927-DSIM Engineering Preview</title>
+  <link rel="stylesheet" href="/veci2/app.css">
+  <script src="/veci2/app.js" defer></script>
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="brand"><span class="mark">V</span><div><strong>VeCI <span>v2</span></strong><small>WE5927-DSIM · engineering preview</small></div></div>
+      <button id="logout" class="quiet" type="button" hidden>Keluar</button>
+    </header>
+    <main>
+      <section id="login" class="login-view" aria-label="Login router">
+        <form id="login-form" class="panel">
+          <h1>Akses router</h1>
+          <p>Login lokal router diperlukan. Kredensial dan token sesi tidak disimpan pada browser.</p>
+          <label for="username">Username</label>
+          <input id="username" type="text" autocomplete="username" required value="root">
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" required>
+          <button type="submit">Masuk</button>
+        </form>
+      </section>
+      <section id="workspace" hidden>
+        <div class="intro"><div><h1>Router health</h1><p>Berbasis kondisi sistem yang terbaca, bukan perkiraan atau indikator cache.</p></div><button id="refresh" type="button">Perbarui</button></div>
+        <nav class="tabs" aria-label="Menu VeCI">
+          <button class="tab active" type="button" data-page="overview">Ringkasan</button>
+          <button class="tab" type="button" data-page="sms">SMS Center</button>
+          <button class="tab" type="button" data-page="apps">Addons</button>
+        </nav>
+        <section id="overview" class="page" aria-label="Status koneksi">
+          <div id="status-grid" class="grid"></div>
+          <p class="notice">Status internet yang belum diuji ditampilkan sebagai belum terverifikasi, bukan dipaksa menjadi offline. Beacon Wi-Fi tidak dianggap hidup hanya karena radio up.</p>
+        </section>
+        <section id="sms" class="page" aria-label="SMS Center" hidden>
+          <article class="panel">
+            <h2>SMS Center — kesiapan modem</h2>
+            <p>Transport SMS menggunakan layanan modem yang ada dan satu kunci akses AT, bukan koneksi paralel yang berisiko membuat modem macet.</p>
+            <div id="sms-status" class="result" aria-live="polite"></div>
+            <p class="notice">Tampilan inbox, multipart SMS, draft, sent, delete dan konfirmasi kirim masih dalam proses porting dari modul yang sudah diuji. Mode percobaan ini tidak mengirim SMS.</p>
+          </article>
+        </section>
+        <section id="apps" class="page" aria-label="Pengelola addon" hidden>
+          <article class="panel">
+            <h2>Addon APK</h2>
+            <p>Hanya feed resmi OpenWrt 25.12.6 atau feed VeCI dengan signature dan build ID cocok. Paket inti dan driver tidak boleh diganti secara live.</p>
+            <div id="apk-status" class="result" aria-live="polite"></div>
+            <form id="package-form" class="formline">
+              <label for="package-name">Nama paket</label>
+              <input id="package-name" type="text" required maxlength="64" placeholder="Contoh: sqm-scripts" autocomplete="off">
+              <button type="submit">Periksa instalasi</button>
+            </form>
+            <div id="package-result" class="result" aria-live="polite"></div>
+            <button id="package-install" type="button" hidden>Install paket terverifikasi</button>
+            <p class="notice">Instalasi bisa mengubah layanan berjalan. Tidak dilakukan otomatis. Addon besar membutuhkan kapasitas overlay atau extroot yang sesuai.</p>
+          </article>
+        </section>
+      </section>
+      <div id="message" class="message" role="status" aria-live="polite"></div>
+    </main>
+    <footer>VeCI v2 · board-locked development · no automatic resets · no production flash</footer>
+  </div>
+</body>
+</html>

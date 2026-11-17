@@ -1,0 +1,17 @@
+{
+  "veci-v2-runtime": {
+    "description": "VeCI v2 read-only exact-board diagnostics",
+    "read": {
+      "ubus": {
+        "veci.v2": [
+          "status",
+          "capabilities",
+          "smsProvider"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {}
+    }
+  }
+}

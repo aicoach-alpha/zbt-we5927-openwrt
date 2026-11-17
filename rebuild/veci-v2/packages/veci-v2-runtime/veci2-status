@@ -1,0 +1,76 @@
+#!/bin/sh
+# VeCI v2 read-only runtime contract; NO Wi-Fi reload, modem reset, or AT.
+# Do not expose AP keys, SMS, IMEI, ICCID, MACs, passwords, or user IPs.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+LC_ALL=C
+export LC_ALL
+numeric() {
+  case "$1" in ''|*[!0-9]*) printf 0 ;; *) printf %s "$1" ;; esac
+}
+ubus_radio_up() {
+  ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
+    jsonfilter -e '@.radio0.up' 2>/dev/null
+}
+ubus_hostapd_ap() {
+  ubus -S -t 3 call hostapd.phy0-ap0 get_status '{}' 2>/dev/null |
+    jsonfilter -e '@.status' 2>/dev/null
+}
+live_board() { cat /tmp/sysinfo/board_name 2>/dev/null || :; }
+openwrt_version() {
+  sed -n "s/^DISTRIB_RELEASE='\([^']*\)'$/\1/p" /etc/openwrt_release 2>/dev/null | head -1
+}
+main() {
+  case "$1:$2" in
+    list:*)
+      printf '{ "status": {}, "capabilities": {}, "smsProvider": {} }\n'
+      ;;
+    call:status)
+      board_ok=false; version_ok=false
+      [ "$(live_board)" = 'zbtlink,zbt-we5927' ] && board_ok=true
+      [ "$(openwrt_version)" = '25.12.6' ] && version_ok=true
+      lte_address=false; lte_route=false; radio=false; ap=false
+      if ip -4 -o addr show dev usb0 2>/dev/null | grep -q ' inet '; then
+        lte_address=true
+      fi
+      if ip -4 route show default dev usb0 2>/dev/null |
+          grep -q '^default via '; then
+        lte_route=true
+      fi
+      radio_result="$(ubus_radio_up || true)"
+      [ "$radio_result" = true ] && radio=true
+      ap_result="$(ubus_hostapd_ap || true)"
+      [ "$ap_result" = ENABLED ] && ap=true
+      ap_missing=false
+      [ "$radio" = true ] && [ "$ap" != true ] && ap_missing=true
+      n=0
+      pids="$(pidof netifd 2>/dev/null || true)"
+      for pid in $pids; do
+        case "$pid" in *[!0-9]*|'') ;; *) n=$((n + 1)) ;; esac
+      done
+      overlay_kb="$(df -Pk /overlay 2>/dev/null | awk 'NR==2 {print $4}' || true)"
+      mem_kb="$(awk '/^MemAvailable:/ {print $2;exit}' /proc/meminfo 2>/dev/null || true)"
+      overlay_kb="$(numeric "$overlay_kb")"
+      mem_kb="$(numeric "$mem_kb")"
+      # Internet is UNKNOWN here, not inferred from a modem lease.
+      printf '{"schema":2,"board_supported":%s,"openwrt_supported":%s,"lte_ipv4":%s,"lte_default_route":%s,"internet_verified":null,"wifi_radio_config_up":%s,"wifi_ap_enabled":%s,"wifi_ap_missing":%s,"wifi_beacon_verified":null,"netifd_count":%s,"overlay_free_kb":%s,"memory_available_kb":%s}\n' \
+        "$board_ok" "$version_ok" "$lte_address" "$lte_route" "$radio" "$ap" "$ap_missing" "$n" "$overlay_kb" "$mem_kb"
+      ;;
+    call:capabilities)
+      printf '{"schema":2,"model":"ZBT-WE5927-DSIM","dual_sim_hardware_source":true,"lte_rndis":true,"wifi_2g":true,"wifi_5g":false,"sms_center_contract":"veci.sms","package_manager":"apk","firmware_auto_install_default":false,"wifi_auto_radio_reload":false}\n'
+      ;;
+    call:smsProvider)
+      available=false
+      if ubus -S -t 3 list veci.sms 2>/dev/null | grep -Fxq 'veci.sms'; then
+        available=true
+      fi
+      printf '{"available":%s,"provider":"veci.sms","send_requires_confirmation":true,"at_probe_performed":false}\n' "$available"
+      ;;
+    *)
+      printf '{"error":"unsupported_method"}\n'
+      exit 2
+      ;;
+  esac
+}
+main "$@"

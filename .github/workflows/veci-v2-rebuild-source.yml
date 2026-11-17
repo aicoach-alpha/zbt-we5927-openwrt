@@ -1,0 +1,90 @@
+name: VeCI v2 WE5927-DSIM rebuild source and signed-feed safety
+
+on:
+  push:
+    paths:
+      - 'rebuild/veci-v2/**'
+      - 'scripts/tests/test_veci_v2_*.py'
+      - '.github/workflows/veci-v2-rebuild-source.yml'
+  pull_request:
+    paths:
+      - 'rebuild/veci-v2/**'
+      - 'scripts/tests/test_veci_v2_*.py'
+      - '.github/workflows/veci-v2-rebuild-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  v2-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate source and regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+          for script in rebuild/veci-v2/packages/veci-v2-runtime/veci2-status \
+                        rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk \
+                        rebuild/veci-v2/ci/stage-v2-source.sh; do
+            sh -n "$script"
+          done
+          node --check rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js
+          python3 -m py_compile rebuild/veci-v2/oem_inventory.py rebuild/veci-v2/ci/release-gate.py
+          git diff --check
+          ! find rebuild/veci-v2 -type f -size +1024k | grep .
+          test ! -e rebuild/veci-v2/vendor-original.bin
+          echo "V2_SOURCE_TESTS=PASS"
+      - name: Refuse unsigned or unverified physical deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          python3 rebuild/veci-v2/ci/release-gate.py > /tmp/release-approval.json
+          status=$?
+          set -e
+          test "$status" -eq 3
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/release-approval.json'))
+          assert x['flash_allowed'] is False
+          assert x['required_modules'] == 37
+          assert x['hardware_accepted'] == 0
+          print('FLASH_PERMISSION=DENIED_AS_DESIGNED')
+          PY
+
+  v2-exact-source:
+    needs: v2-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin official OpenWrt 25.12.6 and custom dual SIM device tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt-v2"
+          mkdir -p "$root"
+          git -C "$root" init -q
+          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git 64900e756efa667774214f9c6b17c113222e01f7
+          git -C "$root" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$root" rev-parse HEAD)" = "$(cat source/openwrt-source-commit.txt)"
+          grep -Fq 'LINUX_VERSION-6.12 = .112' "$root/target/linux/generic/kernel-6.12"
+          grep -Fqx 'PKG_SOURCE_VERSION:=39c960c3ada558b4c2e7915772483d3731573d09' "$root/package/kernel/mt76/Makefile"
+          git -C "$root" apply --check "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          sh rebuild/veci-v2/ci/stage-v2-source.sh "$root"
+          sh rebuild/veci-v2/ci/stage-v2-source.sh "$root"
+          for p in veci-v2-runtime veci-v2-package-manager veci-v2-ui veci-v2-sms; do
+            test -s "$root/package/$p/Makefile"
+          done
+          cmp source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.sms \
+            "$root/package/veci-v2-sms/files/usr/libexec/rpcd/veci.sms"
+          test ! -e "$root/package/veci-v2-sms/files/usr/libexec/rpcd/veci.cellular"
+          echo 'WE5927_DSIM_V2_STAGED_SOURCE_ONLY=PASS'
+          echo 'FIRMWARE_BUILT=NO'
+          echo 'FIRMWARE_SIGNED=NO'
+          echo 'FLASH_PERMISSION=NO'
