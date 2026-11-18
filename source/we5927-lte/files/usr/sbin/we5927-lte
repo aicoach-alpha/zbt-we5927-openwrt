@@ -69,31 +69,24 @@ port_responds() {
 }
 
 at_port() {
-	local t p preferred devpath
-	preferred="$(cfg at_port)"
-
-	# CX07E verified AT function is USB interface 1.4.
-	# Resolve the current ttyUSB name from sysfs instead of probing ports,
-	# because probing the non-AT 1.5 function can enter uninterruptible I/O.
-	for t in /sys/class/tty/ttyUSB*; do
-		[ -e "$t/device" ] || continue
-		devpath="$(readlink -f "$t/device" 2>/dev/null || true)"
-		case "$devpath" in
-			*/1-1:1.4/*)
-				p="/dev/$(basename "$t")"
-				[ -c "$p" ] && {
-					echo "$p"
-					return 0
-				}
-				;;
+	local entry name path modem
+	# CX07E uses USB interface 1.4. On the original enumeration ttyUSB3 is function 1.5.
+	# A tty number alone does not identify the function after USB re-enumeration.
+	for entry in /sys/class/tty/ttyUSB*; do
+		[ -e "$entry/device" ] || continue
+		name=${entry##*/}
+		path="$(readlink -f "$entry/device" 2>/dev/null)" || continue
+		case "$path" in
+			*/1-1/1-1:1.4/"$name") ;;
+			*) continue ;;
 		esac
-	done
-
-	# Only the verified 1.4 interface may be used. On this hardware
-	# ttyUSB3 is function 1.5 and probing it can hang USB I/O.
-	for p in "$preferred" /dev/ttyUSB2; do
-		[ "$p" = /dev/ttyUSB2 ] || continue
-		[ -c "$p" ] && { echo "$p"; return 0; }
+		modem=${path%/*}
+		modem=${modem%/*}
+		[ "$(cat "$modem/idVendor" 2>/dev/null)" = 05c6 ] || continue
+		[ "$(cat "$modem/idProduct" 2>/dev/null)" = 902e ] || continue
+		[ -c "/dev/$name" ] || continue
+		printf '%s\n' "/dev/$name"
+		return 0
 	done
 	return 1
 }
@@ -741,7 +734,6 @@ status_fast_json() {
 	p="$(at_port)"
 	[ -n "$dev" ] || dev=usb0
 	[ -n "$sim" ] || sim=1
-	[ -n "$p" ] || p=/dev/ttyUSB2
 
 	ip4="$(ip -4 -o addr show dev "$dev" 2>/dev/null | awk '{print $4}' | head -1)"
 	gateway="$(ip route show default dev "$dev" 2>/dev/null | awk '/default via/ {print $3; exit}')"
@@ -1157,6 +1149,7 @@ case "$1" in
 	daemon)
 		daemon
 		;;
+	at-port) at_port ;;
 	validate-apn) valid_apn "$2" ;;
 	status-fast)
 		status_fast_json
