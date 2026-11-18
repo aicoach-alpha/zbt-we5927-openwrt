@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - '.github/workflows/veci-v2-lab-image.yml'
+      - 'rebuild/veci-v2/packages/**'
+      - 'source/we5927-lte/**'
+      - 'source/veci-wifi-guardian/**'
   workflow_dispatch:
     inputs:
       export_unsigned_candidate:

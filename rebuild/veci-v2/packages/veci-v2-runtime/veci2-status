@@ -14,8 +14,16 @@ ubus_radio_up() {
     jsonfilter -e '@.radio0.up' 2>/dev/null
 }
 ubus_hostapd_ap() {
-  ubus -S -t 3 call hostapd.phy0-ap0 get_status '{}' 2>/dev/null |
-    jsonfilter -e '@.status' 2>/dev/null
+  local interface status
+  for interface in $(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
+      jsonfilter -e '@.radio0.interfaces[*].ifname' 2>/dev/null); do
+    case "$interface" in ''|*[!a-zA-Z0-9_.-]*) continue ;; esac
+    [ -e "/sys/class/net/$interface/phy80211" ] || continue
+    status="$(ubus -S -t 2 call "hostapd.$interface" get_status '{}' 2>/dev/null |
+      jsonfilter -e '@.status' 2>/dev/null)" || continue
+    [ "$status" = ENABLED ] && { echo ENABLED; return 0; }
+  done
+  return 1
 }
 live_board() { cat /tmp/sysinfo/board_name 2>/dev/null || :; }
 openwrt_version() {

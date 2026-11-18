@@ -319,12 +319,15 @@ power_cycle() {
 }
 
 apply_apn() {
+	wait_at || return 1
+	apply_apn_at_ready
+}
+
+apply_apn_at_ready() {
 	local apn
 
 	apn="$(cfg apn)"
 	[ -n "$apn" ] || apn=internet
-
-	wait_at || return 1
 
 	at "AT+CGDCONT=1,\"IPV4V6\",\"$apn\"" 3000 >/dev/null 2>&1 || \
 	at "AT+CGDCONT=1,\"IP\",\"$apn\"" 3000 >/dev/null 2>&1 || true
@@ -332,7 +335,19 @@ apply_apn() {
 
 sim_ready() {
 	wait_at || return 1
-	at 'AT+CPIN?' 2000 2>/dev/null | grep -q 'READY'
+	sim_ready_at_port
+}
+
+sim_ready_at_port() {
+	local response
+	response="$(at 'AT+CPIN?' 2000 2>/dev/null)" || return 1
+	printf '%s\n' "$response" | grep -Eq '^[[:space:]]*\+CPIN:[[:space:]]*READY[[:space:]]*$'
+}
+
+sim_absent() {
+	local response
+	response="$(at 'AT+CPIN?' 2000 2>/dev/null)" || :
+	printf '%s\n' "$response" | grep -Eiq '^[[:space:]]*\+CME ERROR:[[:space:]]*(10|SIM not inserted)[[:space:]]*$'
 }
 
 soft_reconnect() {
@@ -369,7 +384,8 @@ data_ok() {
  ip -4 addr show dev "$dev" | grep -q "inet " || return 1
  # Two independent remote targets; never reset for one failed ping.
  ping -I "$dev" -c 1 -W 1 "$host" >/dev/null 2>&1 && return 0
- [ "$host" = "8.8.8.8" ] || ping -I "$dev" -c 1 -W 1 8.8.8.8 >/dev/null 2>&1
+ [ "$host" != "8.8.8.8" ] || return 1
+ ping -I "$dev" -c 1 -W 1 8.8.8.8 >/dev/null 2>&1
 }
 
 # HTTPS is diagnostic only when both public ICMP targets fail.
@@ -987,13 +1003,18 @@ daemon() {
    # Only restore GPIO selection during actual cold-start/recovery.
    set_sim "$sim" >/dev/null 2>&1 || true
    usb_repair
-   wait_at || log "AT port not ready yet"
-   if ! sim_ready && [ "$(cfg auto_failover)" = 1 ]; then
-     if [ "$sim" = 1 ]; then next=2; else next=1; fi
-     auto_switch_sim "$sim" "$next" && sim="$next"
+   # Start RNDIS DHCP independently of the serial control port.
+   gateway_ok || ifup lte >/dev/null 2>&1 || true
+   if wait_at; then
+     if [ "$(cfg auto_failover)" = 1 ] && sim_absent; then
+       if [ "$sim" = 1 ]; then next=2; else next=1; fi
+       auto_switch_sim "$sim" "$next" && sim="$next"
+     else
+       apply_apn_at_ready || true
+     fi
+   else
+     log "AT port not ready; netifd continues RNDIS DHCP"
    fi
-   apply_apn || true
-   ifup lte >/dev/null 2>&1 || true
    radio_phase="$(modem_readiness_phase)"
    log "LTE cold-start readiness: modem_phase=$radio_phase"
  fi

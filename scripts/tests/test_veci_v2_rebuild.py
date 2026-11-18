@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -84,6 +85,26 @@ main call status
         self.assertEqual(j["netifd_count"], 1)
         self.assertNotIn("imei", p.stdout.lower())
 
+    def test_ap_status_uses_present_radio_interfaces(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "office-ap/phy80211").mkdir(parents=True)
+            code = without_main(STATUS).replace("/sys/class/net/", directory + "/")
+            stubs = """
+jsonfilter() { cat; }
+ubus() {
+  case "$5" in
+    network.wireless) printf '%s\\n' stale-ap office-ap ;;
+    hostapd.stale-ap) echo ENABLED ;;
+    hostapd.office-ap) echo ENABLED ;;
+  esac
+}
+ubus_hostapd_ap
+"""
+            self.assertEqual(ash(code + stubs).stdout.strip(), "ENABLED")
+            (root / "office-ap/phy80211").rmdir()
+            self.assertNotEqual(ash(code + stubs).returncode, 0)
+
     def test_status_never_runs_mutating_network_commands(self):
         code = "\n".join(x for x in STATUS.splitlines()
                          if not x.lstrip().startswith("#"))
@@ -91,7 +112,7 @@ main call status
                        r"\bif(?:up|down)\b", r"\b(?:reboot|sysupgrade|kill)\b",
                        r"\bAT\+CFUN", r"\bmodprobe\b", r"\buci\s+(?:set|commit)"):
             self.assertNotRegex(code, unsafe)
-        self.assertIn('hostapd.phy0-ap0 get_status', STATUS)
+        self.assertIn('call "hostapd.$interface" get_status', STATUS)
         self.assertIn('internet_verified":null', STATUS)
 
     def test_package_rejects_core_luci_and_kernel_mutations(self):

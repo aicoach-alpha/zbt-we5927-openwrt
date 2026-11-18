@@ -53,6 +53,30 @@ at() {{
 
 
 class TestColdbootReadiness(unittest.TestCase):
+    def test_sim_replies_distinguish_ready_absent_and_unknown(self):
+        script = function("sim_ready_at_port") + function("sim_absent")
+        for reply, expected in [
+            ("+CPIN: READY", "0 1"), ("+CPIN: NOT READY", "1 1"),
+            ("+CPIN: SIM PIN", "1 1"), ("", "1 1"),
+            ("+CME ERROR: 10", "1 0"), ("+CME ERROR: SIM not inserted", "1 0")
+        ]:
+            with self.subTest(reply=reply):
+                result = subprocess.run([SH, "-c", script + """
+at() { printf '%s\\r\\n' "$reply"; }
+sim_ready_at_port; ready=$?
+sim_absent; echo "$ready $?"
+""",], env={"reply": reply}, text=True, capture_output=True, check=True)
+                self.assertEqual(result.stdout.strip(), expected)
+
+    def test_single_configured_ping_failure_is_not_success(self):
+        script = function("data_ok") + """
+cfg() { [ "$1" = data_if ] && echo usb0 || echo 8.8.8.8; }
+ip() { echo ' inet 192.0.2.1'; }
+ping() { return 1; }
+data_ok
+"""
+        self.assertEqual(subprocess.run([SH, "-c", script]).returncode, 1)
+
     def test_attached_sim_and_registered_operator(self):
         self.assertEqual(probe(), "packet_attached")
 
