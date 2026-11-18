@@ -54,7 +54,7 @@ ethernet_ports() {
     }'
 }
 main() {
-  case "$1:$2" in
+  case "${1:-}:${2:-}" in
     list:*)
       printf '{ "status": {}, "capabilities": {}, "smsProvider": {}, "ethernetPorts": {} }\n'
       ;;

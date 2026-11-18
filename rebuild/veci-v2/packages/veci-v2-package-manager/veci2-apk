@@ -132,7 +132,7 @@ install() {
   fi
 }
 main() {
-  case "$1:$2" in
+  case "${1:-}:${2:-}" in
     list:*) printf '{"status":{},"search":{"name":"str"},"preflight":{"name":"str"},"install":{"name":"str","confirm":"str"}}\n' ;;
     call:status)
       ready=false; trust=false; resources=false
