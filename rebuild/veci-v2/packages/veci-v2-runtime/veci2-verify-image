@@ -1,0 +1,37 @@
+#!/bin/sh
+# Verify a staged image in a private directory owned by the upgrade caller.
+set -eu
+umask 077
+fail() { printf '%s\n' "$1" >&2; exit 1; }
+
+[ "$#" -eq 2 ] || fail 'usage: veci2-verify-image /absolute/image expected_sha256'
+image=$1
+expected=$2
+case "$image" in /*) ;; *) fail invalid_path ;; esac
+case "$expected" in ''|*[!0-9a-f]*) fail invalid_digest ;; esac
+[ "${#expected}" -eq 64 ] || fail invalid_digest
+[ "$(cat /tmp/sysinfo/board_name)" = 'zbtlink,zbt-we5927' ] || fail unsupported_board
+[ -f "$image" ] && [ ! -L "$image" ] || fail invalid_file
+size=$(wc -c < "$image")
+[ "$size" -gt 0 ] && [ "$size" -le 7995392 ] || fail invalid_size
+digest=$(sha256sum "$image")
+[ "${digest%% *}" = "$expected" ] || fail checksum_mismatch
+
+anchor=/etc/opkg/keys/1d8759d36251c36c
+key_hash=$(sha256sum "$anchor") || fail missing_anchor
+[ "${key_hash%% *}" = ac67651a0f3a55449aea44b76040329d95374e570c0690490d8ce94f2c61d220 ] || fail anchor_mismatch
+work=$(mktemp -d /tmp/veci-verify.XXXXXX)
+trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
+mkdir "$work/keys"
+for key in "${anchor%/*}"/*; do
+  if [ -L "$key" ] && [ "$(readlink "$key")" = '.revoked.' ]; then
+    ln -s .revoked. "$work/keys/${key##*/}"
+  fi
+done
+ln -s "$anchor" "$work/keys/1d8759d36251c36c"
+fwtool -q -s "$work/cert" "$image" || fail signature_unreadable
+fwtool -q -T -s /dev/null "$image" | ucert -V -m - -c "$work/cert" -P "$work/keys" || fail invalid_signature
+sysupgrade -T "$image" || fail sysupgrade_test_failed
+digest=$(sha256sum "$image")
+[ "${digest%% *}" = "$expected" ] || fail image_changed
