@@ -66,7 +66,10 @@ function showPage(id) {
     tab.classList.toggle('active', selected);
     tab.setAttribute('aria-current', selected ? 'page' : 'false');
   }
-  if (id === 'network') refreshNetwork();
+  if (id === 'network') {
+    refreshNetwork();
+    refreshEthernet();
+  }
   if (id === 'sms') refreshSMS();
   if (id === 'settings') refreshIPv6();
   if (id === 'apps') refreshPackages();
@@ -96,6 +99,20 @@ async function refreshOverview() {
     Number.isFinite(data.memory_available_kb) ?
       Math.round(data.memory_available_kb / 1024) + ' MiB' : 'Unknown'));
   el('status-grid').replaceChildren(...cards);
+}
+async function refreshEthernet() {
+  const root = el('ethernet-status');
+  try {
+    const data = await rpc('veci.v2', 'ethernetPorts');
+    if (!data.available || !Array.isArray(data.ports)) throw Error();
+    root.replaceChildren(...data.ports.map(({port, link}) => {
+      const role = port === 4 ? 'WAN' : 'LAN';
+      const label = link === 'up' ? 'Link aktif' : link === 'down' ? 'Tanpa link' : 'Belum terbaca';
+      return metric(role + ' · port switch ' + port, label, link === 'up' ? 'good' : '');
+    }));
+  } catch {
+    root.textContent = 'Status switch belum terbaca.';
+  }
 }
 async function refreshNetwork() {
   const root = el('network-status');

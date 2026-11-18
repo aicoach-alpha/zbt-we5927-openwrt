@@ -10,7 +10,7 @@ define Package/veci-v2-runtime
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI v2 read-only exact-board health provider (development)
-  DEPENDS:=+rpcd +jsonfilter
+  DEPENDS:=+rpcd +jsonfilter +swconfig
 endef
 
 define Build/Compile

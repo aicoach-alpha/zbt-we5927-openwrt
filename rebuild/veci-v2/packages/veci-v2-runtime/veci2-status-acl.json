@@ -6,7 +6,8 @@
         "veci.v2": [
           "status",
           "capabilities",
-          "smsProvider"
+          "smsProvider",
+          "ethernetPorts"
         ]
       }
     },

@@ -105,6 +105,33 @@ ubus_hostapd_ap
             (root / "office-ap/phy80211").rmdir()
             self.assertNotEqual(ash(code + stubs).returncode, 0)
 
+    def test_ethernet_reads_only_external_switch_ports(self):
+        stub = """
+live_board() { echo zbtlink,zbt-we5927; }
+timeout() {
+  [ "$*" = '3 swconfig dev switch0 show' ] || return 1
+  printf '%s\\n' 'link: port:0 link:down' 'link: port:3 link:up speed:100baseT full-duplex' 'link: port:4 link:up' 'link: port:6 link:up speed:1000baseT'
+}
+main call ethernetPorts
+"""
+        result = ash(without_main(STATUS) + stub)
+        result.check_returncode()
+        data = json.loads(result.stdout)
+        self.assertTrue(data["available"])
+        self.assertEqual([p["port"] for p in data["ports"]], list(range(5)))
+        self.assertEqual([p["link"] for p in data["ports"]],
+                         ["down", "unknown", "unknown", "up", "up"])
+
+    def test_ethernet_unavailable_for_wrong_board_or_switch_error(self):
+        for board, operation in [("other", "echo unexpected >&2"), ("zbtlink,zbt-we5927", "return 1"),
+                                 ("zbtlink,zbt-we5927", "echo 'link: port:6 link:up'")]:
+            with self.subTest(board=board, operation=operation):
+                stub = f"live_board() {{ echo {board}; }}\ntimeout() {{ {operation}; }}\nmain call ethernetPorts"
+                result = ash(without_main(STATUS) + stub)
+                result.check_returncode()
+                self.assertEqual(json.loads(result.stdout), {"available": False, "ports": []})
+                self.assertEqual(result.stderr, "")
+
     def test_status_never_runs_mutating_network_commands(self):
         code = "\n".join(x for x in STATUS.splitlines()
                          if not x.lstrip().startswith("#"))

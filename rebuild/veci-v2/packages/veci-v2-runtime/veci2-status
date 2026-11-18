@@ -29,10 +29,34 @@ live_board() { cat /tmp/sysinfo/board_name 2>/dev/null || :; }
 openwrt_version() {
   sed -n "s/^DISTRIB_RELEASE='\([^']*\)'$/\1/p" /etc/openwrt_release 2>/dev/null | head -1
 }
+ethernet_ports() {
+  local snapshot
+  if [ "$(live_board)" != 'zbtlink,zbt-we5927' ]; then
+    printf '{"available":false,"ports":[]}\n'
+    return
+  fi
+  snapshot="$(timeout 3 swconfig dev switch0 show 2>/dev/null)" || {
+    printf '{"available":false,"ports":[]}\n'
+    return
+  }
+  printf '%s\n' "$snapshot" | awk '
+    $1 == "link:" && $2 ~ /^port:[0-4]$/ && $3 ~ /^link:(up|down)$/ {
+      port = substr($2, 6) + 0
+      state[port] = substr($3, 6)
+      count++
+    }
+    END {
+      printf "{\"available\":%s,\"ports\":[", count ? "true" : "false"
+      for (port = 0; port <= 4 && count; port++) {
+        printf "%s{\"port\":%d,\"link\":\"%s\"}", port ? "," : "", port, state[port] ? state[port] : "unknown"
+      }
+      print "]}"
+    }'
+}
 main() {
   case "$1:$2" in
     list:*)
-      printf '{ "status": {}, "capabilities": {}, "smsProvider": {} }\n'
+      printf '{ "status": {}, "capabilities": {}, "smsProvider": {}, "ethernetPorts": {} }\n'
       ;;
     call:status)
       board_ok=false; version_ok=false
@@ -65,6 +89,7 @@ main() {
       printf '{"schema":2,"board_supported":%s,"openwrt_supported":%s,"lte_ipv4":%s,"lte_default_route":%s,"internet_verified":null,"wifi_radio_config_up":%s,"wifi_ap_enabled":%s,"wifi_ap_missing":%s,"wifi_beacon_verified":null,"netifd_count":%s,"overlay_free_kb":%s,"memory_available_kb":%s}\n' \
         "$board_ok" "$version_ok" "$lte_address" "$lte_route" "$radio" "$ap" "$ap_missing" "$n" "$overlay_kb" "$mem_kb"
       ;;
+    call:ethernetPorts) ethernet_ports ;;
     call:capabilities)
       printf '{"schema":2,"model":"ZBT-WE5927-DSIM","dual_sim_hardware_source":true,"lte_rndis":true,"wifi_2g":true,"wifi_5g":false,"sms_center_contract":"veci.sms","package_manager":"apk","firmware_auto_install_default":false,"wifi_auto_radio_reload":false}\n'
       ;;
