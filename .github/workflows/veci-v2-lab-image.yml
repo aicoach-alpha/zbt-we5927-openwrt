@@ -212,6 +212,14 @@ jobs:
             test -s "$rom/$path" || { echo "MISSING:$path" >&2; exit 1; }
           done
           find "$rom/lib/modules" -type f -name 'mt7603e.ko' -size +0c -print -quit | grep -q mt7603e.ko
+          for helper in veci-sms-send-one veci-sms-delete-one; do
+            test -x "$rom/usr/libexec/$helper"
+            cmp "$GITHUB_WORKSPACE/source/veci-cellular-we5927/files/usr/libexec/$helper" "$rom/usr/libexec/$helper"
+          done
+          test -x "$rom/usr/libexec/veci-sms-cmgs"
+          cmp "$compiled_rom/usr/libexec/veci-sms-cmgs" "$rom/usr/libexec/veci-sms-cmgs"
+          test -x "$rom/usr/sbin/we5927-lte"
+          cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/usr/sbin/we5927-lte" "$rom/usr/sbin/we5927-lte"
           test -x "$rom/usr/bin/ucert"
           test -x "$rom/usr/libexec/rpcd/veci.v2.lte"
           test -x "$rom/usr/libexec/rpcd/veci.v2.wifi"

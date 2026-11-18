@@ -5,6 +5,12 @@ set -eu
 umask 077
 LC_ALL=C; export LC_ALL
 fail(){ printf '{"ok":false,"reason":"send_unavailable"}\n';exit 1; }
+# A disconnect during a transaction must not redirect a later command to another port.
+sms_at() {
+  [ "$(/usr/sbin/we5927-lte at-port)" = "$port" ] || return 1
+  /usr/sbin/we5927-at "$port" "$@"
+}
+
 # This parser runs only AFTER the one-shot CMGS invocation. If the transport
 # exited abnormally or returned an unfamiliar receipt, the outcome is unknown:
 # the SMS may already have been accepted, so never suggest a blind retry.
@@ -56,14 +62,9 @@ case "$pdu" in *[!0-9A-F]*)fail;;esac
 (
   flock -n -x 9 || fail
   [ "$(uci -q get veci_sms.main.enabled 2>/dev/null || :)" = 1 ] || fail
-  [ -c /dev/ttyUSB2 ] || fail
-  target="$(readlink -f /sys/class/tty/ttyUSB2/device 2>/dev/null || :)"
-  case "$target" in /sys/devices/*:1.4/ttyUSB2);;*)fail;;esac
-  parent="$(dirname "$(dirname "$target")")"
-  [ "$(cat "$parent/idVendor" 2>/dev/null || :)" = 05c6 ] || fail
-  [ "$(cat "$parent/idProduct" 2>/dev/null || :)" = 902e ] || fail
+ port="$(/usr/sbin/we5927-lte at-port)" || fail
   # Preserve original modem SMS mode; use PDU only during this transaction.
-  mode="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF?' 1600 2>/dev/null)" || fail
+  mode="$(sms_at 'AT+CMGF?' 1600 2>/dev/null)" || fail
   old_mode="$(printf '%s\n' "$mode" | awk '
     {gsub(/\r/,"",$0);if($0=="")next}
     /^\+CMGF:[ ]*[01][ ]*$/ {gsub(/ /,"",$0);v=substr($0,length($0)); seen++;next}
@@ -75,19 +76,19 @@ case "$pdu" in *[!0-9A-F]*)fail;;esac
   unset mode
   switched=0
   if [ "$old_mode" = 1 ]; then
-    /usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF=0' 2500 >/dev/null 2>&1 || fail
+    sms_at 'AT+CMGF=0' 2500 >/dev/null 2>&1 || fail
     switched=1
   fi
   # Restoration is best effort even when the CMGS response is uncertain.
   # Never repeat or retry a potentially transmitted SMS.
   trap 'if [ "$switched" = 1 ]; then
-    /usr/sbin/we5927-at /dev/ttyUSB2 "AT+CMGF=1" 2500 >/dev/null 2>&1 || :
+    sms_at "AT+CMGF=1" 2500 >/dev/null 2>&1 || :
   fi' EXIT
 
   # CMGS transaction holds the lock until the final modem disposition.
   # A timeout after Ctrl-Z means unknown, not safe to auto-retry.
   transport_rc=0
-  result="$(printf '%s\n' "$pdu" | /usr/libexec/veci-sms-cmgs /dev/ttyUSB2 2>/dev/null)" ||
+  result="$(printf '%s\n' "$pdu" | /usr/libexec/veci-sms-cmgs "$port" 2>/dev/null)" ||
     transport_rc=$?
   normalize_cmgs_result "$transport_rc" "$result"
   unset pdu result
