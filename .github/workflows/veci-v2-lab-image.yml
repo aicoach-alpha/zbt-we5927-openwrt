@@ -248,9 +248,64 @@ jobs:
           cp "$image" "$out/openwrt-25.12.6-veci-v2-WE5927-2SIM-UNSIGNED.bin"
           cp "$meta" "$out/OPENWRT_METADATA.json"
           cp source/openwrt-source-commit.txt "$out/OPENWRT_PIN.txt"
-          printf 'build_sha=%s\\n' "$GITHUB_SHA" > "$out/BUILD_PROVENANCE.txt"
-          sha256sum "$out/openwrt-25.12.6-veci-v2-WE5927-2SIM-UNSIGNED.bin" > "$out/SHA256SUMS"
-          printf '%s\\n' 'UNSIGNED LABORATORY IMAGE. DO NOT FLASH.' 'Hardware UAT, offline signing, router trust anchor, recovery validation still required.' > "$out/DO_NOT_FLASH.txt"
+          # Exported checksum paths must be portable and verifiable off-runner.
+          # Keep all release evidence explicitly UNSIGNED; no signing keys in CI.
+          printf 'build_sha=%s\n' "$GITHUB_SHA" > "$out/BUILD_PROVENANCE.txt"
+          (
+            cd "$out"
+            sha256sum openwrt-25.12.6-veci-v2-WE5927-2SIM-UNSIGNED.bin > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+          python3 - "$out" "$GITHUB_SHA" "$bytes" <<'PYREPORT'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          out = pathlib.Path(sys.argv[1])
+          build_sha = sys.argv[2]
+          image_bytes = int(sys.argv[3])
+          image_name = "openwrt-25.12.6-veci-v2-WE5927-2SIM-UNSIGNED.bin"
+          image_path = out / image_name
+          metadata = json.loads((out / "OPENWRT_METADATA.json").read_text())
+          source_pin = (out / "OPENWRT_PIN.txt").read_text().strip()
+          image_sha256 = hashlib.file_digest(image_path.open("rb"), "sha256").hexdigest()
+          assert len(build_sha) == 40
+          assert image_path.is_file() and image_path.stat().st_size == image_bytes
+          assert 0 < image_bytes <= 7995392 - 1048576
+          assert "zbtlink,zbt-we5927" in metadata.get("supported_devices", [])
+          assert metadata.get("version", {}).get("target") == "ramips/mt76x8"
+          assert metadata.get("version", {}).get("version") == "25.12.6"
+          assert len(source_pin) == 40
+          assert (out / "SHA256SUMS").read_text().strip() == f"{image_sha256}  {image_name}"
+          report = {
+              "schema": "veci-v2-unsigned-candidate.v1",
+              "release_state": "UNSIGNED_LABORATORY_ONLY",
+              "flash_allowed": False,
+              "build_sha": build_sha,
+              "openwrt_source_pin": source_pin,
+              "board": "zbtlink,zbt-we5927",
+              "target": "ramips/mt76x8",
+              "openwrt_version": "25.12.6",
+              "image_filename": image_name,
+              "image_sha256": image_sha256,
+              "image_bytes": image_bytes,
+              "firmware_partition_bytes": 7995392,
+              "minimum_free_partition_reserve_bytes": 1048576,
+              "remaining_partition_bytes": 7995392 - image_bytes,
+              "ci_build_and_embedded_squashfs_gate": "pass",
+              "ci_core_content_and_no_luci_gate": "pass",
+              "signing_and_trust_anchor": "not_verified",
+              "sysupgrade_hardware_test": "not_run",
+              "physical_and_72h_uat": "not_run",
+              "full_oem_luci_parity": "not_verified"
+          }
+          (out / "VERIFICATION_REPORT.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n"
+          )
+          print("PORTABLE_UNSIGNED_CANDIDATE_EVIDENCE=PASS")
+          PYREPORT
+          printf '%s\n' 'UNSIGNED LABORATORY IMAGE. DO NOT FLASH.' 'Hardware UAT, offline signing, router trust anchor, recovery validation still required.' > "$out/DO_NOT_FLASH.txt"
 
       - name: Upload explicit unsigned image for independent offline verification
         if: ${{ github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]'))) }}
