@@ -11,6 +11,13 @@ case "$image" in /*) ;; *) fail invalid_path ;; esac
 case "$expected" in ''|*[!0-9a-f]*) fail invalid_digest ;; esac
 [ "${#expected}" -eq 64 ] || fail invalid_digest
 [ "$(cat /tmp/sysinfo/board_name)" = 'zbtlink,zbt-we5927' ] || fail unsupported_board
+# The board name alone does not establish the size of the running MTD layout.
+awk '$4 == "\"firmware\"" {
+  count++
+  if (NF == 4 && $1 ~ /^mtd[0-9]+:$/ && tolower($2) == "007a0000" &&
+      $3 == "00010000") compatible++
+}
+END { exit !(count == 1 && compatible == 1) }' /proc/mtd || fail incompatible_flash_layout
 [ -f "$image" ] && [ ! -L "$image" ] || fail invalid_file
 size=$(wc -c < "$image")
 [ "$size" -gt 0 ] && [ "$size" -le 7995392 ] || fail invalid_size
@@ -32,6 +39,11 @@ done
 ln -s "$anchor" "$work/keys/1d8759d36251c36c"
 fwtool -q -s "$work/cert" "$image" || fail signature_unreadable
 fwtool -q -T -s /dev/null "$image" | ucert -V -m - -c "$work/cert" -P "$work/keys" || fail invalid_signature
+fwtool -q -i "$work/metadata" "$image" || fail metadata_unreadable
+target=$(jsonfilter -i "$work/metadata" -e '@.version.target') || fail incompatible_target
+[ "$target" = ramips/mt76x8 ] || fail incompatible_target
+devices=$(jsonfilter -i "$work/metadata" -e '@.supported_devices[*]') || fail incompatible_device
+printf '%s\n' "$devices" | grep -Fxq 'zbtlink,zbt-we5927' || fail incompatible_device
 sysupgrade -T "$image" || fail sysupgrade_test_failed
 digest=$(sha256sum "$image")
 [ "${digest%% *}" = "$expected" ] || fail image_changed
