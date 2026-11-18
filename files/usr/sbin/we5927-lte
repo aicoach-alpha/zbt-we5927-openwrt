@@ -297,7 +297,7 @@ power_on() {
 	gpio_set "$n" "$active"
 }
 
-power_cycle() {
+cycle_modem_power() {
 	local n active off
 
 	n="$(cfg modem_gpio)"
@@ -312,14 +312,29 @@ power_cycle() {
 	fi
 
 	log "Hard power-cycle modem on GPIO$n"
-	gpio_set "$n" "$off" || true
+	gpio_set "$n" "$off" || { log "Modem power-off GPIO write failed"; return 1; }
 	sleep 3
-	gpio_set "$n" "$active" || true
+	gpio_set "$n" "$active" || { log "Modem power-on GPIO write failed"; return 1; }
 	sleep 10
+}
 
-	usb_repair
-	wait_at || true
-	ifup lte >/dev/null 2>&1 || true
+power_cycle() {
+	local ready=0
+	cycle_modem_power || return 1
+	wait_at && ready=1
+	# Independent RNDIS DHCP can proceed even while serial control is unavailable.
+	ifup lte >/dev/null 2>&1 || { log "LTE interface start failed"; return 1; }
+	[ "$ready" = 1 ]
+}
+
+start_selected_sim() {
+	cycle_modem_power || return 1
+	wait_at || { log "AT port unavailable after SIM selection"; return 1; }
+	if [ "$1" = require_ready ]; then
+		sim_ready_at_port || { log "Selected SIM is not ready"; return 1; }
+	fi
+	apply_apn_at_ready || return 1
+	ifup lte >/dev/null 2>&1 || { log "LTE interface start failed"; return 1; }
 }
 
 apply_apn() {
@@ -950,35 +965,21 @@ auto_switch_sim() {
 
 	log "automatic dual-SIM failover trial: SIM$old -> SIM$new"
 	set_sim "$new" || return 1
-	power_cycle
-
-	if ! sim_ready; then
-		log "SIM$new not detected; reverting to SIM$old"
-		set_sim "$old" || { log "SIM selector restore failed; stopping failover recovery"; return 1; }
-		power_cycle
-		apply_apn || true
-		ifup lte >/dev/null 2>&1 || true
-		return 1
+	if start_selected_sim require_ready; then
+		i=0
+		while [ "$i" -lt 12 ]; do
+			if data_ok; then
+				log "automatic dual-SIM failover succeeded on SIM$new"
+				return 0
+			fi
+			i=$((i + 1))
+			sleep 2
+		done
 	fi
 
-	apply_apn || true
-	ifup lte >/dev/null 2>&1 || true
-
-	i=0
-	while [ "$i" -lt 12 ]; do
-		data_ok && {
-			log "automatic dual-SIM failover succeeded on SIM$new"
-			return 0
-		}
-		i=$((i + 1))
-		sleep 2
-	done
-
-	log "SIM$new has no working data; reverting to SIM$old"
+	log "SIM$new trial failed; reverting to SIM$old"
 	set_sim "$old" || { log "SIM selector restore failed; stopping failover recovery"; return 1; }
-	power_cycle
-	apply_apn || true
-	ifup lte >/dev/null 2>&1 || true
+	start_selected_sim restore || log "Previous SIM selected but reconnect failed"
 	return 1
 }
 
@@ -1115,7 +1116,7 @@ daemon() {
              if [ "$last_hard" -eq 0 ] || [ "$gap" -ge 900 ]; then
                last_hard="$now"
                stage=last_resort_power_cycle
-               power_cycle
+               power_cycle || stage=power_cycle_failed
              else
                stage=power_cycle_cooldown
                log "Suppressing modem power-cycle during 900-second cooldown"
@@ -1130,7 +1131,7 @@ daemon() {
                sim="$(cfg sim)"
                if [ "$sim" = 1 ]; then next=2; else next=1; fi
                stage=opt_in_sim_failover
-               auto_switch_sim "$sim" "$next" || true
+               auto_switch_sim "$sim" "$next" || stage=sim_failover_failed
              fi
            fi
                fi
@@ -1174,9 +1175,7 @@ case "$1" in
 		;;
 	sim)
 		set_sim "$2" || exit $?
-		power_cycle
-		apply_apn
-		ifup lte >/dev/null 2>&1 || true
+		start_selected_sim manual
 		;;
 	usb-repair)
 		usb_repair

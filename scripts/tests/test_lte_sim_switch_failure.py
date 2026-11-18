@@ -16,7 +16,7 @@ def simulate(stubs, command, *args):
 class SimSwitchFailureTests(unittest.TestCase):
     def test_manual_selector_failure_preserves_error_and_stops(self):
         for rc in (1, 2):
-            stubs = f'set_sim() {{ return {rc}; }}\npower_cycle() {{ echo power; }}\napply_apn() {{ echo apn; }}\nifup() {{ echo up >&2; }}'
+            stubs = f'set_sim() {{ return {rc}; }}\ncycle_modem_power() {{ echo power; }}\napply_apn() {{ echo apn; }}\nifup() {{ echo up >&2; }}'
             result = simulate(stubs, 'case "$1" in' + DISPATCH, 'sim', '2')
             self.assertEqual(result.returncode, rc)
             self.assertEqual(result.stdout + result.stderr, '')
@@ -37,9 +37,10 @@ log() {{ :; }}
         for ready in ('true', 'false'):
             stubs = f"""
 set_sim() {{ echo "select $1"; [ "$1" = 2 ]; }}
-power_cycle() {{ echo power; }}
-sim_ready() {{ {ready}; }}
-apply_apn() {{ :; }}
+cycle_modem_power() {{ echo power; }}
+sim_ready_at_port() {{ {ready}; }}
+wait_at() {{ :; }}
+apply_apn_at_ready() {{ :; }}
 ifup() {{ :; }}
 data_ok() {{ return 1; }}
 sleep() {{ :; }}
@@ -60,11 +61,89 @@ log() { :; }
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout, '')
 
+    def test_manual_reconnect_stops_at_failed_stage(self):
+        for failed, expected in (('power', ['power']), ('at', ['power']),
+                                 ('apn', ['power', 'apn']),
+                                 ('ifup', ['power', 'apn', 'ifup'])):
+            stubs = """
+set_sim() { :; }
+cycle_modem_power() { echo power >&3; [ "$failed" != power ]; }
+wait_at() { [ "$failed" != at ]; }
+log() { :; }
+apply_apn_at_ready() { echo apn >&3; [ "$failed" != apn ]; }
+ifup() { echo ifup >&3; [ "$failed" != ifup ]; }
+exec 3>&1
+"""
+            result = simulate(stubs + 'failed=' + failed, 'case "$1" in' + DISPATCH, 'sim', '2')
+            self.assertNotEqual(result.returncode, 0, failed)
+            self.assertEqual(result.stdout.splitlines(), expected)
+
+    def test_gpio_failure_stops_before_sim_reconnect(self):
+        for failed, expected in (('0', ['gpio 0']), ('1', ['gpio 0', 'gpio 1'])):
+            stubs = """
+cfg() { :; }
+log() { :; }
+sleep() { :; }
+usb_repair() { :; }
+wait_at() { echo wait; }
+ifup() { :; }
+gpio_set() { echo "gpio $2"; [ "$2" != "$failed" ]; }
+"""
+            result = simulate(stubs + 'failed=' + failed, 'power_cycle')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stdout.splitlines(), expected)
+
+    def test_failed_new_apn_restores_old_slot_once(self):
+        stubs = """
+set_sim() { slot=$1; echo "select $1"; }
+cycle_modem_power() { echo "cycle $slot"; }
+wait_at() { :; }
+sim_ready_at_port() { :; }
+apply_apn_at_ready() { echo "apn $slot"; [ "$slot" = 1 ]; }
+ifup() { echo "up $slot" >&3; }
+data_ok() { echo unexpected_probe; return 0; }
+log() { :; }
+exec 3>&1
+"""
+        result = simulate(stubs, 'auto_switch_sim 1 2')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.splitlines(), ['select 2', 'cycle 2', 'apn 2',
+                                                      'select 1', 'cycle 1', 'apn 1', 'up 1'])
+
+    def test_standalone_cycle_requests_rndis_even_without_at(self):
+        stubs = """
+cycle_modem_power() { :; }
+wait_at() { return 1; }
+ifup() { echo "$1" >&3; }
+exec 3>&1
+"""
+        result = simulate(stubs, 'power_cycle')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.splitlines(), ['lte'])
+
+    def test_successful_trial_checks_data_after_starting_new_slot(self):
+        stubs = """
+set_sim() { echo "select $1"; }
+cycle_modem_power() { echo power; }
+wait_at() { echo at; }
+sim_ready_at_port() { echo ready; }
+apply_apn_at_ready() { echo apn; }
+ifup() { echo "up $1" >&3; }
+data_ok() { echo probe; }
+log() { :; }
+exec 3>&1
+"""
+        result = simulate(stubs, 'auto_switch_sim 1 2')
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.splitlines(),
+                         ['select 2', 'power', 'at', 'ready', 'apn', 'up lte', 'probe'])
+
     def test_manual_success_runs_expected_reconnect_steps(self):
         stubs = """
 set_sim() { echo "select $1"; }
-power_cycle() { echo power; }
-apply_apn() { echo apn; }
+cycle_modem_power() { echo power; }
+wait_at() { :; }
+apply_apn_at_ready() { echo apn; }
 ifup() { :; }
 """
         result = simulate(stubs, 'case "$1" in' + DISPATCH, 'sim', '2')
