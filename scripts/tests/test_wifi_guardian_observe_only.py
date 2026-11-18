@@ -23,7 +23,7 @@ class GuardianSafety(unittest.TestCase):
 
     def shell(self, setup, name, invocation, env=None):
         # PowerShell-launched Git Bash lacks /usr/bin in inherited PATH.
-        script = "PATH=/usr/bin:/bin:$PATH\n" + setup + "\n" + func(self.source, name) + "\n" + invocation + "\n"
+        script = "PATH=/usr/bin:/bin:$PATH\n" + func(self.source, "primary_ifname") + setup + "\n" + func(self.source, name) + "\n" + invocation + "\n"
         result = subprocess.run([str(SH), "-c", script], text=True, capture_output=True,
                                 timeout=6, env=env)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -40,63 +40,41 @@ class GuardianSafety(unittest.TestCase):
     def test_runtime_status_uses_bounded_ubus_not_iw(self):
         body = func(self.source, "radio_running")
         self.assertIn("ubus -S -t 3", body)
-        self.assertIn("hostapd.*", body)
+        self.assertIn('hostapd.$interface', body)
         self.assertIn("wifi_netdev_present", body)
         self.assertNotIn("iw dev", body)
 
-    def test_checks_services_up(self):
-        mocks = """
-wifi_netdev_present() { return 0; }
+    def test_primary_ap_readiness(self):
+        mocks = r"""
+wifi_netdev_present() { [ "$1" = "$NETDEV" ]; }
 ubus() {
- if [ "$4" = list ]; then echo hostapd.phy0-ap0; else echo '{}'; fi
+ case "$5" in
+   network.wireless) echo snapshot ;;
+   hostapd.office-ap) echo "$PRIMARY_STATUS" ;;
+   hostapd.guest) echo ENABLED ;;
+ esac
 }
 jsonfilter() {
  case "$2" in
-   '@.radio0.up') echo true ;;
-   '@.status') echo ENABLED ;;
+   '@.radio0.up') echo "$RADIO_UP" ;;
+   '@.radio0.interfaces[@.section="default_radio0"].ifname') echo "$PRIMARY_IF" ;;
+   '@.status') cat ;;
  esac
 }
 """
-        self.assertEqual(self.shell(mocks, "radio_running", "radio_running; echo rc=$?"), "rc=0")
-
-    def test_detects_disabled_hostapd(self):
-        mocks = """
-wifi_netdev_present() { return 0; }
-ubus() {
- if [ "$4" = list ]; then echo hostapd.phy0-ap0; else echo '{}'; fi
-}
-jsonfilter() {
- case "$2" in
-   '@.radio0.up') echo true ;;
-   '@.status') echo DISABLED ;;
- esac
-}
-"""
-        self.assertEqual(self.shell(mocks, "radio_running", "radio_running; echo rc=$?"), "rc=1")
-
-    def test_rejects_missing_wifi_netdev_even_when_radio_is_up(self):
-        mocks = """
-wifi_netdev_present() { return 1; }
-ubus() { if [ "$4" = list ]; then echo hostapd.phy0-ap0; else echo '{}'; fi; }
-jsonfilter() { case "$2" in '@.radio0.up') echo true;; '@.status') echo ENABLED;; esac; }
-"""
-        self.assertEqual(self.shell(mocks, "radio_running", "radio_running; echo rc=$?"), "rc=1")
-
-    def test_accepts_actual_hostapd_object_without_hardcoded_ifname(self):
-        mocks = """
-wifi_netdev_present() { return 0; }
-ubus() { if [ "$4" = list ]; then echo hostapd.wlan0; else echo '{}'; fi; }
-jsonfilter() { case "$2" in '@.radio0.up') echo true;; '@.status') echo ENABLED;; esac; }
-"""
-        self.assertEqual(self.shell(mocks, "radio_running", "radio_running; echo rc=$?"), "rc=0")
-
-    def test_rejects_missing_hostapd_object(self):
-        mocks = """
-wifi_netdev_present() { return 0; }
-ubus() { echo '{}'; }
-jsonfilter() { case "$2" in '@.radio0.up') echo true;; '@.status') echo ENABLED;; esac; }
-"""
-        self.assertEqual(self.shell(mocks, "radio_running", "radio_running; echo rc=$?"), "rc=1")
+        for interface, netdev, status, up, expected in (
+            ("office-ap", "office-ap", "ENABLED", "true", 0),
+            ("office-ap", "office-ap", "DISABLED", "true", 1),
+            ("office-ap", "guest", "ENABLED", "true", 1),
+            ("office-ap", "office-ap", "", "true", 1),
+            ("", "guest", "", "true", 1),
+            ("office-ap", "office-ap", "ENABLED", "false", 1),
+        ):
+            with self.subTest(interface=interface, netdev=netdev, status=status, up=up):
+                env = dict(os.environ, PRIMARY_IF=interface, NETDEV=netdev,
+                           PRIMARY_STATUS=status, RADIO_UP=up)
+                self.assertEqual(self.shell(mocks, "radio_running", "radio_running; echo $?", env),
+                                 str(expected))
 
     def test_failure_reason_distinguishes_missing_interface(self):
         mocks = """

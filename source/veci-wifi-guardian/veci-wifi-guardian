@@ -24,40 +24,46 @@ phy_available() {
 }
 wifi_netdev_present() {
  # A loaded module and phy0 do not prove that an AP interface exists.
+ if [ "$#" -gt 0 ]; then
+   [ -e "/sys/class/net/$1/phy80211" ]
+   return
+ fi
  local dev
  for dev in /sys/class/net/*; do
    [ -e "$dev/phy80211" ] && return 0
  done
  return 1
 }
+primary_ifname() {
+ local interface
+ interface="$(printf '%s\n' "$1" |
+   jsonfilter -e '@.radio0.interfaces[@.section="default_radio0"].ifname' 2>/dev/null)" || return 1
+ case "$interface" in ''|*[!a-zA-Z0-9_.-]*) return 1 ;; esac
+ printf '%s\n' "$interface"
+}
 radio_running() {
  # Bounded ubus/sysfs inspection only. Never call iw in this watchdog.
- # Look up the live hostapd object instead of assuming phy0-ap0 forever.
- local up objects object status
- up="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
-       jsonfilter -e '@.radio0.up' 2>/dev/null)" || return 1
+ local wireless up interface status
+ wireless="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null)" || return 1
+ up="$(printf '%s\n' "$wireless" | jsonfilter -e '@.radio0.up' 2>/dev/null)" || return 1
  [ "$up" = true ] || return 1
- wifi_netdev_present || return 1
- objects="$(ubus -S -t 3 list 'hostapd.*' 2>/dev/null)" || return 1
- [ -n "$objects" ] || return 1
- for object in $objects; do
-   case "$object" in hostapd.*) ;; *) continue ;; esac
-   status="$(ubus -S -t 3 call "$object" get_status '{}' 2>/dev/null |
-             jsonfilter -e '@.status' 2>/dev/null)" || continue
-   [ "$status" = ENABLED ] && return 0
- done
- return 1
+ interface="$(primary_ifname "$wireless")" || return 1
+ wifi_netdev_present "$interface" || return 1
+ status="$(ubus -S -t 3 call "hostapd.$interface" get_status '{}' 2>/dev/null |
+   jsonfilter -e '@.status' 2>/dev/null)" || return 1
+ [ "$status" = ENABLED ]
 }
 ap_failure_reason() {
  # Safe coarse diagnosis. Never include SSID, MAC, address, or credentials.
- local up objects
+ local wireless up interface
  phy_available || { echo phy_missing; return 0; }
- up="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
-       jsonfilter -e '@.radio0.up' 2>/dev/null)" || up=unknown
+ wireless="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null)" || wireless=
+ up="$(printf '%s\n' "$wireless" | jsonfilter -e '@.radio0.up' 2>/dev/null)" || up=unknown
  [ "$up" = true ] || { echo radio_not_up; return 0; }
- wifi_netdev_present || { echo wifi_netdev_missing; return 0; }
- objects="$(ubus -S -t 3 list 'hostapd.*' 2>/dev/null)" || objects=
- [ -n "$objects" ] || { echo hostapd_rpc_missing; return 0; }
+ interface="$(primary_ifname "$wireless")" && wifi_netdev_present "$interface" ||
+   { echo wifi_netdev_missing; return 0; }
+ [ "$(ubus -S -t 3 list "hostapd.$interface" 2>/dev/null)" = "hostapd.$interface" ] ||
+   { echo hostapd_rpc_missing; return 0; }
  echo hostapd_not_enabled
 }
 rx_pse_resets() {
