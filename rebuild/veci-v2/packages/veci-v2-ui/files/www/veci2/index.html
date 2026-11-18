@@ -68,7 +68,13 @@
             <h2>Aplikasi &amp; firmware</h2>
             <p>Addon, pembaruan, backup dan pengaturan lanjutan dikelompokkan di sini—tidak memenuhi menu utama.</p>
             <button id="open-addons" type="button">Kelola Addon</button>
-            <p class="notice">Menu firmware/backup akan diaktifkan setelah modul aman dan UAT-nya selesai; tidak ditampilkan sebagai tombol palsu.</p>
+            <h3>Periksa file firmware manual</h3>
+            <form id="firmware-check">
+              <label>File sysupgrade untuk WE5927 <input type="file" name="image" required></label>
+              <label>SHA-256 dari manifest rilis <input type="text" name="digest" required maxlength="64" pattern="[A-Fa-f0-9]{64}" autocomplete="off"></label>
+              <button type="submit">Bandingkan file dengan manifest</button>
+              <output aria-live="polite"></output>
+            </form>
           </article>
         </section>
         <section id="sms" class="page" aria-label="SMS Center" hidden>

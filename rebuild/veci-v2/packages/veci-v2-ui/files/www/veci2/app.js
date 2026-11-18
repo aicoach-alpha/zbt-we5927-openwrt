@@ -43,6 +43,35 @@ function binaryStatus(value, trueLabel = 'Aktif', falseLabel = 'Tidak aktif') {
   if (value === false) return [falseLabel, 'bad'];
   return ['Belum diverifikasi', 'warn'];
 }
+const firmwareForm = el('firmware-check');
+let firmwareCheckGeneration = 0;
+function resetFirmwareResult() {
+  firmwareCheckGeneration++;
+  firmwareForm.querySelector('output').textContent = '';
+}
+firmwareForm.addEventListener('input', resetFirmwareResult);
+firmwareForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const generation = ++firmwareCheckGeneration;
+  const file = firmwareForm.elements.image.files[0];
+  const expected = firmwareForm.elements.digest.value.trim().toLowerCase();
+  const output = firmwareForm.querySelector('output');
+  try {
+    if (!file || !file.size || file.size > 7995392)
+      throw Error('Ukuran file harus antara 1 dan 7.995.392 byte.');
+    if (!/^[0-9a-f]{64}$/.test(expected)) throw Error('Periksa SHA-256 dari manifest.');
+    if (!globalThis.crypto?.subtle) throw Error('Gunakan halaman HTTPS untuk menghitung SHA-256.');
+    output.textContent = 'Menghitung SHA-256 pada perangkat ini…';
+    const bytes = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+    const actual = Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
+    if (actual !== expected) throw Error('SHA-256 file berbeda dari manifest.');
+    if (generation === firmwareCheckGeneration)
+      output.textContent = 'Ukuran dan SHA-256 cocok. Signature dan kompatibilitas masih harus diperiksa di router.';
+  } catch (error) {
+    if (generation === firmwareCheckGeneration) output.textContent = error.message;
+  }
+});
+
 function showWorkspace() {
   globalThis.VeciSmsCenter.activate();
   el('login').hidden = true;
@@ -50,6 +79,8 @@ function showWorkspace() {
   el('logout').hidden = false;
 }
 function showLogin() {
+  resetFirmwareResult();
+  firmwareForm.reset();
   globalThis.VeciSmsCenter.logout();
   sid = '';
   verifiedPackage = '';
