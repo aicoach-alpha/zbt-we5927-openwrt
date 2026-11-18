@@ -223,6 +223,7 @@ jobs:
           test -x "$rom/usr/bin/ucert"
           test -x "$rom/usr/libexec/rpcd/veci.v2.lte"
           test -x "$rom/usr/libexec/rpcd/veci.v2.wifi"
+          cmp "$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi" "$rom/usr/libexec/rpcd/veci.v2.wifi"
           test -x "$rom/www/cgi-bin/veci2-verify"
           test -x "$rom/usr/libexec/veci2-verify-image"
           cmp "$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify" "$rom/www/cgi-bin/veci2-verify"

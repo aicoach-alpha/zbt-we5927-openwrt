@@ -54,7 +54,11 @@
               <label>APN operator <input id="lte-apn" required maxlength="100" autocomplete="off" disabled></label>
               <button id="lte-apn-save" type="submit" disabled>Simpan APN</button>
             </form>
-            <h3>Visibilitas SSID utama</h3>
+            <h3>Wi-Fi utama</h3>
+            <form id="wifi-name-form">
+              <label>Nama jaringan (SSID, 1–32 byte) <input id="wifi-name" required maxlength="32" autocomplete="off" disabled></label>
+              <button id="wifi-name-save" type="submit" disabled>Simpan nama</button>
+            </form>
             <p id="wifi-visibility-status" role="status"></p>
             <button id="wifi-visibility-change" type="button" disabled>Ubah visibilitas</button>
             <h3>Port Ethernet</h3>

@@ -18,27 +18,61 @@ visibility() {
     *) fail invalid_visibility ;;
   esac
 }
+# UCI prints one terminating newline. Encode the stored bytes before removing it.
+ssid_hex() {
+  local encoded
+  encoded=$(uci -q get "$ap.ssid" | hexdump -v -e '1/1 "%02x"') || return 1
+  printf '%s' "${encoded%0a}"
+}
+save_option() {
+  local tmp
+  tmp=$(mktemp -d /tmp/veci2-wifi.XXXXXX) || fail save_failed
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 1' HUP INT TERM
+  uci -q -t "$tmp" set "$ap.$1=$2" && uci -q -t "$tmp" commit wireless || fail save_failed
+  rm -rf "$tmp"
+  trap - EXIT HUP INT TERM
+}
 case "${1:-}:${2:-}" in
-  list:*) echo '{"status":{},"setVisibility":{"action":"String"}}'; exit 0 ;;
+  list:*) echo '{"status":{},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"}}'; exit 0 ;;
   call:status) check_ap; visibility ;;
-  call:setVisibility)
+  call:setVisibility|call:setSsid)
     request=$(head -c 257)
     [ "${#request}" -le 256 ] || fail invalid_request
-    action=$(jsonfilter -s "$request" -e '@.action') || fail invalid_request
-    case "$action" in SHOW_SSID) desired=true; hidden=0 ;; HIDE_SSID) desired=false; hidden=1 ;; *) fail invalid_action ;; esac
     exec 9<"$0"
     flock -n 9 || fail busy
     check_ap
     visibility
-    if [ "$visible" != "$desired" ]; then
-      tmp=$(mktemp -d /tmp/veci2-wifi.XXXXXX)
-      trap 'rm -rf "$tmp"' EXIT
-      trap 'exit 1' HUP INT TERM
-      uci -q -t "$tmp" set "$ap.hidden=$hidden" && uci -q -t "$tmp" commit wireless || fail save_failed
-      check_ap
-      visibility
-      [ "$visible" = "$desired" ] || fail save_failed
+    if [ "$2" = setVisibility ]; then
+      action=$(jsonfilter -s "$request" -e '@.action') || fail invalid_request
+      case "$action" in SHOW_SSID) desired=true; hidden=0 ;; HIDE_SSID) desired=false; hidden=1 ;; *) fail invalid_action ;; esac
+      if [ "$visible" != "$desired" ]; then
+        save_option hidden "$hidden"
+        check_ap
+        visibility
+        [ "$visible" = "$desired" ] || fail save_failed
+      fi
+    else
+      desired=$(jsonfilter -s "$request" -e '@.ssid_hex') || fail invalid_request
+      case "$desired" in ''|*[!0123456789abcdef]*) fail invalid_ssid ;; esac
+      [ "${#desired}" -le 64 ] && [ $((${#desired} % 2)) -eq 0 ] || fail invalid_ssid
+      remaining=$desired
+      name=
+      while [ -n "$remaining" ]; do
+        rest=${remaining#??}
+        pair=${remaining%"$rest"}
+        case "$pair" in 0?|1?|7f) fail invalid_ssid ;; esac
+        name=$name$(printf '%b' "$(printf '\\%03o' "0x$pair")")
+        remaining=$rest
+      done
+      current=$(ssid_hex) || fail config_unavailable
+      if [ "$current" != "$desired" ]; then
+        save_option ssid "$name"
+        check_ap
+        [ "$(ssid_hex)" = "$desired" ] || fail save_failed
+      fi
     fi ;;
   *) fail unsupported_method ;;
 esac
-printf '{"ok":true,"configured_visible":%s}\n' "$visible"
+configured=$(ssid_hex) || fail config_unavailable
+printf '{"ok":true,"configured_visible":%s,"ssid_hex":"%s"}\n' "$visible" "$configured"

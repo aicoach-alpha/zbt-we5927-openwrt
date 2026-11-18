@@ -217,6 +217,9 @@ function showLogin() {
   lteSaving = false;
   el('lte-policy-change').disabled = true;
   el('lte-policy-status').textContent = '';
+  el('wifi-name').value = '';
+  el('wifi-name').disabled = true;
+  el('wifi-name-save').disabled = true;
   visibilityRequest++;
   configuredVisible = null;
   savingVisibility = false;
@@ -283,18 +286,24 @@ async function refreshOverview() {
 let visibilityRequest = 0;
 let configuredVisible = null;
 let savingVisibility = false;
-async function refreshVisibility(action) {
+async function refreshVisibility(action, ssidHex) {
   if (savingVisibility) return;
   const sequence = ++visibilityRequest;
   const session = sid;
   const button = el('wifi-visibility-change');
   const status = el('wifi-visibility-status');
+  const name = el('wifi-name');
+  const saveName = el('wifi-name-save');
+  name.disabled = true;
+  saveName.disabled = true;
   button.disabled = true;
   configuredVisible = null;
   savingVisibility = Boolean(action);
   status.textContent = action ? 'Menyimpan konfigurasi…' : 'Membaca konfigurasi…';
   try {
-    const data = await rpc('veci.v2.wifi', action ? 'setVisibility' : 'status', action ? {action} : {}, session);
+    const method = action === 'setSsid' ? action : (action ? 'setVisibility' : 'status');
+    const params = action === 'setSsid' ? {ssid_hex: ssidHex} : (action ? {action} : {});
+    const data = await rpc('veci.v2.wifi', method, params, session);
     if (sequence !== visibilityRequest || sid !== session) return;
     if (!data.ok || typeof data.configured_visible !== 'boolean')
       throw Error(data.error || 'Status tidak tersedia');
@@ -302,6 +311,19 @@ async function refreshVisibility(action) {
     status.textContent = (configuredVisible ? 'Konfigurasi: SSID ditampilkan.' : 'Konfigurasi: SSID disembunyikan.') +
       ' Perubahan berlaku saat Wi-Fi berikutnya dimulai. Beacon perlu diperiksa dari perangkat klien.';
     button.textContent = configuredVisible ? 'Sembunyikan SSID' : 'Tampilkan SSID';
+    if (typeof data.ssid_hex === 'string' && /^(?:[0-9a-f]{2}){0,32}$/.test(data.ssid_hex)) {
+      const bytes = Uint8Array.from(data.ssid_hex.match(/../g) || [], byte => parseInt(byte, 16));
+      try {
+        const stored = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(bytes);
+        if (/[\x00-\x1f\x7f]/.test(stored)) throw Error();
+        name.value = stored;
+      } catch {
+        name.value = '';
+        status.textContent += ' Nama saat ini tidak dapat ditampilkan sebagai teks.';
+      }
+      name.disabled = false;
+      saveName.disabled = false;
+    }
     button.disabled = false;
   } catch (error) {
     if (sequence === visibilityRequest && sid === session) status.textContent = error.message;
@@ -547,6 +569,20 @@ document.addEventListener('DOMContentLoaded', () => {
       'Izinkan modem mencoba SIM lain saat koneksi gagal? Perpindahan dapat memutus LTE sementara.' :
       'Nonaktifkan perpindahan SIM otomatis berikutnya?';
     if (window.confirm(message)) refreshLtePolicy(button.dataset.action);
+  });
+  el('wifi-name-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const input = el('wifi-name');
+    if (savingVisibility || input.disabled) return;
+    const bytes = new TextEncoder().encode(input.value);
+    if (!bytes.length || bytes.length > 32 || bytes.some(byte => byte < 32 || byte === 127)) {
+      el('wifi-visibility-status').textContent = 'Gunakan 1–32 byte tanpa karakter kontrol.';
+      return;
+    }
+    if (window.confirm('Simpan nama Wi-Fi utama? Nama baru berlaku saat Wi-Fi berikutnya dimulai.')) {
+      const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+      refreshVisibility('setSsid', hex);
+    }
   });
   el('wifi-visibility-change').addEventListener('click', () => {
     if (configuredVisible === null || savingVisibility) return;
