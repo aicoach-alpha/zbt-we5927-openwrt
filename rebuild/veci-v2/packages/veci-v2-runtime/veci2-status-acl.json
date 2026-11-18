@@ -20,7 +20,8 @@
     "write": {
       "ubus": {
         "veci.v2.firmware": [
-          "verify"
+          "verify",
+          "apply"
         ]
       }
     }

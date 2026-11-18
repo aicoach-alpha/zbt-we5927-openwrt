@@ -44,14 +44,51 @@ function binaryStatus(value, trueLabel = 'Aktif', falseLabel = 'Tidak aktif') {
   return ['Belum diverifikasi', 'warn'];
 }
 const firmwareForm = el('firmware-check');
+let installCandidate = null;
+const installButton = el('firmware-install');
+function clearInstallCandidate() {
+  installCandidate = null;
+  installButton.hidden = true;
+}
+function offerInstall(receipt, payload, ota) {
+  clearInstallCandidate();
+  if (!/^[0-9a-f]{64}$/.test(receipt.ticket || '')) return;
+  installCandidate = {digest: receipt.sha256, ticket: receipt.ticket, payload, ota};
+  installButton.hidden = false;
+}
+installButton.addEventListener('click', async () => {
+  const candidate = installCandidate;
+  if (!candidate || !window.confirm('Pasang firmware SHA-256 ' + candidate.digest +
+      ' dengan mempertahankan konfigurasi? Router akan reboot dan koneksi terputus.')) return;
+  const session = sid;
+  clearInstallCandidate();
+  const status = el('firmware-install-result');
+  status.textContent = 'Memeriksa ulang file dan mengirim permintaan instalasi…';
+  try {
+    const response = await fetch('/cgi-bin/veci2-verify?' + (candidate.ota ? 'stable-apply' : 'apply'), {
+      method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
+      body: new Blob([session, candidate.digest, candidate.ticket, candidate.payload], {type:'application/octet-stream'})
+    });
+    if (sid !== session) return;
+    if (response.status !== 202) throw Error('Router tidak mengonfirmasi permintaan (HTTP ' + response.status + ').');
+    const result = await response.json();
+    if (result.accepted !== true || result.sha256 !== candidate.digest) throw Error('Respons instalasi tidak cocok.');
+    if (sid === session) status.textContent = 'Permintaan diterima. Periksa versi firmware setelah router kembali online.';
+  } catch (error) {
+    if (sid === session) status.textContent = 'Status instalasi belum terkonfirmasi. Periksa router sebelum mencoba lagi. ' + error.message;
+  }
+});
+
 let firmwareCheckGeneration = 0;
 function resetFirmwareResult() {
+  clearInstallCandidate();
   firmwareCheckGeneration++;
   firmwareForm.querySelector('output').textContent = '';
 }
 firmwareForm.addEventListener('input', resetFirmwareResult);
 firmwareForm.addEventListener('submit', async event => {
   event.preventDefault();
+  clearInstallCandidate();
   const generation = ++firmwareCheckGeneration;
   const file = firmwareForm.elements.image.files[0];
   const expected = firmwareForm.elements.digest.value.trim().toLowerCase();
@@ -75,6 +112,7 @@ firmwareForm.addEventListener('submit', async event => {
     const receipt = await response.json();
     if (receipt.verified !== true || receipt.sha256 !== expected)
       throw Error('Hasil pemeriksaan router tidak cocok dengan file.');
+    if (generation === firmwareCheckGeneration) offerInstall(receipt, file, false);
     if (generation === firmwareCheckGeneration)
       output.textContent = 'Signature dan kompatibilitas file terverifikasi di router. File sementara telah diproses tanpa instalasi.';
   } catch (error) {
@@ -105,6 +143,7 @@ let channelRequest;
 channelButton.addEventListener('click', async () => {
   const output = el('firmware-channel-result');
   const request = new AbortController();
+  clearInstallCandidate();
   channelRequest = request;
   stableRelease = null;
   verifyRelease.hidden = true;
@@ -152,6 +191,7 @@ verifyRelease.addEventListener('click', async () => {
     if (!response.ok) throw Error('Unduhan atau verifikasi gagal (HTTP ' + response.status + ').');
     const receipt = await response.json();
     if (receipt.verified !== true || receipt.sha256 !== digest) throw Error('SHA-256 hasil verifikasi berbeda.');
+    if (stableRelease === manifest) offerInstall(receipt, [manifest.size, tag, asset, ''].join('\n'), true);
     if (stableRelease === manifest) output.textContent = 'Firmware kanal stabil terverifikasi di router. Instalasi belum dimulai.';
   } catch (error) {
     if (stableRelease === manifest) output.textContent = error.message;
@@ -167,6 +207,7 @@ function showWorkspace() {
   el('logout').hidden = false;
 }
 function showLogin() {
+  el('firmware-install-result').textContent = '';
   stableRelease = null;
   verifyRelease.hidden = true;
   ltePolicyRequest++;

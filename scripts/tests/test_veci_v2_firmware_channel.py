@@ -18,15 +18,22 @@ function node(id) {
 const base = {schema:1, channel:'stable', board:'zbtlink,zbt-we5927', target:'ramips/mt76x8',
   supported_devices:['zbtlink,zbt-we5927'], available:true, size:7995392, sha256:'a'.repeat(64),
   firmware_url:'https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/v2/fw.bin'};
-let body, calls = 0;
+let body, calls = 0, approved = false, installCalls = 0;
+const window = {confirm: () => approved};
 const document = {getElementById:node, addEventListener() {}};
 const fetch = async (url, options) => {
   calls++;
+  if (url === '/cgi-bin/veci2-verify?stable-apply') {
+    installCalls++;
+    const fields = (await options.body.text()).split(String.fromCharCode(10));
+    assert.deepEqual(fields,['1'.repeat(32) + base.sha256 + 'b'.repeat(64) + base.size,'v2','fw.bin','']);
+    return {status:202,json:async () => ({accepted:true,sha256:base.sha256})};
+  }
   if (url === '/cgi-bin/veci2-verify?stable') {
     assert.equal(options.method,'POST');
     assert.equal(options.credentials,'omit');
     assert.equal(await options.body.text(), '1'.repeat(32) + base.sha256 + '7995392' + String.fromCharCode(10) + 'v2' + String.fromCharCode(10) + 'fw.bin' + String.fromCharCode(10));
-    return {ok:true, json:async () => ({verified:true,sha256:base.sha256})};
+    return {ok:true, json:async () => ({verified:true,sha256:base.sha256,ticket:'b'.repeat(64)})};
   }
   assert.equal(url,'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json');
   assert.equal(options.credentials,'omit');
@@ -35,7 +42,7 @@ const fetch = async (url, options) => {
   return {ok:true, json:async () => body};
 };
 vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8') + ";sid='1'.repeat(32);",
-  {document, Blob, fetch, setTimeout, clearTimeout, AbortController});
+  {document, window, Blob, fetch, setTimeout, clearTimeout, AbortController});
 assert.equal(calls,0);
 (async () => {
   for (const [change, message] of [
@@ -54,6 +61,15 @@ assert.equal(calls,0);
   assert.equal(node('firmware-channel-verify').hidden,false);
   await node('firmware-channel-verify').click();
   assert.match(node('firmware-channel-result').textContent,/terverifikasi di router/);
+  const install = node('firmware-install');
+  assert.equal(install.hidden,false);
+  await install.click();
+  assert.equal(installCalls,0);
+  approved = true;
+  await install.click();
+  assert.match(node('firmware-install-result').textContent,/Permintaan diterima/);
+  await install.click();
+  assert.equal(installCalls,1);
 })().catch(error => { console.error(error); process.exitCode=1; });
 """
         subprocess.run(["node", "-e", script, str(UI / "app.js")], check=True, timeout=8)
