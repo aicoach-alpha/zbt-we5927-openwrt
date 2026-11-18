@@ -213,6 +213,10 @@ jobs:
           done
           find "$rom/lib/modules" -type f -name 'mt7603e.ko' -size +0c -print -quit | grep -q mt7603e.ko
           test -x "$rom/usr/bin/ucert"
+          test -x "$rom/www/cgi-bin/veci2-verify"
+          test -x "$rom/usr/libexec/veci2-verify-image"
+          cmp "$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify" "$rom/www/cgi-bin/veci2-verify"
+          cmp "$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-runtime/veci2-verify-image" "$rom/usr/libexec/veci2-verify-image"
           grep -Fxq 'REQUIRE_IMAGE_SIGNATURE=1' "$rom/lib/upgrade/platform.sh"
           cmp "$GITHUB_WORKSPACE/rebuild/veci-v2/trust/1d8759d36251c36c" "$rom/etc/opkg/keys/1d8759d36251c36c"
           for module in mt7603e rndis_host option; do

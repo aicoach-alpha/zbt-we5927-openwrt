@@ -14,5 +14,15 @@
     "write": {
       "ubus": {}
     }
+  },
+  "veci-v2-firmware": {
+    "description": "Verify a firmware upload in RAM",
+    "write": {
+      "ubus": {
+        "veci.v2.firmware": [
+          "verify"
+        ]
+      }
+    }
   }
 }

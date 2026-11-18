@@ -65,8 +65,18 @@ firmwareForm.addEventListener('submit', async event => {
     const bytes = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
     const actual = Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
     if (actual !== expected) throw Error('SHA-256 file berbeda dari manifest.');
+    if (generation !== firmwareCheckGeneration) return;
+    output.textContent = 'Mengunggah file untuk pemeriksaan signature dan kompatibilitas di router…';
+    const response = await fetch('/cgi-bin/veci2-verify', {
+      method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
+      body: new Blob([sid, expected, file], {type: 'application/octet-stream'})
+    });
+    if (!response.ok) throw Error('Router menolak pemeriksaan (HTTP ' + response.status + ').');
+    const receipt = await response.json();
+    if (receipt.verified !== true || receipt.sha256 !== expected)
+      throw Error('Hasil pemeriksaan router tidak cocok dengan file.');
     if (generation === firmwareCheckGeneration)
-      output.textContent = 'Ukuran dan SHA-256 cocok. Signature dan kompatibilitas masih harus diperiksa di router.';
+      output.textContent = 'Signature dan kompatibilitas file terverifikasi di router. File sementara telah diproses tanpa instalasi.';
   } catch (error) {
     if (generation === firmwareCheckGeneration) output.textContent = error.message;
   }

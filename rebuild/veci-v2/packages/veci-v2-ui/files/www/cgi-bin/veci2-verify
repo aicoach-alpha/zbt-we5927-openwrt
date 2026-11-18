@@ -1,0 +1,38 @@
+#!/bin/sh
+# Body: 32 hex session characters, 64 hex digest characters, then raw image.
+set -eu
+umask 077
+reply() {
+  printf 'Status: %s\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n\r\n%s\n' "$1" "$2"
+  exit 0
+}
+bad() { reply '400 Bad Request' '{"error":"invalid_request"}'; }
+deny() { reply '403 Forbidden' '{"error":"access_denied"}'; }
+[ "${HTTPS:-}" = on ] || deny
+[ "${REQUEST_METHOD:-}" = POST ] && [ "${CONTENT_TYPE:-}" = application/octet-stream ] || bad
+length=${CONTENT_LENGTH:-}
+case "$length" in ''|*[!0-9]*|0*) bad ;; esac
+[ "${#length}" -le 7 ] && [ "$length" -gt 96 ] && [ "$length" -le 7995488 ] || bad
+session=$(head -c 32)
+case "$session" in ''|*[!0-9a-f]*|00000000000000000000000000000000) deny ;; esac
+[ "${#session}" -eq 32 ] || deny
+permitted=$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"ubus\",\"object\":\"veci.v2.firmware\",\"function\":\"verify\"}" | jsonfilter -e '@.access') || deny
+[ "$permitted" = true ] || deny
+digest=$(head -c 64)
+case "$digest" in ''|*[!0-9a-f]*) bad ;; esac
+[ "${#digest}" -eq 64 ] || bad
+size=$((length - 96))
+verify=/usr/libexec/veci2-verify-image
+exec 9<"$verify"
+flock -n 9 || reply '409 Conflict' '{"error":"verification_busy"}'
+free=$(df -Pk /tmp | awk 'NR==2 {print $4}')
+[ "$free" -ge $(((size + 1023) / 1024 + 1024)) ] || reply '507 Insufficient Storage' '{"error":"insufficient_tmp_space"}'
+work=$(mktemp -d /tmp/veci2-upload.XXXXXX)
+trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
+head -c "$size" > "$work/image"
+[ "$(wc -c < "$work/image")" -eq "$size" ] || bad
+if "$verify" "$work/image" "$digest" > "$work/result" 2>&1; then
+  reply '200 OK' "{\"verified\":true,\"sha256\":\"$digest\"}"
+fi
+reply '422 Unprocessable Entity' '{"error":"image_verification_failed"}'
