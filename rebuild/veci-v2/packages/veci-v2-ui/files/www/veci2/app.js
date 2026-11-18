@@ -72,6 +72,50 @@ firmwareForm.addEventListener('submit', async event => {
   }
 });
 
+function describeFirmwareChannel(manifest) {
+  if (manifest?.schema !== 1 || manifest.channel !== 'stable' ||
+      manifest.target !== 'ramips/mt76x8' || manifest.board !== 'zbtlink,zbt-we5927' ||
+      !Array.isArray(manifest.supported_devices) ||
+      !manifest.supported_devices.includes(manifest.board))
+    throw Error('Manifest tidak cocok dengan profil WE5927.');
+  if (manifest.available === false) return 'Belum ada firmware yang diterbitkan di kanal stabil.';
+  if (manifest.available !== true || !Number.isInteger(manifest.size) ||
+      manifest.size < 1 || manifest.size > 7995392 ||
+      typeof manifest.sha256 !== 'string' || !/^[a-fA-F0-9]{64}$/.test(manifest.sha256) ||
+      typeof manifest.firmware_url !== 'string' ||
+      !manifest.firmware_url.startsWith('https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/'))
+    throw Error('Metadata rilis tidak lengkap atau tidak valid.');
+  return 'Kanal stabil mencantumkan firmware ' + manifest.size + ' byte. SHA-256: ' + manifest.sha256;
+}
+const channelButton = el('firmware-channel-check');
+let channelRequest;
+channelButton.addEventListener('click', async () => {
+  const output = el('firmware-channel-result');
+  const request = new AbortController();
+  channelRequest = request;
+  const timer = setTimeout(() => request.abort(), 10000);
+  channelButton.disabled = true;
+  output.textContent = 'Memeriksa kanal stabil…';
+  try {
+    const response = await fetch('https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json', {
+      credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store',
+      redirect: 'error', signal: request.signal
+    });
+    if (!response.ok) throw Error('Kanal GitHub tidak dapat diakses.');
+    const message = describeFirmwareChannel(await response.json());
+    if (channelRequest === request) output.textContent = message;
+  } catch (error) {
+    if (channelRequest === request)
+      output.textContent = 'Pemeriksaan kanal gagal. ' + error.message;
+  } finally {
+    clearTimeout(timer);
+    if (channelRequest === request) {
+      channelRequest = null;
+      channelButton.disabled = false;
+    }
+  }
+});
+
 function showWorkspace() {
   globalThis.VeciSmsCenter.activate();
   el('login').hidden = true;
@@ -79,6 +123,10 @@ function showWorkspace() {
   el('logout').hidden = false;
 }
 function showLogin() {
+  channelRequest?.abort();
+  channelRequest = null;
+  channelButton.disabled = false;
+  el('firmware-channel-result').textContent = '';
   resetFirmwareResult();
   firmwareForm.reset();
   globalThis.VeciSmsCenter.logout();
