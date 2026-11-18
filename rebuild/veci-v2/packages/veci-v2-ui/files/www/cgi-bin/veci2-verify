@@ -13,6 +13,11 @@ deny() { reply '403 Forbidden' '{"error":"access_denied"}'; }
 length=${CONTENT_LENGTH:-}
 case "$length" in ''|*[!0-9]*|0*) bad ;; esac
 [ "${#length}" -le 7 ] && [ "$length" -gt 96 ] && [ "$length" -le 7995488 ] || bad
+case "${QUERY_STRING:-}" in
+  "") ota=false ;;
+  stable) ota=true; [ "$length" -le 512 ] || bad ;;
+  *) bad ;;
+esac
 session=$(head -c 32)
 case "$session" in ''|*[!0-9a-f]*|00000000000000000000000000000000) deny ;; esac
 [ "${#session}" -eq 32 ] || deny
@@ -21,7 +26,19 @@ permitted=$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"
 digest=$(head -c 64)
 case "$digest" in ''|*[!0-9a-f]*) bad ;; esac
 [ "${#digest}" -eq 64 ] || bad
-size=$((length - 96))
+if [ "$ota" = true ]; then
+  IFS= read -r size || bad
+  IFS= read -r tag || bad
+  IFS= read -r asset || bad
+  [ "$length" -eq $((99 + ${#size} + ${#tag} + ${#asset})) ] || bad
+  case "$size" in ''|0*|*[!0-9]*) bad ;; esac
+  [ "${#size}" -le 7 ] && [ "$size" -le 7995392 ] || bad
+  for part in "$tag" "$asset"; do
+    case "$part" in ''|.*|*[!A-Za-z0-9._-]*) bad ;; esac
+  done
+else
+  size=$((length - 96))
+fi
 verify=/usr/libexec/veci2-verify-image
 exec 9<"$verify"
 flock -n 9 || reply '409 Conflict' '{"error":"verification_busy"}'
@@ -30,7 +47,15 @@ free=$(df -Pk /tmp | awk 'NR==2 {print $4}')
 work=$(mktemp -d /tmp/veci2-upload.XXXXXX)
 trap 'rm -rf "$work"' EXIT
 trap 'exit 1' HUP INT TERM
-head -c "$size" > "$work/image"
+if [ "$ota" = true ]; then
+  mkfifo "$work/download"
+  timeout 40 uclient-fetch -q -O - "https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/$tag/$asset" > "$work/download" 2>/dev/null &
+  downloader=$!
+  head -c "$((size + 1))" < "$work/download" > "$work/image"
+  wait "$downloader" || reply '502 Bad Gateway' '{"error":"release_download_failed"}'
+else
+  head -c "$size" > "$work/image"
+fi
 [ "$(wc -c < "$work/image")" -eq "$size" ] || bad
 if "$verify" "$work/image" "$digest" > "$work/result" 2>&1; then
   reply '200 OK' "{\"verified\":true,\"sha256\":\"$digest\"}"

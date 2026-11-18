@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-ui
 PKG_VERSION:=0.1
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -10,7 +10,7 @@ define Package/veci-v2-ui
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI v2 lightweight native UI (development preview)
-  DEPENDS:=+veci-v2-runtime +veci-v2-package-manager +veci-v2-sms +veci-v2-ipv6 +flock +uhttpd +uhttpd-mod-ubus +libustream-mbedtls +px5g-mbedtls
+  DEPENDS:=+veci-v2-runtime +veci-v2-package-manager +veci-v2-sms +veci-v2-ipv6 +uclient-fetch +ca-bundle +flock +uhttpd +uhttpd-mod-ubus +libustream-mbedtls +px5g-mbedtls
 endef
 
 define Package/veci-v2-ui/description

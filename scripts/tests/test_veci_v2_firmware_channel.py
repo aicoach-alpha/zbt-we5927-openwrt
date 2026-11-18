@@ -22,14 +22,20 @@ let body, calls = 0;
 const document = {getElementById:node, addEventListener() {}};
 const fetch = async (url, options) => {
   calls++;
+  if (url === '/cgi-bin/veci2-verify?stable') {
+    assert.equal(options.method,'POST');
+    assert.equal(options.credentials,'omit');
+    assert.equal(await options.body.text(), '1'.repeat(32) + base.sha256 + '7995392' + String.fromCharCode(10) + 'v2' + String.fromCharCode(10) + 'fw.bin' + String.fromCharCode(10));
+    return {ok:true, json:async () => ({verified:true,sha256:base.sha256})};
+  }
   assert.equal(url,'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json');
   assert.equal(options.credentials,'omit');
   assert.equal(options.referrerPolicy,'no-referrer');
   assert.equal(options.redirect,'error');
   return {ok:true, json:async () => body};
 };
-vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8'),
-  {document, fetch, setTimeout, clearTimeout, AbortController});
+vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8') + ";sid='1'.repeat(32);",
+  {document, Blob, fetch, setTimeout, clearTimeout, AbortController});
 assert.equal(calls,0);
 (async () => {
   for (const [change, message] of [
@@ -43,6 +49,11 @@ assert.equal(calls,0);
     assert.match(node('firmware-channel-result').textContent, message);
     assert.equal(node('firmware-channel-check').disabled,false);
   }
+  body = base;
+  await node('firmware-channel-check').click();
+  assert.equal(node('firmware-channel-verify').hidden,false);
+  await node('firmware-channel-verify').click();
+  assert.match(node('firmware-channel-result').textContent,/terverifikasi di router/);
 })().catch(error => { console.error(error); process.exitCode=1; });
 """
         subprocess.run(["node", "-e", script, str(UI / "app.js")], check=True, timeout=8)

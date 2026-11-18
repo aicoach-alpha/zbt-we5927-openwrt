@@ -82,6 +82,9 @@ firmwareForm.addEventListener('submit', async event => {
   }
 });
 
+const releaseAsset = /^https:\/\/github\.com\/aicoach-alpha\/zbt-we5927-openwrt\/releases\/download\/([A-Za-z0-9_-][A-Za-z0-9._-]{0,127})\/([A-Za-z0-9_-][A-Za-z0-9._-]{0,127})$/;
+let stableRelease = null;
+const verifyRelease = el('firmware-channel-verify');
 function describeFirmwareChannel(manifest) {
   if (manifest?.schema !== 1 || manifest.channel !== 'stable' ||
       manifest.target !== 'ramips/mt76x8' || manifest.board !== 'zbtlink,zbt-we5927' ||
@@ -93,7 +96,7 @@ function describeFirmwareChannel(manifest) {
       manifest.size < 1 || manifest.size > 7995392 ||
       typeof manifest.sha256 !== 'string' || !/^[a-fA-F0-9]{64}$/.test(manifest.sha256) ||
       typeof manifest.firmware_url !== 'string' ||
-      !manifest.firmware_url.startsWith('https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/'))
+      !releaseAsset.exec(manifest.firmware_url))
     throw Error('Metadata rilis tidak lengkap atau tidak valid.');
   return 'Kanal stabil mencantumkan firmware ' + manifest.size + ' byte. SHA-256: ' + manifest.sha256;
 }
@@ -103,6 +106,8 @@ channelButton.addEventListener('click', async () => {
   const output = el('firmware-channel-result');
   const request = new AbortController();
   channelRequest = request;
+  stableRelease = null;
+  verifyRelease.hidden = true;
   const timer = setTimeout(() => request.abort(), 10000);
   channelButton.disabled = true;
   output.textContent = 'Memeriksa kanal stabil…';
@@ -112,8 +117,13 @@ channelButton.addEventListener('click', async () => {
       redirect: 'error', signal: request.signal
     });
     if (!response.ok) throw Error('Kanal GitHub tidak dapat diakses.');
-    const message = describeFirmwareChannel(await response.json());
-    if (channelRequest === request) output.textContent = message;
+    const manifest = await response.json();
+    const message = describeFirmwareChannel(manifest);
+    if (channelRequest === request) {
+      output.textContent = message;
+      stableRelease = manifest.available ? manifest : null;
+      verifyRelease.hidden = !stableRelease;
+    }
   } catch (error) {
     if (channelRequest === request)
       output.textContent = 'Pemeriksaan kanal gagal. ' + error.message;
@@ -126,6 +136,30 @@ channelButton.addEventListener('click', async () => {
   }
 });
 
+verifyRelease.addEventListener('click', async () => {
+  const manifest = stableRelease;
+  if (!manifest || verifyRelease.disabled) return;
+  const [, tag, asset] = releaseAsset.exec(manifest.firmware_url);
+  const digest = manifest.sha256.toLowerCase();
+  const output = el('firmware-channel-result');
+  verifyRelease.disabled = true;
+  output.textContent = 'Router sedang mengunduh dan memeriksa firmware…';
+  try {
+    const response = await fetch('/cgi-bin/veci2-verify?stable', {
+      method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
+      body: new Blob([sid, digest, manifest.size + '\n' + tag + '\n' + asset + '\n'], {type: 'application/octet-stream'})
+    });
+    if (!response.ok) throw Error('Unduhan atau verifikasi gagal (HTTP ' + response.status + ').');
+    const receipt = await response.json();
+    if (receipt.verified !== true || receipt.sha256 !== digest) throw Error('SHA-256 hasil verifikasi berbeda.');
+    if (stableRelease === manifest) output.textContent = 'Firmware kanal stabil terverifikasi di router. Instalasi belum dimulai.';
+  } catch (error) {
+    if (stableRelease === manifest) output.textContent = error.message;
+  } finally {
+    verifyRelease.disabled = false;
+  }
+});
+
 function showWorkspace() {
   globalThis.VeciSmsCenter.activate();
   el('login').hidden = true;
@@ -133,6 +167,8 @@ function showWorkspace() {
   el('logout').hidden = false;
 }
 function showLogin() {
+  stableRelease = null;
+  verifyRelease.hidden = true;
   ltePolicyRequest++;
   lteSaving = false;
   el('lte-policy-change').disabled = true;
