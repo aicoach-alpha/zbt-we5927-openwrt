@@ -334,14 +334,21 @@ apply_apn() {
 	apply_apn_at_ready
 }
 
+valid_apn() {
+	local LC_ALL=C
+	case "$1" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
+	[ "${#1}" -le 100 ]
+}
+
 apply_apn_at_ready() {
 	local apn
 
 	apn="$(cfg apn)"
 	[ -n "$apn" ] || apn=internet
+	valid_apn "$apn" || { log "Invalid configured APN"; return 1; }
 
 	at "AT+CGDCONT=1,\"IPV4V6\",\"$apn\"" 3000 >/dev/null 2>&1 || \
-	at "AT+CGDCONT=1,\"IP\",\"$apn\"" 3000 >/dev/null 2>&1 || true
+	at "AT+CGDCONT=1,\"IP\",\"$apn\"" 3000 >/dev/null 2>&1 || { log "Modem APN configuration failed"; return 1; }
 }
 
 sim_ready() {
@@ -1150,6 +1157,7 @@ case "$1" in
 	daemon)
 		daemon
 		;;
+	validate-apn) valid_apn "$2" ;;
 	status-fast)
 		status_fast_json
 		;;

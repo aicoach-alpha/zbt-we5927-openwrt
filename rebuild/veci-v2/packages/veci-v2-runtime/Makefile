@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-runtime
 PKG_VERSION:=0.1
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -10,7 +10,7 @@ define Package/veci-v2-runtime
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI v2 read-only exact-board health provider (development)
-  DEPENDS:=+rpcd +jsonfilter +swconfig +flock +fwtool +ucert
+  DEPENDS:=+we5927-lte +rpcd +jsonfilter +swconfig +flock +fwtool +ucert
 endef
 
 define Build/Compile

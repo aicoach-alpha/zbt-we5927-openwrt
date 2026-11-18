@@ -207,6 +207,9 @@ function showWorkspace() {
   el('logout').hidden = false;
 }
 function showLogin() {
+  el('lte-apn').value = '';
+  el('lte-apn').disabled = true;
+  el('lte-apn-save').disabled = true;
   el('firmware-install-result').textContent = '';
   stableRelease = null;
   verifyRelease.hidden = true;
@@ -308,17 +311,21 @@ async function refreshVisibility(action) {
 }
 let ltePolicyRequest = 0;
 let lteSaving = false;
-async function refreshLtePolicy(action) {
+async function refreshLtePolicy(action, apn) {
   if (lteSaving) return;
   const sequence = ++ltePolicyRequest;
   const session = sid;
   const status = el('lte-policy-status');
   const button = el('lte-policy-change');
   button.disabled = true;
+  el('lte-apn').disabled = true;
+  el('lte-apn-save').disabled = true;
   lteSaving = Boolean(action);
   status.textContent = action ? 'Menyimpan pilihan…' : 'Membaca pilihan…';
   try {
-    const data = await rpc('veci.v2.lte', action ? 'setFailover' : 'status', action ? {action} : {}, session);
+    const method = action === 'setApn' ? 'setApn' : action ? 'setFailover' : 'status';
+    const args = method === 'setApn' ? {apn} : action ? {action} : {};
+    const data = await rpc('veci.v2.lte', method, args, session);
     if (sequence !== ltePolicyRequest || sid !== session) return;
     if (data.ok !== true || typeof data.auto_failover !== 'boolean')
       throw Error(data.error || 'Pilihan failover tidak tersedia.');
@@ -326,6 +333,10 @@ async function refreshLtePolicy(action) {
     status.textContent = 'Slot tersimpan: ' + slot + '. Failover otomatis ' + (data.auto_failover ? 'aktif.' : 'nonaktif.');
     button.textContent = data.auto_failover ? 'Nonaktifkan failover' : 'Aktifkan failover';
     button.dataset.action = data.auto_failover ? 'DISABLE_FAILOVER' : 'ENABLE_FAILOVER';
+    el('lte-apn').value = data.configured_apn || '';
+    el('lte-apn').disabled = false;
+    el('lte-apn-save').disabled = false;
+    if (method === 'setApn') status.textContent += ' APN tersimpan untuk konfigurasi modem berikutnya.';
     button.disabled = false;
   } catch (error) {
     if (sequence === ltePolicyRequest && sid === session) status.textContent = error.message;
@@ -517,6 +528,17 @@ document.addEventListener('DOMContentLoaded', () => {
   el('ipv6-enabled').addEventListener('change', () => {
     el('ipv6-save').disabled = savedIPv6 === null ||
       el('ipv6-enabled').checked === savedIPv6;
+  });
+  el('lte-apn-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const input = el('lte-apn');
+    if (input.disabled || lteSaving) return;
+    if (!/^[A-Za-z0-9._-]{1,100}$/.test(input.value)) {
+      el('lte-policy-status').textContent = 'APN hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda hubung.';
+      return;
+    }
+    if (window.confirm('Simpan APN ' + input.value + ' untuk konfigurasi modem berikutnya?'))
+      refreshLtePolicy('setApn', input.value);
   });
   el('lte-policy-change').addEventListener('click', event => {
     const button = event.currentTarget;
