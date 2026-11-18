@@ -273,12 +273,23 @@ set_sim() {
 			;;
 	esac
 
+	# Leave another editor's pending LTE settings alone.
+	local previous changes
+	previous="$(cfg sim)"
+	if [ "$previous" != "$slot" ]; then
+		changes="$(uci -q changes we5927_lte)" || return 1
+		[ -z "$changes" ] || { log "LTE configuration has pending edits"; return 1; }
+	fi
 	gpio_set "$n" "$v" || return 1
-	# Always drive the physical GPIO on cold boot, but do not write flash
-	# if the persisted SIM selection is already correct.
-	if [ "$(cfg sim)" != "$slot" ]; then
-		uci set "$CFG.sim=$slot"
-		uci commit we5927_lte
+	if [ "$previous" != "$slot" ]; then
+		(
+			umask 077
+			tmp="$(mktemp -d /tmp/we5927-sim.XXXXXX)" || exit 1
+			trap 'rm -rf "$tmp"' EXIT
+			trap 'exit 1' HUP INT TERM
+			uci -q -t "$tmp" set "$CFG.sim=$slot" &&
+				uci -q -t "$tmp" commit we5927_lte
+		) || { log "SIM selector moved but configuration save failed"; return 1; }
 	fi
 	echo "sim=$slot" > "$STATE"
 	log "SIM selector changed to SIM$slot (GPIO$n value=$v)"
@@ -944,7 +955,7 @@ auto_switch_sim() {
 
 	if ! sim_ready; then
 		log "SIM$new not detected; reverting to SIM$old"
-		set_sim "$old" || true
+		set_sim "$old" || { log "SIM selector restore failed; stopping failover recovery"; return 1; }
 		power_cycle
 		apply_apn || true
 		ifup lte >/dev/null 2>&1 || true
@@ -965,7 +976,7 @@ auto_switch_sim() {
 	done
 
 	log "SIM$new has no working data; reverting to SIM$old"
-	set_sim "$old" || true
+	set_sim "$old" || { log "SIM selector restore failed; stopping failover recovery"; return 1; }
 	power_cycle
 	apply_apn || true
 	ifup lte >/dev/null 2>&1 || true
@@ -1162,7 +1173,7 @@ case "$1" in
 		power_cycle
 		;;
 	sim)
-		set_sim "$2"
+		set_sim "$2" || exit $?
 		power_cycle
 		apply_apn
 		ifup lte >/dev/null 2>&1 || true
