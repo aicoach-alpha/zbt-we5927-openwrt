@@ -2,16 +2,17 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
-static long ms_now(void) {
+static int64_t ms_now(void) {
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
+	return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000L;
 }
 
 int main(int argc, char **argv) {
@@ -19,7 +20,9 @@ int main(int argc, char **argv) {
 	int timeout_ms = 2500, fd, rc = 1;
 	struct termios tio;
 	char tx[512], buf[512];
-	long deadline;
+	int64_t deadline;
+	char line[16];
+	size_t used = 0;
 
 	if (argc < 3 || argc > 4) {
 		fprintf(stderr, "usage: %s /dev/ttyUSB1 'AT+CMD' [timeout_ms]\n", argv[0]);
@@ -60,12 +63,26 @@ int main(int argc, char **argv) {
 				buf[n] = '\0';
 				fputs(buf, stdout);
 				fflush(stdout);
-				if (strstr(buf, "\r\nOK\r\n") || strstr(buf, "\nOK\r") || strstr(buf, "\nOK\n")) rc = 0;
-				if (strstr(buf, "\r\nERROR\r\n") || strstr(buf, "+CME ERROR") || strstr(buf, "+CMS ERROR")) rc = 1;
-				if (rc == 0 || strstr(buf, "ERROR")) break;
+				for (ssize_t i = 0; i < n; i++) {
+					if (buf[i] != '\r' && buf[i] != '\n') {
+						if (used < sizeof(line) - 1)
+							line[used++] = buf[i];
+						continue;
+					}
+					line[used] = '\0';
+					if (!strcmp(line, "OK")) {
+						rc = 0;
+						goto done;
+					}
+					if (!strcmp(line, "ERROR") || !strncmp(line, "+CME ERROR:", 11) ||
+					    !strncmp(line, "+CMS ERROR:", 11))
+						goto done;
+					used = 0;
+				}
 			}
 		}
 	}
+done:
 	close(fd);
 	return rc;
 }
