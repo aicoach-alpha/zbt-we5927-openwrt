@@ -264,7 +264,8 @@ async function refreshOverview() {
   cards.push(metric('Identitas board', state[0], state[1]));
   state = binaryStatus(data.openwrt_supported, 'Versi sesuai', 'Versi tidak sesuai');
   cards.push(metric('OpenWrt 25.12.6', state[0], state[1]));
-  const lteLink = data.lte_ipv4 === true && data.lte_default_route === true;
+  const lteLink = typeof data.lte_ipv4 === 'boolean' && typeof data.lte_default_route === 'boolean'
+    ? data.lte_ipv4 && data.lte_default_route : null;
   state = binaryStatus(lteLink, 'IP dan gateway tersedia', 'Belum lengkap');
   cards.push(metric('LTE RNDIS', state[0], state[1]));
   cards.push(metric('Internet end-to-end', 'Belum terverifikasi', 'warn'));

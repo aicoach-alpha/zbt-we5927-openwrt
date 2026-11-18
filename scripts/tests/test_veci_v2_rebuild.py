@@ -59,6 +59,7 @@ live_board() { echo zbtlink,zbt-we5927; }
 openwrt_version() { echo 25.12.6; }
 ubus_radio_up() { echo true; }
 ubus_hostapd_ap() { return 1; }
+lte_data_device() { echo usb0; }
 ip() {
   case "$*" in
     *'addr show dev usb0'*) echo '12: usb0 inet 198.51.100.12/24' ;;
@@ -84,6 +85,31 @@ main call status
         self.assertIsNone(j["wifi_beacon_verified"])
         self.assertEqual(j["netifd_count"], 1)
         self.assertNotIn("imei", p.stdout.lower())
+
+    def test_lte_link_checks_only_the_active_managed_device(self):
+        stubs = """
+uci() { [ "$*" = '-q get we5927_lte.main.data_if' ] && echo usb1; }
+ubus() { [ "$5" = network.interface.lte ] && echo "$active"; }
+jsonfilter() { [ "$2" = '@.l3_device' ] && cat; }
+ip() {
+  case "$*" in
+    '-4 -o addr show dev usb1') echo '3: usb1 inet 192.0.2.2/24' ;;
+    '-4 route show default dev usb1') echo 'default via 192.0.2.1 dev usb1' ;;
+    *) echo unexpected-ip-query >&2 ;;
+  esac
+}
+ubus_radio_up() { :; }
+ubus_hostapd_ap() { :; }
+"""
+        for active, expected in [('usb1', True), ('usb0', None), ('', None)]:
+            with self.subTest(active=active):
+                reply = ash(without_main(STATUS) + stubs + f"active='{active}'\nmain call status")
+                self.assertEqual(reply.returncode, 0, reply.stderr)
+                data = json.loads(reply.stdout)
+                self.assertIs(data['lte_ipv4'], expected)
+                self.assertIs(data['lte_default_route'], expected)
+                self.assertIsNone(data['internet_verified'])
+                self.assertNotIn('192.0.2.', reply.stdout)
 
     def test_ap_status_uses_present_radio_interfaces(self):
         with tempfile.TemporaryDirectory() as directory:

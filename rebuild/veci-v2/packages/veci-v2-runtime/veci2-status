@@ -25,6 +25,16 @@ ubus_hostapd_ap() {
   done
   return 1
 }
+lte_data_device() {
+  local configured active
+  configured=$(uci -q get we5927_lte.main.data_if 2>/dev/null) || configured=usb0
+  [ -n "$configured" ] || configured=usb0
+  active=$(ubus -S -t 3 call network.interface.lte status '{}' 2>/dev/null |
+    jsonfilter -e '@.l3_device' 2>/dev/null) || return 1
+  case "$active" in ''|-*|*[!a-zA-Z0-9_.-]*) return 1 ;; esac
+  [ "$active" = "$configured" ] || return 1
+  printf '%s\n' "$active"
+}
 live_board() { cat /tmp/sysinfo/board_name 2>/dev/null || :; }
 openwrt_version() {
   sed -n "s/^DISTRIB_RELEASE='\([^']*\)'$/\1/p" /etc/openwrt_release 2>/dev/null | head -1
@@ -62,13 +72,15 @@ main() {
       board_ok=false; version_ok=false
       [ "$(live_board)" = 'zbtlink,zbt-we5927' ] && board_ok=true
       [ "$(openwrt_version)" = '25.12.6' ] && version_ok=true
-      lte_address=false; lte_route=false; radio=false; ap=false
-      if ip -4 -o addr show dev usb0 2>/dev/null | grep -q ' inet '; then
-        lte_address=true
-      fi
-      if ip -4 route show default dev usb0 2>/dev/null |
-          grep -q '^default via '; then
-        lte_route=true
+      lte_address=null; lte_route=null; radio=false; ap=false
+      if device=$(lte_data_device); then
+        lte_address=false; lte_route=false
+        if ip -4 -o addr show dev "$device" 2>/dev/null | grep -q ' inet '; then
+          lte_address=true
+        fi
+        if ip -4 route show default dev "$device" 2>/dev/null | grep -q '^default via '; then
+          lte_route=true
+        fi
       fi
       radio_result="$(ubus_radio_up || true)"
       [ "$radio_result" = true ] && radio=true
