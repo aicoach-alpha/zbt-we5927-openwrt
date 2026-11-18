@@ -24,5 +24,22 @@
         ]
       }
     }
+  },
+  "veci-v2-wifi": {
+    "description": "Primary AP visibility",
+    "read": {
+      "ubus": {
+        "veci.v2.wifi": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.wifi": [
+          "setVisibility"
+        ]
+      }
+    }
   }
 }

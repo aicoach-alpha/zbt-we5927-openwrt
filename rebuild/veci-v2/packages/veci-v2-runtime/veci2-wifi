@@ -1,0 +1,44 @@
+#!/bin/sh
+set -eu
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+ap=wireless.default_radio0
+check_ap() {
+  [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+  [ "$(uci -q get "$ap")" = wifi-iface ] &&
+    [ "$(uci -q get "$ap.device")" = radio0 ] &&
+    [ "$(uci -q get "$ap.mode")" = ap ] || fail primary_ap_unavailable
+  changes=$(uci -q changes wireless) || fail config_unavailable
+  [ -z "$changes" ] || fail pending_wireless_changes
+}
+visibility() {
+  case "$(uci -q get "$ap.hidden" || :)" in
+    ''|0|false|off|no) visible=true ;;
+    1|true|on|yes) visible=false ;;
+    *) fail invalid_visibility ;;
+  esac
+}
+case "${1:-}:${2:-}" in
+  list:*) echo '{"status":{},"setVisibility":{"action":"String"}}'; exit 0 ;;
+  call:status) check_ap; visibility ;;
+  call:setVisibility)
+    request=$(head -c 257)
+    [ "${#request}" -le 256 ] || fail invalid_request
+    action=$(jsonfilter -s "$request" -e '@.action') || fail invalid_request
+    case "$action" in SHOW_SSID) desired=true; hidden=0 ;; HIDE_SSID) desired=false; hidden=1 ;; *) fail invalid_action ;; esac
+    exec 9<"$0"
+    flock -n 9 || fail busy
+    check_ap
+    visibility
+    if [ "$visible" != "$desired" ]; then
+      tmp=$(mktemp -d /tmp/veci2-wifi.XXXXXX)
+      trap 'rm -rf "$tmp"' EXIT
+      trap 'exit 1' HUP INT TERM
+      uci -q -t "$tmp" set "$ap.hidden=$hidden" && uci -q -t "$tmp" commit wireless || fail save_failed
+      check_ap
+      visibility
+      [ "$visible" = "$desired" ] || fail save_failed
+    fi ;;
+  *) fail unsupported_method ;;
+esac
+printf '{"ok":true,"configured_visible":%s}\n' "$visible"

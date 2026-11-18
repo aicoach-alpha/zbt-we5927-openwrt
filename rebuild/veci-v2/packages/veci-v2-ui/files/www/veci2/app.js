@@ -133,6 +133,11 @@ function showWorkspace() {
   el('logout').hidden = false;
 }
 function showLogin() {
+  visibilityRequest++;
+  configuredVisible = null;
+  savingVisibility = false;
+  el('wifi-visibility-change').disabled = true;
+  el('wifi-visibility-status').textContent = '';
   channelRequest?.abort();
   channelRequest = null;
   channelButton.disabled = false;
@@ -158,6 +163,7 @@ function showPage(id) {
   if (id === 'network') {
     refreshNetwork();
     refreshEthernet();
+    refreshVisibility();
   }
   if (id === 'sms') refreshSMS();
   if (id === 'settings') refreshIPv6();
@@ -189,6 +195,35 @@ async function refreshOverview() {
       Math.round(data.memory_available_kb / 1024) + ' MiB' : 'Unknown'));
   el('status-grid').replaceChildren(...cards);
 }
+let visibilityRequest = 0;
+let configuredVisible = null;
+let savingVisibility = false;
+async function refreshVisibility(action) {
+  if (savingVisibility) return;
+  const sequence = ++visibilityRequest;
+  const session = sid;
+  const button = el('wifi-visibility-change');
+  const status = el('wifi-visibility-status');
+  button.disabled = true;
+  configuredVisible = null;
+  savingVisibility = Boolean(action);
+  status.textContent = action ? 'Menyimpan konfigurasi…' : 'Membaca konfigurasi…';
+  try {
+    const data = await rpc('veci.v2.wifi', action ? 'setVisibility' : 'status', action ? {action} : {}, session);
+    if (sequence !== visibilityRequest || sid !== session) return;
+    if (!data.ok || typeof data.configured_visible !== 'boolean')
+      throw Error(data.error || 'Status tidak tersedia');
+    configuredVisible = data.configured_visible;
+    status.textContent = (configuredVisible ? 'Konfigurasi: SSID ditampilkan.' : 'Konfigurasi: SSID disembunyikan.') +
+      ' Perubahan berlaku saat Wi-Fi berikutnya dimulai. Beacon perlu diperiksa dari perangkat klien.';
+    button.textContent = configuredVisible ? 'Sembunyikan SSID' : 'Tampilkan SSID';
+    button.disabled = false;
+  } catch (error) {
+    if (sequence === visibilityRequest && sid === session) status.textContent = error.message;
+  } finally {
+    if (sequence === visibilityRequest) savingVisibility = false;
+  }
+}
 async function refreshEthernet() {
   const root = el('ethernet-status');
   try {
@@ -208,10 +243,12 @@ async function refreshNetwork() {
   root.replaceChildren(metric('Koneksi', 'Memeriksa...', 'warn'));
   try {
     const data = await rpc('veci.v2', 'status');
-    const lte = data.lte_ipv4 === true && data.lte_default_route === true;
+    const ipv4 = binaryStatus(data.lte_ipv4, 'Alamat tersedia', 'Belum mendapat alamat');
+    const gateway = binaryStatus(data.lte_default_route, 'Rute tersedia', 'Belum ada rute default');
     const ap = data.wifi_ap_enabled === true;
     root.replaceChildren(
-      metric('LTE / Gateway', lte ? 'Alamat IPv4 dan gateway tersedia' : 'Belum siap', lte ? 'good' : 'warn'),
+      metric('LTE / IPv4', ...ipv4),
+      metric('LTE / Gateway', ...gateway),
       metric('Wi-Fi AP', ap ? 'hostapd aktif — beacon belum teruji' : 'AP belum aktif', ap ? 'warn' : 'bad'),
       metric('Netifd', data.netifd_count === 1 ? 'Satu proses normal' : 'Perlu pemeriksaan',
         data.netifd_count === 1 ? 'good' : 'warn')
@@ -371,6 +408,12 @@ document.addEventListener('DOMContentLoaded', () => {
   el('ipv6-enabled').addEventListener('change', () => {
     el('ipv6-save').disabled = savedIPv6 === null ||
       el('ipv6-enabled').checked === savedIPv6;
+  });
+  el('wifi-visibility-change').addEventListener('click', () => {
+    if (configuredVisible === null || savingVisibility) return;
+    const label = configuredVisible ? 'Sembunyikan' : 'Tampilkan';
+    if (window.confirm(label + ' SSID utama pada konfigurasi tersimpan? Radio tetap berjalan.'))
+      refreshVisibility(configuredVisible ? 'HIDE_SSID' : 'SHOW_SSID');
   });
   el('ipv6-save').addEventListener('click', saveIPv6);
   el('open-addons').addEventListener('click', () => showPage('apps'));
