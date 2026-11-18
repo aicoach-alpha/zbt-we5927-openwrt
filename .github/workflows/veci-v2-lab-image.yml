@@ -167,7 +167,10 @@ jobs:
           }
           rom="$RUNNER_TEMP/veci-v2-verified-squashfs"
           mkdir -p "$rom"
-          unsquashfs -no-progress -d "$rom" "$squash"
+          # SquashFS contains /dev/console character device. A non-root extraction
+          # returns exit code 2 even when regular files are extracted.
+          # Extract as root so device-node errors remain a hard gate.
+          sudo unsquashfs -no-progress -d "$rom" "$squash"
           test -s "$rom/usr/libexec/rpcd/veci.v2" || {
             echo 'FINAL_SQUASHFS_MISSING_RPCD_V2' >&2; exit 1;
           }
