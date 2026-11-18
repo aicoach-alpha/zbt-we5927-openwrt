@@ -984,7 +984,7 @@ auto_switch_sim() {
 }
 
 daemon() {
- local failures recoveries threshold interval hard_after auto sim_after sim next
+ local failures recoveries threshold interval hard_after sim_after sim next
  local last_hard last_sim last_upstream_check now gap stage classification radio_phase
  local last_renew_attempt last_repair_attempt renew_rc repair_rc
  radio_phase=unknown
@@ -1033,7 +1033,6 @@ daemon() {
  threshold="$(clamped_number "$(cfg fail_threshold)" 3 2 20)"
  interval="$(clamped_number "$(cfg ping_interval)" 10 5 120)"
  hard_after="$(clamped_number "$(cfg hard_reset_after)" 3 2 20)"
- auto="$(cfg auto_failover)"
  sim_after="$(clamped_number "$(cfg sim_failover_after)" 3 2 20)"
  log "LTE performance-first monitor started; checks every $interval sec; threshold $threshold"
 
@@ -1123,7 +1122,7 @@ daemon() {
                log "Suppressing modem power-cycle during 900-second cooldown"
              fi
            fi
-           if [ "$auto" = 1 ] && [ "$recoveries" -ge "$sim_after" ] && ! data_ok && ! gateway_ok; then
+           if [ "$recoveries" -ge "$sim_after" ] && [ "$(cfg auto_failover)" = 1 ] && ! data_ok && ! gateway_ok; then
              now="$(date +%s)"
              case "$now" in ''|*[!0-9]*) now=0 ;; esac
              gap=$((now - last_sim))

@@ -41,5 +41,22 @@
         ]
       }
     }
+  },
+  "veci-v2-lte": {
+    "description": "Read cellular preferences and change automatic SIM failover",
+    "read": {
+      "ubus": {
+        "veci.v2.lte": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.lte": [
+          "setFailover"
+        ]
+      }
+    }
   }
 }

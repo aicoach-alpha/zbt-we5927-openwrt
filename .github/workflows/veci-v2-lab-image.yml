@@ -213,6 +213,7 @@ jobs:
           done
           find "$rom/lib/modules" -type f -name 'mt7603e.ko' -size +0c -print -quit | grep -q mt7603e.ko
           test -x "$rom/usr/bin/ucert"
+          test -x "$rom/usr/libexec/rpcd/veci.v2.lte"
           test -x "$rom/usr/libexec/rpcd/veci.v2.wifi"
           test -x "$rom/www/cgi-bin/veci2-verify"
           test -x "$rom/usr/libexec/veci2-verify-image"

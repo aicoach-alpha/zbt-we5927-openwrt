@@ -133,6 +133,10 @@ function showWorkspace() {
   el('logout').hidden = false;
 }
 function showLogin() {
+  ltePolicyRequest++;
+  lteSaving = false;
+  el('lte-policy-change').disabled = true;
+  el('lte-policy-status').textContent = '';
   visibilityRequest++;
   configuredVisible = null;
   savingVisibility = false;
@@ -164,6 +168,7 @@ function showPage(id) {
     refreshNetwork();
     refreshEthernet();
     refreshVisibility();
+    refreshLtePolicy();
   }
   if (id === 'sms') refreshSMS();
   if (id === 'settings') refreshIPv6();
@@ -222,6 +227,33 @@ async function refreshVisibility(action) {
     if (sequence === visibilityRequest && sid === session) status.textContent = error.message;
   } finally {
     if (sequence === visibilityRequest) savingVisibility = false;
+  }
+}
+let ltePolicyRequest = 0;
+let lteSaving = false;
+async function refreshLtePolicy(action) {
+  if (lteSaving) return;
+  const sequence = ++ltePolicyRequest;
+  const session = sid;
+  const status = el('lte-policy-status');
+  const button = el('lte-policy-change');
+  button.disabled = true;
+  lteSaving = Boolean(action);
+  status.textContent = action ? 'Menyimpan pilihan…' : 'Membaca pilihan…';
+  try {
+    const data = await rpc('veci.v2.lte', action ? 'setFailover' : 'status', action ? {action} : {}, session);
+    if (sequence !== ltePolicyRequest || sid !== session) return;
+    if (data.ok !== true || typeof data.auto_failover !== 'boolean')
+      throw Error(data.error || 'Pilihan failover tidak tersedia.');
+    const slot = [1, 2].includes(data.configured_slot) ? 'SIM ' + data.configured_slot : 'belum diketahui';
+    status.textContent = 'Slot tersimpan: ' + slot + '. Failover otomatis ' + (data.auto_failover ? 'aktif.' : 'nonaktif.');
+    button.textContent = data.auto_failover ? 'Nonaktifkan failover' : 'Aktifkan failover';
+    button.dataset.action = data.auto_failover ? 'DISABLE_FAILOVER' : 'ENABLE_FAILOVER';
+    button.disabled = false;
+  } catch (error) {
+    if (sequence === ltePolicyRequest && sid === session) status.textContent = error.message;
+  } finally {
+    if (sequence === ltePolicyRequest) lteSaving = false;
   }
 }
 async function refreshEthernet() {
@@ -408,6 +440,14 @@ document.addEventListener('DOMContentLoaded', () => {
   el('ipv6-enabled').addEventListener('change', () => {
     el('ipv6-save').disabled = savedIPv6 === null ||
       el('ipv6-enabled').checked === savedIPv6;
+  });
+  el('lte-policy-change').addEventListener('click', event => {
+    const button = event.currentTarget;
+    if (button.disabled) return;
+    const message = button.dataset.action === 'ENABLE_FAILOVER' ?
+      'Izinkan modem mencoba SIM lain saat koneksi gagal? Perpindahan dapat memutus LTE sementara.' :
+      'Nonaktifkan perpindahan SIM otomatis berikutnya?';
+    if (window.confirm(message)) refreshLtePolicy(button.dataset.action);
   });
   el('wifi-visibility-change').addEventListener('click', () => {
     if (configuredVisible === null || savingVisibility) return;
