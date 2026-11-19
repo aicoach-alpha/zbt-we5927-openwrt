@@ -241,14 +241,14 @@
       "origin": "LuCI LED Configuration",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "system_access_ssh_https",
       "origin": "LuCI Administration",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "system_backup_restore",
