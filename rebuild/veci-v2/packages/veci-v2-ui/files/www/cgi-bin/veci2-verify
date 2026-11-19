@@ -81,7 +81,16 @@ else
 fi
 [ "$(wc -c < "$work/image")" -eq "$size" ] || bad
 if ! "$verify" "$work/image" "$digest" > "$work/result" 2>&1; then
-  reply '422 Unprocessable Entity' '{"error":"image_verification_failed"}'
+  reason=$(tail -n 1 "$work/result")
+  case "$reason" in
+    unsupported_board|incompatible_flash_layout|incompatible_target|incompatible_device) reason=incompatible_image ;;
+    missing_anchor|anchor_mismatch) reason=trust_anchor_failed ;;
+    signature_unreadable|invalid_signature) reason=signature_failed ;;
+    checksum_mismatch|image_changed) reason=digest_failed ;;
+    sysupgrade_test_failed) reason=sysupgrade_test_failed ;;
+    *) reason=image_verification_failed ;;
+  esac
+  reply '422 Unprocessable Entity' "{\"error\":\"$reason\"}"
 fi
 if [ "$operation" = apply ]; then
   authorize

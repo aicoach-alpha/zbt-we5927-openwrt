@@ -18,7 +18,7 @@ function node(id) {
 const base = {schema:1, channel:'stable', board:'zbtlink,zbt-we5927', target:'ramips/mt76x8',
   supported_devices:['zbtlink,zbt-we5927'], available:true, size:7995392, sha256:'a'.repeat(64),
   firmware_url:'https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/v2/fw.bin'};
-let body, calls = 0, approved = false, installCalls = 0;
+let verifyFailure, calls = 0, approved = false, installCalls = 0, body;
 const window = {confirm: () => approved};
 const document = {getElementById:node, addEventListener() {}};
 const fetch = async (url, options) => {
@@ -30,6 +30,7 @@ const fetch = async (url, options) => {
     return {status:202,json:async () => ({accepted:true,sha256:base.sha256})};
   }
   if (url === '/cgi-bin/veci2-verify?stable') {
+    if (verifyFailure) return {ok:false,status:422,json:async()=>({error:verifyFailure})};
     assert.equal(options.method,'POST');
     assert.equal(options.credentials,'omit');
     assert.equal(await options.body.text(), '1'.repeat(32) + base.sha256 + '7995392' + String.fromCharCode(10) + 'v2' + String.fromCharCode(10) + 'fw.bin' + String.fromCharCode(10));
@@ -61,6 +62,14 @@ assert.equal(calls,0);
   assert.equal(node('firmware-channel-verify').hidden,false);
   await node('firmware-channel-verify').click();
   assert.match(node('firmware-channel-result').textContent,/terverifikasi di router/);
+  for (const [code, message] of [['signature_failed', /Signature/], ['unknown_private_detail', /HTTP 422/]]) {
+    verifyFailure = code;
+    await node('firmware-channel-verify').click();
+    assert.match(node('firmware-channel-result').textContent, message);
+    assert.equal(node('firmware-install').hidden,true);
+  }
+  verifyFailure = null;
+  await node('firmware-channel-verify').click();
   const install = node('firmware-install');
   assert.equal(install.hidden,false);
   await install.click();

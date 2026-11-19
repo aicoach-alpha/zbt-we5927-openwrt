@@ -43,6 +43,23 @@ function binaryStatus(value, trueLabel = 'Aktif', falseLabel = 'Tidak aktif') {
   if (value === false) return [falseLabel, 'bad'];
   return ['Belum diverifikasi', 'warn'];
 }
+async function firmwareError(response) {
+  const fallback = 'Permintaan firmware gagal (HTTP ' + response.status + ').';
+  let code;
+  try { code = (await response.json()).error; } catch { return fallback; }
+  switch (code) {
+    case 'incompatible_image': return 'Board, target, atau partisi flash tidak cocok dengan image.';
+    case 'trust_anchor_failed': return 'Kunci tepercaya router tidak tersedia atau berbeda dari kunci rilis.';
+    case 'signature_failed': return 'Signature firmware tidak dapat diverifikasi. Periksa sumber image.';
+    case 'digest_failed': return 'Byte image berbeda dari SHA-256 yang dipilih. Periksa file dan manifest.';
+    case 'sysupgrade_test_failed': return 'Router menolak image saat uji sysupgrade -T.';
+    case 'verification_expired_or_replaced': return 'Tiket sudah kedaluwarsa atau diganti. Verifikasi ulang firmware.';
+    case 'verification_busy': return 'Router sedang memproses firmware. Tunggu hingga proses selesai.';
+    case 'insufficient_tmp_space': return 'Ruang sementara router tidak cukup untuk memeriksa image.';
+    case 'release_download_failed': return 'Router gagal mengunduh aset rilis GitHub. Periksa koneksi router.';
+    default: return fallback;
+  }
+}
 const firmwareForm = el('firmware-check');
 let installCandidate = null;
 const installButton = el('firmware-install');
@@ -71,7 +88,7 @@ installButton.addEventListener('click', async () => {
       body: new Blob([session, candidate.digest, candidate.ticket, candidate.payload], {type:'application/octet-stream'})
     });
     if (sid !== session) return;
-    if (response.status !== 202) throw Error('Router tidak mengonfirmasi permintaan (HTTP ' + response.status + ').');
+    if (response.status !== 202) throw Error(await firmwareError(response));
     const result = await response.json();
     if (result.accepted !== true || result.sha256 !== candidate.digest) throw Error('Respons instalasi tidak cocok.');
     if (sid === session) status.textContent = 'Permintaan diterima. Periksa versi firmware setelah router kembali online.';
@@ -113,7 +130,7 @@ firmwareForm.addEventListener('submit', async event => {
       method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
       body: new Blob([session, expected, file], {type: 'application/octet-stream'})
     });
-    if (!response.ok) throw Error('Router menolak pemeriksaan (HTTP ' + response.status + ').');
+    if (!response.ok) throw Error(await firmwareError(response));
     const receipt = await response.json();
     if (receipt.verified !== true || receipt.sha256 !== expected)
       throw Error('Hasil pemeriksaan router tidak cocok dengan file.');
@@ -195,7 +212,7 @@ verifyRelease.addEventListener('click', async () => {
       method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
       body: new Blob([session, digest, manifest.size + '\n' + tag + '\n' + asset + '\n'], {type: 'application/octet-stream'})
     });
-    if (!response.ok) throw Error('Unduhan atau verifikasi gagal (HTTP ' + response.status + ').');
+    if (!response.ok) throw Error(await firmwareError(response));
     const receipt = await response.json();
     if (receipt.verified !== true || receipt.sha256 !== digest) throw Error('SHA-256 hasil verifikasi berbeda.');
     if (generation !== firmwareCheckGeneration || sid !== session) return;
