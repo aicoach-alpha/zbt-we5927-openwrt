@@ -52,7 +52,8 @@ function clearInstallCandidate() {
 }
 function offerInstall(receipt, payload, ota) {
   clearInstallCandidate();
-  if (!/^[0-9a-f]{64}$/.test(receipt.ticket || '')) return;
+  if (!/^[0-9a-f]{64}$/.test(receipt.ticket || ''))
+    throw Error('Router tidak memberikan tiket instalasi yang valid.');
   installCandidate = {digest: receipt.sha256, ticket: receipt.ticket, payload, ota};
   installButton.hidden = false;
 }
@@ -82,14 +83,18 @@ installButton.addEventListener('click', async () => {
 let firmwareCheckGeneration = 0;
 function resetFirmwareResult() {
   clearInstallCandidate();
-  firmwareCheckGeneration++;
+  const generation = ++firmwareCheckGeneration;
+  verifyRelease.disabled = false;
   firmwareForm.querySelector('output').textContent = '';
+  if (stableRelease)
+    el('firmware-channel-result').textContent = describeFirmwareChannel(stableRelease);
+  return generation;
 }
 firmwareForm.addEventListener('input', resetFirmwareResult);
 firmwareForm.addEventListener('submit', async event => {
   event.preventDefault();
-  clearInstallCandidate();
-  const generation = ++firmwareCheckGeneration;
+  const generation = resetFirmwareResult();
+  const session = sid;
   const file = firmwareForm.elements.image.files[0];
   const expected = firmwareForm.elements.digest.value.trim().toLowerCase();
   const output = firmwareForm.querySelector('output');
@@ -102,21 +107,21 @@ firmwareForm.addEventListener('submit', async event => {
     const bytes = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
     const actual = Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
     if (actual !== expected) throw Error('SHA-256 file berbeda dari manifest.');
-    if (generation !== firmwareCheckGeneration) return;
+    if (generation !== firmwareCheckGeneration || sid !== session) return;
     output.textContent = 'Mengunggah file untuk pemeriksaan signature dan kompatibilitas di router…';
     const response = await fetch('/cgi-bin/veci2-verify', {
       method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
-      body: new Blob([sid, expected, file], {type: 'application/octet-stream'})
+      body: new Blob([session, expected, file], {type: 'application/octet-stream'})
     });
     if (!response.ok) throw Error('Router menolak pemeriksaan (HTTP ' + response.status + ').');
     const receipt = await response.json();
     if (receipt.verified !== true || receipt.sha256 !== expected)
       throw Error('Hasil pemeriksaan router tidak cocok dengan file.');
-    if (generation === firmwareCheckGeneration) offerInstall(receipt, file, false);
-    if (generation === firmwareCheckGeneration)
-      output.textContent = 'Signature dan kompatibilitas file terverifikasi di router. File sementara telah diproses tanpa instalasi.';
+    if (generation !== firmwareCheckGeneration || sid !== session) return;
+    offerInstall(receipt, file, false);
+    output.textContent = 'Signature dan kompatibilitas file terverifikasi di router. File sementara telah diproses tanpa instalasi.';
   } catch (error) {
-    if (generation === firmwareCheckGeneration) output.textContent = error.message;
+    if (generation === firmwareCheckGeneration && sid === session) output.textContent = error.message;
   }
 });
 
@@ -143,7 +148,7 @@ let channelRequest;
 channelButton.addEventListener('click', async () => {
   const output = el('firmware-channel-result');
   const request = new AbortController();
-  clearInstallCandidate();
+  resetFirmwareResult();
   channelRequest = request;
   stableRelease = null;
   verifyRelease.hidden = true;
@@ -181,22 +186,25 @@ verifyRelease.addEventListener('click', async () => {
   const [, tag, asset] = releaseAsset.exec(manifest.firmware_url);
   const digest = manifest.sha256.toLowerCase();
   const output = el('firmware-channel-result');
+  const generation = resetFirmwareResult();
+  const session = sid;
   verifyRelease.disabled = true;
   output.textContent = 'Router sedang mengunduh dan memeriksa firmware…';
   try {
     const response = await fetch('/cgi-bin/veci2-verify?stable', {
       method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
-      body: new Blob([sid, digest, manifest.size + '\n' + tag + '\n' + asset + '\n'], {type: 'application/octet-stream'})
+      body: new Blob([session, digest, manifest.size + '\n' + tag + '\n' + asset + '\n'], {type: 'application/octet-stream'})
     });
     if (!response.ok) throw Error('Unduhan atau verifikasi gagal (HTTP ' + response.status + ').');
     const receipt = await response.json();
     if (receipt.verified !== true || receipt.sha256 !== digest) throw Error('SHA-256 hasil verifikasi berbeda.');
-    if (stableRelease === manifest) offerInstall(receipt, [manifest.size, tag, asset, ''].join('\n'), true);
-    if (stableRelease === manifest) output.textContent = 'Firmware kanal stabil terverifikasi di router. Instalasi belum dimulai.';
+    if (generation !== firmwareCheckGeneration || sid !== session) return;
+    offerInstall(receipt, [manifest.size, tag, asset, ''].join('\n'), true);
+    output.textContent = 'Firmware kanal stabil terverifikasi di router. Instalasi belum dimulai.';
   } catch (error) {
-    if (stableRelease === manifest) output.textContent = error.message;
+    if (generation === firmwareCheckGeneration && sid === session) output.textContent = error.message;
   } finally {
-    verifyRelease.disabled = false;
+    if (generation === firmwareCheckGeneration) verifyRelease.disabled = false;
   }
 });
 

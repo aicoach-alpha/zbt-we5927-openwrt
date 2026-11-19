@@ -12,7 +12,7 @@ class FirmwareChannelTests(unittest.TestCase):
 const fs = require('fs'), vm = require('vm'), assert = require('assert/strict');
 const nodes = new Map();
 function node(id) {
-  if (!nodes.has(id)) nodes.set(id, {addEventListener(type, fn) { this[type] = fn; }});
+  if (!nodes.has(id)) nodes.set(id, {querySelector(){return node(id+'-output');}, addEventListener(type, fn) { this[type] = fn; }});
   return nodes.get(id);
 }
 const base = {schema:1, channel:'stable', board:'zbtlink,zbt-we5927', target:'ramips/mt76x8',
