@@ -148,11 +148,7 @@ jobs:
           # precise image root and is present in the image's real SquashFS.
           # A successful package compile or APK installation log alone is
           # insufficient; do not mask an absent runtime with a source overlay.
-          for pkg in veci-v2-runtime veci-v2-package-manager veci-v2-sms veci-v2-ipv6 veci-v2-ui; do
-            test -s "bin/packages/mipsel_24kc/base/${pkg}-0.1-r1.apk" || {
-              echo "MISSING_COMPILED_APK:$pkg" >&2; exit 1;
-            }
-          done
+          python3 "$GITHUB_WORKSPACE/rebuild/veci-v2/ci/check-compiled-apks.py" bin/packages/mipsel_24kc/base
           compiled_rom="$PWD/build_dir/target-mipsel_24kc_musl/root-ramips"
           test -d "$compiled_rom" || { echo "IMAGE_ROOT_MISSING:$compiled_rom" >&2; exit 1; }
           if [ ! -s "$compiled_rom/usr/libexec/rpcd/veci.v2" ]; then
@@ -229,6 +225,15 @@ jobs:
           test -x "$rom/usr/sbin/we5927-lte"
           cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/usr/sbin/we5927-lte" "$rom/usr/sbin/we5927-lte"
           test -x "$rom/usr/bin/ucert"
+          runtime="$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-runtime"
+          ui="$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-ui/files"
+          cmp "$runtime/veci2-lte-policy" "$rom/usr/libexec/rpcd/veci.v2.lte"
+          cmp "$runtime/veci2-status" "$rom/usr/libexec/rpcd/veci.v2"
+          cmp "$runtime/veci2-status-acl.json" "$rom/usr/share/rpcd/acl.d/veci-v2-runtime.json"
+          for rel in www/veci2/app.js www/veci2/index.html www/veci2/app.css etc/uci-defaults/97-veci-v2-https; do
+            cmp "$ui/$rel" "$rom/$rel"
+          done
+          test -x "$rom/etc/uci-defaults/97-veci-v2-https"
           test -x "$rom/usr/libexec/rpcd/veci.v2.lte"
           test -x "$rom/usr/libexec/rpcd/veci.v2.wifi"
           cmp "$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi" "$rom/usr/libexec/rpcd/veci.v2.wifi"
