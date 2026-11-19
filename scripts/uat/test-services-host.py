@@ -19,12 +19,17 @@ with tempfile.TemporaryDirectory() as tmp:
     board.write_text("zbtlink,zbt-we5927\n")
     provider = root / "provider"
     provider.write_text((pkg / "veci2-services").read_text()
-                        .replace("/etc/init.d", str(init)).replace("/etc/rc.d", str(rc))
+                        .replace("init=/etc/init.d", "init=" + str(init)).replace("/etc/rc.d", str(rc))
                         .replace("/tmp/sysinfo/board_name", str(board))
                         .replace("/usr/share/libubox/jshn.sh", str(prefix / "share/libubox/jshn.sh")))
-    env = dict(os.environ, PATH=f"{prefix}/bin:" + os.environ["PATH"],
+    env = dict(os.environ, PATH=f"{root}:{prefix}/bin:" + os.environ["PATH"],
                LD_LIBRARY_PATH=str(prefix / "lib"))
-    for name in ("cron", "sysntpd", "we5927-lte", "network"):
+    apk = root / "apk"
+    apk.write_text('#!/bin/sh\n[ "$1 $2" = "info -L" ] || exit 1\n'
+                   'case "$3" in ddns-scripts) echo /etc/init.d/ddns ;; '
+                   'sqm-scripts) echo etc/init.d/sqm ;; *) exit 1 ;; esac\n')
+    apk.chmod(0o755)
+    for name in ("ddns", "sqm", "cron", "sysntpd", "we5927-lte", "network"):
         script = init / name
         script.write_text('#!/bin/sh\ncase "$1" in\n'
                           f'enable) ln -s ../init.d/{name} "{rc}/S50{name}" ;;\n'
@@ -44,8 +49,17 @@ with tempfile.TemporaryDirectory() as tmp:
     def state(data):
         return {s["name"]: (s["enabled"], s["mutable"]) for s in data["services"]}
 
-    assert state(call("status")) == {"cron": (False, True), "sysntpd": (False, True),
+    assert state(call("status")) == {"ddns": (False, True), "sqm": (False, True), "cron": (False, True), "sysntpd": (False, True),
                                      "we5927-lte": (False, False), "network": (False, False)}
+    for name in ("ddns", "sqm"):
+        addon = next(s for s in call("status")["services"] if s["name"] == name)
+        assert addon["package"] == name + "-scripts"
+        assert state(select(name, "0", "1"))[name] == (True, True)
+        assert select(name, "0", "1")["error"] == "stale_selection"
+        assert state(select(name, "1", "0"))[name] == (False, True)
+    apk.write_text('#!/bin/sh\necho etc/init.d/unrelated\n')
+    assert select("ddns", "0", "1")["error"] == "protected_service"
+    assert not any(row.get("package") for row in call("status")["services"])
     assert state(select("cron", "0", "1"))["cron"] == (True, True)
     assert select("cron", "0", "1")["error"] == "stale_selection"
     assert state(select("cron", "1", "1"))["cron"] == (True, True)
