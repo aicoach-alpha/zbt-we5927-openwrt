@@ -64,3 +64,9 @@ footer { text-align:center; color:var(--muted); padding:18px; font-size:11px }
 .sms-card small { display:block; color:var(--muted); margin:5px 0 }
 .sms-card p { white-space:pre-wrap; overflow-wrap:anywhere; margin:9px 0; color:var(--ink) }
 .sms-card button { font-size:12px; padding:7px 11px; margin:3px 5px 3px 0 }
+
+/* DNS Settings native controls */
+#dns-form { max-width:510px }
+#dns-form select,#dns-form input { width:100%; border:1px solid #bdcbd6; color:var(--ink); background:#fff; border-radius:8px; padding:10px; font:inherit }
+#dns-save { margin-top:14px }
+#speedtest-history { white-space:pre-line; font-size:13px; color:var(--muted) }

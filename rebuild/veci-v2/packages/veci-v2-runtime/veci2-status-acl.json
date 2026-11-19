@@ -1,18 +1,19 @@
 {
-  "veci-v2-runtime": {
-    "description": "VeCI v2 read-only exact-board diagnostics",
+  "veci-v2-dns": {
+    "description": "Manage upstream DNS via authenticated local dnsmasq",
     "read": {
       "ubus": {
-        "veci.v2": [
-          "status",
-          "capabilities",
-          "smsProvider",
-          "ethernetPorts"
+        "veci.v2.dns": [
+          "status"
         ]
       }
     },
     "write": {
-      "ubus": {}
+      "ubus": {
+        "veci.v2.dns": [
+          "set"
+        ]
+      }
     }
   },
   "veci-v2-firmware": {
@@ -22,25 +23,6 @@
         "veci.v2.firmware": [
           "verify",
           "apply"
-        ]
-      }
-    }
-  },
-  "veci-v2-wifi": {
-    "description": "Primary AP name and visibility",
-    "read": {
-      "ubus": {
-        "veci.v2.wifi": [
-          "status"
-        ]
-      }
-    },
-    "write": {
-      "ubus": {
-        "veci.v2.wifi": [
-          "setVisibility",
-          "setSsid",
-          "setAutoChannel"
         ]
       }
     }
@@ -59,6 +41,41 @@
         "veci.v2.lte": [
           "setFailover",
           "setApn"
+        ]
+      }
+    }
+  },
+  "veci-v2-runtime": {
+    "description": "VeCI v2 read-only exact-board diagnostics",
+    "read": {
+      "ubus": {
+        "veci.v2": [
+          "status",
+          "capabilities",
+          "smsProvider",
+          "ethernetPorts"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {}
+    }
+  },
+  "veci-v2-wifi": {
+    "description": "Primary AP name and visibility",
+    "read": {
+      "ubus": {
+        "veci.v2.wifi": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.wifi": [
+          "setVisibility",
+          "setSsid",
+          "setAutoChannel"
         ]
       }
     }

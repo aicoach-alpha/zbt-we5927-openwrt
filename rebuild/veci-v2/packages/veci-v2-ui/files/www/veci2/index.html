@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json https://speed.cloudflare.com; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'">
   <title>VeCI v2 — WE5927-DSIM Engineering Preview</title>
   <link rel="stylesheet" href="/veci2/app.css">
   <script src="/veci2/sms-codec.js" defer></script>
   <script src="/veci2/sms-center.js" defer></script>
+  <script src="/veci2/speed-test.js" defer></script>
+  <script src="/veci2/dns-settings.js" defer></script>
   <script src="/veci2/app.js" defer></script>
 </head>
 <body>
@@ -68,6 +70,32 @@
           </article>
         </section>
         <section id="settings" class="page" aria-label="Pengaturan router" hidden>
+          <article class="panel">
+            <h2>DNS Settings</h2>
+            <p>Atur DNS upstream yang digunakan dnsmasq untuk perangkat LAN. Mode otomatis mengikuti DNS operator; mode manual memakai DNS IPv4 pilihan. Tidak mengubah modem atau APN.</p>
+            <form id="dns-form">
+              <label for="dns-mode">Mode DNS</label>
+              <select id="dns-mode"><option value="AUTO">Otomatis dari operator</option><option value="CUSTOM">Manual (IPv4)</option></select>
+              <label for="dns-preset">Preset manual</label>
+              <select id="dns-preset"><option value="">Pilih sendiri</option><option value="cloudflare">Cloudflare</option><option value="google">Google</option><option value="quad9">Quad9</option><option value="adguard">AdGuard</option></select>
+              <label for="dns-primary">DNS utama</label>
+              <input id="dns-primary" inputmode="decimal" maxlength="15" placeholder="1.1.1.1" autocomplete="off">
+              <label for="dns-secondary">DNS kedua (opsional)</label>
+              <input id="dns-secondary" inputmode="decimal" maxlength="15" placeholder="1.0.0.1" autocomplete="off">
+              <button id="dns-save" type="submit" disabled>Simpan &amp; terapkan DNS</button>
+            </form>
+            <p class="notice">Penerapan me-restart dnsmasq sebentar; tidak me-restart modem, Wi-Fi, atau firewall. Jika restart gagal, konfigurasi DHCP sebelumnya dipulihkan.</p>
+            <p id="dns-status" class="result" role="status" aria-live="polite">Memuat pengaturan DNS…</p>
+          </article>
+          <article class="panel">
+            <h2>Speed Test Lite</h2>
+            <p>Ukur kecepatan koneksi melalui browser ke server Cloudflare. Ini mengukur jalur perangkat penguji, bukan kemampuan maksimum CPU router. Hanya gunakan saat browser benar-benar tersambung melalui router LTE ini.</p>
+            <button id="speedtest-run" type="button">Jalankan Speed Test</button>
+            <button id="speedtest-cancel" class="quiet" type="button" disabled>Batalkan</button>
+            <p class="notice">Sekitar 2 MB data per pengujian. Tidak berjalan otomatis.</p>
+            <div id="speedtest-result" class="result" aria-live="polite">Belum diuji.</div>
+            <div id="speedtest-history" class="result" aria-live="polite"></div>
+          </article>
           <article class="panel">
             <h2>IPv6</h2>
             <p>Default <strong>Off</strong> untuk WE5927-DSIM. IPv4, LTE dan koneksi LAN tetap dipertahankan. Aktifkan IPv6 hanya jika diperlukan.</p>

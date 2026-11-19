@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-ui
 PKG_VERSION:=0.1
-PKG_RELEASE:=9
+PKG_RELEASE:=11
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -32,6 +32,8 @@ define Package/veci-v2-ui/install
 	$(INSTALL_DATA) ./files/www/veci2/app.js $(1)/www/veci2/app.js
 	$(INSTALL_DATA) ./files/www/veci2/sms-codec.js $(1)/www/veci2/sms-codec.js
 	$(INSTALL_DATA) ./files/www/veci2/sms-center.js $(1)/www/veci2/sms-center.js
+	$(INSTALL_DATA) ./files/www/veci2/speed-test.js $(1)/www/veci2/speed-test.js
+	$(INSTALL_DATA) ./files/www/veci2/dns-settings.js $(1)/www/veci2/dns-settings.js
 	$(INSTALL_DATA) ./files/www/veci2/app.css $(1)/www/veci2/app.css
 endef
 

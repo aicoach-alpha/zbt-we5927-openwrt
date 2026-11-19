@@ -21,3 +21,9 @@ Status ini adalah **analisis source, bukan klaim fitur fisik sudah lulus**.
 Catatan: Kontrak 40 required_core pada proyek VeCI v2 mengandung modul yang masih not_ported_to_v2. Jangan ubah label status menjadi PASS hanya karena kode dasar exist. Perbedaan SSID/guest/encryption antara UCI dan driver OEM harus diperhatikan, dan UI 5GHz vendor **bukan** fitur unit pemilik.
 
 Implementasi berikut: DNS native RPC + rollback; Speed Test Lite berbasis browser yang menampilkan konteks uji dari klien; pindahkan fungsi OEM lain satu per satu secara terukur. Jangan duplikasi manajemen modem, SMS lock, atau DNS daemon.
+
+## Progress native tools — 19 November 2026 (source branch only)
+- Speed Test Lite native di tab Pengaturan: pengujian HTTP latency/jitter, download 1 MiB, upload 512 KiB dengan abort, timeout, dan batas riwayat sesi browser. CSP hanya memperbolehkan endpoint Cloudflare yang ditentukan. Mengukur koneksi dari browser/klien, bukan throughput langsung firmware router.
+- DNS Settings native di tab Pengaturan: mode AUTO DNS operator / CUSTOM upstream IPv4, preset Cloudflare/Google/Quad9/AdGuard; provider rpcd veci.v2.dns dengan ACL status(read)/set(write), pembatas board, validasi IPv4, lock serial, pemeriksaan pending UCI, restart dnsmasq serta restore file dhcp bila penerapan gagal.
+- Browser tool bukan daemon background dan tidak memodifikasi modem, GPIO atau rute LTE.
+- Pengujian lokal validator/ACL/JS/shell dan regresi utama lulus. **Belum dikompilasi ke image baru**, belum ada uji UI browser fisik, operasi DNS pada router, maupun pengukuran LTE sebenarnya. Seluruh modul gabungan dhcp_dns_static_leases tetap PARTIAL karena DHCP/leases belum diport penuh.
