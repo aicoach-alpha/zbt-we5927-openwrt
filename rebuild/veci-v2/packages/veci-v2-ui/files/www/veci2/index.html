@@ -11,6 +11,7 @@
   <script src="/veci2/sms-codec.js" defer></script>
   <script src="/veci2/sms-center.js" defer></script>
   <script src="/veci2/time.js" defer></script>
+  <script src="/veci2/services.js" defer></script>
   <script src="/veci2/app.js" defer></script>
   <script src="/veci2/wifi-controls.js" defer></script>
 </head>
@@ -82,6 +83,12 @@
           </article>
         </section>
         <section id="settings" class="page" aria-label="Pengaturan router" hidden>
+          <article class="panel">
+            <h2>Layanan saat startup</h2>
+            <button id="startup-read" type="button">Baca layanan</button>
+            <p id="startup-status" role="status"></p>
+            <ul id="startup-services"></ul>
+          </article>
           <article class="panel">
             <h2>Log dan diagnostik</h2>
             <form id="diag-form">
