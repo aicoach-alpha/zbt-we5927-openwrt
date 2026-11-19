@@ -157,6 +157,42 @@ ubus_hostapd_ap
             (root / "office-ap/phy80211").rmdir()
             self.assertNotEqual(ash(code + stubs).returncode, 0)
 
+    def test_channel_only_from_enabled_primary_bss(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "primary/phy80211").mkdir(parents=True)
+            code = without_main(STATUS).replace("/sys/class/net/", directory + "/")
+            stubs = """
+primary_ap_configured() { return 0; }
+ubus_radio_up() { echo true; }
+lte_data_device() { return 1; }
+ubus() {
+  case "$5" in
+    network.wireless) echo interfaces ;;
+    hostapd.primary) echo status ;;
+    *) return 1 ;;
+  esac
+}
+jsonfilter() {
+  read -r reply || :
+  case "$reply:$2" in
+    'interfaces:@.radio0.interfaces[@.section="default_radio0"].ifname') echo primary ;;
+    'status:@.status') echo "$apstate" ;;
+    'status:@.channel') echo "$channel" ;;
+    *) return 1 ;;
+  esac
+}
+"""
+            for state, channel, expected in [('ENABLED', '11', 11), ('ENABLED', '14', 14),
+                                             ('ENABLED', '36', None), ('ENABLED', '', None),
+                                             ('DISABLED', '6', None)]:
+                with self.subTest(state=state, channel=channel):
+                    result = ash(code + stubs + f"apstate={state}; channel='{channel}'; main call status")
+                    result.check_returncode()
+                    data = json.loads(result.stdout)
+                    self.assertEqual(data['wifi_ap_channel'], expected)
+                    self.assertEqual(data['wifi_ap_enabled'], state == 'ENABLED')
+                    self.assertIsNone(data['wifi_beacon_verified'])
+
     def test_ethernet_reads_only_external_switch_ports(self):
         stub = """
 live_board() { echo zbtlink,zbt-we5927; }

@@ -405,6 +405,8 @@ async function refreshNetwork() {
       metric('LTE / IPv4', ...ipv4),
       metric('LTE / Gateway', ...gateway),
       metric('Wi-Fi AP', ...primaryApStatus(data)),
+      metric('Kanal AP utama', Number.isInteger(data.wifi_ap_channel)
+        ? String(data.wifi_ap_channel) : 'Belum terbaca'),
       metric('Netifd', data.netifd_count === 1 ? 'Satu proses normal' : 'Perlu pemeriksaan',
         data.netifd_count === 1 ? 'good' : 'warn')
     );
