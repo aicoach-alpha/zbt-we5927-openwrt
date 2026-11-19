@@ -13,6 +13,7 @@
   <script src="/veci2/time.js" defer></script>
   <script src="/veci2/app.js" defer></script>
   <script src="/veci2/sim-lock.js" defer></script>
+  <script src="/veci2/ussd.js" defer></script>
   <script src="/veci2/services.js" defer></script>
   <script src="/veci2/interfaces.js" defer></script>
   <script src="/veci2/wifi-controls.js" defer></script>
@@ -68,6 +69,12 @@
                 <label id="sim-new-label" hidden>PIN baru <input id="sim-new-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></label>
                 <button type="submit">Kirim satu percobaan</button>
               </form>
+            </details>
+            <details><summary>USSD operator</summary>
+              <button id="ussd-check" type="button">Periksa dukungan modem</button>
+              <form id="ussd-form" hidden autocomplete="off"><label>Kode operator <input id="ussd-code" maxlength="32" required autocomplete="off"></label><button>Kirim sekali</button></form>
+              <button type="button" id="ussd-cancel" hidden>Akhiri sesi USSD</button>
+              <p id="ussd-status" role="status"></p>
             </details>
             <form id="lte-apn-form">
               <label>APN operator <input id="lte-apn" required maxlength="100" autocomplete="off" disabled></label>

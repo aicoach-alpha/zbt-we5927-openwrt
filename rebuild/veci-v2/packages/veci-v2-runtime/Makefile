@@ -41,6 +41,7 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_BIN) ./veci2-dhcp $(1)/usr/libexec/rpcd/veci.v2.dhcp
 	$(INSTALL_BIN) ./veci2-lte-policy $(1)/usr/libexec/rpcd/veci.v2.lte
 	$(INSTALL_BIN) ./veci2-sim-lock $(1)/usr/libexec/rpcd/veci.v2.simlock
+	$(INSTALL_BIN) ./veci2-ussd $(1)/usr/libexec/rpcd/veci.v2.ussd
 	$(INSTALL_DATA) ./veci2-wifi-controls $(1)/usr/libexec/veci2-wifi-controls
 	$(INSTALL_BIN) ./veci2-wifi $(1)/usr/libexec/rpcd/veci.v2.wifi
 	$(INSTALL_BIN) ./veci2-status $(1)/usr/libexec/rpcd/veci.v2
