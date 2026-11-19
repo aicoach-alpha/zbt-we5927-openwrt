@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/veci2/app.css">
   <script src="/veci2/sms-codec.js" defer></script>
   <script src="/veci2/sms-center.js" defer></script>
+  <script src="/veci2/time.js" defer></script>
   <script src="/veci2/app.js" defer></script>
 </head>
 <body>
@@ -76,6 +77,18 @@
               <button id="diag-run" type="submit">Jalankan</button>
             </form>
             <pre id="diag-result" role="status"></pre>
+          </article>
+          <article class="panel">
+            <h2>Waktu dan NTP</h2>
+            <button id="time-read" type="button">Baca waktu router</button>
+            <p id="time-status" role="status"></p>
+            <fieldset id="time-fields" disabled>
+              <label>Zona waktu <select id="time-zone"><option value="keep">Pertahankan zona tersimpan</option><option>UTC</option><option>Asia/Jakarta</option><option>Asia/Makassar</option><option>Asia/Jayapura</option></select></label>
+              <label><input id="time-enabled" type="checkbox"> Aktifkan klien NTP</label>
+              <label><input id="time-dhcp" type="checkbox"> Gunakan server NTP dari DHCP</label>
+              <label>Server NTP (pisahkan dengan spasi) <input id="time-peers" maxlength="4000" autocomplete="off"></label>
+              <button id="time-save" type="button">Simpan waktu dan NTP</button>
+            </fieldset>
           </article>
           <article class="panel">
             <h2>IPv6</h2>

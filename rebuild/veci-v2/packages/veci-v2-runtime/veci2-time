@@ -1,0 +1,98 @@
+#!/bin/sh
+# Time preferences are applied by OpenWrt system and sysntpd at next startup.
+set -e
+set -f
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "${1:-}:${2:-}" in
+  list:*) echo '{"status":{},"save":{"revision":"String","enabled":"String","dhcp":"String","servers":"String","zone":"String"}}'; exit 0 ;;
+  call:save|call:status) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+. /usr/share/libubox/jshn.sh
+exec 9<"$0"
+flock -n 9 || fail busy
+[ "$(uci -q get 'system.@system[0]')" = system ] || fail system_unavailable
+kind=$(uci -q get system.ntp || :)
+case "$kind" in timeserver|'') ;; *) fail unexpected_ntp_section ;; esac
+pending=$(uci -q changes system) || fail config_unavailable
+[ -z "$pending" ] || fail pending_system_changes
+revision=$(sha256sum /etc/config/system) || fail config_unavailable
+revision=${revision%% *}
+if [ "$2" = save ]; then
+  request=$(head -c 4097)
+  [ "${#request}" -le 4096 ] && json_load "$request" || fail invalid_request
+  json_get_var expected revision
+  [ "$revision" = "$expected" ] || fail stale_configuration
+  json_get_var enabled enabled
+  json_get_var dhcp dhcp
+  json_get_var peers servers
+  json_get_var zone zone
+  case "$enabled:$dhcp" in 0:0|0:1|1:0|1:1) ;; *) fail invalid_mode ;; esac
+  case "$zone" in
+    keep) ;;
+    UTC) tz=UTC0 ;;
+    Asia/Jakarta) tz=WIB-7 ;;
+    Asia/Makassar) tz=WITA-8 ;;
+    Asia/Jayapura) tz=WIT-9 ;;
+    *) fail invalid_zone ;;
+  esac
+  count=0
+  for peer in $peers; do
+    count=$((count+1))
+    [ "$count" -le 16 ] && [ "${#peer}" -le 253 ] || fail invalid_peer
+    # Validate DNS labels, IPv4 octets and IPv6 hextets (including compression).
+    printf '%s\n' "$peer" | awk '
+      function ipv4(s, a,n,i) {
+        n=split(s,a,"[.]"); if(n!=4) return 0
+        for(i=1;i<=n;i++) if(a[i]!~/^[0-9]+$/ || length(a[i])>3 || a[i]+0>255) return 0
+        return 1
+      }
+      /:/ {
+        s=$0; if(s!~/^[A-Fa-f0-9:.]+$/ || s~/:::/) exit 1
+        if(s~/[.]/) {v=s; sub(/^.*:/,"",v); if(!ipv4(v)) exit 1; sub(/[^:]+$/,"0:0",s)}
+        compressed=sub(/::/,"X",s)
+        if(s~/::/ || s~/^:/ || s~/:$/) exit 1
+        gsub(/X/,":",s); sub(/^:/,"",s); sub(/:$/,"",s)
+        n=split(s,a,":")
+        for(i=1;i<=n;i++) if(!length(a[i]) || length(a[i])>4) exit 1
+        exit !((compressed && n<8) || (!compressed && n==8))
+      }
+      /^[0-9.]+$/ {exit !ipv4($0)}
+      {s=$0; sub(/[.]$/,"",s); n=split(s,a,"[.]"); if(!n) exit 1
+       for(i=1;i<=n;i++) if(a[i]!~/^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$/ || length(a[i])>63) exit 1}
+    ' || fail invalid_peer
+  done
+  [ "$enabled:$dhcp:$count" != 1:0:0 ] || fail missing_peer
+  tmp=$(mktemp -d /tmp/veci2-time.XXXXXX) || fail save_failed
+  trap 'rm -rf "$tmp"' EXIT
+  change() { uci -q -t "$tmp" "$@"; }
+  if [ -z "$kind" ]; then change set system.ntp=timeserver || fail save_failed; fi
+  change set "system.ntp.enabled=$enabled" && change set "system.ntp.use_dhcp=$dhcp" || fail save_failed
+  if change get system.ntp.server >/dev/null; then change delete system.ntp.server || fail save_failed; fi
+  for peer in $peers; do change add_list "system.ntp.server=$peer" || fail save_failed; done
+  if [ "$zone" != keep ]; then
+    change set "system.@system[0].zonename=$zone" && change set "system.@system[0].timezone=$tz" || fail save_failed
+  fi
+  change commit system || fail save_failed
+  revision=$(sha256sum /etc/config/system) || fail config_unavailable
+  revision=${revision%% *}
+fi
+configured=$(uci -q get system.ntp.enabled || :)
+dhcp=$(uci -q get system.ntp.use_dhcp || :)
+boolean() { case "$1" in 1|on|yes|true|'') echo 1 ;; 0|off|no|false) echo 0 ;; *) return 1 ;; esac; }
+configured=$(boolean "$configured") && dhcp=$(boolean "$dhcp") || fail invalid_saved_mode
+[ -n "$kind" ] || [ "$2" = save ] || configured=0
+peers=$(uci -q get system.ntp.server || :)
+zone=$(uci -q get 'system.@system[0].zonename' || :)
+stamp=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+json_init
+json_add_boolean ok 1
+json_add_string clock "$stamp"
+json_add_string zone "$zone"
+json_add_string revision "$revision"
+json_add_boolean enabled "$configured"
+json_add_boolean dhcp "$dhcp"
+json_add_string servers "$peers"
+json_dump
