@@ -3,6 +3,7 @@
     "description": "VeCI v2 read-only exact-board diagnostics",
     "read": {
       "ubus": {
+        "session": ["destroy"],
         "veci.v2": [
           "status",
           "capabilities",
