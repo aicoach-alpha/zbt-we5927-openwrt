@@ -13,6 +13,7 @@
   <script src="/veci2/access.js" defer></script>
   <script src="/veci2/time.js" defer></script>
   <script src="/veci2/app.js" defer></script>
+  <script src="/veci2/backup.js" defer></script>
   <script src="/veci2/services.js" defer></script>
   <script src="/veci2/leds.js" defer></script>
   <script src="/veci2/interfaces.js" defer></script>
@@ -195,6 +196,8 @@
           </article>
           <article class="panel">
             <h2>Aplikasi &amp; firmware</h2>
+            <button type="button" id="backup-export">Unduh cadangan konfigurasi</button>
+            <p>Arsip dapat memuat kata sandi dan kunci privat. Simpan di tempat aman.</p><p id="backup-message" role="status"></p>
             <p>Addon, pembaruan, backup dan pengaturan lanjutan dikelompokkan di sini—tidak memenuhi menu utama.</p>
             <button id="open-addons" type="button">Kelola Addon</button>
             <label>Kebijakan pemasangan firmware

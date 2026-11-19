@@ -3,7 +3,9 @@
     "description": "VeCI v2 read-only exact-board diagnostics",
     "read": {
       "ubus": {
-        "session": ["destroy"],
+        "session": [
+          "destroy"
+        ],
         "veci.v2": [
           "status",
           "capabilities",
@@ -84,6 +86,16 @@
       "ubus": {
         "veci.v2.updatepolicy": [
           "save"
+        ]
+      }
+    }
+  },
+  "veci-v2-backup": {
+    "description": "Export private OpenWrt configuration",
+    "write": {
+      "ubus": {
+        "veci.v2.backup": [
+          "export"
         ]
       }
     }

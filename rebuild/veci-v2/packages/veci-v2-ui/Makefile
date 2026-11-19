@@ -24,6 +24,7 @@ endef
 define Package/veci-v2-ui/install
 	$(INSTALL_DIR) $(1)/www/cgi-bin
 	$(INSTALL_BIN) ./files/www/cgi-bin/veci2-verify $(1)/www/cgi-bin/veci2-verify
+	$(INSTALL_BIN) ./files/www/cgi-bin/veci2-backup $(1)/www/cgi-bin/veci2-backup
 	$(INSTALL_DATA) ./files/www/index.html $(1)/www/index.html
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./files/etc/uci-defaults/97-veci-v2-https $(1)/etc/uci-defaults/97-veci-v2-https
@@ -31,6 +32,7 @@ define Package/veci-v2-ui/install
 	$(INSTALL_DATA) ./files/www/veci2/index.html $(1)/www/veci2/index.html
 	$(INSTALL_DATA) ./files/www/veci2/wifi-controls.js $(1)/www/veci2/wifi-controls.js
 	$(INSTALL_DATA) ./files/www/veci2/app.js $(1)/www/veci2/app.js
+	$(INSTALL_DATA) ./files/www/veci2/backup.js $(1)/www/veci2/backup.js
 	$(INSTALL_DATA) ./files/www/veci2/dhcp.js $(1)/www/veci2/dhcp.js
 	$(INSTALL_DATA) ./files/www/veci2/sms-codec.js $(1)/www/veci2/sms-codec.js
 	$(INSTALL_DATA) ./files/www/veci2/sms-center.js $(1)/www/veci2/sms-center.js
