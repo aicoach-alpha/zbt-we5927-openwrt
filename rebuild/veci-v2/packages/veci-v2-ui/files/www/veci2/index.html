@@ -13,6 +13,7 @@
   <script src="/veci2/time.js" defer></script>
   <script src="/veci2/app.js" defer></script>
   <script src="/veci2/services.js" defer></script>
+  <script src="/veci2/leds.js" defer></script>
   <script src="/veci2/interfaces.js" defer></script>
   <script src="/veci2/wifi-controls.js" defer></script>
   <script src="/veci2/dhcp.js" defer></script>
@@ -126,6 +127,12 @@
           </article>
         </section>
         <section id="settings" class="page" aria-label="Pengaturan router" hidden>
+          <article class="panel">
+            <h2>LED dan tombol</h2>
+            <button id="led-read" type="button">Baca panel perangkat</button>
+            <p id="led-status" role="status"></p>
+            <ul id="led-list"></ul>
+          </article>
           <article class="panel">
             <h2>Layanan saat startup</h2>
             <button id="startup-read" type="button">Baca layanan</button>

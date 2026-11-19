@@ -28,6 +28,8 @@ endef
 
 define Package/veci-v2-runtime/install
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd $(1)/usr/share/rpcd/acl.d
+	$(INSTALL_BIN) ./veci2-leds $(1)/usr/libexec/rpcd/veci.v2.leds
+	$(INSTALL_DATA) ./veci2-leds-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-leds.json
 	$(INSTALL_BIN) ./veci2-services $(1)/usr/libexec/rpcd/veci.v2.services
 	$(INSTALL_DATA) ./veci2-services-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-services.json
 	$(INSTALL_BIN) ./veci2-reliability $(1)/usr/libexec/veci2-reliability

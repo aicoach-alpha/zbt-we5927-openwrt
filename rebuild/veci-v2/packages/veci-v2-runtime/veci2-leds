@@ -1,0 +1,75 @@
+#!/bin/sh
+set -e
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "${1:-}:${2:-}" in
+  list:*) echo '{"status":{},"identify":{"name":"String"}}'; exit 0 ;;
+  call:status|call:identify) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+. /usr/share/libubox/jshn.sh
+leds=/sys/class/leds
+keys=/sys/firmware/devicetree/base/keys
+[ -d "$leds" ] || fail led_class_unavailable
+# Only bare, steady Ethernet LEDs can be identified. Never steal a kernel trigger.
+steady_lamp() {
+  case "$1" in green:lan-1|green:lan-2|green:lan-3|green:wan) ;; *) return 1 ;; esac
+  grep -Fq '[none]' "$leds/$1/trigger" && [ -w "$leds/$1/brightness" ]
+}
+if [ "$2" = identify ]; then
+  exec 9<"$0"
+  flock -n 9 || fail busy
+  request=$(head -c 257)
+  [ "${#request}" -le 256 ] && json_load "$request" || fail invalid_request
+  json_get_var name name
+  steady_lamp "$name" || fail led_unavailable
+  lamp="$leds/$name"
+  original=$(cat "$lamp/brightness") || fail led_unavailable
+  maximum=$(cat "$lamp/max_brightness") || fail led_unavailable
+  case "$original:$maximum" in *[!0-9:]*|:*|*:|*:0) fail led_unavailable ;; esac
+  if [ "$original" = 0 ]; then level=$maximum; else level=0; fi
+  restore() {
+    # Another owner may have claimed the trigger or brightness during the pulse.
+    if steady_lamp "$name" && [ "$(cat "$lamp/brightness")" = "$level" ]; then
+      printf '%s\n' "$original" > "$lamp/brightness"
+    fi
+  }
+  trap restore EXIT
+  trap 'exit 1' HUP INT TERM
+  printf '%s\n' "$level" > "$lamp/brightness" || fail led_write_failed
+  sleep 1
+  restore || fail led_restore_failed
+  trap - EXIT HUP INT TERM
+fi
+json_init
+json_add_boolean ok 1
+json_add_array leds
+for lamp in "$leds"/*; do
+  [ -r "$lamp/brightness" ] && [ -r "$lamp/trigger" ] || continue
+  name=${lamp##*/}
+  level=$(cat "$lamp/brightness") || continue
+  trigger=$(sed -n 's/.*\[\([^]]*\)\].*/\1/p' "$lamp/trigger") || continue
+  case "$level" in ''|*[!0-9]*) continue ;; esac
+  mutable=0; if steady_lamp "$name"; then mutable=1; fi
+  json_add_object ''
+  json_add_string name "$name"
+  json_add_int brightness "$level"
+  json_add_string trigger "$trigger"
+  json_add_boolean identify "$mutable"
+  json_close_object
+done
+json_close_array
+json_add_array buttons
+for label in "$keys"/*/label; do
+  [ -r "$label" ] || continue
+  name=$(tr -d '\000' < "$label")
+  case "$name" in ''|*[!a-zA-Z0-9_-]*) continue ;; esac
+  installed=0; if [ -x "/etc/rc.button/$name" ]; then installed=1; fi
+  json_add_object ''
+  json_add_string name "$name"
+  json_add_boolean handler "$installed"
+  json_close_object
+done
+json_close_array
+json_dump

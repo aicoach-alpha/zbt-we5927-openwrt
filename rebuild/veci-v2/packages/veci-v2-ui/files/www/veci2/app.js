@@ -252,6 +252,7 @@ function showLogin() {
   el('lte-policy-status').textContent = '';
   globalThis.VeciWifiControls?.reset();
   globalThis.VeciServices?.reset();
+  globalThis.VeciLeds?.reset();
   globalThis.VeciInterfaces?.reset();
   el('wifi-channel-auto').disabled = true;
   el('wifi-name').value = '';
