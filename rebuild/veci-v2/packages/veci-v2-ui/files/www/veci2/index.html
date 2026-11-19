@@ -13,6 +13,7 @@
   <script src="/veci2/time.js" defer></script>
   <script src="/veci2/services.js" defer></script>
   <script src="/veci2/app.js" defer></script>
+  <script src="/veci2/interfaces.js" defer></script>
   <script src="/veci2/wifi-controls.js" defer></script>
   <script src="/veci2/dhcp.js" defer></script>
 </head>
@@ -102,6 +103,20 @@
               <button type="button" id="dhcp-remove">Hapus DNS</button>
               <button type="button" id="dhcp-apply">Terapkan konfigurasi ke dnsmasq</button>
             </fieldset>
+            <details><summary>Alamat IPv4 LAN dan WAN Ethernet</summary>
+              <button type="button" id="interface-read">Baca konfigurasi</button>
+              <form id="interface-form"><fieldset name="controls" disabled>
+                <label>Alamat LAN <input name="lan" required maxlength="15"></label>
+                <label>Mask atau panjang prefiks LAN <input name="lan_mask" required maxlength="15"></label>
+                <label>Protokol WAN <select name="wan_mode"><option value="dhcp">DHCP</option><option value="static">IPv4 statis</option></select></label>
+                <fieldset id="interface-static" disabled>
+                  <label>Alamat WAN <input name="wan" required maxlength="15"></label>
+                  <label>Mask atau panjang prefiks WAN <input name="wan_mask" required maxlength="15"></label>
+                  <label>Gateway WAN <input name="gateway" required maxlength="15"></label>
+                </fieldset>
+                <button>Simpan konfigurasi IPv4</button>
+              </fieldset></form><p id="interface-message" role="status"></p>
+            </details>
             <h3>Port Ethernet</h3>
             <div id="ethernet-status" class="grid" aria-live="polite"></div>
             <p class="notice">Munculnya alamat IP tidak membuktikan akses internet dari klien. AP Wi-Fi harus memiliki hostapd/BSSID dan koneksi klien yang teruji.</p>

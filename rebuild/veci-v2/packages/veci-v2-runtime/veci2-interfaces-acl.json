@@ -1,0 +1,19 @@
+{
+  "veci-v2-interfaces": {
+    "description": "Ethernet LAN and WAN IPv4 preferences",
+    "read": {
+      "ubus": {
+        "veci.v2.interfaces": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.interfaces": [
+          "save"
+        ]
+      }
+    }
+  }
+}

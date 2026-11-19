@@ -1,0 +1,90 @@
+#!/bin/sh
+set -ef
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "$1:${2:-}" in
+  list:*) echo '{"status":{},"save":{"revision":"String","confirm":"String","lan":"String","lan_mask":"String","wan_mode":"String","wan":"String","wan_mask":"String","gateway":"String"}}'; exit 0 ;;
+  call:save|call:status) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail board_mismatch
+. /usr/share/libubox/jshn.sh
+exec 9>/var/lock/veci2-ipv6.lock
+flock -n 9 || fail busy
+cfg=/etc/config/network
+[ -f "$cfg" ] && [ ! -L "$cfg" ] || fail config_unavailable
+revision() { digest=$(sha256sum "$cfg") || return 1; echo "${digest%% *}"; }
+get() { uci -q get "network.$1" || :; }
+[ "$(get lan)" = interface ] && [ "$(get wan)" = interface ] && [ "$(get lan.proto)" = static ] || fail unsupported_layout
+mode=$(get wan.proto)
+case "$mode" in dhcp|static) ;; *) fail unsupported_wan_protocol ;; esac
+pending=$(uci -q changes network) || fail config_unavailable
+[ -z "$pending" ] || fail pending_network_changes
+lan=$(get lan.ipaddr); lan_mask=$(get lan.netmask)
+wan=$(get wan.ipaddr); wan_mask=$(get wan.netmask); gateway=$(get wan.gateway)
+# Never replace a list of existing addresses or an ambiguous CIDR/netmask pair.
+for section in lan wan; do
+  address=$(get "$section.ipaddr"); mask=$(get "$section.netmask")
+  case "$address" in *[[:space:]]*) fail multiple_addresses ;; */*)
+    [ -z "$mask" ] || fail ambiguous_mask
+    if [ "$section" = lan ]; then lan=${address%/*}; lan_mask=${address##*/}; else wan=${address%/*}; wan_mask=${address##*/}; fi ;;
+  esac
+done
+current=$(revision) || fail config_unavailable
+if [ "$2" = save ]; then
+  input=$(head -c 1025)
+  [ "${#input}" -le 1024 ] && json_load "$input" || fail invalid_request
+  json_get_var token revision ''; json_get_var confirm confirm ''
+  [ "$token" = "$current" ] || fail stale_configuration
+  [ "$confirm" = SAVE_NETWORK ] || fail confirmation_required
+  json_get_var lan lan ''; json_get_var lan_mask lan_mask ''; json_get_var mode wan_mode ''
+  json_get_var wan wan ''; json_get_var wan_mask wan_mask ''; json_get_var gateway gateway ''
+  case "$mode" in dhcp) wan=; wan_mask=; gateway= ;; static) ;; *) fail invalid_wan_mode ;; esac
+  # Convert each mask to prefix length and validate usable, disjoint subnets.
+  for arg in "$lan" "$lan_mask" "$wan" "$wan_mask" "$gateway"; do
+    case "$arg" in *[!0-9.]*) fail invalid_address ;; esac
+  done
+  masks=$(awk -v lan="$lan" -v lm="$lan_mask" -v mode="$mode" -v wan="$wan" -v wm="$wan_mask" -v gw="$gateway" '
+    function ip(s, a,i,n,v) {
+      n=split(s,a,"[.]"); if(n!=4)return -1
+      for(i=1;i<=4;i++){if(a[i]!~/^(0|[1-9][0-9]?[0-9]?)$/ || a[i]+0>255)return -1; v=v*256+a[i]}
+      return v
+    }
+    function block(p, i,n){n=1;for(i=p;i<32;i++)n*=2;return n}
+    function prefix(s, v,p){if(s~/^([1-9]|[12][0-9]|30)$/)return s+0
+      v=ip(s); for(p=1;p<=30;p++)if(v==4294967296-block(p))return p;return -1}
+    function host(v,size, first){first=int(v/16777216);return v>=0 && first>0 && first!=127 && first<224 && v%size!=0 && v%size!=size-1}
+    BEGIN {a=ip(lan);p=prefix(lm);s=block(p);if(p<1 || !host(a,s))exit 1
+      if(mode=="static"){b=ip(wan);q=prefix(wm);t=block(q);g=ip(gw)
+        if(q<1 || !host(b,t) || !host(g,t) || b==g || int(b/t)!=int(g/t))exit 1
+        z=s>t?s:t;if(int(a/z)==int(b/z))exit 1}
+      print p,q+0
+    }') || fail invalid_subnet_or_gateway
+  set -- $masks
+  tmp=$(mktemp -d /tmp/veci2-interfaces.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  change() { uci -q -t "$tmp" "$@"; }
+  remove() { if change get "$1" >/dev/null; then change delete "$1"; fi; }
+  change set "network.lan.ipaddr=$lan/$1" && remove network.lan.netmask &&
+    change set "network.wan.proto=$mode" || fail stage_failed
+  remove network.wan.netmask || fail stage_failed
+  if [ "$mode" = dhcp ]; then
+    remove network.wan.ipaddr && remove network.wan.gateway || fail stage_failed
+  else
+    change set "network.wan.ipaddr=$wan/$2" && change set "network.wan.gateway=$gateway" || fail stage_failed
+  fi
+  pending=$(uci -q changes network) || fail config_unavailable
+  [ "$(revision)" = "$current" ] && [ -z "$pending" ] || fail stale_configuration
+  change commit network || fail commit_failed
+  current=$(revision) || fail config_unavailable; lan_mask=$1; [ "$mode" = dhcp ] || wan_mask=$2
+fi
+json_init
+json_add_boolean ok 1
+json_add_string revision "$current"
+json_add_string lan "$lan"
+json_add_string lan_mask "$lan_mask"
+json_add_string wan_mode "$mode"
+json_add_string wan "$wan"
+json_add_string wan_mask "$wan_mask"
+json_add_string gateway "$gateway"
+json_dump
