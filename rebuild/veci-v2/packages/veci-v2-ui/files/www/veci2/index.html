@@ -12,6 +12,7 @@
   <script src="/veci2/sms-center.js" defer></script>
   <script src="/veci2/time.js" defer></script>
   <script src="/veci2/app.js" defer></script>
+  <script src="/veci2/sim-lock.js" defer></script>
   <script src="/veci2/services.js" defer></script>
   <script src="/veci2/interfaces.js" defer></script>
   <script src="/veci2/wifi-controls.js" defer></script>
@@ -58,6 +59,16 @@
             <button id="lte-policy-change" type="button" disabled>Ubah failover</button>
             <button id="lte-sim-switch" type="button" disabled>Pindah SIM</button>
             <button id="lte-sim-refresh" type="button">Periksa status SIM</button>
+            <details><summary>PIN dan PUK SIM</summary>
+              <button type="button" id="sim-lock-read">Baca status kunci</button>
+              <p id="sim-lock-status" role="status"></p>
+              <form id="sim-lock-form" autocomplete="off" hidden>
+                <label id="sim-code-label" for="sim-code">Kode</label>
+                <input id="sim-code" type="password" inputmode="numeric" maxlength="8" required autocomplete="off">
+                <label id="sim-new-label" hidden>PIN baru <input id="sim-new-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></label>
+                <button type="submit">Kirim satu percobaan</button>
+              </form>
+            </details>
             <form id="lte-apn-form">
               <label>APN operator <input id="lte-apn" required maxlength="100" autocomplete="off" disabled></label>
               <button id="lte-apn-save" type="submit" disabled>Simpan APN</button>
