@@ -5,6 +5,13 @@ on:
     paths:
       - '.github/workflows/veci-v2-lab-image.yml'
       - 'rebuild/veci-v2/packages/**'
+      - 'rebuild/veci-v2/ci/stage-v2-source.sh'
+      - 'rebuild/veci-v2/trust/**'
+      - 'source/veci-cellular-we5927/**'
+      - 'source/openwrt-source-commit.txt'
+      - 'source/openwrt-we5927.config'
+      - 'source/openwrt-zbt-we5927-current.patch'
+      - 'scripts/stage-veci-reliability-rc.sh'
       - 'source/we5927-lte/**'
       - 'source/veci-wifi-guardian/**'
   workflow_dispatch:
