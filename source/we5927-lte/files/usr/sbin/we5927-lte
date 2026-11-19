@@ -135,6 +135,18 @@ driver_name() {
 	basename "$x"
 }
 
+rndis_data_ready() {
+	local net modem interface
+	net="$(cfg data_if)"
+	[ -n "$net" ] || net=usb0
+	case "$net" in .|..|-*|*[!A-Za-z0-9_.-]*) return 1 ;; esac
+	modem="$(usb_device_dir)" || return 1
+	modem="$(readlink -f "$modem")" || return 1
+	interface="$(readlink -f "/sys/class/net/$net/device")" || return 1
+	[ "${interface%/*}" = "$modem" ] || return 1
+	[ "$(driver_name "$interface")" = rndis_host ]
+}
+
 repair_rndis() {
 	local dev base i cls sub proto drv ctrl=""
 
@@ -166,7 +178,7 @@ repair_rndis() {
 
 	local n=0
 	while [ "$n" -lt 10 ]; do
-		ip link show usb0 >/dev/null 2>&1 && return 0
+		rndis_data_ready && return 0
 		n=$((n + 1))
 		sleep 1
 	done
@@ -176,7 +188,7 @@ repair_rndis() {
 usb_repair() {
 	# Do not unbind/rebind an already healthy RNDIS+AT pair.
 	# Re-enumeration can interrupt active LTE traffic or SMS transactions.
-	if ip link show usb0 >/dev/null 2>&1; then
+	if rndis_data_ready; then
 		local live_port
 		live_port="$(at_port)"
 		[ -c "$live_port" ] && return 0
