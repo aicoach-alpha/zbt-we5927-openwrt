@@ -61,6 +61,35 @@ log() { :; }
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout, '')
 
+    def test_same_slot_with_pending_edits_preserves_hardware(self):
+        stubs = """
+cfg() { echo 2; }
+uci() { echo pending; }
+gpio_set() { echo unexpected; }
+log() { :; }
+"""
+        result = simulate(stubs, 'set_sim 2')
+        self.assertEqual((result.returncode, result.stdout), (1, ''))
+
+    def test_selector_readback_handles_polarity_and_missing_line(self):
+        stubs = """
+cfg() { case "$1" in sim_gpio) echo "$pin";; sim1_value) echo "$first_cfg";; sim2_value) echo "$second_cfg";; esac; }
+cat() { [ "$1" = /sys/class/gpio/sim_select/value ] && [ "$line" != missing ] && echo "$line"; }
+gpio_path() { echo unexpected >&2; return 1; }
+"""
+        for first, second, level, pin, expected in (
+            ('1', '0', '1', '46', '1'), ('1', '0', '0', '46', '2'),
+            ('0', '1', '1', '46', '2'), ('0', '1', '0', '46', '1'),
+            ('', '', '1', '', '1'), ('1', '1', '1', '46', ''),
+            ('1', '0', 'missing', '46', ''), ('1', '0', '1', '1', ''),
+        ):
+            with self.subTest(first=first, second=second, level=level, pin=pin):
+                result = simulate(stubs, 'first_cfg=$1; second_cfg=$2; line=$3; pin=$4; selector_slot',
+                                  first, second, level, pin)
+                self.assertEqual(result.stdout.strip(), expected)
+                self.assertEqual(result.returncode == 0, bool(expected))
+                self.assertEqual(result.stderr, '')
+
     def test_manual_reconnect_stops_at_failed_stage(self):
         for failed, expected in (('power', ['power']), ('at', ['power']),
                                  ('apn', ['power', 'apn']),

@@ -389,6 +389,8 @@ async function refreshLtePolicy(action, apn) {
       throw Error(data.error || 'Pilihan failover tidak tersedia.');
     const slot = [1, 2].includes(data.configured_slot) ? 'SIM ' + data.configured_slot : 'belum diketahui';
     status.textContent = 'Slot tersimpan: ' + slot + '. Failover otomatis ' + (data.auto_failover ? 'aktif.' : 'nonaktif.');
+    const selector = [1, 2].includes(data.selector_slot) ? 'SIM ' + data.selector_slot : 'belum terbaca';
+    status.textContent += ' Posisi selektor: ' + selector + '.';
     button.textContent = data.auto_failover ? 'Nonaktifkan failover' : 'Aktifkan failover';
     button.dataset.action = data.auto_failover ? 'DISABLE_FAILOVER' : 'ENABLE_FAILOVER';
     el('lte-apn').value = data.configured_apn || '';

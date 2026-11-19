@@ -40,6 +40,8 @@ if [ "$2" != status ] && [ "$(uci -q get "$cfg.$option" || :)" != "$desired" ]; 
 fi
 slot=$(uci -q get "$cfg.sim" || :)
 case "$slot" in 1|2) ;; *) slot=null ;; esac
+selected=$(/usr/sbin/we5927-lte selector-slot 2>/dev/null) || selected=
+case "$selected" in 1|2) ;; *) selected=null ;; esac
 case "$value" in 1) enabled=true ;; *) enabled=false ;; esac
 apn=$(uci -q get "$cfg.apn" || :)
 [ -n "$apn" ] || apn=internet
@@ -48,4 +50,4 @@ if /usr/sbin/we5927-lte validate-apn "$apn"; then
 else
   apn_json=null
 fi
-printf '{"ok":true,"auto_failover":%s,"configured_slot":%s,"configured_apn":%s}\n' "$enabled" "$slot" "$apn_json"
+printf '{"ok":true,"auto_failover":%s,"configured_slot":%s,"selector_slot":%s,"configured_apn":%s}\n' "$enabled" "$slot" "$selected" "$apn_json"

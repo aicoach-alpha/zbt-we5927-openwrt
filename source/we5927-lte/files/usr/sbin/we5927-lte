@@ -256,35 +256,39 @@ ensure_network() {
  return 0
 }
 
-set_sim() {
-	local slot n v
+sim1_level() {
+	local first second
+	first="$(cfg sim1_value)"
+	second="$(cfg sim2_value)"
+	case "${first:-1}:${second:-0}" in
+		1:0) echo 1 ;;
+		0:1) echo 0 ;;
+		*) return 1 ;;
+	esac
+}
 
+selector_slot() {
+	local n first level
+	n="$(cfg sim_gpio)"
+	[ "${n:-46}" = 46 ] || return 1
+	first="$(sim1_level)" || return 1
+	# Only observe the named line exported by the board. gpio_path may change direction.
+	level="$(cat /sys/class/gpio/sim_select/value 2>/dev/null)" || return 1
+	case "$level" in 0|1) ;; *) return 1 ;; esac
+	if [ "$level" = "$first" ]; then echo 1; else echo 2; fi
+}
+
+set_sim() {
+	local slot n v first previous changes
 	slot="$1"
+	case "$slot" in 1|2) ;; *) return 2 ;; esac
+	changes="$(uci -q changes we5927_lte)" || return 1
+	[ -z "$changes" ] || { log "LTE configuration has pending edits"; return 1; }
 	n="$(cfg sim_gpio)"
 	[ -n "$n" ] || n=46
-
-	case "$slot" in
-		1)
-			v="$(cfg sim1_value)"
-			[ -n "$v" ] || v=1
-			;;
-		2)
-			v="$(cfg sim2_value)"
-			[ -n "$v" ] || v=0
-			;;
-		*)
-			echo "usage: $0 sim 1|2" >&2
-			return 2
-			;;
-	esac
-
-	# Leave another editor's pending LTE settings alone.
-	local previous changes
+	first="$(sim1_level)" || { log "Invalid SIM selector levels"; return 1; }
+	if [ "$slot" = 1 ]; then v="$first"; else v=$((1 - first)); fi
 	previous="$(cfg sim)"
-	if [ "$previous" != "$slot" ]; then
-		changes="$(uci -q changes we5927_lte)" || return 1
-		[ -z "$changes" ] || { log "LTE configuration has pending edits"; return 1; }
-	fi
 	gpio_set "$n" "$v" || return 1
 	if [ "$previous" != "$slot" ]; then
 		(
@@ -1168,6 +1172,7 @@ case "$1" in
 		daemon
 		;;
 	at-port) at_port ;;
+	selector-slot) selector_slot ;;
 	validate-apn) valid_apn "$2" ;;
 	status-fast)
 		status_fast_json
