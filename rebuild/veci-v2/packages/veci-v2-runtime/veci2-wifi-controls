@@ -25,6 +25,19 @@ advanced_write() (
   trap 'exit 1' HUP INT TERM
   change() { uci -q -t "$tmp" "$@"; }
   case "$2" in
+    setPrimary)
+      requested=$(jsonfilter -s "$request" -e '@.action') || fail invalid_action
+      case "$requested" in
+        ENABLE_PRIMARY)
+          [ "$(uci -q get wireless.radio0.band)" = 2g ] || fail channel_unavailable
+          case "$(uci -q get wireless.radio0.disabled || :)" in 1|on|yes|true) fail radio_disabled ;; esac
+          case "$(uci -q get "$ap.encryption" || :)" in psk2|sae|sae-mixed) ;; *) fail configure_security_first ;; esac
+          [ -n "$(uci -q get "$ap.key" || :)" ] || fail configure_security_first
+          wanted=0 ;;
+        DISABLE_PRIMARY) wanted=1 ;;
+        *) fail invalid_action ;;
+      esac
+      change set "$ap.disabled=$wanted" || fail save_failed ;;
     setChannel)
       channel=$(jsonfilter -s "$request" -e '@.channel') || fail invalid_channel
       case "$channel" in [1-9]|1[0-4]) ;; *) fail invalid_channel ;; esac
@@ -72,6 +85,10 @@ advanced_info() {
   . /usr/share/libubox/jshn.sh
   json_init
   json_add_boolean ok 1
+  case "$(uci -q get "$ap.disabled" || :)" in
+    1|on|true|yes) json_add_boolean primary_enabled 0 ;;
+    0|off|false|no|'') json_add_boolean primary_enabled 1 ;;
+  esac
   enc=$(uci -q get "$ap.encryption" || :)
   case "$enc" in psk2|sae|sae-mixed|none|psk-mixed) json_add_string encryption "$enc" ;; esac
   mode=$(uci -q get "$ap.macfilter" || :)

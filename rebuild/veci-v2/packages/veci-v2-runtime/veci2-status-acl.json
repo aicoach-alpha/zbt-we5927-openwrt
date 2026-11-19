@@ -44,6 +44,7 @@
           "setSsid",
           "setAutoChannel",
           "survey",
+          "setPrimary",
           "setChannel",
           "setAccess",
           "setAuth"

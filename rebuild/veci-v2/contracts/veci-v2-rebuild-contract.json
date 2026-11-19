@@ -122,7 +122,7 @@
       "origin": "LuCI Wireless + OEM Wi-Fi 2.4",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "wifi_survey_channel",
@@ -157,7 +157,7 @@
       "origin": "OEM WE5927 dual-SIM",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "lte_apn_pin_puk",

@@ -57,6 +57,12 @@ esac
         return subprocess.check_output([root / 'uci', 'get', 'wireless.' + key], env=env, text=True).strip()
     info = call('info')
     assert info['channels'] == [1, 6] and info['clients'] == ['02:12:34:56:78:9a'], info
+    assert info['primary_enabled'] is True
+    assert call('setPrimary', action='DISABLE_PRIMARY')['saved']
+    assert not call('info')['primary_enabled']
+    assert call('setPrimary', action='ENABLE_PRIMARY')['saved']
+    assert call('info')['primary_enabled'] and value('guest.ssid') == 'Guest'
+    assert call('setPrimary', action='RELOAD')['error'] == 'invalid_action'
     assert call('survey')['networks'][0]['ssid'] == 'nearby "one"'
     assert call('setChannel', channel='11')['error'] == 'channel_unavailable'
     assert call('setChannel', channel='6')['saved'] and value('radio0.channel') == '6'

@@ -40,8 +40,8 @@ save_option() {
   trap - EXIT HUP INT TERM
 }
 case "${1:-}:${2:-}" in
-  list:*) echo '{"status":{},"info":{},"survey":{},"setChannel":{"channel":"String"},"setAuth":{"mode":"String","key_hex":"String"},"setAccess":{"mode":"String","addresses":"String"},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"}}'; exit 0 ;;
-  call:info|call:survey|call:setChannel|call:setAuth|call:setAccess)
+  list:*) echo '{"status":{},"info":{},"survey":{},"setPrimary":{"action":"String"},"setChannel":{"channel":"String"},"setAuth":{"mode":"String","key_hex":"String"},"setAccess":{"mode":"String","addresses":"String"},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"}}'; exit 0 ;;
+  call:info|call:survey|call:setPrimary|call:setChannel|call:setAuth|call:setAccess)
     . /usr/libexec/veci2-wifi-controls
     check_ap
     case "$2" in

@@ -77,6 +77,7 @@
                   <label>Alamat MAC, satu per baris<textarea name="addresses" maxlength="608"></textarea></label><button>Simpan filter</button></form>
                 <form id="wifi-auth"><label>Keamanan<select name="mode"><option value="psk2">WPA2</option><option value="sae">WPA3</option><option value="sae-mixed">WPA2/WPA3</option></select></label>
                   <label>Sandi baru<input type="password" name="key" required minlength="8" maxlength="63" autocomplete="new-password"></label><button>Simpan keamanan</button></form>
+                <button type="button" id="wifi-primary" disabled>Ubah AP utama saat startup</button>
                 <form id="wifi-fixed"><label>Kanal tetap<select name="channel" required></select></label><button>Simpan kanal</button></form>
                 <button type="button" id="wifi-scan">Survei jaringan sekitar</button><pre id="scan-results"></pre>
               </fieldset>

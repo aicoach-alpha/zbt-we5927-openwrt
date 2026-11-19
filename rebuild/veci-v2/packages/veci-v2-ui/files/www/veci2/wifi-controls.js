@@ -4,6 +4,10 @@
   const access = el('station-acl').elements, security = el('wifi-auth').elements, fixed = el('wifi-fixed').elements;
   let generation = 0;
   function render(data) {
+    const primary = el('wifi-primary');
+    primary.disabled = typeof data.primary_enabled !== 'boolean';
+    primary.dataset.action = data.primary_enabled ? 'DISABLE_PRIMARY' : 'ENABLE_PRIMARY';
+    primary.textContent = data.primary_enabled ? 'Nonaktifkan AP utama saat startup' : 'Aktifkan AP utama saat startup';
     access.mode.value = data.access || '';
     access.addresses.value = (data.addresses || []).join('\n');
     security.mode.value = data.encryption || '';
@@ -42,6 +46,10 @@
       if (gen === generation && sid === session) controls.disabled = false;
     }
   }
+  el('wifi-primary').addEventListener('click', event => {
+    if (window.confirm('Ubah AP utama saat startup berikutnya? Jika dinonaktifkan, akses administrasi memerlukan koneksi lain.'))
+      run('setPrimary', {action: event.currentTarget.dataset.action});
+  });
   panel.addEventListener('toggle', () => { if (panel.open) run(); });
   el('stations-refresh').addEventListener('click', () => run());
   el('station-acl').addEventListener('submit', event => {
