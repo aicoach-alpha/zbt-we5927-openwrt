@@ -53,6 +53,8 @@ def main():
         "hardware_accepted": sum(x["physical_uat"] == "pass"
                                  for x in contract["required_core"]),
         "flash_allowed": len(blockers) == 0,
+        "post_flash_gates_pending": [g for g in contract["post_flash_gates"]
+                                     if evidence.get(g) is not True],
         "blocker_count": len(blockers),
         "blockers": blockers
     }, indent=2))

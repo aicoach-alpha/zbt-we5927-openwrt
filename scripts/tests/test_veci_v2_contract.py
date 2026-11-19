@@ -70,6 +70,11 @@ class FeatureContract(unittest.TestCase):
         self.assertTrue(any(x.startswith("hardware_uat_missing:") for x in blockers))
         self.assertIn("signed_image_not_verified",blockers)
 
+    def test_owner_endurance_starts_after_flash(self):
+        self.assertEqual(CONTRACT["post_flash_gates"], ["continuous_72h_on_owner_router"])
+        self.assertFalse(any("72h" in gate for gate in CONTRACT["mandatory_gates"]))
+        self.assertIn("reboot_recovery_on_identical_test_unit", CONTRACT["mandatory_gates"])
+
     def test_even_fake_pass_evidence_cannot_override_contract(self):
         f=json.loads(json.dumps(CONTRACT))
         evidence={x:True for x in f["mandatory_gates"]}

@@ -27,7 +27,10 @@
     "package_feed_verified",
     "fuzz_and_security_review",
     "image_size_and_flash_headroom",
-    "continuous_72h_and_reboot_recovery"
+    "reboot_recovery_on_identical_test_unit"
+  ],
+  "post_flash_gates": [
+    "continuous_72h_on_owner_router"
   ],
   "navigation": [
     {
