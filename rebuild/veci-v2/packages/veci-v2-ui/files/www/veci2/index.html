@@ -69,6 +69,15 @@
         </section>
         <section id="settings" class="page" aria-label="Pengaturan router" hidden>
           <article class="panel">
+            <h2>Log dan diagnostik</h2>
+            <form id="diag-form">
+              <label>Pemeriksaan <select id="diag-method"><option value="systemLog">Log sistem</option><option value="kernelLog">Log kernel</option><option value="lookup">DNS</option><option value="ping">Ping</option><option value="trace">Traceroute</option></select></label>
+              <label id="diag-target-label" hidden>Hostname atau IPv4 <input id="diag-target" maxlength="253" autocomplete="off"></label>
+              <button id="diag-run" type="submit">Jalankan</button>
+            </form>
+            <pre id="diag-result" role="status"></pre>
+          </article>
+          <article class="panel">
             <h2>IPv6</h2>
             <p>Default <strong>Off</strong> untuk WE5927-DSIM. IPv4, LTE dan koneksi LAN tetap dipertahankan. Aktifkan IPv6 hanya jika diperlukan.</p>
             <div id="ipv6-status" class="result" role="status" aria-live="polite">Memuat status IPv6...</div>

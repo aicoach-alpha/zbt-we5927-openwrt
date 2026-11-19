@@ -234,6 +234,9 @@ function showWorkspace() {
   el('logout').hidden = false;
 }
 function showLogin() {
+  el('diag-result').textContent = '';
+  el('diag-target').value = '';
+  el('diag-run').disabled = false;
   el('lte-apn').value = '';
   el('lte-apn').disabled = true;
   el('lte-apn-save').disabled = true;
@@ -678,6 +681,34 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   el('update-policy-save').addEventListener('click', () => refreshUpdatePolicy(true));
   el('ipv6-save').addEventListener('click', saveIPv6);
+  const diagnostic = el('diag-method');
+  const needsHost = () => ['lookup', 'ping', 'trace'].includes(diagnostic.value);
+  diagnostic.addEventListener('change', () => {
+    el('diag-target-label').hidden = !needsHost();
+    el('diag-target').required = needsHost();
+  });
+  el('diag-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = el('diag-run');
+    if (button.disabled || !sid) return;
+    const session = sid;
+    const output = el('diag-result');
+    button.disabled = true;
+    output.textContent = 'Mengambil hasil…';
+    try {
+      const params = needsHost() ? {target: el('diag-target').value.trim()} : {};
+      const reply = await rpc('veci.v2.diag', diagnostic.value, params, session, 14000);
+      if (sid !== session) return;
+      if (!reply.ok || !Array.isArray(reply.lines)) throw Error(reply.error || 'Hasil tidak tersedia');
+      const lines = reply.lines.join('\n');
+      output.textContent = reply.exit_code === 0 ? lines || 'Tidak ada entri.' :
+        'Pemeriksaan gagal (kode ' + reply.exit_code + ').\n' + lines;
+    } catch (error) {
+      if (sid === session) output.textContent = error.message;
+    } finally {
+      if (sid === session) button.disabled = false;
+    }
+  });
   el('open-addons').addEventListener('click', () => showPage('apps'));
   el('back-settings').addEventListener('click', () => showPage('settings'));
   el('package-form').addEventListener('submit', onPackagePreflight);

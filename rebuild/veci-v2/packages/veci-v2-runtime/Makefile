@@ -27,6 +27,9 @@ define Package/veci-v2-runtime/conffiles
 endef
 
 define Package/veci-v2-runtime/install
+	$(INSTALL_DIR) $(1)/usr/libexec/rpcd $(1)/usr/share/rpcd/acl.d
+	$(INSTALL_BIN) ./veci2-diagnostics $(1)/usr/libexec/rpcd/veci.v2.diag
+	$(INSTALL_DATA) ./veci2-diag-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-diagnostics.json
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
 	$(INSTALL_DIR) $(1)/etc
 	$(INSTALL_CONF) ./update-policy.default $(1)/etc/veci2-update-policy
