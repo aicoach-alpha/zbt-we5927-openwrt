@@ -191,7 +191,7 @@ performance_status() {
             case "$k" in
                 wifi)
                     case "$v" in
-                        ready|ap_not_ready|manual_recovery_required|driver_reset_observed|radio_recovery|hold_associated_or_unknown|cooldown_or_observe|intentionally_disabled|starting) wifi_stage="$v" ;;
+                        ready|ap_not_ready|manual_recovery_required|driver_reset_observed|radio_recovery|hold_associated_or_unknown|cooldown_or_observe|intentionally_disabled|config_unknown|starting) wifi_stage="$v" ;;
                     esac ;;
                 failures)
                     case "$v" in ''|*[!0-9]*) ;; *) wifi_failures="$v" ;; esac ;;

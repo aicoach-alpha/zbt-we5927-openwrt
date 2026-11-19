@@ -257,6 +257,13 @@ function showPage(id) {
   if (id === 'settings') refreshIPv6();
   if (id === 'apps') refreshPackages();
 }
+function primaryApStatus(data) {
+  if (data.wifi_ap_enabled === true) return ['Hostapd aktif, beacon belum diuji', 'warn'];
+  if (data.wifi_ap_configured === false) return ['Dinonaktifkan di konfigurasi', ''];
+  if (data.wifi_ap_configured !== true || data.wifi_radio_config_up == null)
+    return ['Status AP belum terverifikasi', 'warn'];
+  return ['AP utama belum aktif', 'bad'];
+}
 async function refreshOverview() {
   const data = await rpc('veci.v2', 'status');
   const cards = [];
@@ -269,9 +276,7 @@ async function refreshOverview() {
   state = binaryStatus(lteLink, 'IP dan gateway tersedia', 'Belum lengkap');
   cards.push(metric('LTE RNDIS', state[0], state[1]));
   cards.push(metric('Internet end-to-end', 'Belum terverifikasi', 'warn'));
-  state = binaryStatus(data.wifi_ap_enabled,
-    'Hostapd AP aktif (beacon belum dicek)', 'Access point tidak aktif');
-  cards.push(metric('Wi-Fi AP', state[0], state[1]));
+  cards.push(metric('Wi-Fi AP', ...primaryApStatus(data)));
   if (data.wifi_ap_missing === true)
     cards.push(metric('Wi-Fi radio/AP mismatch', 'Radio UP, AP hilang', 'bad'));
   cards.push(metric('Proses netifd', String(data.netifd_count || 0) +
@@ -388,11 +393,10 @@ async function refreshNetwork() {
     const data = await rpc('veci.v2', 'status');
     const ipv4 = binaryStatus(data.lte_ipv4, 'Alamat tersedia', 'Belum mendapat alamat');
     const gateway = binaryStatus(data.lte_default_route, 'Rute tersedia', 'Belum ada rute default');
-    const ap = data.wifi_ap_enabled === true;
     root.replaceChildren(
       metric('LTE / IPv4', ...ipv4),
       metric('LTE / Gateway', ...gateway),
-      metric('Wi-Fi AP', ap ? 'hostapd aktif — beacon belum teruji' : 'AP belum aktif', ap ? 'warn' : 'bad'),
+      metric('Wi-Fi AP', ...primaryApStatus(data)),
       metric('Netifd', data.netifd_count === 1 ? 'Satu proses normal' : 'Perlu pemeriksaan',
         data.netifd_count === 1 ? 'good' : 'warn')
     );

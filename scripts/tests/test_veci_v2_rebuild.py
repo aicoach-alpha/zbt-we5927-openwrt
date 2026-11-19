@@ -57,6 +57,7 @@ class V2BuildTests(unittest.TestCase):
         stub = """
 live_board() { echo zbtlink,zbt-we5927; }
 openwrt_version() { echo 25.12.6; }
+primary_ap_configured() { return 0; }
 ubus_radio_up() { echo true; }
 ubus_hostapd_ap() { return 1; }
 lte_data_device() { echo usb0; }
@@ -85,6 +86,31 @@ main call status
         self.assertIsNone(j["wifi_beacon_verified"])
         self.assertEqual(j["netifd_count"], 1)
         self.assertNotIn("imei", p.stdout.lower())
+
+    def test_primary_ap_configuration_and_runtime_are_independent(self):
+        stubs = """
+primary_ap_configured() { return "$wanted"; }
+ubus_radio_up() { echo "$up"; }
+ubus_hostapd_ap() { echo "$state"; }
+lte_data_device() { return 1; }
+"""
+        cases = [
+            (1, 'true', '', False, False),
+            (0, 'true', '', True, True),
+            (0, 'false', '', True, False),
+            (2, 'true', '', None, None),
+            (0, '', '', True, None),
+            (1, 'true', 'ENABLED', False, False),
+        ]
+        for wanted, up, state, configured, missing in cases:
+            with self.subTest(wanted=wanted, up=up, state=state):
+                result = ash(without_main(STATUS) + stubs +
+                             f"wanted={wanted}; up='{up}'; state='{state}'; main call status")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                data = json.loads(result.stdout)
+                self.assertIs(data['wifi_ap_configured'], configured)
+                self.assertIs(data['wifi_ap_missing'], missing)
+                self.assertIs(data['wifi_beacon_verified'], None)
 
     def test_lte_link_checks_only_the_active_managed_device(self):
         stubs = """

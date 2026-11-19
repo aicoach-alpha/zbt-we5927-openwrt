@@ -9,6 +9,9 @@ export LC_ALL
 numeric() {
   case "$1" in ''|*[!0-9]*) printf 0 ;; *) printf %s "$1" ;; esac
 }
+primary_ap_configured() {
+  /usr/sbin/veci-wifi-guardian configured 2>/dev/null
+}
 ubus_radio_up() {
   ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
     jsonfilter -e '@.radio0.up' 2>/dev/null
@@ -72,7 +75,7 @@ main() {
       board_ok=false; version_ok=false
       [ "$(live_board)" = 'zbtlink,zbt-we5927' ] && board_ok=true
       [ "$(openwrt_version)" = '25.12.6' ] && version_ok=true
-      lte_address=null; lte_route=null; radio=false; ap=false
+      lte_address=null; lte_route=null; radio=null; ap=false
       if device=$(lte_data_device); then
         lte_address=false; lte_route=false
         if ip -4 -o addr show dev "$device" 2>/dev/null | grep -q ' inet '; then
@@ -83,11 +86,18 @@ main() {
         fi
       fi
       radio_result="$(ubus_radio_up || true)"
-      [ "$radio_result" = true ] && radio=true
+      case "$radio_result" in true|false) radio=$radio_result ;; esac
       ap_result="$(ubus_hostapd_ap || true)"
       [ "$ap_result" = ENABLED ] && ap=true
-      ap_missing=false
-      [ "$radio" = true ] && [ "$ap" != true ] && ap_missing=true
+      wanted_rc=0
+      primary_ap_configured || wanted_rc=$?
+      case "$wanted_rc" in 0) expected=true ;; 1) expected=false ;; *) expected=null ;; esac
+      ap_missing=null
+      if [ "$ap" = true ] || [ "$expected" = false ] || [ "$radio" = false ]; then
+        ap_missing=false
+      elif [ "$radio" = true ] && [ "$expected" = true ]; then
+        ap_missing=true
+      fi
       n=0
       pids="$(pidof netifd 2>/dev/null || true)"
       for pid in $pids; do
@@ -98,8 +108,8 @@ main() {
       overlay_kb="$(numeric "$overlay_kb")"
       mem_kb="$(numeric "$mem_kb")"
       # Internet is UNKNOWN here, not inferred from a modem lease.
-      printf '{"schema":2,"board_supported":%s,"openwrt_supported":%s,"lte_ipv4":%s,"lte_default_route":%s,"internet_verified":null,"wifi_radio_config_up":%s,"wifi_ap_enabled":%s,"wifi_ap_missing":%s,"wifi_beacon_verified":null,"netifd_count":%s,"overlay_free_kb":%s,"memory_available_kb":%s}\n' \
-        "$board_ok" "$version_ok" "$lte_address" "$lte_route" "$radio" "$ap" "$ap_missing" "$n" "$overlay_kb" "$mem_kb"
+      printf '{"schema":2,"board_supported":%s,"openwrt_supported":%s,"lte_ipv4":%s,"lte_default_route":%s,"internet_verified":null,"wifi_ap_configured":%s,"wifi_radio_config_up":%s,"wifi_ap_enabled":%s,"wifi_ap_missing":%s,"wifi_beacon_verified":null,"netifd_count":%s,"overlay_free_kb":%s,"memory_available_kb":%s}\n' \
+        "$board_ok" "$version_ok" "$lte_address" "$lte_route" "$expected" "$radio" "$ap" "$ap_missing" "$n" "$overlay_kb" "$mem_kb"
       ;;
     call:ethernetPorts) ethernet_ports ;;
     call:capabilities)

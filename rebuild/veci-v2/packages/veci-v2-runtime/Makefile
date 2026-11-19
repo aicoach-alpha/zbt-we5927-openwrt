@@ -10,7 +10,7 @@ define Package/veci-v2-runtime
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI v2 read-only exact-board health provider (development)
-  DEPENDS:=+we5927-lte +rpcd +jsonfilter +swconfig +flock +fwtool +ucert
+  DEPENDS:=+we5927-lte +veci-wifi-guardian +rpcd +jsonfilter +swconfig +flock +fwtool +ucert
 endef
 
 define Build/Compile
