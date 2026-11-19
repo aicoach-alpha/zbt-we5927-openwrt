@@ -37,6 +37,7 @@ define Package/veci-v2-ui/install
 	$(INSTALL_DATA) ./files/www/veci2/leds.js $(1)/www/veci2/leds.js
 	$(INSTALL_DATA) ./files/www/veci2/services.js $(1)/www/veci2/services.js
 	$(INSTALL_DATA) ./files/www/veci2/interfaces.js $(1)/www/veci2/interfaces.js
+	$(INSTALL_DATA) ./files/www/veci2/access.js $(1)/www/veci2/access.js
 	$(INSTALL_DATA) ./files/www/veci2/time.js $(1)/www/veci2/time.js
 	$(INSTALL_DATA) ./files/www/veci2/app.css $(1)/www/veci2/app.css
 endef

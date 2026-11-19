@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/veci2/app.css">
   <script src="/veci2/sms-codec.js" defer></script>
   <script src="/veci2/sms-center.js" defer></script>
+  <script src="/veci2/access.js" defer></script>
   <script src="/veci2/time.js" defer></script>
   <script src="/veci2/app.js" defer></script>
   <script src="/veci2/services.js" defer></script>
@@ -147,6 +148,17 @@
               <button id="diag-run" type="submit">Jalankan</button>
             </form>
             <pre id="diag-result" role="status"></pre>
+          </article>
+          <article class="panel">
+            <h2>Akses SSH dan HTTPS</h2>
+            <button id="access-read" type="button">Baca konfigurasi akses</button>
+            <p id="access-status" role="status"></p>
+            <fieldset id="access-fields" disabled>
+              <label for="access-idle">Batas sesi SSH tanpa aktivitas, dalam detik (0 untuk tanpa batas)</label>
+              <input id="access-idle" type="number" min="0" max="86400" step="1">
+              <button id="access-save" type="button">Simpan batas sesi</button>
+              <button id="access-https" type="button">Wajibkan pengalihan HTTP ke HTTPS</button>
+            </fieldset>
           </article>
           <article class="panel">
             <h2>Waktu dan NTP</h2>

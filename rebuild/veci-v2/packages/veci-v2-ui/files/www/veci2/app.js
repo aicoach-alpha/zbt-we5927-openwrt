@@ -235,6 +235,7 @@ function showWorkspace() {
   el('logout').hidden = false;
 }
 function showLogin() {
+  globalThis.VeciAccess?.reset();
   globalThis.VeciTime?.reset();
   el('diag-result').textContent = '';
   el('diag-target').value = '';

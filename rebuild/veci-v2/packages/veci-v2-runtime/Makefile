@@ -48,6 +48,8 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_BIN) ./veci2-interfaces $(1)/usr/libexec/rpcd/veci.v2.interfaces
 	$(INSTALL_DATA) ./veci2-interfaces-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-interfaces.json
+	$(INSTALL_BIN) ./veci2-access $(1)/usr/libexec/rpcd/veci.v2.access
+	$(INSTALL_DATA) ./veci2-access-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-access.json
 	$(INSTALL_BIN) ./veci2-time $(1)/usr/libexec/rpcd/veci.v2.time
 	$(INSTALL_DATA) ./veci2-time-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-time.json
 	$(INSTALL_DATA) ./veci2-dhcp-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-dhcp.json
