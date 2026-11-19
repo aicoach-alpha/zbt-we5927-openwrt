@@ -1,6 +1,6 @@
 {
   "veci-v2-diagnostics": {
     "description": "Read system logs and run bounded network diagnostics",
-    "read": {"ubus": {"veci.v2.diag": ["systemLog", "kernelLog", "lookup", "ping", "trace"]}}
+    "read": {"ubus": {"veci.v2.diag": ["reliability", "systemLog", "kernelLog", "lookup", "ping", "trace"]}}
   }
 }

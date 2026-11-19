@@ -1,0 +1,37 @@
+#!/bin/sh
+# Snapshot the Guardian's latest observation and first fault for this boot.
+# These are independently published records and the first fault is never cleared here.
+set -eu
+export LC_ALL=C
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || exit 1
+bounded() {
+  [ ! -L "$1" ] && [ -f "$1" ] && [ -r "$1" ] || return 0
+  head -c "$2" "$1"
+}
+bounded /tmp/veci-wifi-performance.state 512 | awk '
+  BEGIN {phase=failures=resets=stamp="unknown"}
+  NR==1 {
+    for(i=1;i<=NF;i++) {
+      split($i,p,"=")
+      if (p[1]=="wifi" && p[2]~/^(starting|ready|config_unknown|intentionally_disabled|ap_not_ready|manual_recovery_required|driver_reset_observed)$/) phase=p[2]
+      if (p[2]!~/^[0-9]+$/ || length(p[2])>12) continue
+      if (p[1]=="failures") failures=p[2]
+      if (p[1]=="rx_pse_resets") resets=p[2]
+      if (p[1]=="timestamp") stamp=p[2]
+    }
+  }
+  END {
+    print "guardian_phase=" phase
+    print "guardian_failures=" failures
+    print "guardian_rx_pse_resets=" resets
+    print "guardian_epoch_s=" stamp
+  }'
+bounded /tmp/veci-wifi-first-fault.txt 1024 | awk -F= '
+  BEGIN {reason=age="unknown"}
+  $0=="schema=veci_wifi_first_fault_v1" {known=1}
+  $1=="capture_uptime_s" && $2~/^[0-9]+$/ && length($2)<=12 {age=$2}
+  $1=="reason" && $2~/^(phy_missing|radio_not_up|wifi_netdev_missing|hostapd_rpc_missing|hostapd_not_enabled)$/ {reason=$2}
+  END {
+    print "first_fault_reason=" (known ? reason : "unknown")
+    print "first_fault_uptime_s=" (known ? age : "unknown")
+  }'

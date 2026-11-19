@@ -26,7 +26,16 @@ KEYS = {
     "dhcp_renew_log_count", "usb_disconnect_log_count",
     "wifi_kernel_stall_log_count", "mem_available_kib",
 }
-INTEGER = KEYS - {"usb0_operstate"}
+BASE_KEYS = frozenset(KEYS)
+ENUMS = {
+    "usb0_operstate": {"up", "down", "dormant", "unknown", "?"},
+    "guardian_phase": {"starting", "ready", "config_unknown", "intentionally_disabled",
+                       "ap_not_ready", "manual_recovery_required", "driver_reset_observed", "unknown"},
+    "first_fault_reason": {"phy_missing", "radio_not_up", "wifi_netdev_missing",
+                           "hostapd_rpc_missing", "hostapd_not_enabled", "unknown"},
+}
+KEYS.update(ENUMS)
+KEYS.update({"guardian_failures", "guardian_rx_pse_resets", "guardian_epoch_s", "first_fault_uptime_s"})
 INTPAT = re.compile(r"\d+\Z")
 # A successful SSH exit is not evidence that the core telemetry parsed.
 # A physically missing USB interface reports unknown carrier/operstate,
@@ -35,7 +44,7 @@ BINARY_REQUIRED = ("usb0_ipv4", "lte_default_route", "public_ping_ok")
 
 
 def snapshot_valid(record):
-    return (len(record) >= 12
+    return (len(BASE_KEYS.intersection(record)) >= 12
             and type(record.get("epoch_s")) is int and record["epoch_s"] > 0
             and type(record.get("uptime_s")) is int and record["uptime_s"] >= 0
             and all(type(record.get(k)) is int and record[k] in (0, 1)
@@ -54,8 +63,8 @@ def parse_snapshot(stdout):
         k, v = line.split("=", 1)
         if k not in KEYS:
             continue
-        if k == "usb0_operstate":
-            result[k] = v if v in {"up", "down", "dormant", "unknown", "?"} else "?"
+        if k in ENUMS:
+            result[k] = v if v in ENUMS[k] else "?"
         else:
             result[k] = int(v) if INTPAT.fullmatch(v) else None
     return result

@@ -28,6 +28,13 @@ class Tests(unittest.TestCase):
         out=monitor.parse_snapshot("epoch_s=42\nusb0_carrier=1\nssid=PRIVATE\nimei=SECRET\n"
                                    "usb0_operstate=up\n")
         self.assertEqual(out,{"epoch_s":42,"usb0_carrier":1,"usb0_operstate":"up"})
+    def test_guardian_telemetry_is_optional_and_sanitized(self):
+        record = monitor.parse_snapshot("guardian_phase=ready\nfirst_fault_reason=private\n"
+                                        "guardian_failures=3\nguardian_epoch_s=unknown")
+        self.assertEqual(record, {"guardian_phase":"ready", "first_fault_reason":"?",
+                                  "guardian_failures":3, "guardian_epoch_s":None})
+        self.assertFalse(monitor.snapshot_valid(record))
+
     def test_successful_ssh_with_unparsed_metrics_is_not_valid_telemetry(self):
         malformed="\n".join(f"{k}=?" for k in monitor.KEYS) + "\n"
         with patch.object(monitor.subprocess, "run",

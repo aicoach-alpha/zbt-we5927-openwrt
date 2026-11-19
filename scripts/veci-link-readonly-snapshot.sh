@@ -35,20 +35,38 @@ log_counts(){
 }
 printf 'epoch_s=%s\n' "$(date +%s)"
 printf 'uptime_s=%s\n' "$(awk '{printf "%.0f", $1}' /proc/uptime 2>/dev/null)"
-printf 'usb0_carrier=%s\n' "$(sysval /sys/class/net/usb0/carrier)"
-printf 'usb0_operstate=%s\n' "$(sysval /sys/class/net/usb0/operstate)"
-printf 'usb0_ipv4=%s\n' "$(yesno sh -c "ip -4 -o addr show dev usb0 2>/dev/null | grep -q ' inet '")"
-printf 'lte_default_route=%s\n' "$(yesno sh -c "ip -4 route show default dev usb0 2>/dev/null | grep -q '^default '")"
-gateway="$(ip -4 route show default dev usb0 2>/dev/null | awk '/^default via /{print $3; exit}')"
-if [ -n "$gateway" ]; then
-  gateway_ok="$(yesno ping -I usb0 -c 1 -W 1 "$gateway")"
-else gateway_ok='?'; fi
-printf 'gateway_ping_ok=%s\n' "$gateway_ok"
-printf 'public_ping_ok=%s\n' "$(if ping -I usb0 -c 1 -W 1 1.1.1.1 >/dev/null 2>&1 ||
- ping -I usb0 -c 1 -W 1 8.8.8.8 >/dev/null 2>&1; then echo 1; else echo 0; fi)"
+# Preserve the legacy JSONL field names, while binding v2 probes to the
+# interface positively identified by the firmware's selected RNDIS modem.
+net=usb0
+if [ -x /usr/libexec/veci2-reliability ]; then
+  state=$(/usr/sbin/we5927-lte rndis-state) || exit 1
+  case "$state" in
+    carrier_up\ *|carrier_down\ *|carrier_unknown\ *)
+      net=${state#* }
+      case "$net" in ''|.|..|-*|*[!A-Za-z0-9_.-]*) exit 1 ;; esac ;;
+    modem_missing|interface_missing|other_device|driver_mismatch) net= ;;
+    *) exit 1 ;;
+  esac
+fi
+if [ -n "$net" ]; then
+  printf 'usb0_carrier=%s\n' "$(sysval "/sys/class/net/$net/carrier")"
+  printf 'usb0_operstate=%s\n' "$(sysval "/sys/class/net/$net/operstate")"
+  addr=$(ip -4 -o addr show dev "$net" 2>/dev/null) || { [ ! -x /usr/libexec/veci2-reliability ] || exit 1; addr=; }
+  routes=$(ip -4 route show default dev "$net" 2>/dev/null) || { [ ! -x /usr/libexec/veci2-reliability ] || exit 1; routes=; }
+  printf 'usb0_ipv4=%s\n' "$(printf '%s\n' "$addr" | grep -q ' inet ' && echo 1 || echo 0)"
+  printf 'lte_default_route=%s\n' "$(printf '%s\n' "$routes" | grep -q '^default ' && echo 1 || echo 0)"
+  gateway=$(printf '%s\n' "$routes" | awk '/^default via /{print $3; exit}')
+  if [ -n "$gateway" ]; then gateway_ok=$(yesno ping -I "$net" -c 1 -W 1 "$gateway")
+  else gateway_ok='?'; fi
+  printf 'gateway_ping_ok=%s\n' "$gateway_ok"
+  printf 'public_ping_ok=%s\n' "$(if ping -I "$net" -c 1 -W 1 1.1.1.1 >/dev/null 2>&1 ||
+    ping -I "$net" -c 1 -W 1 8.8.8.8 >/dev/null 2>&1; then echo 1; else echo 0; fi)"
+else
+  printf '%s\n' 'usb0_carrier=?' 'usb0_operstate=?' usb0_ipv4=0 lte_default_route=0 'gateway_ping_ok=?' public_ping_ok=0
+fi
 for x in rx_errors tx_errors rx_dropped tx_dropped; do
-  file="/sys/class/net/usb0/statistics/$x"
-  if [ -r "$file" ]; then printf 'usb0_%s=%s\n' "$x" "$(num "$(cat "$file")")"
+  file="/sys/class/net/$net/statistics/$x"
+  if [ -n "$net" ] && [ -r "$file" ]; then printf 'usb0_%s=%s\n' "$x" "$(num "$(cat "$file")")"
   else printf 'usb0_%s=?\n' "$x"; fi
 done
 # ubus 2 sec timeout. Never print the raw status JSON, which may contain IPs.
@@ -58,3 +76,6 @@ if command -v ubus >/dev/null 2>&1; then
 else printf 'ubus_responsive=?\n'; fi
 log_counts
 printf 'mem_available_kib=%s\n' "$(awk '/^MemAvailable:/{print $2;f=1;exit}END{if(!f)print "?"}' /proc/meminfo 2>/dev/null)"
+
+# VeCI v2 adds sanitized Guardian observations to the existing wired time series.
+if [ -x /usr/libexec/veci2-reliability ]; then /usr/libexec/veci2-reliability || exit 1; fi

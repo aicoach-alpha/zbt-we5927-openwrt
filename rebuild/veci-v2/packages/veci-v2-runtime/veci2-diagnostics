@@ -3,8 +3,8 @@ set -eu
 umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 case "${1:-}:${2:-}" in
-  list:*) echo '{"systemLog":{},"kernelLog":{},"lookup":{"target":"String"},"ping":{"target":"String"},"trace":{"target":"String"}}'; exit 0 ;;
-  call:systemLog|call:kernelLog|call:lookup|call:ping|call:trace) ;;
+  list:*) echo '{"reliability":{},"systemLog":{},"kernelLog":{},"lookup":{"target":"String"},"ping":{"target":"String"},"trace":{"target":"String"}}'; exit 0 ;;
+  call:reliability|call:systemLog|call:kernelLog|call:lookup|call:ping|call:trace) ;;
   *) fail invalid_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail board_mismatch
@@ -23,6 +23,7 @@ trap 'rm -f "$tmp"' EXIT
 trap 'exit 1' HUP INT TERM
 run() {
   case "$2" in
+    reliability) timeout 3 /usr/libexec/veci2-reliability 9<&- ;;
     systemLog) timeout 4 logread -l 80 ;;
     kernelLog) timeout 4 dmesg ;;
     lookup) timeout 5 nslookup "$target" ;;
