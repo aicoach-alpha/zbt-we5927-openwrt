@@ -252,6 +252,7 @@ function showLogin() {
   el('lte-policy-change').disabled = true;
   el('lte-policy-status').textContent = '';
   globalThis.VeciWifiControls?.reset();
+  globalThis.VeciRa?.reset();
   globalThis.VeciServices?.reset();
   globalThis.VeciLeds?.reset();
   globalThis.VeciInterfaces?.reset();

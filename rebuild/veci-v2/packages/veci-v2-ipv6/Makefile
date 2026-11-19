@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 PKG_NAME:=veci-v2-ipv6
 PKG_VERSION:=0.1
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKGARCH:=all
 include $(INCLUDE_DIR)/package.mk
 define Package/veci-v2-ipv6
@@ -29,6 +29,7 @@ define Package/veci-v2-ipv6/install
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./files/etc/uci-defaults/90-veci2-ipv6-initial $(1)/etc/uci-defaults/90-veci2-ipv6-initial
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
+	$(INSTALL_BIN) ./files/usr/libexec/rpcd/veci2-ra $(1)/usr/libexec/rpcd/veci.v2.ra
 	$(INSTALL_BIN) ./files/usr/libexec/rpcd/veci2-ipv6 $(1)/usr/libexec/rpcd/veci.v2.ipv6
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/veci-v2-ipv6.json $(1)/usr/share/rpcd/acl.d/veci-v2-ipv6.json

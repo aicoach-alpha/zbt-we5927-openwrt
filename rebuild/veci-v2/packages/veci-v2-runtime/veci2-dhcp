@@ -37,7 +37,7 @@ lan_bounds() {
    }
    printf "%.0f %.0f\n",size-2,router%size }'
 }
-exec 9<"$0"
+exec 9>/var/lock/veci2-ipv6.lock
 flock -n 9 || fail busy
 pending=$(uci -q changes dhcp) || fail config_unavailable
 [ -z "$pending" ] || fail pending_changes

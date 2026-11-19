@@ -1,4 +1,5 @@
 """Exercise LAN reservations, DHCP pool and upstream DNS on disposable native UCI."""
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -29,6 +30,7 @@ with tempfile.TemporaryDirectory() as directory:
         executable.chmod(0o700)
     provider = root / 'provider'
     provider.write_text((runtime/'veci2-dhcp').read_text().replace('/tmp/sysinfo/board_name', str(board))
+                        .replace('/var/lock/veci2-ipv6.lock', str(root/'shared.lock'))
                         .replace('/etc/config/dhcp', str(dhcp)).replace('/etc/init.d/dnsmasq', str(root/'dnsmasq'))
                         .replace('/usr/share/libubox/jshn.sh', str(prefix/'share/libubox/jshn.sh')))
     env = dict(os.environ, PATH=f'{root}:{prefix}/bin:' + os.environ['PATH'])
@@ -37,6 +39,9 @@ with tempfile.TemporaryDirectory() as directory:
                           env=env, input=json.dumps(args), text=True, timeout=5))
     def save(method, **args):
         return call(method, revision=call('status')['revision'], **args)
+    with (root/'shared.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        assert call('status')['error'] == 'busy'
     state = call('status')
     assert state['ok'] and state['leases'][0]['section'] == '@host[0]', state
     for start, limit, reason in [('1','2','pool_contains_router'),('30','34','invalid_pool')]:

@@ -57,6 +57,12 @@ save() {
 		# Only persistent UCI changes. New state starts at next user reboot.
 		if [ "$value" = 1 ]; then
 			lanassign=60; delegated=1; ra=server; dhcpv6=server
+			case "$(uci -q get dhcp.lan.veci2_ipv6_profile || :)" in
+				disabled) ra=disabled; dhcpv6=disabled ;;
+				slaac) dhcpv6=disabled ;;
+				mixed|'') ;;
+				*) fail invalid_lan_profile; exit 0 ;;
+			esac
 			uplink_mode=auto; wan6_disabled=0
 		else
 			lanassign=0; delegated=0; ra=disabled; dhcpv6=disabled

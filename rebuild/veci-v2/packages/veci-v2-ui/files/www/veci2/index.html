@@ -16,6 +16,7 @@
   <script src="/veci2/services.js" defer></script>
   <script src="/veci2/leds.js" defer></script>
   <script src="/veci2/interfaces.js" defer></script>
+  <script src="/veci2/ipv6-ra.js" defer></script>
   <script src="/veci2/wifi-controls.js" defer></script>
   <script src="/veci2/dhcp.js" defer></script>
 </head>
@@ -181,6 +182,15 @@
               <span>Aktifkan IPv6</span>
             </label>
             <button id="ipv6-save" type="button" disabled>Simpan pilihan</button>
+            <details><summary>Router Advertisement dan DHCPv6 LAN</summary>
+              <button type="button" id="ra-read">Baca profil LAN</button>
+              <label>Profil layanan IPv6 LAN <select id="ra-profile" disabled>
+                <option value="">Pilih profil</option><option value="disabled">Nonaktif</option>
+                <option value="slaac">SLAAC</option><option value="mixed">SLAAC dan DHCPv6</option>
+              </select></label>
+              <button id="ra-save" type="button" disabled>Simpan profil LAN</button>
+              <p id="ra-message" role="status"></p>
+            </details>
             <p class="notice">Perubahan disimpan tanpa memutus jaringan. IPv6 baru berubah setelah Anda melakukan reboot secara sadar. Mengaktifkan IPv6 tidak menjamin modem/operator memberikan koneksi IPv6 internet.</p>
           </article>
           <article class="panel">

@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory() as td:
     shutil.copy(base / "etc/config/veci2_ipv6", cfg)
     (cfg / "network").write_text("config interface 'lan'\n option ipaddr '192.168.1.1'\n"
                                  "config interface 'wan'\nconfig interface 'wan6'\nconfig interface 'lte'\n")
-    (cfg / "dhcp").write_text("config dhcp 'lan'\n option start '100'\n")
+    (cfg / "dhcp").write_text("config dhcp 'lan'\n option start '100'\n option interface 'lan'\n")
     for name in ["default", "all"]:
         path = root / name / "disable_ipv6"
         path.parent.mkdir()
@@ -74,4 +74,24 @@ with tempfile.TemporaryDirectory() as td:
     run(["sh", "-c", boot], check=True)
     assert (root / "all/disable_ipv6").read_text().strip() == "0"
     assert save(False, "IPV6_DISABLE")["saved"] and value("network.wan6.disabled") == "1"
+    ra = script("usr/libexec/rpcd/veci2-ra")
+    def profile(method, **params):
+        return json.loads(run(["busybox", "ash", "-c", ra, "ra", "call", method], check=True,
+                              input=json.dumps(params)).stdout)
+    assert profile("status")["enabled"] == 0
+    assert profile("save")["error"] == "ipv6_disabled"
+    assert save(True, "IPV6_ENABLE")["saved"]
+    for target in ("slaac", "mixed", "disabled", "slaac"):
+        revision = profile("status")["revision"]
+        args = dict(profile=target, revision=revision, confirm="SAVE_RA")
+        assert profile("save", **(args | dict(revision="stale")))["error"] == "stale_configuration"
+        assert profile("save", **(args | dict(confirm="")))["error"] == "confirmation_required"
+        assert profile("save", **(args | dict(profile="relay")))["error"] == "invalid_profile"
+        assert profile("save", **args)["profile"] == target
+        assert value("dhcp.lan.dhcpv6") == ("server" if target == "mixed" else "disabled")
+    assert save(False, "IPV6_DISABLE")["saved"] and value("dhcp.lan.ra") == "disabled"
+    assert save(True, "IPV6_ENABLE")["saved"] and value("dhcp.lan.ra") == "server"
+    assert value("dhcp.lan.dhcpv6") == "disabled" and profile("status")["profile"] == "slaac"
+    assert value("dhcp.lan.start") == "100" and value("network.lan.ipaddr") == "192.168.1.1"
+    print("PASS RA/DHCPv6 profiles, master-off refusal, stale revision, invalid relay, explicit confirmation, profile roundtrip across master off/on")
     print("PASS native UCI: initialization, retry, boot, confirmation, pending edits, rollback, enable/disable, IPv4 preservation")
