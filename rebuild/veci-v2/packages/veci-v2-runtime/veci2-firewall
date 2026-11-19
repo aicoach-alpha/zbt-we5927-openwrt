@@ -1,0 +1,102 @@
+#!/bin/sh
+set -ef
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "$1:${2:-}" in
+ list:*) echo '{"status":{},"setZone":{"revision":"String","confirm":"String","section":"String","input":"String","output":"String","forward":"String","masq":"String"},"addRedirect":{"revision":"String","confirm":"String","kind":"String","proto":"String","ext":"String","port":"String","ip":"String"},"deleteRedirect":{"revision":"String","confirm":"String","section":"String"}}'; exit ;;
+ call:status|call:setZone|call:addRedirect|call:deleteRedirect) ;;
+ *) fail unknown_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail wrong_board
+. /usr/share/libubox/jshn.sh
+. /usr/libexec/veci2-lan-bounds
+exec 9>/var/lock/veci2-ipv6.lock
+flock -n 9 || fail busy
+for package in network firewall; do
+ pending=$(uci -q changes "$package") || fail config_unavailable
+ [ -z "$pending" ] || fail pending_changes
+done
+config=$(uci -q show firewall) || fail config_unavailable
+get() { uci -q get "firewall.$1" || :; }
+sections() { printf '%s\n' "$config" | sed -n "s/^firewall\\.\\([^.=]*\\)=$1\$/\\1/p"; }
+digest() { sums=$(sha256sum /etc/config/firewall /etc/config/network) || return 1; sum=$(printf '%s' "$sums" | sha256sum) || return 1; echo "${sum%% *}"; }
+revision=$(digest) || fail config_unavailable
+if [ "$2" = status ]; then
+ json_init; json_add_boolean ok 1; json_add_string revision "$revision"
+ for type in zone redirect; do
+   json_add_array "$type"
+   for s in $(sections "$type"); do
+     json_add_object ''; json_add_string section "$s"
+     if [ "$type" = zone ]; then fields='name network input output forward masq'; else fields='name src dest target proto src_dport dest_port dest_ip enabled'; fi
+     for f in $fields; do json_add_string "$f" "$(get "$s.$f")"; done
+     json_close_object
+   done
+   json_close_array
+ done
+ json_dump; exit
+fi
+request=$(head -c 1025)
+[ "${#request}" -le 1024 ] && json_load "$request" || fail invalid_request
+json_get_vars revision confirm || fail invalid_request
+[ "$revision" = "$(digest)" ] || fail stale_configuration
+tmp=$(mktemp -d /tmp/veci-fw.XXXXXX) || fail stage_failed
+trap 'rm -rf "$tmp"' EXIT
+change() { uci -q -t "$tmp" "$@" || fail stage_failed; }
+port() { case "$1" in ''|0*|*[!0-9]*) return 1;; esac; [ "${#1}" -le 5 ] && [ "$1" -le 65535 ]; }
+case "$2" in
+ setZone)
+   [ "$confirm" = SAVE_ZONE ] || fail confirmation_required
+   json_get_var section section || fail unknown_zone
+   sections zone | grep -Fxq -- "$section" || fail unknown_zone
+   json_get_vars input output forward masq
+   for action in "$input" "$output" "$forward"; do case "$action" in ACCEPT|REJECT|DROP) ;; *) fail invalid_policy;; esac; done
+   case "$masq" in 0|1) ;; *) fail invalid_masq;; esac
+   change set "firewall.$section.input=$input"; change set "firewall.$section.output=$output"
+   change set "firewall.$section.forward=$forward"; change set "firewall.$section.masq=$masq" ;;
+ addRedirect)
+   json_get_vars kind proto ip ext port
+   ipv4 "$ip" && lan_bounds "$ip" >/dev/null || fail invalid_lan_address
+   haswan=0; haslan=0
+   for s in $(sections zone); do case "$(get "$s.name")" in
+     lan) case " $(get "$s.network") " in *' lan '*) haslan=$((haslan+1));; esac;;
+     wan) haswan=$((haswan+1));;
+   esac; done
+   [ "$haswan:$haslan" = 1:1 ] || fail unsupported_zones
+   case "$kind" in
+     port) [ "$confirm" = SAVE_FORWARD ] || fail confirmation_required
+       case "$proto" in tcp|udp) ;; *) fail invalid_protocol;; esac
+       port "$ext" && port "$port" || fail invalid_port ;;
+     dmz) [ "$confirm" = SAVE_ALL_PORTS_TO_HOST ] || fail confirmation_required
+       [ -z "$ext$port" ] && [ "$proto" = all ] || fail invalid_dmz ;;
+     *) fail invalid_kind ;;
+   esac
+   for s in $(sections redirect); do
+     [ "$(get "$s.src")" = wan ] || continue
+     case "$(get "$s.target")" in DNAT|dnat|'') ;; *) continue ;; esac
+     ports=$(get "$s.src_dport")
+     # A catch-all can shadow specific rules added later. Reject ambiguous overlaps.
+     [ -n "$ports" ] || fail catch_all_exists
+     if [ "$kind" = port ]; then
+       protos=$(get "$s.proto")
+       case " $protos " in *" $proto "*|*' all '*|'  '|*' tcpudp '*) ;; *) continue ;; esac
+       for range in $ports; do
+         low=${range%%[-:]*}; high=${range##*[-:]}
+         port "$low" && port "$high" || fail ambiguous_forward
+         [ "$ext" -lt "$low" ] || [ "$ext" -gt "$high" ] || fail port_in_use
+       done
+     fi
+   done
+   id=$(uci -q -t "$tmp" add firewall redirect) || fail stage_failed
+   change set "firewall.$id.name=VeCI $kind"
+   change set "firewall.$id.src=wan"; change set "firewall.$id.dest=lan"; change set "firewall.$id.target=DNAT"
+   change set "firewall.$id.family=ipv4"; change set "firewall.$id.dest_ip=$ip"; change set "firewall.$id.proto=$proto"
+   if [ "$kind" = port ]; then change set "firewall.$id.src_dport=$ext"; change set "firewall.$id.dest_port=$port"; fi ;;
+ deleteRedirect)
+   [ "$confirm" = DELETE_REDIRECT ] || fail confirmation_required
+   json_get_var section section || fail unknown_redirect
+   sections redirect | grep -Fxq -- "$section" || fail unknown_redirect
+   change delete "firewall.$section" ;;
+esac
+[ "$revision" = "$(digest)" ] || fail stale_configuration
+change commit firewall
+echo '{"ok":true,"saved":true}'

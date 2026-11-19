@@ -1,0 +1,1 @@
+{"veci-v2-firewall":{"description":"Read firewall inventory and save confirmed firewall configuration","read":{"ubus":{"veci.v2.firewall":["status"]}},"write":{"ubus":{"veci.v2.firewall":["setZone","addRedirect","deleteRedirect"]}}}}

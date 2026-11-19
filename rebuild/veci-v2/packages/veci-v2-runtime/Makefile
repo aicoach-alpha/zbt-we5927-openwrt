@@ -40,6 +40,8 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_CONF) ./update-policy.default $(1)/etc/veci2-update-policy
 	$(INSTALL_BIN) ./veci2-update-policy $(1)/usr/libexec/rpcd/veci.v2.updatepolicy
 	$(INSTALL_BIN) ./veci2-verify-image $(1)/usr/libexec/veci2-verify-image
+	$(INSTALL_DATA) ./veci2-lan-bounds $(1)/usr/libexec/veci2-lan-bounds
+	$(INSTALL_BIN) ./veci2-firewall $(1)/usr/libexec/rpcd/veci.v2.firewall
 	$(INSTALL_BIN) ./veci2-dhcp $(1)/usr/libexec/rpcd/veci.v2.dhcp
 	$(INSTALL_BIN) ./veci2-lte-policy $(1)/usr/libexec/rpcd/veci.v2.lte
 	$(INSTALL_BIN) ./veci2-sim-lock $(1)/usr/libexec/rpcd/veci.v2.simlock
@@ -53,6 +55,7 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_DATA) ./veci2-access-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-access.json
 	$(INSTALL_BIN) ./veci2-time $(1)/usr/libexec/rpcd/veci.v2.time
 	$(INSTALL_DATA) ./veci2-time-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-time.json
+	$(INSTALL_DATA) ./veci2-firewall-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-firewall.json
 	$(INSTALL_DATA) ./veci2-dhcp-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-dhcp.json
 	$(INSTALL_DATA) ./veci2-status-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-runtime.json
 endef

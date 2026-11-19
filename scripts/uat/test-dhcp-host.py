@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory() as directory:
     provider = root / 'provider'
     provider.write_text((runtime/'veci2-dhcp').read_text().replace('/tmp/sysinfo/board_name', str(board))
                         .replace('/var/lock/veci2-ipv6.lock', str(root/'shared.lock'))
-                        .replace('/etc/config/dhcp', str(dhcp)).replace('/etc/init.d/dnsmasq', str(root/'dnsmasq'))
+                        .replace('/usr/libexec/veci2-lan-bounds', str(runtime/'veci2-lan-bounds')).replace('/etc/config/dhcp', str(dhcp)).replace('/etc/init.d/dnsmasq', str(root/'dnsmasq'))
                         .replace('/usr/share/libubox/jshn.sh', str(prefix/'share/libubox/jshn.sh')))
     env = dict(os.environ, PATH=f'{root}:{prefix}/bin:' + os.environ['PATH'])
     def call(method, **args):

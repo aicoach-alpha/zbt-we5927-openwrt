@@ -20,6 +20,7 @@
   <script src="/veci2/interfaces.js" defer></script>
   <script src="/veci2/ipv6-ra.js" defer></script>
   <script src="/veci2/wifi-controls.js" defer></script>
+  <script src="/veci2/firewall.js" defer></script>
   <script src="/veci2/dhcp.js" defer></script>
 </head>
 <body>
@@ -154,6 +155,25 @@
             <ul id="startup-services"></ul>
           </article>
           <article class="panel">
+            <h2>Firewall IPv4 dan NAT</h2>
+            <button id="fw-read" type="button">Baca konfigurasi firewall</button>
+            <fieldset id="fw-edit" disabled>
+              <label>Zona <select id="fw-zone"></select></label>
+              <label>Input <select id="fw-input"></select></label>
+              <label>Output <select id="fw-output"></select></label>
+              <label>Forward <select id="fw-forward"></select></label>
+              <label><input id="fw-masq" type="checkbox"> Masquerading IPv4</label>
+              <button id="fw-zone-save" type="button">Simpan kebijakan zona</button>
+              <label>Aturan pengalihan <select id="fw-rule"></select></label>
+              <button id="fw-delete" type="button">Hapus pengalihan terpilih</button>
+              <label>Jenis <select id="fw-kind"><option value="port">Port tunggal</option><option value="dmz">Seluruh port WAN ke satu host (DMZ)</option></select></label>
+              <label>IPv4 host LAN <input id="fw-ip"></label>
+              <label>Protokol <select id="fw-proto"><option>tcp</option><option>udp</option></select></label>
+              <label>Port WAN <input id="fw-ext" inputmode="numeric"></label>
+              <label>Port tujuan <input id="fw-port" inputmode="numeric"></label>
+              <button id="fw-add" type="button">Simpan pengalihan WAN</button>
+            </fieldset><p id="fw-message" role="status"></p>
+          </article><article class="panel">
             <h2>Log dan diagnostik</h2>
             <form id="diag-form">
               <label>Pemeriksaan <select id="diag-method"><option value="reliability">Wi-Fi Guardian dan gangguan pertama sejak boot</option><option value="systemLog">Log sistem</option><option value="kernelLog">Log kernel</option><option value="lookup">DNS</option><option value="ping">Ping</option><option value="trace">Traceroute</option></select></label>
