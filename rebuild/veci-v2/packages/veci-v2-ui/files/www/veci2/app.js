@@ -242,6 +242,7 @@ function showLogin() {
   lteSaving = false;
   el('lte-policy-change').disabled = true;
   el('lte-policy-status').textContent = '';
+  el('wifi-channel-auto').disabled = true;
   el('wifi-name').value = '';
   el('wifi-name').disabled = true;
   el('wifi-name-save').disabled = true;
@@ -317,7 +318,7 @@ async function refreshOverview() {
 let visibilityRequest = 0;
 let configuredVisible = null;
 let savingVisibility = false;
-async function refreshVisibility(action, ssidHex) {
+async function refreshVisibility(method = 'status', params = {}) {
   if (savingVisibility) return;
   const sequence = ++visibilityRequest;
   const session = sid;
@@ -325,15 +326,15 @@ async function refreshVisibility(action, ssidHex) {
   const status = el('wifi-visibility-status');
   const name = el('wifi-name');
   const saveName = el('wifi-name-save');
+  const autoChannel = el('wifi-channel-auto');
+  autoChannel.disabled = true;
   name.disabled = true;
   saveName.disabled = true;
   button.disabled = true;
   configuredVisible = null;
-  savingVisibility = Boolean(action);
-  status.textContent = action ? 'Menyimpan konfigurasi…' : 'Membaca konfigurasi…';
+  savingVisibility = method !== 'status';
+  status.textContent = savingVisibility ? 'Menyimpan konfigurasi…' : 'Membaca konfigurasi…';
   try {
-    const method = action === 'setSsid' ? action : (action ? 'setVisibility' : 'status');
-    const params = action === 'setSsid' ? {ssid_hex: ssidHex} : (action ? {action} : {});
     const data = await rpc('veci.v2.wifi', method, params, session);
     if (sequence !== visibilityRequest || sid !== session) return;
     if (!data.ok || typeof data.configured_visible !== 'boolean')
@@ -341,6 +342,10 @@ async function refreshVisibility(action, ssidHex) {
     configuredVisible = data.configured_visible;
     status.textContent = (configuredVisible ? 'Konfigurasi: SSID ditampilkan.' : 'Konfigurasi: SSID disembunyikan.') +
       ' Perubahan berlaku saat Wi-Fi berikutnya dimulai. Beacon perlu diperiksa dari perangkat klien.';
+    if (/^(?:auto|[1-9]|1[0-4])$/.test(data.configured_channel)) {
+      status.textContent += ' Kanal tersimpan: ' + (data.configured_channel === 'auto' ? 'otomatis' : data.configured_channel) + '.';
+      autoChannel.disabled = data.configured_channel === 'auto';
+    }
     button.textContent = configuredVisible ? 'Sembunyikan SSID' : 'Tampilkan SSID';
     if (typeof data.ssid_hex === 'string' && /^(?:[0-9a-f]{2}){0,32}$/.test(data.ssid_hex)) {
       const bytes = Uint8Array.from(data.ssid_hex.match(/../g) || [], byte => parseInt(byte, 16));
@@ -616,6 +621,10 @@ document.addEventListener('DOMContentLoaded', () => {
       'Nonaktifkan perpindahan SIM otomatis berikutnya?';
     if (window.confirm(message)) refreshLtePolicy(button.dataset.action);
   });
+  el('wifi-channel-auto').addEventListener('click', () => {
+    if (!savingVisibility && window.confirm('Simpan pemilihan kanal otomatis untuk Wi-Fi 2,4 GHz saat radio berikutnya dimulai?'))
+      refreshVisibility('setAutoChannel', {action: 'AUTO_CHANNEL_2G'});
+  });
   el('wifi-name-form').addEventListener('submit', event => {
     event.preventDefault();
     const input = el('wifi-name');
@@ -627,14 +636,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (window.confirm('Simpan nama Wi-Fi utama? Nama baru berlaku saat Wi-Fi berikutnya dimulai.')) {
       const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
-      refreshVisibility('setSsid', hex);
+      refreshVisibility('setSsid', {ssid_hex: hex});
     }
   });
   el('wifi-visibility-change').addEventListener('click', () => {
     if (configuredVisible === null || savingVisibility) return;
     const label = configuredVisible ? 'Sembunyikan' : 'Tampilkan';
     if (window.confirm(label + ' SSID utama pada konfigurasi tersimpan? Radio tetap berjalan.'))
-      refreshVisibility(configuredVisible ? 'HIDE_SSID' : 'SHOW_SSID');
+      refreshVisibility('setVisibility', {action: configuredVisible ? 'HIDE_SSID' : 'SHOW_SSID'});
   });
   el('ipv6-save').addEventListener('click', saveIPv6);
   el('open-addons').addEventListener('click', () => showPage('apps'));

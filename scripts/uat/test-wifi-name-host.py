@@ -15,7 +15,8 @@ with tempfile.TemporaryDirectory() as tmp:
     for folder in ("config", "delta"):
         (root / folder).mkdir()
     config = root / "config/wireless"
-    config.write_text("config wifi-iface 'default_radio0'\n option device 'radio0'\n"
+    config.write_text("config wifi-device 'radio0'\n option band '2g'\n option channel '6'\n"
+                      "config wifi-iface 'default_radio0'\n option device 'radio0'\n"
                       " option mode 'ap'\n option ssid 'Old'\n option hidden '1'\n"
                       " option encryption 'psk2'\nconfig wifi-iface 'guest'\n option ssid 'Guest'\n")
     board = root / "board"
@@ -45,13 +46,21 @@ with tempfile.TemporaryDirectory() as tmp:
     for name in ("Kantor 2", "é" * 16, " A'\"$;\\ akhir "):
         raw = name.encode()
         result = call("setSsid", ssid_hex=raw.hex())
-        assert result == {"ok": True, "configured_visible": False, "ssid_hex": raw.hex()}, result
+        assert result == {"ok": True, "configured_visible": False, "ssid_hex": raw.hex(), "configured_channel": "6"}, result
         assert config_value("default_radio0.ssid") == raw
         assert config_value("guest.ssid") == b"Guest"
         assert config_value("default_radio0.encryption") == b"psk2"
         saved = config.stat()
         assert call("setSsid", ssid_hex=raw.hex()) == result
         assert config.stat().st_mtime_ns == saved.st_mtime_ns
+    assert call("setAutoChannel", action="wrong")["error"] == "invalid_action"
+    assert config_value("radio0.channel") == b"6"
+    assert call("setAutoChannel", action="AUTO_CHANNEL_2G")["configured_channel"] == "auto"
+    saved = config.stat().st_mtime_ns
+    assert call("setAutoChannel", action="AUTO_CHANNEL_2G")["ok"]
+    assert config.stat().st_mtime_ns == saved
+    assert config_value("radio0.channel") == b"auto"
+    assert config_value("default_radio0.ssid") == raw
     before = config.read_bytes()
     for bad in ("", "a", "zz", "00", "0a", "7f", "61" * 33):
         assert call("setSsid", ssid_hex=bad)["error"] == "invalid_ssid"
@@ -60,9 +69,16 @@ with tempfile.TemporaryDirectory() as tmp:
         assert call("setSsid", ssid_hex="61")["error"] == "busy"
     subprocess.run([root / "uci", "set", "wireless.guest.ssid=Pending"], env=env, check=True)
     assert call("setSsid", ssid_hex="61")["error"] == "pending_wireless_changes"
+    assert call("setAutoChannel", action="AUTO_CHANNEL_2G")["error"] == "pending_wireless_changes"
     assert config_value("guest.ssid") == b"Pending" and config.read_bytes() == before
     acl = json.loads((RUNTIME / "veci2-status-acl.json").read_text())["veci-v2-wifi"]
     assert "setSsid" in acl["write"]["ubus"]["veci.v2.wifi"]
     assert "setSsid" not in acl["read"]["ubus"]["veci.v2.wifi"]
-    print("PASS: native UCI, exact SSID bytes including UTF-8, limits, punctuation, "
+    assert "setAutoChannel" in acl["write"]["ubus"]["veci.v2.wifi"]
+    assert "setAutoChannel" not in acl["read"]["ubus"]["veci.v2.wifi"]
+    subprocess.run([root / "uci", "revert", "wireless"], env=env, check=True)
+    subprocess.run([root / "uci", "set", "wireless.radio0.band=5g"], env=env, check=True)
+    subprocess.run([root / "uci", "commit", "wireless"], env=env, check=True)
+    assert call("setAutoChannel", action="AUTO_CHANNEL_2G")["error"] == "channel_unavailable"
+    print("PASS: auto channel, wrong band, native UCI, exact SSID bytes including UTF-8, limits, punctuation, "
           "idempotence, guest, encryption, hidden flag, lock, pending changes and RPC ACL")
