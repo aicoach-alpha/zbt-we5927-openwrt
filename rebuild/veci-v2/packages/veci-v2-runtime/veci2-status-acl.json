@@ -58,6 +58,7 @@
     "description": "Read cellular preferences and change automatic SIM failover",
     "read": {
       "ubus": {
+        "veci.v2.simlock": ["status"],
         "veci.v2.lte": [
           "status"
         ]
@@ -65,6 +66,7 @@
     },
     "write": {
       "ubus": {
+        "veci.v2.simlock": ["unlock"],
         "veci.v2.lte": [
           "setFailover",
           "setApn",

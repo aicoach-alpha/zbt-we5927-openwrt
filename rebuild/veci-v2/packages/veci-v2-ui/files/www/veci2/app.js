@@ -237,6 +237,7 @@ function showWorkspace() {
 function showLogin() {
   el("backup-message").textContent = "";
   globalThis.VeciAccess?.reset();
+  globalThis.VeciSimLock?.reset();
   globalThis.VeciTime?.reset();
   el('diag-result').textContent = '';
   el('diag-target').value = '';
