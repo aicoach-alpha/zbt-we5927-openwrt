@@ -34,6 +34,7 @@ ubus_hostapd_ap() {
   done
   return 1
 }
+lte_usb_path() { /usr/sbin/we5927-lte rndis-state 2>/dev/null; }
 lte_data_device() {
   local configured active
   configured=$(uci -q get we5927_lte.main.data_if 2>/dev/null) || configured=usb0
@@ -94,7 +95,14 @@ main() {
       [ "$(live_board)" = 'zbtlink,zbt-we5927' ] && board_ok=true
       [ "$(openwrt_version)" = '25.12.6' ] && version_ok=true
       lte_address=null; lte_route=null; radio=null; ap=false
-      if device=$(lte_data_device); then
+      usb_snapshot=$(lte_usb_path) || usb_snapshot=
+      usb_state=${usb_snapshot%% *}
+      case "$usb_state" in
+        carrier_up|carrier_down|carrier_unknown|modem_missing|interface_missing|other_device|driver_mismatch|invalid_configuration) ;;
+        *) usb_state=unknown ;;
+      esac
+      case "$usb_state" in carrier_*) bound_device=${usb_snapshot#* } ;; *) bound_device= ;; esac
+      if [ -n "$bound_device" ] && device=$(lte_data_device) && [ "$device" = "$bound_device" ]; then
         if addresses=$(ip -4 -o addr show dev "$device" 2>/dev/null); then
           lte_address=false
           if printf '%s\n' "$addresses" | grep -q ' inet '; then lte_address=true; fi
@@ -133,8 +141,8 @@ main() {
       overlay_kb="$(numeric "$overlay_kb")"
       mem_kb="$(numeric "$mem_kb")"
       # Internet is UNKNOWN here, not inferred from a modem lease.
-      printf '{"schema":2,"board_supported":%s,"openwrt_supported":%s,"lte_monitor_stage":%s,"lte_ipv4":%s,"lte_default_route":%s,"internet_verified":null,"wifi_ap_configured":%s,"wifi_radio_config_up":%s,"wifi_ap_enabled":%s,"wifi_ap_missing":%s,"wifi_ap_channel":%s,"wifi_beacon_verified":null,"netifd_count":%s,"overlay_free_kb":%s,"memory_available_kb":%s}\n' \
-        "$board_ok" "$version_ok" "$stage_json" "$lte_address" "$lte_route" "$expected" "$radio" "$ap" "$ap_missing" "$ap_channel" "$n" "$overlay_kb" "$mem_kb"
+      printf '{"schema":2,"board_supported":%s,"openwrt_supported":%s,"lte_usb_state":"%s","lte_monitor_stage":%s,"lte_ipv4":%s,"lte_default_route":%s,"internet_verified":null,"wifi_ap_configured":%s,"wifi_radio_config_up":%s,"wifi_ap_enabled":%s,"wifi_ap_missing":%s,"wifi_ap_channel":%s,"wifi_beacon_verified":null,"netifd_count":%s,"overlay_free_kb":%s,"memory_available_kb":%s}\n' \
+        "$board_ok" "$version_ok" "$usb_state" "$stage_json" "$lte_address" "$lte_route" "$expected" "$radio" "$ap" "$ap_missing" "$ap_channel" "$n" "$overlay_kb" "$mem_kb"
       ;;
     call:ethernetPorts) ethernet_ports ;;
     call:capabilities)

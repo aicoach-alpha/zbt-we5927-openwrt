@@ -436,6 +436,16 @@ const lteMonitorLabels = new Map([
   ['power_cycle_cooldown', 'Menunggu percobaan pemulihan modem'],
   ['opt_in_sim_failover', 'Mencoba SIM cadangan'], ['sim_failover_failed', 'Percobaan SIM cadangan gagal']
 ]);
+const lteUsbLabels = new Map([
+  ['invalid_configuration', 'Nama interface LTE tidak valid'],
+  ['modem_missing', 'Modem USB yang dikonfigurasi belum terdeteksi'],
+  ['interface_missing', 'Interface data USB belum tersedia'],
+  ['other_device', 'Interface data berasal dari perangkat USB lain'],
+  ['driver_mismatch', 'Interface modem belum memakai driver RNDIS'],
+  ['carrier_down', 'Driver RNDIS terpasang, link data turun'],
+  ['carrier_up', 'Driver RNDIS terpasang, link data aktif'],
+  ['carrier_unknown', 'Driver RNDIS terpasang, status link belum terbaca']
+]);
 async function refreshNetwork() {
   const root = el('network-status');
   root.replaceChildren(metric('Koneksi', 'Memeriksa...', 'warn'));
@@ -444,6 +454,7 @@ async function refreshNetwork() {
     const ipv4 = binaryStatus(data.lte_ipv4, 'Alamat tersedia', 'Belum mendapat alamat');
     const gateway = binaryStatus(data.lte_default_route, 'Rute tersedia', 'Belum ada rute default');
     root.replaceChildren(
+      metric('Modem USB / RNDIS', lteUsbLabels.get(data.lte_usb_state) || 'Belum terbaca'),
       metric('LTE / IPv4', ...ipv4),
       metric('LTE / Gateway', ...gateway),
       metric('Observasi terakhir monitor LTE', lteMonitorLabels.get(data.lte_monitor_stage) || 'Belum tersedia'),

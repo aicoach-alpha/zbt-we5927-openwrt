@@ -60,6 +60,7 @@ openwrt_version() { echo 25.12.6; }
 primary_ap_configured() { return 0; }
 ubus_radio_up() { echo true; }
 ubus_hostapd_ap() { return 1; }
+lte_usb_path() { echo "carrier_up usb0"; }
 lte_data_device() { echo usb0; }
 ip() {
   case "$*" in
@@ -114,6 +115,7 @@ lte_data_device() { return 1; }
 
     def test_lte_link_checks_only_the_active_managed_device(self):
         stubs = """
+lte_usb_path() { echo "$usb_state"; }
 uci() { [ "$*" = '-q get we5927_lte.main.data_if' ] && echo usb1; }
 ubus() { [ "$5" = network.interface.lte ] && echo "$active"; }
 jsonfilter() { [ "$2" = '@.l3_device' ] && cat; }
@@ -127,9 +129,11 @@ ip() {
 ubus_radio_up() { :; }
 ubus_hostapd_ap() { :; }
 """
-        for active, expected in [('usb1', True), ('usb0', None), ('', None)]:
+        for active, usb_state, expected in [('usb1', 'carrier_up usb1', True), ('usb0', 'carrier_up usb1', None),
+                                             ('', 'carrier_up usb1', None), ('usb1', 'other_device', None),
+                                             ('usb1', 'carrier_up usb2', None)]:
             with self.subTest(active=active):
-                reply = ash(without_main(STATUS) + stubs + f"active='{active}'\nmain call status")
+                reply = ash(without_main(STATUS) + stubs + f"active='{active}'; usb_state='{usb_state}'\nmain call status")
                 self.assertEqual(reply.returncode, 0, reply.stderr)
                 data = json.loads(reply.stdout)
                 self.assertIs(data['lte_ipv4'], expected)
@@ -139,6 +143,7 @@ ubus_hostapd_ap() { :; }
 
     def test_lte_default_device_route_and_failed_queries(self):
         stubs = """
+lte_usb_path() { echo "carrier_up usb0"; }
 lte_data_device() { echo usb0; }
 ubus_radio_up() { :; }
 ubus_hostapd_ap() { :; }
