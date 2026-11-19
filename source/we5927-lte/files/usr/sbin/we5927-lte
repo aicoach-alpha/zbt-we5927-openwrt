@@ -291,8 +291,13 @@ selector_slot() {
 	if [ "$level" = "$first" ]; then echo 1; else echo 2; fi
 }
 
+restore_selector() {
+	gpio_set "$1" "$2" && [ "$(cat /sys/class/gpio/sim_select/value 2>/dev/null)" = "$2" ] ||
+		{ log "SIM selector rollback failed; hardware needs inspection"; return 1; }
+}
+
 set_sim() {
-	local slot n v first previous changes
+	local slot n v first previous changes original
 	slot="$1"
 	case "$slot" in 1|2) ;; *) return 2 ;; esac
 	changes="$(uci -q changes we5927_lte)" || return 1
@@ -302,7 +307,17 @@ set_sim() {
 	first="$(sim1_level)" || { log "Invalid SIM selector levels"; return 1; }
 	if [ "$slot" = 1 ]; then v="$first"; else v=$((1 - first)); fi
 	previous="$(cfg sim)"
-	gpio_set "$n" "$v" || return 1
+	# Snapshot the named selector itself: a saved slot may be stale.
+	[ "$n" = 46 ] || { log "Unexpected SIM selector GPIO"; return 1; }
+	original="$(cat /sys/class/gpio/sim_select/value 2>/dev/null)" || return 1
+	case "$original" in 0|1) ;; *) return 1 ;; esac
+	if [ "$original" != "$v" ]; then
+		gpio_set "$n" "$v" &&
+			[ "$(cat /sys/class/gpio/sim_select/value 2>/dev/null)" = "$v" ] || {
+			restore_selector "$n" "$original"
+			return 1
+		}
+	fi
 	if [ "$previous" != "$slot" ]; then
 		(
 			umask 077
@@ -311,7 +326,11 @@ set_sim() {
 			trap 'exit 1' HUP INT TERM
 			uci -q -t "$tmp" set "$CFG.sim=$slot" &&
 				uci -q -t "$tmp" commit we5927_lte
-		) || { log "SIM selector moved but configuration save failed"; return 1; }
+		) || {
+			log "SIM configuration save failed"
+			[ "$original" = "$v" ] || restore_selector "$n" "$original"
+			return 1
+		}
 	fi
 	echo "sim=$slot" > "$STATE"
 	log "SIM selector changed to SIM$slot (GPIO$n value=$v)"

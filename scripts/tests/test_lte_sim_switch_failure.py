@@ -21,17 +21,28 @@ class SimSwitchFailureTests(unittest.TestCase):
             self.assertEqual(result.returncode, rc)
             self.assertEqual(result.stdout + result.stderr, '')
 
-    def test_persistence_failure_does_not_report_success(self):
+    def test_persistence_failure_restores_observed_selector(self):
         for failing in ('set', 'commit'):
-            stubs = f"""
-cfg() {{ case "$1" in sim) echo 1 ;; esac; }}
-gpio_set() {{ return 0; }}
-uci() {{ [ "$2" = changes ] && return 0; [ "$4" != {failing} ]; }}
-log() {{ :; }}
+            stubs = """
+cfg() { case "$1" in sim) echo 1 ;; esac; }
+cat() { echo "$level"; }
+gpio_set() { level=$2; echo "gpio $2"; }
+uci() { [ "$2" = changes ] && return 0; [ "$4" != "$failed" ]; }
+log() { :; }
 """
-            result = simulate(stubs, 'set_sim 2')
+            result = simulate(stubs, 'level=1; failed=$1; set_sim 2', failing)
             self.assertEqual(result.returncode, 1)
-            self.assertEqual(result.stdout, '')
+            self.assertEqual(result.stdout.splitlines(), ['gpio 0', 'gpio 1'])
+            result = simulate(stubs, 'level=0; failed=$1; set_sim 2', failing)
+            self.assertEqual((result.returncode, result.stdout), (1, ''))
+
+    def test_unknown_original_selector_blocks_modification(self):
+        stubs = """
+cfg() { :; }; uci() { [ "$2" = changes ]; }
+cat() { return 1; }; gpio_set() { echo unexpected; }
+"""
+        result = simulate(stubs, 'set_sim 2')
+        self.assertEqual((result.returncode, result.stdout), (1, ''))
 
     def test_failed_rollback_stops_before_second_cycle(self):
         for ready in ('true', 'false'):
