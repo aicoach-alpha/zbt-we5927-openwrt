@@ -150,7 +150,7 @@
       "origin": "OEM cellular RNDIS",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "lte_dual_sim_manual",
@@ -227,7 +227,7 @@
       "origin": "LuCI System + OEM Diagnose",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "system_time_ntp",
