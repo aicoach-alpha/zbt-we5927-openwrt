@@ -1,0 +1,119 @@
+# Sourced by the exact-board primary AP provider.
+radio_paths() {
+  local snapshot iface
+  snapshot=$(ubus -S -t 3 call network.wireless status '{}') || return 1
+  iface=$(jsonfilter -s "$snapshot" -e '@.radio0.interfaces[@.section="default_radio0"].ifname') || return 1
+  case "$iface" in ''|-*|*[!A-Za-z0-9_.-]*) return 1 ;; esac
+  phy=$(cat "/sys/class/net/$iface/phy80211/name") || return 1
+  case "$phy" in phy*) ;; *) return 1 ;; esac
+  case "${phy#phy}" in ''|*[!0-9]*) return 1 ;; esac
+  wlan=$iface
+}
+permitted_channels() {
+  local info
+  info=$(timeout 4 iw phy "$phy" info 9<&-) || return 1
+  printf '%s\n' "$info" | awk '$1=="*" && $2>=2412 && $2<=2484 && $3=="MHz" && $4 ~ /^\[[0-9]+\]$/ && $0 !~ /disabled|no IR|radar detection/ { n=substr($4,2,length($4)-2)+0; if(n>=1 && n<=14) print n }'
+}
+valid_mac() {
+  case "$1" in 00:00:00:00:00:00) return 1 ;; esac
+  printf '%s\n' "$1" | grep -Eq '^[0-9a-fA-F][02468aAcCeE](:[0-9a-fA-F]{2}){5}$'
+}
+advanced_write() (
+  local tmp channel wanted mode mac macs list seen count secret pair rest pass
+  tmp=$(mktemp -d /tmp/veci2-wifi.XXXXXX) || fail save_failed
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 1' HUP INT TERM
+  change() { uci -q -t "$tmp" "$@"; }
+  case "$2" in
+    setChannel)
+      channel=$(jsonfilter -s "$request" -e '@.channel') || fail invalid_channel
+      case "$channel" in [1-9]|1[0-4]) ;; *) fail invalid_channel ;; esac
+      [ "$(uci -q get wireless.radio0.band)" = 2g ] || fail channel_unavailable
+      radio_paths && permitted_channels | grep -Fxq "$channel" || fail channel_unavailable
+      change set "wireless.radio0.channel=$channel" || fail save_failed ;;
+    setAccess)
+      mode=$(jsonfilter -s "$request" -e '@.mode') || fail invalid_access
+      macs=$(jsonfilter -s "$request" -e '@.addresses') || fail invalid_access
+      case "$mode" in allow|deny|disable) ;; *) fail invalid_access ;; esac
+      case "$macs" in *[!0-9a-fA-F:\ ]*) fail invalid_access ;; esac
+      seen=" "; count=0
+      for mac in $macs; do
+        valid_mac "$mac" || fail invalid_access
+        mac=$(printf '%s' "$mac" | tr A-F a-f)
+        case "$seen" in *" $mac "*) continue ;; esac
+        seen="$seen$mac "; count=$((count + 1))
+        [ "$count" -le 32 ] || fail invalid_access
+      done
+      [ "$mode" != allow ] || [ "$count" -gt 0 ] || fail empty_allow_list
+      if change get "$ap.maclist" >/dev/null; then change delete "$ap.maclist" || fail save_failed; fi
+      change set "$ap.macfilter=$mode" || fail save_failed
+      for mac in $seen; do change add_list "$ap.maclist=$mac" || fail save_failed; done ;;
+    setAuth)
+      mode=$(jsonfilter -s "$request" -e '@.mode') || fail invalid_security
+      secret=$(jsonfilter -s "$request" -e '@.key_hex') || fail invalid_security
+      case "$mode" in psk2|sae-mixed|sae) ;; *) fail invalid_security ;; esac
+      case "$secret" in ''|*[!0-9a-f]*) fail invalid_key ;; esac
+      [ "${#secret}" -ge 16 ] && [ "${#secret}" -le 126 ] && [ $((${#secret}%2)) -eq 0 ] || fail invalid_key
+      pass=
+      while [ -n "$secret" ]; do
+        rest=${secret#??}; pair=${secret%"$rest"}
+        case "$pair" in [2-6]?|7[0-9a-e]) ;; *) fail invalid_key ;; esac
+        pass=$pass$(printf '%b' "$(printf '\\%03o' "0x$pair")")
+        secret=$rest
+      done
+      change set "$ap.encryption=$mode" && change set "$ap.key=$pass" || fail save_failed ;;
+  esac
+  change commit wireless || fail save_failed
+  printf '{"ok":true,"saved":true}\n'
+)
+advanced_info() {
+  local mode mac list enc channel chans stations
+  set +u # jshn reads unset dynamic JSON variables.
+  . /usr/share/libubox/jshn.sh
+  json_init
+  json_add_boolean ok 1
+  enc=$(uci -q get "$ap.encryption" || :)
+  case "$enc" in psk2|sae|sae-mixed|none|psk-mixed) json_add_string encryption "$enc" ;; esac
+  mode=$(uci -q get "$ap.macfilter" || :)
+  case "$mode" in '') mode=disable ;; allow|deny|disable) ;; *) mode=unknown ;; esac
+  json_add_string access "$mode"
+  json_add_array addresses
+  list=$(uci -q get "$ap.maclist" || :)
+  set -f
+  for mac in $list; do valid_mac "$mac" && json_add_string '' "$mac"; done
+  json_close_array
+  if radio_paths; then
+    if chans=$(permitted_channels); then
+      json_add_array channels
+      for channel in $chans; do json_add_int '' "$channel"; done
+      json_close_array
+    fi
+    if stations=$(timeout 4 iw dev "$wlan" station dump); then
+      json_add_array clients
+      for mac in $(printf '%s\n' "$stations" | awk '$1=="Station" {print $2}'); do
+        valid_mac "$mac" && json_add_string '' "$mac"
+      done
+      json_close_array
+    fi
+  fi
+  json_dump
+}
+survey() {
+  local raw
+  radio_paths || fail radio_unavailable
+  raw=$(timeout 12 iw dev "$wlan" scan passive 9<&-) || fail scan_unavailable
+  LC_ALL=C printf '%s\n' "$raw" | LC_ALL=C awk '
+  function emit() {
+    if(mac=="" || freq<2412 || freq>2484 || count>=100) return
+    if(count++) printf ","
+    printf "{\"bssid\":\"%s\",\"frequency_mhz\":%d,\"signal_dbm\":%s,\"ssid\":\"", mac,freq,sig
+    for(i=1;i<=length(ssid);i++){c=substr(ssid,i,1); if(c=="\\" || c=="\"") printf "\\"; if(c ~ /[ -~]/) printf "%s",c; else printf "?"}
+    printf "\"}"
+  }
+  BEGIN {printf "{\"ok\":true,\"networks\":["}
+  /^BSS / {emit(); mac=substr($2,1,17); if(length(mac)!=17 || mac !~ /^[a-fA-F0-9:]+$/) mac=""; freq=0; sig="null"; ssid=""}
+  /^[[:space:]]*freq:/ {freq=$2+0}
+  /^[[:space:]]*signal:/ && $2 ~ /^-?[0-9]+(\.[0-9]+)?$/ {sig=$2+0}
+  /^[[:space:]]*SSID:/ {sub(/^[[:space:]]*SSID: ?/,"");ssid=$0}
+  END {emit(); print "]}" }'
+}

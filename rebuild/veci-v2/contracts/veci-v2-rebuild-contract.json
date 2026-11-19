@@ -129,14 +129,14 @@
       "origin": "LuCI Wireless Site Survey",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "wifi_clients_access_control",
       "origin": "LuCI Wireless Access Control",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "ethernet_port_status",

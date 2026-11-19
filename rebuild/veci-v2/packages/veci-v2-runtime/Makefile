@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-runtime
 PKG_VERSION:=0.1
-PKG_RELEASE:=14
+PKG_RELEASE:=15
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -10,7 +10,7 @@ define Package/veci-v2-runtime
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI v2 read-only exact-board health provider (development)
-  DEPENDS:=+we5927-lte +veci-wifi-guardian +rpcd +jsonfilter +swconfig +flock +fwtool +ucert
+  DEPENDS:=+iw +we5927-lte +veci-wifi-guardian +rpcd +jsonfilter +swconfig +flock +fwtool +ucert
 endef
 
 define Build/Compile
@@ -36,6 +36,7 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_BIN) ./veci2-update-policy $(1)/usr/libexec/rpcd/veci.v2.updatepolicy
 	$(INSTALL_BIN) ./veci2-verify-image $(1)/usr/libexec/veci2-verify-image
 	$(INSTALL_BIN) ./veci2-lte-policy $(1)/usr/libexec/rpcd/veci.v2.lte
+	$(INSTALL_DATA) ./veci2-wifi-controls $(1)/usr/libexec/veci2-wifi-controls
 	$(INSTALL_BIN) ./veci2-wifi $(1)/usr/libexec/rpcd/veci.v2.wifi
 	$(INSTALL_BIN) ./veci2-status $(1)/usr/libexec/rpcd/veci.v2
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d

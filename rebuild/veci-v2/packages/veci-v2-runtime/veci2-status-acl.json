@@ -31,7 +31,8 @@
     "read": {
       "ubus": {
         "veci.v2.wifi": [
-          "status"
+          "status",
+          "info"
         ]
       }
     },
@@ -40,7 +41,11 @@
         "veci.v2.wifi": [
           "setVisibility",
           "setSsid",
-          "setAutoChannel"
+          "setAutoChannel",
+          "survey",
+          "setChannel",
+          "setAccess",
+          "setAuth"
         ]
       }
     }

@@ -247,6 +247,7 @@ function showLogin() {
   lteSaving = false;
   el('lte-policy-change').disabled = true;
   el('lte-policy-status').textContent = '';
+  globalThis.VeciWifiControls?.reset();
   el('wifi-channel-auto').disabled = true;
   el('wifi-name').value = '';
   el('wifi-name').disabled = true;
