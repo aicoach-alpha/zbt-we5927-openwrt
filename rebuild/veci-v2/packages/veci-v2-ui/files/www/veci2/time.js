@@ -40,3 +40,12 @@ document.addEventListener('DOMContentLoaded', () => {
   el('time-save').addEventListener('click', () => refreshTime(true));
   el('time-read').addEventListener('click', () => refreshTime());
 });
+globalThis.VeciTime = {reset() {
+  ++timeRequest;
+  timeSaving = false;
+  timeRevision = '';
+  el('time-fields').disabled = true;
+  el('time-zone').value = 'keep';
+  el('time-peers').value = el('time-status').textContent = '';
+  el('time-enabled').checked = el('time-dhcp').checked = false;
+}};

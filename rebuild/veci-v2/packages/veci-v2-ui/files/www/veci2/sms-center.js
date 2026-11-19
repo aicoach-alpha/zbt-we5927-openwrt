@@ -32,13 +32,13 @@ function logout() {
   clearPrivateData();
   setStatus('');
   $('sms-enable').hidden = true;
-  for (const id of ('sms-inbox-open','sms-sent-open','sms-drafts-open','sms-compose-open')) {
+  for (const id of ['sms-inbox-open','sms-sent-open','sms-drafts-open','sms-compose-open']) {
     $(id).disabled = true;
   }
 }
 function showActions() {
   $('sms-inbox-open').disabled = !enabled;
-  for (const id of ('sms-sent-open','sms-drafts-open','sms-compose-open')) {
+  for (const id of ['sms-sent-open','sms-drafts-open','sms-compose-open']) {
     $(id).disabled = !canWrite();
   }
   $('sms-enable').hidden = false;
@@ -66,7 +66,7 @@ async function refresh() {
     enabled = false;
     mode = 'unknown';
     $('sms-enable').hidden = true;
-    for (const id of ('sms-inbox-open','sms-sent-open','sms-drafts-open','sms-compose-open'))
+    for (const id of ['sms-inbox-open','sms-sent-open','sms-drafts-open','sms-compose-open'])
       $(id).disabled = true;
     setStatus('SMS belum siap: ' + error.message);
   }

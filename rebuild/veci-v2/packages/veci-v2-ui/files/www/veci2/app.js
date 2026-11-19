@@ -228,12 +228,14 @@ verifyRelease.addEventListener('click', async () => {
 });
 
 function showWorkspace() {
+  showPage("overview");
   globalThis.VeciSmsCenter.activate();
   el('login').hidden = true;
   el('workspace').hidden = false;
   el('logout').hidden = false;
 }
 function showLogin() {
+  globalThis.VeciTime?.reset();
   el('diag-result').textContent = '';
   el('diag-target').value = '';
   el('diag-run').disabled = false;
