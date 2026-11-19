@@ -79,6 +79,15 @@ else:
         self.mtd.unlink()
         self.verify_result('incompatible_flash_layout')
 
+    def test_rejects_stream_error_even_if_consumer_succeeds(self):
+        (self.root / 'fwtool').write_text(
+            '#!/bin/sh\nif [ "$2" = -T ]; then echo partial; exit 1; fi\n')
+        self.verify_result('signature_unreadable')
+
+    def test_rejects_verifier_error_with_complete_stream(self):
+        (self.root / 'ucert').write_text('#!/bin/sh\ncat >/dev/null\nexit 1\n')
+        self.verify_result('invalid_signature')
+
     def test_wrong_image_target(self):
         self.meta['version']['target'] = 'ramips/mt7621'
         self.verify_result('incompatible_target')

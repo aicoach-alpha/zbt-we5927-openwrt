@@ -38,7 +38,10 @@ for key in "${anchor%/*}"/*; do
 done
 ln -s "$anchor" "$work/keys/1d8759d36251c36c"
 fwtool -q -s "$work/cert" "$image" || fail signature_unreadable
-fwtool -q -T -s /dev/null "$image" | ucert -V -m - -c "$work/cert" -P "$work/keys" || fail invalid_signature
+# Record producer success as well as the verifier result, without a second image in RAM.
+(fwtool -q -T -s /dev/null "$image" && touch "$work/payload-complete") |
+  ucert -V -m - -c "$work/cert" -P "$work/keys" || fail invalid_signature
+[ -f "$work/payload-complete" ] || fail signature_unreadable
 fwtool -q -i "$work/metadata" "$image" || fail metadata_unreadable
 target=$(jsonfilter -i "$work/metadata" -e '@.version.target') || fail incompatible_target
 [ "$target" = ramips/mt76x8 ] || fail incompatible_target
