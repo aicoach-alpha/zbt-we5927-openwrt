@@ -73,21 +73,21 @@
       "origin": "LuCI Administration",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "interface_wan_lan",
       "origin": "LuCI Network Interfaces",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "dhcp_dns_static_leases",
       "origin": "LuCI DHCP and DNS",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "ipv6_ra_dhcpv6",
@@ -213,7 +213,7 @@
       "origin": "LuCI Startup",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "system_cron_scheduler",
@@ -311,7 +311,7 @@
       "origin": "VeCI 24/7 reliability",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "guest_wifi_isolation",
