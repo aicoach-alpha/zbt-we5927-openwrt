@@ -137,6 +137,29 @@ ubus_hostapd_ap() { :; }
                 self.assertIsNone(data['internet_verified'])
                 self.assertNotIn('192.0.2.', reply.stdout)
 
+    def test_lte_default_device_route_and_failed_queries(self):
+        stubs = """
+lte_data_device() { echo usb0; }
+ubus_radio_up() { :; }
+ubus_hostapd_ap() { :; }
+ip() {
+  case "$*" in
+    '-4 -o addr show dev usb0') return 1 ;;
+    '-4 route show default dev usb0') echo "$route"; return "$rc" ;;
+    *) return 1 ;;
+  esac
+}
+"""
+        for route, rc, expected in [('default dev usb0 scope link', 0, True),
+                                    ('', 0, False), ('', 1, None)]:
+            with self.subTest(route=route, rc=rc):
+                result = ash(without_main(STATUS) + stubs + f"route='{route}'; rc={rc}; main call status")
+                result.check_returncode()
+                data = json.loads(result.stdout)
+                self.assertIs(data['lte_default_route'], expected)
+                self.assertIsNone(data['lte_ipv4'])
+                self.assertIsNone(data['internet_verified'])
+
     def test_ap_status_uses_present_radio_interfaces(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

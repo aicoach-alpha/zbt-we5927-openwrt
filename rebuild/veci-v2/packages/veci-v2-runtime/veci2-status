@@ -83,12 +83,13 @@ main() {
       [ "$(openwrt_version)" = '25.12.6' ] && version_ok=true
       lte_address=null; lte_route=null; radio=null; ap=false
       if device=$(lte_data_device); then
-        lte_address=false; lte_route=false
-        if ip -4 -o addr show dev "$device" 2>/dev/null | grep -q ' inet '; then
-          lte_address=true
+        if addresses=$(ip -4 -o addr show dev "$device" 2>/dev/null); then
+          lte_address=false
+          if printf '%s\n' "$addresses" | grep -q ' inet '; then lte_address=true; fi
         fi
-        if ip -4 route show default dev "$device" 2>/dev/null | grep -q '^default via '; then
-          lte_route=true
+        if routes=$(ip -4 route show default dev "$device" 2>/dev/null); then
+          lte_route=false
+          if printf '%s\n' "$routes" | grep -Eq '^default (via|dev) '; then lte_route=true; fi
         fi
       fi
       radio_result="$(ubus_radio_up || true)"
