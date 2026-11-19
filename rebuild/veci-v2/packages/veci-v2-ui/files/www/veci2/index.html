@@ -16,6 +16,7 @@
   <script src="/veci2/backup.js" defer></script>
   <script src="/veci2/sim-lock.js" defer></script>
   <script src="/veci2/services.js" defer></script>
+  <script src="/veci2/cron.js" defer></script>
   <script src="/veci2/leds.js" defer></script>
   <script src="/veci2/interfaces.js" defer></script>
   <script src="/veci2/ipv6-ra.js" defer></script>
@@ -150,6 +151,10 @@
           </article>
           <article class="panel">
             <h2>Layanan saat startup</h2>
+            <h3>Jadwal cron</h3>
+            <button type="button" id="cron-read">Baca jadwal</button>
+            <form id="cron-form"><fieldset id="cron-fields" disabled><label>Tugas<select id="cron-job"></select></label><label>Menit, jam, tanggal, bulan, hari<input id="cron-schedule" required maxlength="100"></label><label><input type="checkbox" id="cron-enabled"> Aktif</label><button>Simpan jadwal</button></fieldset></form>
+            <p role="status" id="cron-status"></p>
             <button id="startup-read" type="button">Baca layanan</button>
             <p id="startup-status" role="status"></p>
             <ul id="startup-services"></ul>

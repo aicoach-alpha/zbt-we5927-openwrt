@@ -257,6 +257,7 @@ function showLogin() {
   globalThis.VeciWifiControls?.reset();
   globalThis.VeciRa?.reset();
   globalThis.VeciServices?.reset();
+  globalThis.VeciCron?.reset();
   globalThis.VeciLeds?.reset();
   globalThis.VeciInterfaces?.reset();
   el('wifi-channel-auto').disabled = true;
