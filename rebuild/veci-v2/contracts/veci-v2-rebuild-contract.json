@@ -325,14 +325,14 @@
       "origin": "User requirement 2026-11-17",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "source_implemented_not_hardware_verified"
+      "v2_state": "source_tested"
     },
     {
       "id": "system_ipv6_guarded_settings_toggle",
       "origin": "User requirement 2026-11-17",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "source_implemented_not_hardware_verified"
+      "v2_state": "source_tested"
     },
     {
       "id": "ui_four_group_navigation",

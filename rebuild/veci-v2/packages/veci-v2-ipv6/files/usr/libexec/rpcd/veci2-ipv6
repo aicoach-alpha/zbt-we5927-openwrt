@@ -30,15 +30,20 @@ save() {
 		false:IPV6_DISABLE) value=0 ;;
 		*) fail explicit_confirmation_required; return ;;
 	esac
-	[ "$(current)" != "$value" ] || { status; return; }
 	[ "$(uci -q get network.lan 2>/dev/null)" = interface ] &&
 	[ "$(uci -q get dhcp.lan 2>/dev/null)" = dhcp ] ||
 		{ fail network_sections_unavailable; return; }
 	(
 		flock -n -x 9 || { fail change_busy; exit 0; }
+		for cfg in network dhcp veci2_ipv6; do
+			changes="$(uci -q changes "$cfg")" || { fail configuration_unavailable; exit 0; }
+			[ -z "$changes" ] || { fail pending_configuration_changes; exit 0; }
+		done
+		[ "$(current)" != "$value" ] || { status; exit 0; }
 		umask 077
 		tmp="$(mktemp -d /tmp/veci2-ipv6.XXXXXX)" || { fail backup_failed; exit 0; }
 		trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+		mkdir "$tmp/delta" || { fail backup_failed; exit 0; }
 		for cfg in network dhcp veci2_ipv6; do
 			[ -f "/etc/config/$cfg" ] && [ ! -L "/etc/config/$cfg" ] &&
 			cp -p "/etc/config/$cfg" "$tmp/$cfg" ||
@@ -47,7 +52,6 @@ save() {
 		rollback() {
 			for cfg in network dhcp veci2_ipv6; do
 				cp -p "$tmp/$cfg" "/etc/config/$cfg" || :
-				uci -q revert "$cfg" >/dev/null 2>&1 || :
 			done
 		}
 		# Only persistent UCI changes. New state starts at next user reboot.
@@ -58,25 +62,25 @@ save() {
 			lanassign=0; delegated=0; ra=disabled; dhcpv6=disabled
 			uplink_mode=0; wan6_disabled=1
 		fi
-		uci -q set "network.lan.ip6assign=$lanassign" &&
-		uci -q set "network.lan.delegate=$delegated" &&
-		uci -q set "dhcp.lan.ra=$ra" &&
-		uci -q set "dhcp.lan.dhcpv6=$dhcpv6" &&
-		uci -q set dhcp.lan.ndp=disabled || { rollback; fail stage_failed; exit 0; }
+		uci -q -t "$tmp/delta" set "network.lan.ip6assign=$lanassign" &&
+		uci -q -t "$tmp/delta" set "network.lan.delegate=$delegated" &&
+		uci -q -t "$tmp/delta" set "dhcp.lan.ra=$ra" &&
+		uci -q -t "$tmp/delta" set "dhcp.lan.dhcpv6=$dhcpv6" &&
+		uci -q -t "$tmp/delta" set dhcp.lan.ndp=disabled || { rollback; fail stage_failed; exit 0; }
 		for uplink in wan lte; do
 			[ "$(uci -q get network.$uplink 2>/dev/null)" = interface ] || continue
-			uci -q set "network.$uplink.ipv6=$uplink_mode" ||
+			uci -q -t "$tmp/delta" set "network.$uplink.ipv6=$uplink_mode" ||
 				{ rollback; fail stage_failed; exit 0; }
 		done
 		if [ "$(uci -q get network.wan6 2>/dev/null)" = interface ]; then
-			uci -q set "network.wan6.disabled=$wan6_disabled" ||
+			uci -q -t "$tmp/delta" set "network.wan6.disabled=$wan6_disabled" ||
 				{ rollback; fail stage_failed; exit 0; }
 		fi
-		uci -q set "$CFG.enabled=$value" ||
+		uci -q -t "$tmp/delta" set "$CFG.enabled=$value" ||
 			{ rollback; fail stage_failed; exit 0; }
-		if ! uci -q commit network ||
-		   ! uci -q commit dhcp ||
-		   ! uci -q commit veci2_ipv6; then
+		if ! uci -q -t "$tmp/delta" commit network ||
+		   ! uci -q -t "$tmp/delta" commit dhcp ||
+		   ! uci -q -t "$tmp/delta" commit veci2_ipv6; then
 			rollback; fail commit_failed; exit 0
 		fi
 		printf '{"ok":true,"saved":true,"reboot_required":true,"reboot_started":false,"network_reloaded":false}\n'

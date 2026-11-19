@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 PKG_NAME:=veci-v2-ipv6
 PKG_VERSION:=0.1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKGARCH:=all
 include $(INCLUDE_DIR)/package.mk
 define Package/veci-v2-ipv6

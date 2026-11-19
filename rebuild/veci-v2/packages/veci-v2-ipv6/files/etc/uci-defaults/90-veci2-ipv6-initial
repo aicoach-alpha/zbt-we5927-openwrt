@@ -13,8 +13,9 @@ for uplink in wan lte; do
 		continue
 	uci -q set "network.$uplink.ipv6=0"
 done
-[ "$(uci -q get network.wan6 2>/dev/null)" = interface ] &&
-	uci -q set network.wan6.disabled=1 || :
+if [ "$(uci -q get network.wan6 2>/dev/null)" = interface ]; then
+	uci -q set network.wan6.disabled=1
+fi
 uci -q set dhcp.lan.ra=disabled
 uci -q set dhcp.lan.dhcpv6=disabled
 uci -q set dhcp.lan.ndp=disabled
