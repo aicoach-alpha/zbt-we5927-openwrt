@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -56,8 +57,10 @@ class V2BuildTests(unittest.TestCase):
         stub = """
 live_board() { echo zbtlink,zbt-we5927; }
 openwrt_version() { echo 25.12.6; }
+primary_ap_configured() { return 0; }
 ubus_radio_up() { echo true; }
 ubus_hostapd_ap() { return 1; }
+lte_data_device() { echo usb0; }
 ip() {
   case "$*" in
     *'addr show dev usb0'*) echo '12: usb0 inet 198.51.100.12/24' ;;
@@ -84,6 +87,175 @@ main call status
         self.assertEqual(j["netifd_count"], 1)
         self.assertNotIn("imei", p.stdout.lower())
 
+    def test_primary_ap_configuration_and_runtime_are_independent(self):
+        stubs = """
+primary_ap_configured() { return "$wanted"; }
+ubus_radio_up() { echo "$up"; }
+ubus_hostapd_ap() { echo "$state"; }
+lte_data_device() { return 1; }
+"""
+        cases = [
+            (1, 'true', '', False, False),
+            (0, 'true', '', True, True),
+            (0, 'false', '', True, False),
+            (2, 'true', '', None, None),
+            (0, '', '', True, None),
+            (1, 'true', 'ENABLED', False, False),
+        ]
+        for wanted, up, state, configured, missing in cases:
+            with self.subTest(wanted=wanted, up=up, state=state):
+                result = ash(without_main(STATUS) + stubs +
+                             f"wanted={wanted}; up='{up}'; state='{state}'; main call status")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                data = json.loads(result.stdout)
+                self.assertIs(data['wifi_ap_configured'], configured)
+                self.assertIs(data['wifi_ap_missing'], missing)
+                self.assertIs(data['wifi_beacon_verified'], None)
+
+    def test_lte_link_checks_only_the_active_managed_device(self):
+        stubs = """
+uci() { [ "$*" = '-q get we5927_lte.main.data_if' ] && echo usb1; }
+ubus() { [ "$5" = network.interface.lte ] && echo "$active"; }
+jsonfilter() { [ "$2" = '@.l3_device' ] && cat; }
+ip() {
+  case "$*" in
+    '-4 -o addr show dev usb1') echo '3: usb1 inet 192.0.2.2/24' ;;
+    '-4 route show default dev usb1') echo 'default via 192.0.2.1 dev usb1' ;;
+    *) echo unexpected-ip-query >&2 ;;
+  esac
+}
+ubus_radio_up() { :; }
+ubus_hostapd_ap() { :; }
+"""
+        for active, expected in [('usb1', True), ('usb0', None), ('', None)]:
+            with self.subTest(active=active):
+                reply = ash(without_main(STATUS) + stubs + f"active='{active}'\nmain call status")
+                self.assertEqual(reply.returncode, 0, reply.stderr)
+                data = json.loads(reply.stdout)
+                self.assertIs(data['lte_ipv4'], expected)
+                self.assertIs(data['lte_default_route'], expected)
+                self.assertIsNone(data['internet_verified'])
+                self.assertNotIn('192.0.2.', reply.stdout)
+
+    def test_lte_default_device_route_and_failed_queries(self):
+        stubs = """
+lte_data_device() { echo usb0; }
+ubus_radio_up() { :; }
+ubus_hostapd_ap() { :; }
+ip() {
+  case "$*" in
+    '-4 -o addr show dev usb0') return 1 ;;
+    '-4 route show default dev usb0') echo "$route"; return "$rc" ;;
+    *) return 1 ;;
+  esac
+}
+"""
+        for route, rc, expected in [('default dev usb0 scope link', 0, True),
+                                    ('', 0, False), ('', 1, None)]:
+            with self.subTest(route=route, rc=rc):
+                result = ash(without_main(STATUS) + stubs + f"route='{route}'; rc={rc}; main call status")
+                result.check_returncode()
+                data = json.loads(result.stdout)
+                self.assertIs(data['lte_default_route'], expected)
+                self.assertIsNone(data['lte_ipv4'])
+                self.assertIsNone(data['internet_verified'])
+
+    def test_lte_monitor_only_reports_recent_known_stages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "monitor"
+            script = without_main(STATUS).replace("/tmp/veci-lte-performance.state", str(state))
+            for timestamp, stage, expected in [(820, 'sim_failover_failed', 'sim_failover_failed'),
+                                                (819, 'healthy', ''), (1001, 'healthy', ''),
+                                                (1000, 'private_data', ''), ('unknown', 'healthy', '')]:
+                with self.subTest(timestamp=timestamp, stage=stage):
+                    state.write_text(f"failures=0 recoveries=0 stage={stage} modem_phase=unknown timestamp={timestamp}\n")
+                    result = ash(script + "date() { echo 1000; }; lte_monitor_stage")
+                    result.check_returncode()
+                    self.assertEqual(result.stdout.strip(), expected)
+
+    def test_ap_status_uses_present_radio_interfaces(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "office-ap/phy80211").mkdir(parents=True)
+            code = without_main(STATUS).replace("/sys/class/net/", directory + "/")
+            stubs = """
+jsonfilter() { cat; }
+ubus() {
+  case "$5" in
+    network.wireless) printf '%s\\n' stale-ap office-ap ;;
+    hostapd.stale-ap) echo ENABLED ;;
+    hostapd.office-ap) echo ENABLED ;;
+  esac
+}
+ubus_hostapd_ap
+"""
+            self.assertEqual(ash(code + stubs).stdout.strip(), "ENABLED")
+            (root / "office-ap/phy80211").rmdir()
+            self.assertNotEqual(ash(code + stubs).returncode, 0)
+
+    def test_channel_only_from_enabled_primary_bss(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "primary/phy80211").mkdir(parents=True)
+            code = without_main(STATUS).replace("/sys/class/net/", directory + "/")
+            stubs = """
+primary_ap_configured() { return 0; }
+ubus_radio_up() { echo true; }
+lte_data_device() { return 1; }
+ubus() {
+  case "$5" in
+    network.wireless) echo interfaces ;;
+    hostapd.primary) echo status ;;
+    *) return 1 ;;
+  esac
+}
+jsonfilter() {
+  read -r reply || :
+  case "$reply:$2" in
+    'interfaces:@.radio0.interfaces[@.section="default_radio0"].ifname') echo primary ;;
+    'status:@.status') echo "$apstate" ;;
+    'status:@.channel') echo "$channel" ;;
+    *) return 1 ;;
+  esac
+}
+"""
+            for state, channel, expected in [('ENABLED', '11', 11), ('ENABLED', '14', 14),
+                                             ('ENABLED', '36', None), ('ENABLED', '', None),
+                                             ('DISABLED', '6', None)]:
+                with self.subTest(state=state, channel=channel):
+                    result = ash(code + stubs + f"apstate={state}; channel='{channel}'; main call status")
+                    result.check_returncode()
+                    data = json.loads(result.stdout)
+                    self.assertEqual(data['wifi_ap_channel'], expected)
+                    self.assertEqual(data['wifi_ap_enabled'], state == 'ENABLED')
+                    self.assertIsNone(data['wifi_beacon_verified'])
+
+    def test_ethernet_reads_only_external_switch_ports(self):
+        stub = """
+live_board() { echo zbtlink,zbt-we5927; }
+timeout() {
+  [ "$*" = '3 swconfig dev switch0 show' ] || return 1
+  printf '%s\\n' 'link: port:0 link:down' 'link: port:3 link:up speed:100baseT full-duplex' 'link: port:4 link:up' 'link: port:6 link:up speed:1000baseT'
+}
+main call ethernetPorts
+"""
+        result = ash(without_main(STATUS) + stub)
+        result.check_returncode()
+        data = json.loads(result.stdout)
+        self.assertTrue(data["available"])
+        self.assertEqual([p["port"] for p in data["ports"]], list(range(5)))
+        self.assertEqual([p["link"] for p in data["ports"]],
+                         ["down", "unknown", "unknown", "up", "up"])
+
+    def test_ethernet_unavailable_for_wrong_board_or_switch_error(self):
+        for board, operation in [("other", "echo unexpected >&2"), ("zbtlink,zbt-we5927", "return 1"),
+                                 ("zbtlink,zbt-we5927", "echo 'link: port:6 link:up'")]:
+            with self.subTest(board=board, operation=operation):
+                stub = f"live_board() {{ echo {board}; }}\ntimeout() {{ {operation}; }}\nmain call ethernetPorts"
+                result = ash(without_main(STATUS) + stub)
+                result.check_returncode()
+                self.assertEqual(json.loads(result.stdout), {"available": False, "ports": []})
+                self.assertEqual(result.stderr, "")
+
     def test_status_never_runs_mutating_network_commands(self):
         code = "\n".join(x for x in STATUS.splitlines()
                          if not x.lstrip().startswith("#"))
@@ -91,7 +263,7 @@ main call status
                        r"\bif(?:up|down)\b", r"\b(?:reboot|sysupgrade|kill)\b",
                        r"\bAT\+CFUN", r"\bmodprobe\b", r"\buci\s+(?:set|commit)"):
             self.assertNotRegex(code, unsafe)
-        self.assertIn('hostapd.phy0-ap0 get_status', STATUS)
+        self.assertIn('call "hostapd.$interface" get_status', STATUS)
         self.assertIn('internet_verified":null', STATUS)
 
     def test_package_rejects_core_luci_and_kernel_mutations(self):

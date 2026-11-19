@@ -171,7 +171,7 @@ performance_status() {
             case "$k" in
                 stage)
                     case "$v" in
-                        healthy|checking|dhcp_renew|recovered_dhcp|upstream_degraded|interface_recovery|recovered_interface|modem_soft_reconnect|recovered_soft|last_resort_power_cycle|power_cycle_cooldown|opt_in_sim_failover|starting)
+                        healthy|checking|dhcp_renew|recovered_dhcp|upstream_degraded|interface_recovery|recovered_interface|modem_soft_reconnect|recovered_soft|last_resort_power_cycle|power_cycle_cooldown|power_cycle_failed|opt_in_sim_failover|sim_failover_failed|starting)
                             lte_stage="$v" ;;
                     esac ;;
                 failures)
@@ -191,7 +191,7 @@ performance_status() {
             case "$k" in
                 wifi)
                     case "$v" in
-                        ready|ap_not_ready|manual_recovery_required|driver_reset_observed|radio_recovery|hold_associated_or_unknown|cooldown_or_observe|intentionally_disabled|starting) wifi_stage="$v" ;;
+                        ready|ap_not_ready|manual_recovery_required|driver_reset_observed|radio_recovery|hold_associated_or_unknown|cooldown_or_observe|intentionally_disabled|config_unknown|starting) wifi_stage="$v" ;;
                     esac ;;
                 failures)
                     case "$v" in ''|*[!0-9]*) ;; *) wifi_failures="$v" ;; esac ;;

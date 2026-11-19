@@ -4,6 +4,12 @@ set -eu
 umask 077
 LC_ALL=C;export LC_ALL
 fail(){ printf '{"ok":false,"reason":"delete_unavailable"}\n'; exit 1; }
+# A disconnect during a transaction must not redirect a later command to another port.
+sms_at() {
+  [ "$(/usr/sbin/we5927-lte at-port)" = "$port" ] || return 1
+  /usr/sbin/we5927-at "$port" "$@"
+}
+
 [ "$#" -eq 2 ] || fail
 slot="$1"; memory="$2"
 case "$slot" in ''|*[!0-9]*)fail;;esac
@@ -82,17 +88,12 @@ delete_ok(){
 }
 (
  flock -n -x 9 || fail
- [ -c /dev/ttyUSB2 ] || fail
- dev="$(readlink -f /sys/class/tty/ttyUSB2/device 2>/dev/null || :)"
- case "$dev" in /sys/devices/*:1.4/ttyUSB2);;*)fail;;esac
- parent="$(dirname "$(dirname "$dev")")"
- [ "$(cat "$parent/idVendor" 2>/dev/null || :)" = 05c6 ] || fail
- [ "$(cat "$parent/idProduct" 2>/dev/null || :)" = 902e ] || fail
- res="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CPMS?' 2000 2>/dev/null)" || fail
+ port="$(/usr/sbin/we5927-lte at-port)" || fail
+ res="$(sms_at 'AT+CPMS?' 2000 2>/dev/null)" || fail
  active="$(printf '%s\n' "$res" | storage_from_cpms)" || fail
  unset res
  [ "$active" = "$memory" ] || fail
- res="$(/usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF?' 1500 2>/dev/null)" || fail
+ res="$(sms_at 'AT+CMGF?' 1500 2>/dev/null)" || fail
  old_mode="$(printf '%s\n' "$res" | tr -d '\r' | awk '
  /^\+CMGF:[ ]*[01][ ]*$/ {gsub(/ /,"",$0);v=substr($0,length($0));seen=1}
  $0=="OK" && seen {done=1}
@@ -102,18 +103,18 @@ delete_ok(){
  case "$old_mode" in 0|1) ;; *)fail;;esac
  switched=0
  if [ "$old_mode" = 1 ]; then
-    /usr/sbin/we5927-at /dev/ttyUSB2 'AT+CMGF=0' 2200 >/dev/null 2>&1 || fail
+    sms_at 'AT+CMGF=0' 2200 >/dev/null 2>&1 || fail
     switched=1
  fi
  trap 'if [ "$switched" = 1 ]; then
-    /usr/sbin/we5927-at /dev/ttyUSB2 "AT+CMGF=1" 2200 >/dev/null 2>&1 || :
+    sms_at "AT+CMGF=1" 2200 >/dev/null 2>&1 || :
  fi' EXIT
- res="$(/usr/sbin/we5927-at /dev/ttyUSB2 "AT+CMGR=$slot" 3500 2>/dev/null)" || fail
+ res="$(sms_at "AT+CMGR=$slot" 3500 2>/dev/null)" || fail
  current="$(printf '%s\n' "$res" | single_pdu)" || fail
  unset res
  [ "$current" = "$expected" ] || fail
  unset current expected
- res="$(/usr/sbin/we5927-at /dev/ttyUSB2 "AT+CMGD=$slot,0" 4000 2>/dev/null)" || fail
+ res="$(sms_at "AT+CMGD=$slot,0" 4000 2>/dev/null)" || fail
  printf '%s\n' "$res" | delete_ok || fail
  unset res
  printf '{"ok":true,"deleted":%s,"storage":"%s"}\n' "$slot" "$memory"

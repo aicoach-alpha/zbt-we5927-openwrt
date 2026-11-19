@@ -45,30 +45,13 @@ set_enabled() {
 }
 # Bind only known AT interface 1.4, or one explicitly configured fallback.
 # W907 function 1.5 / ttyUSB3 must never be probed.
-find_port() {
-    for t in /sys/class/tty/ttyUSB*; do
-        [ -e "$t/device" ] || continue
-        devpath="$(readlink -f "$t/device" 2>/dev/null || true)"
-        case "$devpath" in
-            */1-1:1.4/*)
-                p="/dev/$(basename "$t")"
-                if [ -c "$p" ]; then printf '%s\n' "$p"; return 0; fi ;;
-        esac
-    done
-    fallback="$(uci -q get we5927_lte.main.at_port 2>/dev/null || true)"
-    case "$fallback" in
-        /dev/ttyUSB3) return 1 ;;
-        /dev/ttyUSB[0-9]|/dev/ttyUSB[0-9][0-9])
-            [ -c "$fallback" ] && { printf '%s\n' "$fallback"; return 0; } ;;
-    esac
-    return 1
-}
+
 read_inbox() {
     enabled || { error_json disabled; return; }
     [ -x /usr/sbin/we5927-at ] || { error_json at_tool_unavailable; return; }
     [ -x /usr/libexec/veci-sms-parse ] || { error_json invalid_modem_response; return; }
     command -v flock >/dev/null 2>&1 || { error_json modem_busy; return; }
-    PORT="$(find_port)" || { error_json modem_port_unavailable; return; }
+    PORT="$(/usr/sbin/we5927-lte at-port)" || { error_json modem_port_unavailable; return; }
     # Shared lock remains held throughout the PDU-mode and inbox commands.
     (
         flock -n -x 9 || { error_json modem_busy; exit 0; }

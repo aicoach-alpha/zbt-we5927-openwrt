@@ -4,7 +4,23 @@ on:
   push:
     paths:
       - '.github/workflows/veci-v2-lab-image.yml'
+      - 'rebuild/veci-v2/packages/**'
+      - 'rebuild/veci-v2/ci/stage-v2-source.sh'
+      - 'rebuild/veci-v2/trust/**'
+      - 'source/veci-cellular-we5927/**'
+      - 'source/openwrt-source-commit.txt'
+      - 'source/openwrt-we5927.config'
+      - 'source/openwrt-zbt-we5927-current.patch'
+      - 'scripts/stage-veci-reliability-rc.sh'
+      - 'source/we5927-lte/**'
+      - 'source/veci-wifi-guardian/**'
   workflow_dispatch:
+    inputs:
+      export_unsigned_candidate:
+        description: "Explicitly export verified UNSIGNED candidate to private artifact (NOT flash approved)"
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -24,7 +40,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential clang bison flex gawk gettext git gcc-multilib \
             libncurses-dev libssl-dev rsync subversion swig unzip wget \
-            zlib1g-dev python3 python3-setuptools file xz-utils zstd
+            zlib1g-dev python3 python3-setuptools file xz-utils zstd squashfs-tools
 
       - name: Pin, stage and verify exact 2SIM board sources
         shell: bash
@@ -41,6 +57,30 @@ jobs:
           git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
           sh scripts/stage-veci-reliability-rc.sh "$root"
           sh rebuild/veci-v2/ci/stage-v2-source.sh "$root"
+          # The legacy catalog prepares this exact source identity, but the
+          # catalog itself is deliberately NOT bundled into VeCI v2 ROM.
+          # Without this overlay, veci.v2.pkg cannot verify a build-specific
+          # signed app feed even though its APK compiles successfully.
+          release_src="$root/package/veci-app-catalog-we5927/files/etc/veci-release.json"
+          release_dst="$root/files/etc/veci-release.json"
+          test -s "$release_src" && test ! -L "$release_src"
+          test ! -L "$release_dst"
+          mkdir -p "$root/files/etc"
+          cp "$release_src" "$release_dst"
+          python3 - "$release_dst" "$GITHUB_SHA" <<'PYRELEASE'
+          import json, pathlib, sys
+          m=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert m["build_id"] == sys.argv[2]
+          assert m["board"] == "zbtlink,zbt-we5927"
+          assert m["target"] == "ramips/mt76x8"
+          assert m["version"] == "25.12.6"
+          assert m["image_signature"] == "not_verified"
+          print("V2_BUILD_ID_MANIFEST_STAGED=PASS")
+          PYRELEASE
+          install -Dm644 rebuild/veci-v2/trust/1d8759d36251c36c "$root/files/etc/opkg/keys/1d8759d36251c36c"
+          platform="$root/target/linux/ramips/mt76x8/base-files/lib/upgrade/platform.sh"
+          grep -Fxq 'REQUIRE_IMAGE_METADATA=1' "$platform"
+          sed -i '/^REQUIRE_IMAGE_METADATA=1$/a REQUIRE_IMAGE_SIGNATURE=1' "$platform"
           cp source/openwrt-we5927.config "$root/.config"
           cat >> "$root/.config" <<'PKGS'
           CONFIG_PACKAGE_veci-v2-runtime=y
@@ -51,6 +91,7 @@ jobs:
           CONFIG_PACKAGE_veci-wifi-guardian=y
           CONFIG_PACKAGE_we5927-lte=y
           CONFIG_PACKAGE_libustream-mbedtls=y
+          CONFIG_PACKAGE_ucert=y
           CONFIG_PACKAGE_px5g-mbedtls=y
           PKGS
           echo 'EXACT_TWO_SIM_SOURCE_STAGED=PASS'
@@ -67,12 +108,10 @@ jobs:
           for name in veci-v2-runtime veci-v2-package-manager veci-v2-sms veci-v2-ipv6 veci-v2-ui veci-wifi-guardian; do
             grep -Fxq "CONFIG_PACKAGE_$name=y" .config
           done
-          ! grep -Eq '^CONFIG_(DEFAULT_luci|PACKAGE_luci([-A-Za-z0-9_]*)?|PACKAGE_rpcd-mod-luci)=y$' .config
-          ! grep -Fxq 'CONFIG_PACKAGE_veci=y' .config
-          ! grep -Fxq 'CONFIG_PACKAGE_veci-cellular-we5927=y' .config
-          ! grep -Fxq 'CONFIG_PACKAGE_veci-data-meter=y' .config
-          ! grep -Fxq 'CONFIG_PACKAGE_veci-app-guest=y' .config
-          ! grep -Fxq 'CONFIG_PACKAGE_veci-app-voucher=y' .config
+          if grep -E '^CONFIG_(DEFAULT_luci|PACKAGE_(luci([-A-Za-z0-9_]*)?|rpcd-mod-luci|veci|veci-cellular-we5927|veci-data-meter|veci-app-guest|veci-app-voucher))=y$' .config; then
+            echo 'Unexpected package enabled in minimal image' >&2
+            exit 1
+          fi
           make -j2 V=s tools/install
           make -j2 V=s toolchain/install
           make -j2 V=s
@@ -105,9 +144,61 @@ jobs:
           assert m.get("version",{}).get("version")=="25.12.6"
           print("EXACT_BOARD_IMAGE_METADATA=PASS")
           PY
-          f="$(find build_dir -path '*/root-ramips/usr/libexec/rpcd/veci.v2' -type f -print -quit)"
-          test -n "$f"
-          rom="$(printf %s "$f" | sed 's|/usr/libexec/rpcd/veci.v2$||')"
+          # Prove the compiled package payload was installed into the
+          # precise image root and is present in the image's real SquashFS.
+          # A successful package compile or APK installation log alone is
+          # insufficient; do not mask an absent runtime with a source overlay.
+          python3 "$GITHUB_WORKSPACE/rebuild/veci-v2/ci/check-compiled-apks.py" bin/packages/mipsel_24kc/base
+          compiled_rom="$PWD/build_dir/target-mipsel_24kc_musl/root-ramips"
+          test -d "$compiled_rom" || { echo "IMAGE_ROOT_MISSING:$compiled_rom" >&2; exit 1; }
+          if [ ! -s "$compiled_rom/usr/libexec/rpcd/veci.v2" ]; then
+            echo "IMAGE_ROOT_MISSING_RPCD_V2:$compiled_rom/usr/libexec/rpcd/veci.v2" >&2
+            for dir in "$compiled_rom/usr/libexec/rpcd" "$PWD/staging_dir/target-mipsel_24kc_musl/root-ramips/usr/libexec/rpcd"; do
+              echo "DIAGNOSTIC_RPCD_DIR:$dir" >&2
+              if [ -d "$dir" ]; then ls -la "$dir" >&2; else echo NOT_A_DIRECTORY >&2; fi
+            done
+            echo "DIAGNOSTIC_PACKAGE_PAYLOAD:" >&2
+            ls -la "$PWD/build_dir/target-mipsel_24kc_musl/veci-v2-runtime-0.1/ipkg-mipsel_24kc/veci-v2-runtime/usr/libexec/rpcd/" >&2 || true
+            echo "DIAGNOSTIC_INSTALLED_MANIFEST:" >&2
+            ls -la "$compiled_rom/lib/apk/db/" >&2 || true
+            exit 1
+          fi
+          echo 'EXACT_COMPILED_IMAGE_ROOT_RPCD_V2=PASS'
+          squash="$PWD/build_dir/target-mipsel_24kc_musl/linux-ramips_mt76x8/root.squashfs"
+          kernel="$PWD/build_dir/target-mipsel_24kc_musl/linux-ramips_mt76x8/zbtlink_zbt-we5927-kernel.bin"
+          test -s "$squash" && test -s "$kernel" || {
+            echo 'MISSING_FINAL_KERNEL_OR_SQUASHFS' >&2; exit 1;
+          }
+          kernel_bytes="$(stat -c %s "$kernel")"
+          squash_bytes="$(stat -c %s "$squash")"
+          cmp -s -n "$squash_bytes" -i "$kernel_bytes:0" "$image" "$squash" || {
+            echo 'IMAGE_EMBEDDED_SQUASHFS_MISMATCH' >&2; exit 1;
+          }
+          rom="$RUNNER_TEMP/veci-v2-verified-squashfs"
+          mkdir -p "$rom"
+          # SquashFS contains /dev/console character device. A non-root extraction
+          # returns exit code 2 even when regular files are extracted.
+          # Extract as root so device-node errors remain a hard gate.
+          sudo unsquashfs -no-progress -d "$rom" "$squash"
+          test -s "$rom/usr/libexec/rpcd/veci.v2" || {
+            echo 'FINAL_SQUASHFS_MISSING_RPCD_V2' >&2; exit 1;
+          }
+          cmp -s "$compiled_rom/usr/libexec/rpcd/veci.v2" "$rom/usr/libexec/rpcd/veci.v2" || {
+            echo 'FINAL_SQUASHFS_RPCD_V2_DIFFERENT_FROM_BUILD_ROOT' >&2; exit 1;
+          }
+          echo 'EXACT_EMBEDDED_SQUASHFS_AND_RPCD_V2=PASS'
+          python3 - "$rom/etc/veci-release.json" "$GITHUB_SHA" <<'PYRELEASE'
+          import json, pathlib, sys
+          path=pathlib.Path(sys.argv[1])
+          assert path.is_file() and path.stat().st_size > 0
+          m=json.loads(path.read_text())
+          assert m["build_id"] == sys.argv[2]
+          assert m["board"] == "zbtlink,zbt-we5927"
+          assert m["target"] == "ramips/mt76x8"
+          assert m["version"] == "25.12.6"
+          assert m["image_signature"] == "not_verified"
+          print("V2_EXTRACTED_RELEASE_MANIFEST=PASS")
+          PYRELEASE
           for path in usr/libexec/rpcd/veci.v2 \
                       usr/libexec/rpcd/veci.v2.pkg \
                       usr/libexec/rpcd/veci.sms \
@@ -123,7 +214,41 @@ jobs:
                       www/index.html; do
             test -s "$rom/$path" || { echo "MISSING:$path" >&2; exit 1; }
           done
-          find "$rom/lib/modules" -type f -name 'mt7603e.ko' -size +0c -print -quit | grep -q mt7603e.ko
+          for module in mt7603e rndis_host usb_wwan option; do
+            path=$(find "$rom/lib/modules" -type f -name "$module.ko" -size +0c -print -quit)
+            test -n "$path" || { echo "MISSING_DRIVER:$module" >&2; exit 1; }
+          done
+          for helper in veci-sms-send-one veci-sms-delete-one; do
+            test -x "$rom/usr/libexec/$helper"
+            cmp "$GITHUB_WORKSPACE/source/veci-cellular-we5927/files/usr/libexec/$helper" "$rom/usr/libexec/$helper"
+          done
+          test -x "$rom/usr/libexec/veci-sms-cmgs"
+          cmp "$compiled_rom/usr/libexec/veci-sms-cmgs" "$rom/usr/libexec/veci-sms-cmgs"
+          test -x "$rom/usr/bin/curl"
+          test -x "$rom/usr/sbin/we5927-lte"
+          cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/usr/sbin/we5927-lte" "$rom/usr/sbin/we5927-lte"
+          test -x "$rom/usr/bin/ucert"
+          runtime="$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-runtime"
+          ui="$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-ui/files"
+          cmp "$runtime/veci2-lte-policy" "$rom/usr/libexec/rpcd/veci.v2.lte"
+          cmp "$runtime/veci2-status" "$rom/usr/libexec/rpcd/veci.v2"
+          cmp "$runtime/veci2-status-acl.json" "$rom/usr/share/rpcd/acl.d/veci-v2-runtime.json"
+          for rel in www/veci2/app.js www/veci2/index.html www/veci2/app.css etc/uci-defaults/97-veci-v2-https; do
+            cmp "$ui/$rel" "$rom/$rel"
+          done
+          test -x "$rom/etc/uci-defaults/97-veci-v2-https"
+          test -x "$rom/usr/libexec/rpcd/veci.v2.lte"
+          test -x "$rom/usr/libexec/rpcd/veci.v2.wifi"
+          cmp "$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi" "$rom/usr/libexec/rpcd/veci.v2.wifi"
+          test -x "$rom/www/cgi-bin/veci2-verify"
+          test -x "$rom/usr/libexec/veci2-verify-image"
+          cmp "$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify" "$rom/www/cgi-bin/veci2-verify"
+          cmp "$GITHUB_WORKSPACE/rebuild/veci-v2/packages/veci-v2-runtime/veci2-verify-image" "$rom/usr/libexec/veci2-verify-image"
+          grep -Fxq 'REQUIRE_IMAGE_SIGNATURE=1' "$rom/lib/upgrade/platform.sh"
+          cmp "$GITHUB_WORKSPACE/rebuild/veci-v2/trust/1d8759d36251c36c" "$rom/etc/opkg/keys/1d8759d36251c36c"
+          for module in mt7603e rndis_host option; do
+            test -s "$rom/lib/modules/6.12.112/$module.ko"
+          done
           for forbidden in www/cgi-bin/luci www/luci-static usr/share/luci usr/lib/lua/luci usr/libexec/rpcd/veci.meter; do
             test ! -e "$rom/$forbidden" || { echo "UNWANTED:$forbidden"; exit 1; }
           done
@@ -137,10 +262,107 @@ jobs:
           echo 'SIGNATURE_TRUST=NOT_VERIFIED'
           echo 'FLASH_PERMISSION=NO'
 
+      # Deliberately restricted to an explicitly requested, reviewed build
+      # branch. Only manual explicit export or a marked build commit exports; ordinary pushes/PR runs cannot.
+      - name: Prepare verified unsigned VeCI v2 image for offline signing
+        if: ${{ github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]'))) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/openwrt-v2/bin/targets/ramips/mt76x8"
+          mapfile -t images < <(find "$dir" -maxdepth 1 -type f -name '*zbt*we5927*sysupgrade.bin' -print)
+          test "${#images[@]}" -eq 1
+          image="${images[0]}"
+          bytes="$(stat -c %s "$image")"
+          test "$bytes" -gt 0 && test "$bytes" -le 6946816
+          meta="$RUNNER_TEMP/v2-offline-verify.json"
+          "$RUNNER_TEMP/openwrt-v2/staging_dir/host/bin/fwtool" -i "$meta" "$image"
+          python3 - "$meta" "$GITHUB_SHA" <<'PYV2'
+          import json, pathlib, sys
+          meta = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert "zbtlink,zbt-we5927" in meta.get("supported_devices", [])
+          assert meta.get("version", {}).get("version") == "25.12.6"
+          assert meta.get("version", {}).get("target") == "ramips/mt76x8"
+          assert len(sys.argv[2]) == 40
+          print("V2_UNSIGNED_EXACT_BOARD_METADATA=PASS")
+          PYV2
+          out="$RUNNER_TEMP/veci-v2-candidate"
+          mkdir -p "$out"
+          cp "$image" "$out/openwrt-25.12.6-veci-v2-WE5927-2SIM-UNSIGNED.bin"
+          cp "$meta" "$out/OPENWRT_METADATA.json"
+          cp source/openwrt-source-commit.txt "$out/OPENWRT_PIN.txt"
+          # Exported checksum paths must be portable and verifiable off-runner.
+          # Keep all release evidence explicitly UNSIGNED; no signing keys in CI.
+          printf 'build_sha=%s\n' "$GITHUB_SHA" > "$out/BUILD_PROVENANCE.txt"
+          (
+            cd "$out"
+            sha256sum openwrt-25.12.6-veci-v2-WE5927-2SIM-UNSIGNED.bin > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+          python3 - "$out" "$GITHUB_SHA" "$bytes" <<'PYREPORT'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          out = pathlib.Path(sys.argv[1])
+          build_sha = sys.argv[2]
+          image_bytes = int(sys.argv[3])
+          image_name = "openwrt-25.12.6-veci-v2-WE5927-2SIM-UNSIGNED.bin"
+          image_path = out / image_name
+          metadata = json.loads((out / "OPENWRT_METADATA.json").read_text())
+          source_pin = (out / "OPENWRT_PIN.txt").read_text().strip()
+          image_sha256 = hashlib.file_digest(image_path.open("rb"), "sha256").hexdigest()
+          assert len(build_sha) == 40
+          assert image_path.is_file() and image_path.stat().st_size == image_bytes
+          assert 0 < image_bytes <= 7995392 - 1048576
+          assert "zbtlink,zbt-we5927" in metadata.get("supported_devices", [])
+          assert metadata.get("version", {}).get("target") == "ramips/mt76x8"
+          assert metadata.get("version", {}).get("version") == "25.12.6"
+          assert len(source_pin) == 40
+          assert (out / "SHA256SUMS").read_text().strip() == f"{image_sha256}  {image_name}"
+          report = {
+              "schema": "veci-v2-unsigned-candidate.v1",
+              "release_state": "UNSIGNED_LABORATORY_ONLY",
+              "flash_allowed": False,
+              "build_sha": build_sha,
+              "openwrt_source_pin": source_pin,
+              "board": "zbtlink,zbt-we5927",
+              "target": "ramips/mt76x8",
+              "openwrt_version": "25.12.6",
+              "image_filename": image_name,
+              "image_sha256": image_sha256,
+              "image_bytes": image_bytes,
+              "firmware_partition_bytes": 7995392,
+              "minimum_free_partition_reserve_bytes": 1048576,
+              "remaining_partition_bytes": 7995392 - image_bytes,
+              "ci_build_and_embedded_squashfs_gate": "pass",
+              "ci_core_content_and_no_luci_gate": "pass",
+              "signing_and_trust_anchor": "not_verified",
+              "sysupgrade_hardware_test": "not_run",
+              "physical_and_72h_uat": "not_run",
+              "full_oem_luci_parity": "not_verified"
+          }
+          (out / "VERIFICATION_REPORT.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n"
+          )
+          print("PORTABLE_UNSIGNED_CANDIDATE_EVIDENCE=PASS")
+          PYREPORT
+          printf '%s\n' 'UNSIGNED LABORATORY IMAGE. DO NOT FLASH.' 'Hardware UAT, offline signing, router trust anchor, recovery validation still required.' > "$out/DO_NOT_FLASH.txt"
+
+      - name: Upload explicit unsigned image for independent offline verification
+        if: ${{ github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]'))) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-v2-we5927-2sim-unsigned-${{ github.sha }}
+          path: ${{ runner.temp }}/veci-v2-candidate/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Production flash prohibited even on green CI
         if: always()
         run: |
           echo 'V2 IS A LABORATORY SOURCE/IMAGE PROTOTYPE.'
-          echo 'NO UNSIGNED IMAGE UPLOADED OR RELEASED.'
+          echo 'SIGNED RELEASE NOT PRODUCED. ONLY CONDITIONALLY EXPORTED UNSIGNED LAB IMAGE.'
           echo 'PRODUCTION ROUTER NOT MODIFIED.'
           echo 'FULL LUCI/OEM PARITY AND 72h PHYSICAL UAT NOT COMPLETE.'

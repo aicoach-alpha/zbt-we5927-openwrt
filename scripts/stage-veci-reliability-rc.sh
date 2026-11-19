@@ -111,6 +111,8 @@ echo 'VECI_NATIVE_LANDING_AND_REAL_RELEASE_ID_STAGED=PASS'
 [ -f "$here/source/we5927-lte/src/veci-sms-cmgs.c" ] || {
   echo 'sms_cmgs_source_missing' >&2; exit 3
 }
+cp "$here/source/we5927-lte/src/we5927-at.c" "$root/package/we5927-lte/src/we5927-at.c"
+cmp -s "$here/source/we5927-lte/src/we5927-at.c" "$root/package/we5927-lte/src/we5927-at.c" || exit 4
 cp "$here/source/we5927-lte/src/veci-sms-cmgs.c" "$root/package/we5927-lte/src/veci-sms-cmgs.c"
 cp "$here/source/we5927-lte/Makefile" "$root/package/we5927-lte/Makefile"
 grep -Fq '$(PKG_BUILD_DIR)/veci-sms-cmgs' "$root/package/we5927-lte/Makefile" || {

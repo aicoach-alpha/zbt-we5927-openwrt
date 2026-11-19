@@ -88,7 +88,7 @@ set_sim() { :; }
 usb_repair() { :; }
 wait_at() { :; }
 sim_ready() { :; }
-apply_apn() { :; }
+apply_apn_at_ready() { :; }
 ifup() { :; }
 modem_readiness_phase() { echo at_busy_or_unavailable; }
 log() { :; }

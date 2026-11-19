@@ -6,12 +6,61 @@
         "veci.v2": [
           "status",
           "capabilities",
-          "smsProvider"
+          "smsProvider",
+          "ethernetPorts"
         ]
       }
     },
     "write": {
       "ubus": {}
+    }
+  },
+  "veci-v2-firmware": {
+    "description": "Verify a firmware upload in RAM",
+    "write": {
+      "ubus": {
+        "veci.v2.firmware": [
+          "verify",
+          "apply"
+        ]
+      }
+    }
+  },
+  "veci-v2-wifi": {
+    "description": "Primary AP name and visibility",
+    "read": {
+      "ubus": {
+        "veci.v2.wifi": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.wifi": [
+          "setVisibility",
+          "setSsid",
+          "setAutoChannel"
+        ]
+      }
+    }
+  },
+  "veci-v2-lte": {
+    "description": "Read cellular preferences and change automatic SIM failover",
+    "read": {
+      "ubus": {
+        "veci.v2.lte": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.lte": [
+          "setFailover",
+          "setApn"
+        ]
+      }
     }
   }
 }

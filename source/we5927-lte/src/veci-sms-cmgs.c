@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <stdint.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -174,22 +175,47 @@ static int read_phase(int fd,int prompt_phase,long long deadline,int *out_mr){
         }
     }
 }
+/* The SMS transaction must keep the port chosen while the caller held the AT lock. */
+static int current_modem_port(const char *path) {
+    char selected[64];
+    FILE *manager = popen("/usr/sbin/we5927-lte at-port", "r");
+    if (!manager) return 0;
+    int matched = fgets(selected, sizeof selected, manager) != NULL;
+    if (matched) {
+        selected[strcspn(selected, "\n")] = '\0';
+        matched = strcmp(selected, path) == 0;
+    }
+    return pclose(manager) == 0 && matched;
+}
+
 int main(int argc,char **argv){
     unsigned char data[MAX_BYTES]={0};
     size_t n=0;int len=0,fd=-1,rc=1,phase,mr=-1;
     struct termios tty,old;
+    int configured = 0;
     char command[32],hex[MAX_HEX+1];
     long long deadline;
     if(argc!=2 || parse_hex(data,&n) || !valid_submit(data,n,&len)){
         puts("{\"ok\":false,\"reason\":\"invalid_submit\"}");
         goto done;
     }
-    if(strcmp(argv[1],"/dev/ttyUSB2") && strncmp(argv[1],"/dev/pts/",9)){
+    const char *path = argv[1];
+    const char usb_prefix[] = "/dev/ttyUSB";
+    int usb = !strncmp(path, usb_prefix, sizeof usb_prefix - 1);
+    const char *number = NULL;
+    if (usb) number = path + sizeof usb_prefix - 1;
+    else if (!strncmp(path, "/dev/pts/", 9)) number = path + 9;
+    if (!number || !*number || number[strspn(number, "0123456789")] ||
+        (usb && !current_modem_port(path))) {
         puts("{\"ok\":false,\"reason\":\"invalid_device\"}");
         goto done;
     }
-    fd=open(argv[1],O_RDWR|O_NOCTTY|O_NONBLOCK|O_CLOEXEC);
-    if(fd<0 || tcgetattr(fd,&old)){
+    fd=open(path,O_RDWR|O_NOCTTY|O_NONBLOCK|O_CLOEXEC|O_NOFOLLOW);
+    struct stat opened, current;
+    if(fd<0 || fstat(fd,&opened) || !S_ISCHR(opened.st_mode) ||
+       (usb && (!current_modem_port(path) || stat(path,&current) ||
+                opened.st_dev!=current.st_dev || opened.st_ino!=current.st_ino)) ||
+       tcgetattr(fd,&old)){
         puts("{\"ok\":false,\"reason\":\"serial_unavailable\"}");
         goto done;
     }
@@ -201,6 +227,7 @@ int main(int argc,char **argv){
         puts("{\"ok\":false,\"reason\":\"serial_unavailable\"}");
         goto done;
     }
+    configured = 1;
     /* No modem state change except one explicit message transaction. */
     tcflush(fd,TCIFLUSH);
     snprintf(command,sizeof command,"AT+CMGS=%d\r",len);
@@ -233,6 +260,7 @@ int main(int argc,char **argv){
 done:
     memset(data,0,sizeof data);
     memset(hex,0,sizeof hex);
-    if(fd>=0){tcsetattr(fd,TCSANOW,&old);close(fd);}
+    if(configured) tcsetattr(fd,TCSANOW,&old);
+    if(fd>=0) close(fd);
     return rc;
 }

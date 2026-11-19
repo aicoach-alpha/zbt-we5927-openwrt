@@ -1,0 +1,93 @@
+#!/bin/sh
+set -eu
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+ap=wireless.default_radio0
+check_ap() {
+  [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+  [ "$(uci -q get "$ap")" = wifi-iface ] &&
+    [ "$(uci -q get "$ap.device")" = radio0 ] &&
+    [ "$(uci -q get "$ap.mode")" = ap ] || fail primary_ap_unavailable
+  changes=$(uci -q changes wireless) || fail config_unavailable
+  [ -z "$changes" ] || fail pending_wireless_changes
+}
+visibility() {
+  case "$(uci -q get "$ap.hidden" || :)" in
+    ''|0|false|off|no) visible=true ;;
+    1|true|on|yes) visible=false ;;
+    *) fail invalid_visibility ;;
+  esac
+}
+# UCI prints one terminating newline. Encode the stored bytes before removing it.
+ssid_hex() {
+  local encoded
+  encoded=$(uci -q get "$ap.ssid" | hexdump -v -e '1/1 "%02x"') || return 1
+  printf '%s' "${encoded%0a}"
+}
+primary_channel() {
+  [ "$(uci -q get wireless.radio0)" = wifi-device ] &&
+    [ "$(uci -q get wireless.radio0.band)" = 2g ] || return 1
+  channel=$(uci -q get wireless.radio0.channel) || return 1
+  case "$channel" in auto|[1-9]|1[0-4]) printf '%s' "$channel" ;; *) return 1 ;; esac
+}
+save_option() {
+  local tmp
+  tmp=$(mktemp -d /tmp/veci2-wifi.XXXXXX) || fail save_failed
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 1' HUP INT TERM
+  uci -q -t "$tmp" set "$1=$2" && uci -q -t "$tmp" commit wireless || fail save_failed
+  rm -rf "$tmp"
+  trap - EXIT HUP INT TERM
+}
+case "${1:-}:${2:-}" in
+  list:*) echo '{"status":{},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"}}'; exit 0 ;;
+  call:status) check_ap; visibility ;;
+  call:setVisibility|call:setSsid|call:setAutoChannel)
+    request=$(head -c 257)
+    [ "${#request}" -le 256 ] || fail invalid_request
+    exec 9<"$0"
+    flock -n 9 || fail busy
+    check_ap
+    visibility
+    if [ "$2" = setAutoChannel ]; then
+      action=$(jsonfilter -s "$request" -e '@.action') || fail invalid_request
+      [ "$action" = AUTO_CHANNEL_2G ] || fail invalid_action
+      channel=$(primary_channel) || fail channel_unavailable
+      if [ "$channel" != auto ]; then
+        save_option wireless.radio0.channel auto
+        [ "$(primary_channel)" = auto ] || fail save_failed
+      fi
+    elif [ "$2" = setVisibility ]; then
+      action=$(jsonfilter -s "$request" -e '@.action') || fail invalid_request
+      case "$action" in SHOW_SSID) desired=true; hidden=0 ;; HIDE_SSID) desired=false; hidden=1 ;; *) fail invalid_action ;; esac
+      if [ "$visible" != "$desired" ]; then
+        save_option "$ap.hidden" "$hidden"
+        check_ap
+        visibility
+        [ "$visible" = "$desired" ] || fail save_failed
+      fi
+    else
+      desired=$(jsonfilter -s "$request" -e '@.ssid_hex') || fail invalid_request
+      case "$desired" in ''|*[!0123456789abcdef]*) fail invalid_ssid ;; esac
+      [ "${#desired}" -le 64 ] && [ $((${#desired} % 2)) -eq 0 ] || fail invalid_ssid
+      remaining=$desired
+      name=
+      while [ -n "$remaining" ]; do
+        rest=${remaining#??}
+        pair=${remaining%"$rest"}
+        case "$pair" in 0?|1?|7f) fail invalid_ssid ;; esac
+        name=$name$(printf '%b' "$(printf '\\%03o' "0x$pair")")
+        remaining=$rest
+      done
+      current=$(ssid_hex) || fail config_unavailable
+      if [ "$current" != "$desired" ]; then
+        save_option "$ap.ssid" "$name"
+        check_ap
+        [ "$(ssid_hex)" = "$desired" ] || fail save_failed
+      fi
+    fi ;;
+  *) fail unsupported_method ;;
+esac
+configured=$(ssid_hex) || fail config_unavailable
+channel=$(primary_channel) || channel=
+printf '{"ok":true,"configured_visible":%s,"ssid_hex":"%s","configured_channel":"%s"}\n' "$visible" "$configured" "$channel"

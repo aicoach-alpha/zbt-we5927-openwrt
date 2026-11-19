@@ -43,6 +43,188 @@ function binaryStatus(value, trueLabel = 'Aktif', falseLabel = 'Tidak aktif') {
   if (value === false) return [falseLabel, 'bad'];
   return ['Belum diverifikasi', 'warn'];
 }
+async function firmwareError(response) {
+  const fallback = 'Permintaan firmware gagal (HTTP ' + response.status + ').';
+  let code;
+  try { code = (await response.json()).error; } catch { return fallback; }
+  switch (code) {
+    case 'incompatible_image': return 'Board, target, atau partisi flash tidak cocok dengan image.';
+    case 'trust_anchor_failed': return 'Kunci tepercaya router tidak tersedia atau berbeda dari kunci rilis.';
+    case 'signature_failed': return 'Signature firmware tidak dapat diverifikasi. Periksa sumber image.';
+    case 'digest_failed': return 'Byte image berbeda dari SHA-256 yang dipilih. Periksa file dan manifest.';
+    case 'sysupgrade_test_failed': return 'Router menolak image saat uji sysupgrade -T.';
+    case 'verification_expired_or_replaced': return 'Tiket sudah kedaluwarsa atau diganti. Verifikasi ulang firmware.';
+    case 'verification_busy': return 'Router sedang memproses firmware. Tunggu hingga proses selesai.';
+    case 'insufficient_tmp_space': return 'Ruang sementara router tidak cukup untuk memeriksa image.';
+    case 'release_download_failed': return 'Router gagal mengunduh aset rilis GitHub. Periksa koneksi router.';
+    default: return fallback;
+  }
+}
+const firmwareForm = el('firmware-check');
+let installCandidate = null;
+const installButton = el('firmware-install');
+function clearInstallCandidate() {
+  installCandidate = null;
+  installButton.hidden = true;
+}
+function offerInstall(receipt, payload, ota) {
+  clearInstallCandidate();
+  if (!/^[0-9a-f]{64}$/.test(receipt.ticket || ''))
+    throw Error('Router tidak memberikan tiket instalasi yang valid.');
+  installCandidate = {digest: receipt.sha256, ticket: receipt.ticket, payload, ota};
+  installButton.hidden = false;
+}
+installButton.addEventListener('click', async () => {
+  const candidate = installCandidate;
+  if (!candidate || !window.confirm('Pasang firmware SHA-256 ' + candidate.digest +
+      ' dengan mempertahankan konfigurasi? Router akan reboot dan koneksi terputus.')) return;
+  const session = sid;
+  clearInstallCandidate();
+  const status = el('firmware-install-result');
+  status.textContent = 'Memeriksa ulang file dan mengirim permintaan instalasi…';
+  try {
+    const response = await fetch('/cgi-bin/veci2-verify?' + (candidate.ota ? 'stable-apply' : 'apply'), {
+      method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
+      body: new Blob([session, candidate.digest, candidate.ticket, candidate.payload], {type:'application/octet-stream'})
+    });
+    if (sid !== session) return;
+    if (response.status !== 202) throw Error(await firmwareError(response));
+    const result = await response.json();
+    if (result.accepted !== true || result.sha256 !== candidate.digest) throw Error('Respons instalasi tidak cocok.');
+    if (sid === session) status.textContent = 'Permintaan diterima. Periksa versi firmware setelah router kembali online.';
+  } catch (error) {
+    if (sid === session) status.textContent = 'Status instalasi belum terkonfirmasi. Periksa router sebelum mencoba lagi. ' + error.message;
+  }
+});
+
+let firmwareCheckGeneration = 0;
+function resetFirmwareResult() {
+  clearInstallCandidate();
+  const generation = ++firmwareCheckGeneration;
+  verifyRelease.disabled = false;
+  firmwareForm.querySelector('output').textContent = '';
+  if (stableRelease)
+    el('firmware-channel-result').textContent = describeFirmwareChannel(stableRelease);
+  return generation;
+}
+firmwareForm.addEventListener('input', resetFirmwareResult);
+firmwareForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const generation = resetFirmwareResult();
+  const session = sid;
+  const file = firmwareForm.elements.image.files[0];
+  const expected = firmwareForm.elements.digest.value.trim().toLowerCase();
+  const output = firmwareForm.querySelector('output');
+  try {
+    if (!file || !file.size || file.size > 7995392)
+      throw Error('Ukuran file harus antara 1 dan 7.995.392 byte.');
+    if (!/^[0-9a-f]{64}$/.test(expected)) throw Error('Periksa SHA-256 dari manifest.');
+    if (!globalThis.crypto?.subtle) throw Error('Gunakan halaman HTTPS untuk menghitung SHA-256.');
+    output.textContent = 'Menghitung SHA-256 pada perangkat ini…';
+    const bytes = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+    const actual = Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
+    if (actual !== expected) throw Error('SHA-256 file berbeda dari manifest.');
+    if (generation !== firmwareCheckGeneration || sid !== session) return;
+    output.textContent = 'Mengunggah file untuk pemeriksaan signature dan kompatibilitas di router…';
+    const response = await fetch('/cgi-bin/veci2-verify', {
+      method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
+      body: new Blob([session, expected, file], {type: 'application/octet-stream'})
+    });
+    if (!response.ok) throw Error(await firmwareError(response));
+    const receipt = await response.json();
+    if (receipt.verified !== true || receipt.sha256 !== expected)
+      throw Error('Hasil pemeriksaan router tidak cocok dengan file.');
+    if (generation !== firmwareCheckGeneration || sid !== session) return;
+    offerInstall(receipt, file, false);
+    output.textContent = 'Signature dan kompatibilitas file terverifikasi di router. File sementara telah diproses tanpa instalasi.';
+  } catch (error) {
+    if (generation === firmwareCheckGeneration && sid === session) output.textContent = error.message;
+  }
+});
+
+const releaseAsset = /^https:\/\/github\.com\/aicoach-alpha\/zbt-we5927-openwrt\/releases\/download\/([A-Za-z0-9_-][A-Za-z0-9._-]{0,127})\/([A-Za-z0-9_-][A-Za-z0-9._-]{0,127})$/;
+let stableRelease = null;
+const verifyRelease = el('firmware-channel-verify');
+function describeFirmwareChannel(manifest) {
+  if (manifest?.schema !== 1 || manifest.channel !== 'stable' ||
+      manifest.target !== 'ramips/mt76x8' || manifest.board !== 'zbtlink,zbt-we5927' ||
+      !Array.isArray(manifest.supported_devices) ||
+      !manifest.supported_devices.includes(manifest.board))
+    throw Error('Manifest tidak cocok dengan profil WE5927.');
+  if (manifest.available === false) return 'Belum ada firmware yang diterbitkan di kanal stabil.';
+  if (manifest.available !== true || !Number.isInteger(manifest.size) ||
+      manifest.size < 1 || manifest.size > 7995392 ||
+      typeof manifest.sha256 !== 'string' || !/^[a-fA-F0-9]{64}$/.test(manifest.sha256) ||
+      typeof manifest.firmware_url !== 'string' ||
+      !releaseAsset.exec(manifest.firmware_url))
+    throw Error('Metadata rilis tidak lengkap atau tidak valid.');
+  return 'Kanal stabil mencantumkan firmware ' + manifest.size + ' byte. SHA-256: ' + manifest.sha256;
+}
+const channelButton = el('firmware-channel-check');
+let channelRequest;
+channelButton.addEventListener('click', async () => {
+  const output = el('firmware-channel-result');
+  const request = new AbortController();
+  resetFirmwareResult();
+  channelRequest = request;
+  stableRelease = null;
+  verifyRelease.hidden = true;
+  const timer = setTimeout(() => request.abort(), 10000);
+  channelButton.disabled = true;
+  output.textContent = 'Memeriksa kanal stabil…';
+  try {
+    const response = await fetch('https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json', {
+      credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store',
+      redirect: 'error', signal: request.signal
+    });
+    if (!response.ok) throw Error('Kanal GitHub tidak dapat diakses.');
+    const manifest = await response.json();
+    const message = describeFirmwareChannel(manifest);
+    if (channelRequest === request) {
+      output.textContent = message;
+      stableRelease = manifest.available ? manifest : null;
+      verifyRelease.hidden = !stableRelease;
+    }
+  } catch (error) {
+    if (channelRequest === request)
+      output.textContent = 'Pemeriksaan kanal gagal. ' + error.message;
+  } finally {
+    clearTimeout(timer);
+    if (channelRequest === request) {
+      channelRequest = null;
+      channelButton.disabled = false;
+    }
+  }
+});
+
+verifyRelease.addEventListener('click', async () => {
+  const manifest = stableRelease;
+  if (!manifest || verifyRelease.disabled) return;
+  const [, tag, asset] = releaseAsset.exec(manifest.firmware_url);
+  const digest = manifest.sha256.toLowerCase();
+  const output = el('firmware-channel-result');
+  const generation = resetFirmwareResult();
+  const session = sid;
+  verifyRelease.disabled = true;
+  output.textContent = 'Router sedang mengunduh dan memeriksa firmware…';
+  try {
+    const response = await fetch('/cgi-bin/veci2-verify?stable', {
+      method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
+      body: new Blob([session, digest, manifest.size + '\n' + tag + '\n' + asset + '\n'], {type: 'application/octet-stream'})
+    });
+    if (!response.ok) throw Error(await firmwareError(response));
+    const receipt = await response.json();
+    if (receipt.verified !== true || receipt.sha256 !== digest) throw Error('SHA-256 hasil verifikasi berbeda.');
+    if (generation !== firmwareCheckGeneration || sid !== session) return;
+    offerInstall(receipt, [manifest.size, tag, asset, ''].join('\n'), true);
+    output.textContent = 'Firmware kanal stabil terverifikasi di router. Instalasi belum dimulai.';
+  } catch (error) {
+    if (generation === firmwareCheckGeneration && sid === session) output.textContent = error.message;
+  } finally {
+    if (generation === firmwareCheckGeneration) verifyRelease.disabled = false;
+  }
+});
+
 function showWorkspace() {
   globalThis.VeciSmsCenter.activate();
   el('login').hidden = true;
@@ -50,6 +232,31 @@ function showWorkspace() {
   el('logout').hidden = false;
 }
 function showLogin() {
+  el('lte-apn').value = '';
+  el('lte-apn').disabled = true;
+  el('lte-apn-save').disabled = true;
+  el('firmware-install-result').textContent = '';
+  stableRelease = null;
+  verifyRelease.hidden = true;
+  ltePolicyRequest++;
+  lteSaving = false;
+  el('lte-policy-change').disabled = true;
+  el('lte-policy-status').textContent = '';
+  el('wifi-channel-auto').disabled = true;
+  el('wifi-name').value = '';
+  el('wifi-name').disabled = true;
+  el('wifi-name-save').disabled = true;
+  visibilityRequest++;
+  configuredVisible = null;
+  savingVisibility = false;
+  el('wifi-visibility-change').disabled = true;
+  el('wifi-visibility-status').textContent = '';
+  channelRequest?.abort();
+  channelRequest = null;
+  channelButton.disabled = false;
+  el('firmware-channel-result').textContent = '';
+  resetFirmwareResult();
+  firmwareForm.reset();
   globalThis.VeciSmsCenter.logout();
   sid = '';
   verifiedPackage = '';
@@ -66,10 +273,22 @@ function showPage(id) {
     tab.classList.toggle('active', selected);
     tab.setAttribute('aria-current', selected ? 'page' : 'false');
   }
-  if (id === 'network') refreshNetwork();
+  if (id === 'network') {
+    refreshNetwork();
+    refreshEthernet();
+    refreshVisibility();
+    refreshLtePolicy();
+  }
   if (id === 'sms') refreshSMS();
   if (id === 'settings') refreshIPv6();
   if (id === 'apps') refreshPackages();
+}
+function primaryApStatus(data) {
+  if (data.wifi_ap_enabled === true) return ['Hostapd aktif, beacon belum diuji', 'warn'];
+  if (data.wifi_ap_configured === false) return ['Dinonaktifkan di konfigurasi', ''];
+  if (data.wifi_ap_configured !== true || data.wifi_radio_config_up == null)
+    return ['Status AP belum terverifikasi', 'warn'];
+  return ['AP utama belum aktif', 'bad'];
 }
 async function refreshOverview() {
   const data = await rpc('veci.v2', 'status');
@@ -78,13 +297,12 @@ async function refreshOverview() {
   cards.push(metric('Identitas board', state[0], state[1]));
   state = binaryStatus(data.openwrt_supported, 'Versi sesuai', 'Versi tidak sesuai');
   cards.push(metric('OpenWrt 25.12.6', state[0], state[1]));
-  const lteLink = data.lte_ipv4 === true && data.lte_default_route === true;
+  const lteLink = typeof data.lte_ipv4 === 'boolean' && typeof data.lte_default_route === 'boolean'
+    ? data.lte_ipv4 && data.lte_default_route : null;
   state = binaryStatus(lteLink, 'IP dan gateway tersedia', 'Belum lengkap');
   cards.push(metric('LTE RNDIS', state[0], state[1]));
   cards.push(metric('Internet end-to-end', 'Belum terverifikasi', 'warn'));
-  state = binaryStatus(data.wifi_ap_enabled,
-    'Hostapd AP aktif (beacon belum dicek)', 'Access point tidak aktif');
-  cards.push(metric('Wi-Fi AP', state[0], state[1]));
+  cards.push(metric('Wi-Fi AP', ...primaryApStatus(data)));
   if (data.wifi_ap_missing === true)
     cards.push(metric('Wi-Fi radio/AP mismatch', 'Radio UP, AP hilang', 'bad'));
   cards.push(metric('Proses netifd', String(data.netifd_count || 0) +
@@ -97,16 +315,136 @@ async function refreshOverview() {
       Math.round(data.memory_available_kb / 1024) + ' MiB' : 'Unknown'));
   el('status-grid').replaceChildren(...cards);
 }
+let visibilityRequest = 0;
+let configuredVisible = null;
+let savingVisibility = false;
+async function refreshVisibility(method = 'status', params = {}) {
+  if (savingVisibility) return;
+  const sequence = ++visibilityRequest;
+  const session = sid;
+  const button = el('wifi-visibility-change');
+  const status = el('wifi-visibility-status');
+  const name = el('wifi-name');
+  const saveName = el('wifi-name-save');
+  const autoChannel = el('wifi-channel-auto');
+  autoChannel.disabled = true;
+  name.disabled = true;
+  saveName.disabled = true;
+  button.disabled = true;
+  configuredVisible = null;
+  savingVisibility = method !== 'status';
+  status.textContent = savingVisibility ? 'Menyimpan konfigurasi…' : 'Membaca konfigurasi…';
+  try {
+    const data = await rpc('veci.v2.wifi', method, params, session);
+    if (sequence !== visibilityRequest || sid !== session) return;
+    if (!data.ok || typeof data.configured_visible !== 'boolean')
+      throw Error(data.error || 'Status tidak tersedia');
+    configuredVisible = data.configured_visible;
+    status.textContent = (configuredVisible ? 'Konfigurasi: SSID ditampilkan.' : 'Konfigurasi: SSID disembunyikan.') +
+      ' Perubahan berlaku saat Wi-Fi berikutnya dimulai. Beacon perlu diperiksa dari perangkat klien.';
+    if (/^(?:auto|[1-9]|1[0-4])$/.test(data.configured_channel)) {
+      status.textContent += ' Kanal tersimpan: ' + (data.configured_channel === 'auto' ? 'otomatis' : data.configured_channel) + '.';
+      autoChannel.disabled = data.configured_channel === 'auto';
+    }
+    button.textContent = configuredVisible ? 'Sembunyikan SSID' : 'Tampilkan SSID';
+    if (typeof data.ssid_hex === 'string' && /^(?:[0-9a-f]{2}){0,32}$/.test(data.ssid_hex)) {
+      const bytes = Uint8Array.from(data.ssid_hex.match(/../g) || [], byte => parseInt(byte, 16));
+      try {
+        const stored = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(bytes);
+        if (/[\x00-\x1f\x7f]/.test(stored)) throw Error();
+        name.value = stored;
+      } catch {
+        name.value = '';
+        status.textContent += ' Nama saat ini tidak dapat ditampilkan sebagai teks.';
+      }
+      name.disabled = false;
+      saveName.disabled = false;
+    }
+    button.disabled = false;
+  } catch (error) {
+    if (sequence === visibilityRequest && sid === session) status.textContent = error.message;
+  } finally {
+    if (sequence === visibilityRequest) savingVisibility = false;
+  }
+}
+let ltePolicyRequest = 0;
+let lteSaving = false;
+async function refreshLtePolicy(action, apn) {
+  if (lteSaving) return;
+  const sequence = ++ltePolicyRequest;
+  const session = sid;
+  const status = el('lte-policy-status');
+  const button = el('lte-policy-change');
+  button.disabled = true;
+  el('lte-apn').disabled = true;
+  el('lte-apn-save').disabled = true;
+  lteSaving = Boolean(action);
+  status.textContent = action ? 'Menyimpan pilihan…' : 'Membaca pilihan…';
+  try {
+    const method = action === 'setApn' ? 'setApn' : action ? 'setFailover' : 'status';
+    const args = method === 'setApn' ? {apn} : action ? {action} : {};
+    const data = await rpc('veci.v2.lte', method, args, session);
+    if (sequence !== ltePolicyRequest || sid !== session) return;
+    if (data.ok !== true || typeof data.auto_failover !== 'boolean')
+      throw Error(data.error || 'Pilihan failover tidak tersedia.');
+    const slot = [1, 2].includes(data.configured_slot) ? 'SIM ' + data.configured_slot : 'belum diketahui';
+    status.textContent = 'Slot tersimpan: ' + slot + '. Failover otomatis ' + (data.auto_failover ? 'aktif.' : 'nonaktif.');
+    const selector = [1, 2].includes(data.selector_slot) ? 'SIM ' + data.selector_slot : 'belum terbaca';
+    status.textContent += ' Posisi selektor: ' + selector + '.';
+    button.textContent = data.auto_failover ? 'Nonaktifkan failover' : 'Aktifkan failover';
+    button.dataset.action = data.auto_failover ? 'DISABLE_FAILOVER' : 'ENABLE_FAILOVER';
+    el('lte-apn').value = data.configured_apn || '';
+    el('lte-apn').disabled = false;
+    el('lte-apn-save').disabled = false;
+    if (method === 'setApn') status.textContent += ' APN tersimpan untuk konfigurasi modem berikutnya.';
+    button.disabled = false;
+  } catch (error) {
+    if (sequence === ltePolicyRequest && sid === session) status.textContent = error.message;
+  } finally {
+    if (sequence === ltePolicyRequest) lteSaving = false;
+  }
+}
+async function refreshEthernet() {
+  const root = el('ethernet-status');
+  try {
+    const data = await rpc('veci.v2', 'ethernetPorts');
+    if (!data.available || !Array.isArray(data.ports)) throw Error();
+    root.replaceChildren(...data.ports.map(({port, link}) => {
+      const role = port === 4 ? 'WAN' : 'LAN';
+      const label = link === 'up' ? 'Link aktif' : link === 'down' ? 'Tanpa link' : 'Belum terbaca';
+      return metric(role + ' · port switch ' + port, label, link === 'up' ? 'good' : '');
+    }));
+  } catch {
+    root.textContent = 'Status switch belum terbaca.';
+  }
+}
+const lteMonitorLabels = new Map([
+  ['healthy', 'Koneksi terdeteksi'], ['checking', 'Memeriksa koneksi'],
+  ['upstream_degraded', 'Gateway merespons, akses luar terganggu'],
+  ['icmp_degraded_https_ok', 'HTTPS berhasil, ping gagal'],
+  ['dhcp_renew', 'Memperbarui DHCP'], ['recovered_dhcp', 'Pulih setelah pembaruan DHCP'],
+  ['dhcp_cooldown', 'Menunggu percobaan DHCP berikutnya'],
+  ['interface_recovery', 'Memulihkan interface'], ['recovered_interface', 'Interface pulih'],
+  ['interface_cooldown', 'Menunggu percobaan pemulihan interface'],
+  ['modem_soft_reconnect', 'Menyambungkan ulang modem'], ['recovered_soft', 'Modem tersambung kembali'],
+  ['last_resort_power_cycle', 'Mengulang daya modem'], ['power_cycle_failed', 'Pengulangan daya modem gagal'],
+  ['power_cycle_cooldown', 'Menunggu percobaan pemulihan modem'],
+  ['opt_in_sim_failover', 'Mencoba SIM cadangan'], ['sim_failover_failed', 'Percobaan SIM cadangan gagal']
+]);
 async function refreshNetwork() {
   const root = el('network-status');
   root.replaceChildren(metric('Koneksi', 'Memeriksa...', 'warn'));
   try {
     const data = await rpc('veci.v2', 'status');
-    const lte = data.lte_ipv4 === true && data.lte_default_route === true;
-    const ap = data.wifi_ap_enabled === true;
+    const ipv4 = binaryStatus(data.lte_ipv4, 'Alamat tersedia', 'Belum mendapat alamat');
+    const gateway = binaryStatus(data.lte_default_route, 'Rute tersedia', 'Belum ada rute default');
     root.replaceChildren(
-      metric('LTE / Gateway', lte ? 'Alamat IPv4 dan gateway tersedia' : 'Belum siap', lte ? 'good' : 'warn'),
-      metric('Wi-Fi AP', ap ? 'hostapd aktif — beacon belum teruji' : 'AP belum aktif', ap ? 'warn' : 'bad'),
+      metric('LTE / IPv4', ...ipv4),
+      metric('LTE / Gateway', ...gateway),
+      metric('Observasi terakhir monitor LTE', lteMonitorLabels.get(data.lte_monitor_stage) || 'Belum tersedia'),
+      metric('Wi-Fi AP', ...primaryApStatus(data)),
+      metric('Kanal AP utama', Number.isInteger(data.wifi_ap_channel)
+        ? String(data.wifi_ap_channel) : 'Belum terbaca'),
       metric('Netifd', data.netifd_count === 1 ? 'Satu proses normal' : 'Perlu pemeriksaan',
         data.netifd_count === 1 ? 'good' : 'warn')
     );
@@ -265,6 +603,49 @@ document.addEventListener('DOMContentLoaded', () => {
   el('ipv6-enabled').addEventListener('change', () => {
     el('ipv6-save').disabled = savedIPv6 === null ||
       el('ipv6-enabled').checked === savedIPv6;
+  });
+  el('lte-apn-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const input = el('lte-apn');
+    if (input.disabled || lteSaving) return;
+    if (!/^[A-Za-z0-9._-]{1,100}$/.test(input.value)) {
+      el('lte-policy-status').textContent = 'APN hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda hubung.';
+      return;
+    }
+    if (window.confirm('Simpan APN ' + input.value + ' untuk konfigurasi modem berikutnya?'))
+      refreshLtePolicy('setApn', input.value);
+  });
+  el('lte-policy-change').addEventListener('click', event => {
+    const button = event.currentTarget;
+    if (button.disabled) return;
+    const message = button.dataset.action === 'ENABLE_FAILOVER' ?
+      'Izinkan modem mencoba SIM lain saat koneksi gagal? Perpindahan dapat memutus LTE sementara.' :
+      'Nonaktifkan perpindahan SIM otomatis berikutnya?';
+    if (window.confirm(message)) refreshLtePolicy(button.dataset.action);
+  });
+  el('wifi-channel-auto').addEventListener('click', () => {
+    if (!savingVisibility && window.confirm('Simpan pemilihan kanal otomatis untuk Wi-Fi 2,4 GHz saat radio berikutnya dimulai?'))
+      refreshVisibility('setAutoChannel', {action: 'AUTO_CHANNEL_2G'});
+  });
+  el('wifi-name-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const input = el('wifi-name');
+    if (savingVisibility || input.disabled) return;
+    const bytes = new TextEncoder().encode(input.value);
+    if (!bytes.length || bytes.length > 32 || bytes.some(byte => byte < 32 || byte === 127)) {
+      el('wifi-visibility-status').textContent = 'Gunakan 1–32 byte tanpa karakter kontrol.';
+      return;
+    }
+    if (window.confirm('Simpan nama Wi-Fi utama? Nama baru berlaku saat Wi-Fi berikutnya dimulai.')) {
+      const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+      refreshVisibility('setSsid', {ssid_hex: hex});
+    }
+  });
+  el('wifi-visibility-change').addEventListener('click', () => {
+    if (configuredVisible === null || savingVisibility) return;
+    const label = configuredVisible ? 'Sembunyikan' : 'Tampilkan';
+    if (window.confirm(label + ' SSID utama pada konfigurasi tersimpan? Radio tetap berjalan.'))
+      refreshVisibility('setVisibility', {action: configuredVisible ? 'HIDE_SSID' : 'SHOW_SSID'});
   });
   el('ipv6-save').addEventListener('click', saveIPv6);
   el('open-addons').addEventListener('click', () => showPage('apps'));

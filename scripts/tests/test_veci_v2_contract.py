@@ -17,6 +17,21 @@ SPEC.loader.exec_module(GATE)
 
 
 class FeatureContract(unittest.TestCase):
+    def test_gate_requires_boolean_evidence_and_integer_byte_count(self):
+        gate = "wifi_beacon_and_client_join"
+        for value in ("false", "not_run", 1, ["pass"]):
+            with self.subTest(value=value):
+                self.assertIn("required_gate_missing:" + gate,
+                              GATE.evaluate(CONTRACT, {gate: value}))
+        self.assertNotIn("required_gate_missing:" + gate,
+                         GATE.evaluate(CONTRACT, {gate: True}))
+        for value in (True, 1.5, "5505314", None, 6946817):
+            with self.subTest(value=value):
+                self.assertIn("raw_image_size_or_headroom",
+                              GATE.evaluate(CONTRACT, {"firmware_image_bytes": value}))
+        self.assertNotIn("raw_image_size_or_headroom",
+                         GATE.evaluate(CONTRACT, {"firmware_image_bytes": 6946816}))
+
     def test_exact_oem_luci_openwrt_pins_and_counts(self):
         self.assertEqual(CONTRACT["board_id"], "ZBT-WE5927-DSIM")
         self.assertEqual(CONTRACT["openwrt_version"], "25.12.6")
@@ -54,6 +69,11 @@ class FeatureContract(unittest.TestCase):
         self.assertIn("contract_disallows_flash", blockers)
         self.assertTrue(any(x.startswith("hardware_uat_missing:") for x in blockers))
         self.assertIn("signed_image_not_verified",blockers)
+
+    def test_owner_endurance_starts_after_flash(self):
+        self.assertEqual(CONTRACT["post_flash_gates"], ["continuous_72h_on_owner_router"])
+        self.assertFalse(any("72h" in gate for gate in CONTRACT["mandatory_gates"]))
+        self.assertIn("reboot_recovery_on_identical_test_unit", CONTRACT["mandatory_gates"])
 
     def test_even_fake_pass_evidence_cannot_override_contract(self):
         f=json.loads(json.dumps(CONTRACT))

@@ -9,41 +9,120 @@ export LC_ALL
 numeric() {
   case "$1" in ''|*[!0-9]*) printf 0 ;; *) printf %s "$1" ;; esac
 }
+primary_ap_configured() {
+  /usr/sbin/veci-wifi-guardian configured 2>/dev/null
+}
 ubus_radio_up() {
   ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
     jsonfilter -e '@.radio0.up' 2>/dev/null
 }
 ubus_hostapd_ap() {
-  ubus -S -t 3 call hostapd.phy0-ap0 get_status '{}' 2>/dev/null |
-    jsonfilter -e '@.status' 2>/dev/null
+  local interface status snapshot channel
+  for interface in $(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
+      jsonfilter -e '@.radio0.interfaces[@.section="default_radio0"].ifname' 2>/dev/null); do
+    case "$interface" in ''|*[!a-zA-Z0-9_.-]*) continue ;; esac
+    [ -e "/sys/class/net/$interface/phy80211" ] || continue
+    snapshot="$(ubus -S -t 2 call "hostapd.$interface" get_status '{}' 2>/dev/null)" || continue
+    status="$(printf '%s' "$snapshot" | jsonfilter -e '@.status' 2>/dev/null)" || continue
+    [ "$status" = ENABLED ] || continue
+    channel="$(printf '%s' "$snapshot" | jsonfilter -e '@.channel' 2>/dev/null)" || channel=
+    case "$channel" in
+      [1-9]|1[0-4]) printf 'ENABLED %s\n' "$channel" ;;
+      *) echo ENABLED ;;
+    esac
+    return 0
+  done
+  return 1
+}
+lte_data_device() {
+  local configured active
+  configured=$(uci -q get we5927_lte.main.data_if 2>/dev/null) || configured=usb0
+  [ -n "$configured" ] || configured=usb0
+  active=$(ubus -S -t 3 call network.interface.lte status '{}' 2>/dev/null |
+    jsonfilter -e '@.l3_device' 2>/dev/null) || return 1
+  case "$active" in ''|-*|*[!a-zA-Z0-9_.-]*) return 1 ;; esac
+  [ "$active" = "$configured" ] || return 1
+  printf '%s\n' "$active"
+}
+lte_monitor_stage() {
+  local now
+  now=$(date +%s) || return 1
+  awk -v now="$now" '
+    NF == 5 && $3 ~ /^stage=/ && $5 ~ /^timestamp=[0-9]+$/ {
+      stage = substr($3,7)
+      age = now - substr($5,11)
+      if (age >= 0 && age <= 180 &&
+          stage ~ /^(healthy|checking|upstream_degraded|icmp_degraded_https_ok|dhcp_renew|recovered_dhcp|dhcp_cooldown|interface_recovery|recovered_interface|interface_cooldown|modem_soft_reconnect|recovered_soft|last_resort_power_cycle|power_cycle_failed|power_cycle_cooldown|opt_in_sim_failover|sim_failover_failed)$/)
+        print stage
+    }' /tmp/veci-lte-performance.state 2>/dev/null
 }
 live_board() { cat /tmp/sysinfo/board_name 2>/dev/null || :; }
 openwrt_version() {
   sed -n "s/^DISTRIB_RELEASE='\([^']*\)'$/\1/p" /etc/openwrt_release 2>/dev/null | head -1
 }
+ethernet_ports() {
+  local snapshot
+  if [ "$(live_board)" != 'zbtlink,zbt-we5927' ]; then
+    printf '{"available":false,"ports":[]}\n'
+    return
+  fi
+  snapshot="$(timeout 3 swconfig dev switch0 show 2>/dev/null)" || {
+    printf '{"available":false,"ports":[]}\n'
+    return
+  }
+  printf '%s\n' "$snapshot" | awk '
+    $1 == "link:" && $2 ~ /^port:[0-4]$/ && $3 ~ /^link:(up|down)$/ {
+      port = substr($2, 6) + 0
+      state[port] = substr($3, 6)
+      count++
+    }
+    END {
+      printf "{\"available\":%s,\"ports\":[", count ? "true" : "false"
+      for (port = 0; port <= 4 && count; port++) {
+        printf "%s{\"port\":%d,\"link\":\"%s\"}", port ? "," : "", port, state[port] ? state[port] : "unknown"
+      }
+      print "]}"
+    }'
+}
 main() {
-  case "$1:$2" in
+  case "${1:-}:${2:-}" in
     list:*)
-      printf '{ "status": {}, "capabilities": {}, "smsProvider": {} }\n'
+      printf '{ "status": {}, "capabilities": {}, "smsProvider": {}, "ethernetPorts": {} }\n'
       ;;
     call:status)
       board_ok=false; version_ok=false
       [ "$(live_board)" = 'zbtlink,zbt-we5927' ] && board_ok=true
       [ "$(openwrt_version)" = '25.12.6' ] && version_ok=true
-      lte_address=false; lte_route=false; radio=false; ap=false
-      if ip -4 -o addr show dev usb0 2>/dev/null | grep -q ' inet '; then
-        lte_address=true
-      fi
-      if ip -4 route show default dev usb0 2>/dev/null |
-          grep -q '^default via '; then
-        lte_route=true
+      lte_address=null; lte_route=null; radio=null; ap=false
+      if device=$(lte_data_device); then
+        if addresses=$(ip -4 -o addr show dev "$device" 2>/dev/null); then
+          lte_address=false
+          if printf '%s\n' "$addresses" | grep -q ' inet '; then lte_address=true; fi
+        fi
+        if routes=$(ip -4 route show default dev "$device" 2>/dev/null); then
+          lte_route=false
+          if printf '%s\n' "$routes" | grep -Eq '^default (via|dev) '; then lte_route=true; fi
+        fi
       fi
       radio_result="$(ubus_radio_up || true)"
-      [ "$radio_result" = true ] && radio=true
+      case "$radio_result" in true|false) radio=$radio_result ;; esac
       ap_result="$(ubus_hostapd_ap || true)"
-      [ "$ap_result" = ENABLED ] && ap=true
-      ap_missing=false
-      [ "$radio" = true ] && [ "$ap" != true ] && ap_missing=true
+      ap_channel=null
+      case "$ap_result" in
+        ENABLED) ap=true ;;
+        'ENABLED '[1-9]|'ENABLED '1[0-4]) ap=true; ap_channel="${ap_result#ENABLED }" ;;
+      esac
+      wanted_rc=0
+      primary_ap_configured || wanted_rc=$?
+      case "$wanted_rc" in 0) expected=true ;; 1) expected=false ;; *) expected=null ;; esac
+      ap_missing=null
+      if [ "$ap" = true ] || [ "$expected" = false ] || [ "$radio" = false ]; then
+        ap_missing=false
+      elif [ "$radio" = true ] && [ "$expected" = true ]; then
+        ap_missing=true
+      fi
+      stage=$(lte_monitor_stage) || stage=
+      case "$stage" in ''|*[!a-z_]*) stage_json=null ;; *) stage_json=$(printf '"%s"' "$stage") ;; esac
       n=0
       pids="$(pidof netifd 2>/dev/null || true)"
       for pid in $pids; do
@@ -54,9 +133,10 @@ main() {
       overlay_kb="$(numeric "$overlay_kb")"
       mem_kb="$(numeric "$mem_kb")"
       # Internet is UNKNOWN here, not inferred from a modem lease.
-      printf '{"schema":2,"board_supported":%s,"openwrt_supported":%s,"lte_ipv4":%s,"lte_default_route":%s,"internet_verified":null,"wifi_radio_config_up":%s,"wifi_ap_enabled":%s,"wifi_ap_missing":%s,"wifi_beacon_verified":null,"netifd_count":%s,"overlay_free_kb":%s,"memory_available_kb":%s}\n' \
-        "$board_ok" "$version_ok" "$lte_address" "$lte_route" "$radio" "$ap" "$ap_missing" "$n" "$overlay_kb" "$mem_kb"
+      printf '{"schema":2,"board_supported":%s,"openwrt_supported":%s,"lte_monitor_stage":%s,"lte_ipv4":%s,"lte_default_route":%s,"internet_verified":null,"wifi_ap_configured":%s,"wifi_radio_config_up":%s,"wifi_ap_enabled":%s,"wifi_ap_missing":%s,"wifi_ap_channel":%s,"wifi_beacon_verified":null,"netifd_count":%s,"overlay_free_kb":%s,"memory_available_kb":%s}\n' \
+        "$board_ok" "$version_ok" "$stage_json" "$lte_address" "$lte_route" "$expected" "$radio" "$ap" "$ap_missing" "$ap_channel" "$n" "$overlay_kb" "$mem_kb"
       ;;
+    call:ethernetPorts) ethernet_ports ;;
     call:capabilities)
       printf '{"schema":2,"model":"ZBT-WE5927-DSIM","dual_sim_hardware_source":true,"lte_rndis":true,"wifi_2g":true,"wifi_5g":false,"sms_center_contract":"veci.sms","package_manager":"apk","firmware_auto_install_default":false,"wifi_auto_radio_reload":false}\n'
       ;;

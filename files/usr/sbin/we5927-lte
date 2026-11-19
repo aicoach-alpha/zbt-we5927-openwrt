@@ -69,31 +69,24 @@ port_responds() {
 }
 
 at_port() {
-	local t p preferred devpath
-	preferred="$(cfg at_port)"
-
-	# CX07E verified AT function is USB interface 1.4.
-	# Resolve the current ttyUSB name from sysfs instead of probing ports,
-	# because probing the non-AT 1.5 function can enter uninterruptible I/O.
-	for t in /sys/class/tty/ttyUSB*; do
-		[ -e "$t/device" ] || continue
-		devpath="$(readlink -f "$t/device" 2>/dev/null || true)"
-		case "$devpath" in
-			*/1-1:1.4/*)
-				p="/dev/$(basename "$t")"
-				[ -c "$p" ] && {
-					echo "$p"
-					return 0
-				}
-				;;
+	local entry name path modem
+	# CX07E uses USB interface 1.4. On the original enumeration ttyUSB3 is function 1.5.
+	# A tty number alone does not identify the function after USB re-enumeration.
+	for entry in /sys/class/tty/ttyUSB*; do
+		[ -e "$entry/device" ] || continue
+		name=${entry##*/}
+		path="$(readlink -f "$entry/device" 2>/dev/null)" || continue
+		case "$path" in
+			*/1-1/1-1:1.4/"$name") ;;
+			*) continue ;;
 		esac
-	done
-
-	# Only the verified 1.4 interface may be used. On this hardware
-	# ttyUSB3 is function 1.5 and probing it can hang USB I/O.
-	for p in "$preferred" /dev/ttyUSB2; do
-		[ "$p" = /dev/ttyUSB2 ] || continue
-		[ -c "$p" ] && { echo "$p"; return 0; }
+		modem=${path%/*}
+		modem=${modem%/*}
+		[ "$(cat "$modem/idVendor" 2>/dev/null)" = 05c6 ] || continue
+		[ "$(cat "$modem/idProduct" 2>/dev/null)" = 902e ] || continue
+		[ -c "/dev/$name" ] || continue
+		printf '%s\n' "/dev/$name"
+		return 0
 	done
 	return 1
 }
@@ -142,6 +135,18 @@ driver_name() {
 	basename "$x"
 }
 
+rndis_data_ready() {
+	local net modem interface
+	net="$(cfg data_if)"
+	[ -n "$net" ] || net=usb0
+	case "$net" in .|..|-*|*[!A-Za-z0-9_.-]*) return 1 ;; esac
+	modem="$(usb_device_dir)" || return 1
+	modem="$(readlink -f "$modem")" || return 1
+	interface="$(readlink -f "/sys/class/net/$net/device")" || return 1
+	[ "${interface%/*}" = "$modem" ] || return 1
+	[ "$(driver_name "$interface")" = rndis_host ]
+}
+
 repair_rndis() {
 	local dev base i cls sub proto drv ctrl=""
 
@@ -173,7 +178,7 @@ repair_rndis() {
 
 	local n=0
 	while [ "$n" -lt 10 ]; do
-		ip link show usb0 >/dev/null 2>&1 && return 0
+		rndis_data_ready && return 0
 		n=$((n + 1))
 		sleep 1
 	done
@@ -183,7 +188,7 @@ repair_rndis() {
 usb_repair() {
 	# Do not unbind/rebind an already healthy RNDIS+AT pair.
 	# Re-enumeration can interrupt active LTE traffic or SMS transactions.
-	if ip link show usb0 >/dev/null 2>&1; then
+	if rndis_data_ready; then
 		local live_port
 		live_port="$(at_port)"
 		[ -c "$live_port" ] && return 0
@@ -251,34 +256,49 @@ ensure_network() {
  return 0
 }
 
-set_sim() {
-	local slot n v
+sim1_level() {
+	local first second
+	first="$(cfg sim1_value)"
+	second="$(cfg sim2_value)"
+	case "${first:-1}:${second:-0}" in
+		1:0) echo 1 ;;
+		0:1) echo 0 ;;
+		*) return 1 ;;
+	esac
+}
 
+selector_slot() {
+	local n first level
+	n="$(cfg sim_gpio)"
+	[ "${n:-46}" = 46 ] || return 1
+	first="$(sim1_level)" || return 1
+	# Only observe the named line exported by the board. gpio_path may change direction.
+	level="$(cat /sys/class/gpio/sim_select/value 2>/dev/null)" || return 1
+	case "$level" in 0|1) ;; *) return 1 ;; esac
+	if [ "$level" = "$first" ]; then echo 1; else echo 2; fi
+}
+
+set_sim() {
+	local slot n v first previous changes
 	slot="$1"
+	case "$slot" in 1|2) ;; *) return 2 ;; esac
+	changes="$(uci -q changes we5927_lte)" || return 1
+	[ -z "$changes" ] || { log "LTE configuration has pending edits"; return 1; }
 	n="$(cfg sim_gpio)"
 	[ -n "$n" ] || n=46
-
-	case "$slot" in
-		1)
-			v="$(cfg sim1_value)"
-			[ -n "$v" ] || v=1
-			;;
-		2)
-			v="$(cfg sim2_value)"
-			[ -n "$v" ] || v=0
-			;;
-		*)
-			echo "usage: $0 sim 1|2" >&2
-			return 2
-			;;
-	esac
-
+	first="$(sim1_level)" || { log "Invalid SIM selector levels"; return 1; }
+	if [ "$slot" = 1 ]; then v="$first"; else v=$((1 - first)); fi
+	previous="$(cfg sim)"
 	gpio_set "$n" "$v" || return 1
-	# Always drive the physical GPIO on cold boot, but do not write flash
-	# if the persisted SIM selection is already correct.
-	if [ "$(cfg sim)" != "$slot" ]; then
-		uci set "$CFG.sim=$slot"
-		uci commit we5927_lte
+	if [ "$previous" != "$slot" ]; then
+		(
+			umask 077
+			tmp="$(mktemp -d /tmp/we5927-sim.XXXXXX)" || exit 1
+			trap 'rm -rf "$tmp"' EXIT
+			trap 'exit 1' HUP INT TERM
+			uci -q -t "$tmp" set "$CFG.sim=$slot" &&
+				uci -q -t "$tmp" commit we5927_lte
+		) || { log "SIM selector moved but configuration save failed"; return 1; }
 	fi
 	echo "sim=$slot" > "$STATE"
 	log "SIM selector changed to SIM$slot (GPIO$n value=$v)"
@@ -293,7 +313,7 @@ power_on() {
 	gpio_set "$n" "$active"
 }
 
-power_cycle() {
+cycle_modem_power() {
 	local n active off
 
 	n="$(cfg modem_gpio)"
@@ -308,31 +328,68 @@ power_cycle() {
 	fi
 
 	log "Hard power-cycle modem on GPIO$n"
-	gpio_set "$n" "$off" || true
+	gpio_set "$n" "$off" || { log "Modem power-off GPIO write failed"; return 1; }
 	sleep 3
-	gpio_set "$n" "$active" || true
+	gpio_set "$n" "$active" || { log "Modem power-on GPIO write failed"; return 1; }
 	sleep 10
+}
 
-	usb_repair
-	wait_at || true
-	ifup lte >/dev/null 2>&1 || true
+power_cycle() {
+	local ready=0
+	cycle_modem_power || return 1
+	wait_at && ready=1
+	# Independent RNDIS DHCP can proceed even while serial control is unavailable.
+	ifup lte >/dev/null 2>&1 || { log "LTE interface start failed"; return 1; }
+	[ "$ready" = 1 ]
+}
+
+start_selected_sim() {
+	cycle_modem_power || return 1
+	wait_at || { log "AT port unavailable after SIM selection"; return 1; }
+	if [ "$1" = require_ready ]; then
+		sim_ready_at_port || { log "Selected SIM is not ready"; return 1; }
+	fi
+	apply_apn_at_ready || return 1
+	ifup lte >/dev/null 2>&1 || { log "LTE interface start failed"; return 1; }
 }
 
 apply_apn() {
+	wait_at || return 1
+	apply_apn_at_ready
+}
+
+valid_apn() {
+	local LC_ALL=C
+	case "$1" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
+	[ "${#1}" -le 100 ]
+}
+
+apply_apn_at_ready() {
 	local apn
 
 	apn="$(cfg apn)"
 	[ -n "$apn" ] || apn=internet
-
-	wait_at || return 1
+	valid_apn "$apn" || { log "Invalid configured APN"; return 1; }
 
 	at "AT+CGDCONT=1,\"IPV4V6\",\"$apn\"" 3000 >/dev/null 2>&1 || \
-	at "AT+CGDCONT=1,\"IP\",\"$apn\"" 3000 >/dev/null 2>&1 || true
+	at "AT+CGDCONT=1,\"IP\",\"$apn\"" 3000 >/dev/null 2>&1 || { log "Modem APN configuration failed"; return 1; }
 }
 
 sim_ready() {
 	wait_at || return 1
-	at 'AT+CPIN?' 2000 2>/dev/null | grep -q 'READY'
+	sim_ready_at_port
+}
+
+sim_ready_at_port() {
+	local response
+	response="$(at 'AT+CPIN?' 2000 2>/dev/null)" || return 1
+	printf '%s\n' "$response" | grep -Eq '^[[:space:]]*\+CPIN:[[:space:]]*READY[[:space:]]*$'
+}
+
+sim_absent() {
+	local response
+	response="$(at 'AT+CPIN?' 2000 2>/dev/null)" || :
+	printf '%s\n' "$response" | grep -Eiq '^[[:space:]]*\+CME ERROR:[[:space:]]*(10|SIM not inserted)[[:space:]]*$'
 }
 
 soft_reconnect() {
@@ -369,15 +426,21 @@ data_ok() {
  ip -4 addr show dev "$dev" | grep -q "inet " || return 1
  # Two independent remote targets; never reset for one failed ping.
  ping -I "$dev" -c 1 -W 1 "$host" >/dev/null 2>&1 && return 0
- [ "$host" = "8.8.8.8" ] || ping -I "$dev" -c 1 -W 1 8.8.8.8 >/dev/null 2>&1
+ [ "$host" != "8.8.8.8" ] || return 1
+ ping -I "$dev" -c 1 -W 1 8.8.8.8 >/dev/null 2>&1
 }
 
 # HTTPS is diagnostic only when both public ICMP targets fail.
 # Bounded five-second IPv4 request with normal CA validation.
 https_ok() {
- command -v uclient-fetch >/dev/null 2>&1 || return 1
- uclient-fetch -4 -q -T 5 -O /dev/null \
-    'https://www.cloudflare.com/cdn-cgi/trace' >/dev/null 2>&1
+ local dev code
+ dev="$(cfg data_if)"
+ [ -n "$dev" ] || dev=usb0
+ # An HTTPS response over Ethernet must never qualify the LTE path.
+ code=$(curl --disable --ipv4 --silent --noproxy '*' --interface "if!$dev" \
+    --max-time 5 --output /dev/null --write-out '%{http_code}' \
+    'https://1.1.1.1/cdn-cgi/trace') || return 1
+ [ "$code" = 200 ]
 }
 
 # VeCI PDP diagnostic on real degraded WAN events only.
@@ -707,7 +770,6 @@ status_fast_json() {
 	p="$(at_port)"
 	[ -n "$dev" ] || dev=usb0
 	[ -n "$sim" ] || sim=1
-	[ -n "$p" ] || p=/dev/ttyUSB2
 
 	ip4="$(ip -4 -o addr show dev "$dev" 2>/dev/null | awk '{print $4}' | head -1)"
 	gateway="$(ip route show default dev "$dev" 2>/dev/null | awk '/default via/ {print $3; exit}')"
@@ -924,40 +986,26 @@ auto_switch_sim() {
 
 	log "automatic dual-SIM failover trial: SIM$old -> SIM$new"
 	set_sim "$new" || return 1
-	power_cycle
-
-	if ! sim_ready; then
-		log "SIM$new not detected; reverting to SIM$old"
-		set_sim "$old" || true
-		power_cycle
-		apply_apn || true
-		ifup lte >/dev/null 2>&1 || true
-		return 1
+	if start_selected_sim require_ready; then
+		i=0
+		while [ "$i" -lt 12 ]; do
+			if data_ok; then
+				log "automatic dual-SIM failover succeeded on SIM$new"
+				return 0
+			fi
+			i=$((i + 1))
+			sleep 2
+		done
 	fi
 
-	apply_apn || true
-	ifup lte >/dev/null 2>&1 || true
-
-	i=0
-	while [ "$i" -lt 12 ]; do
-		data_ok && {
-			log "automatic dual-SIM failover succeeded on SIM$new"
-			return 0
-		}
-		i=$((i + 1))
-		sleep 2
-	done
-
-	log "SIM$new has no working data; reverting to SIM$old"
-	set_sim "$old" || true
-	power_cycle
-	apply_apn || true
-	ifup lte >/dev/null 2>&1 || true
+	log "SIM$new trial failed; reverting to SIM$old"
+	set_sim "$old" || { log "SIM selector restore failed; stopping failover recovery"; return 1; }
+	start_selected_sim restore || log "Previous SIM selected but reconnect failed"
 	return 1
 }
 
 daemon() {
- local failures recoveries threshold interval hard_after auto sim_after sim next
+ local failures recoveries threshold interval hard_after sim_after sim next
  local last_hard last_sim last_upstream_check now gap stage classification radio_phase
  local last_renew_attempt last_repair_attempt renew_rc repair_rc
  radio_phase=unknown
@@ -987,13 +1035,18 @@ daemon() {
    # Only restore GPIO selection during actual cold-start/recovery.
    set_sim "$sim" >/dev/null 2>&1 || true
    usb_repair
-   wait_at || log "AT port not ready yet"
-   if ! sim_ready && [ "$(cfg auto_failover)" = 1 ]; then
-     if [ "$sim" = 1 ]; then next=2; else next=1; fi
-     auto_switch_sim "$sim" "$next" && sim="$next"
+   # Start RNDIS DHCP independently of the serial control port.
+   gateway_ok || ifup lte >/dev/null 2>&1 || true
+   if wait_at; then
+     if [ "$(cfg auto_failover)" = 1 ] && sim_absent; then
+       if [ "$sim" = 1 ]; then next=2; else next=1; fi
+       auto_switch_sim "$sim" "$next" && sim="$next"
+     else
+       apply_apn_at_ready || true
+     fi
+   else
+     log "AT port not ready; netifd continues RNDIS DHCP"
    fi
-   apply_apn || true
-   ifup lte >/dev/null 2>&1 || true
    radio_phase="$(modem_readiness_phase)"
    log "LTE cold-start readiness: modem_phase=$radio_phase"
  fi
@@ -1001,7 +1054,6 @@ daemon() {
  threshold="$(clamped_number "$(cfg fail_threshold)" 3 2 20)"
  interval="$(clamped_number "$(cfg ping_interval)" 10 5 120)"
  hard_after="$(clamped_number "$(cfg hard_reset_after)" 3 2 20)"
- auto="$(cfg auto_failover)"
  sim_after="$(clamped_number "$(cfg sim_failover_after)" 3 2 20)"
  log "LTE performance-first monitor started; checks every $interval sec; threshold $threshold"
 
@@ -1085,13 +1137,13 @@ daemon() {
              if [ "$last_hard" -eq 0 ] || [ "$gap" -ge 900 ]; then
                last_hard="$now"
                stage=last_resort_power_cycle
-               power_cycle
+               power_cycle || stage=power_cycle_failed
              else
                stage=power_cycle_cooldown
                log "Suppressing modem power-cycle during 900-second cooldown"
              fi
            fi
-           if [ "$auto" = 1 ] && [ "$recoveries" -ge "$sim_after" ] && ! data_ok && ! gateway_ok; then
+           if [ "$recoveries" -ge "$sim_after" ] && [ "$(cfg auto_failover)" = 1 ] && ! data_ok && ! gateway_ok; then
              now="$(date +%s)"
              case "$now" in ''|*[!0-9]*) now=0 ;; esac
              gap=$((now - last_sim))
@@ -1100,7 +1152,7 @@ daemon() {
                sim="$(cfg sim)"
                if [ "$sim" = 1 ]; then next=2; else next=1; fi
                stage=opt_in_sim_failover
-               auto_switch_sim "$sim" "$next" || true
+               auto_switch_sim "$sim" "$next" || stage=sim_failover_failed
              fi
            fi
                fi
@@ -1119,6 +1171,9 @@ case "$1" in
 	daemon)
 		daemon
 		;;
+	at-port) at_port ;;
+	selector-slot) selector_slot ;;
+	validate-apn) valid_apn "$2" ;;
 	status-fast)
 		status_fast_json
 		;;
@@ -1141,10 +1196,8 @@ case "$1" in
 		power_cycle
 		;;
 	sim)
-		set_sim "$2"
-		power_cycle
-		apply_apn
-		ifup lte >/dev/null 2>&1 || true
+		set_sim "$2" || exit $?
+		start_selected_sim manual
 		;;
 	usb-repair)
 		usb_repair

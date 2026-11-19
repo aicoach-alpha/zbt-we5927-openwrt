@@ -25,12 +25,12 @@ def evaluate(contract, evidence):
         if feature.get("physical_uat") != "pass":
             blockers.append("hardware_uat_missing:" + feature["id"])
     for gate in contract.get("mandatory_gates", []):
-        if not evidence.get(gate, False):
+        if evidence.get(gate) is not True:
             blockers.append("required_gate_missing:" + gate)
     if evidence.get("signed_image_hash_verified") is not True:
         blockers.append("signed_image_not_verified")
-    if evidence.get("firmware_image_bytes", 0) > 7995392 - 1048576 or (
-            evidence.get("firmware_image_bytes", 0) <= 0):
+    image_bytes = evidence.get("firmware_image_bytes")
+    if type(image_bytes) is not int or not 0 < image_bytes <= 7995392 - 1048576:
         blockers.append("raw_image_size_or_headroom")
     if contract.get("flash_authorized") is not True:
         blockers.append("contract_disallows_flash")
@@ -53,6 +53,8 @@ def main():
         "hardware_accepted": sum(x["physical_uat"] == "pass"
                                  for x in contract["required_core"]),
         "flash_allowed": len(blockers) == 0,
+        "post_flash_gates_pending": [g for g in contract["post_flash_gates"]
+                                     if evidence.get(g) is not True],
         "blocker_count": len(blockers),
         "blockers": blockers
     }, indent=2))

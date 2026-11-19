@@ -1,4 +1,4 @@
-"""Synthetic no-modem tests for VeCI optional LTE data meter."""
+"""Regression coverage for the retired LTE meter. The fixture is never packaged."""
 import json
 import os
 from pathlib import Path
@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-SOURCE=ROOT/"source/veci-data-meter/files/usr/libexec/rpcd/veci.meter"
+SOURCE=ROOT/"tests/fixtures/retired-data-meter/veci.meter"
 class Meter(unittest.TestCase):
     def setUp(self):
         self.t=tempfile.TemporaryDirectory()
