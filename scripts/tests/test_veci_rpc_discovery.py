@@ -13,7 +13,7 @@ class RpcDiscoveryTests(unittest.TestCase):
         providers = {
             PACKAGES / "veci-v2-runtime/veci2-status": {"status", "ethernetPorts", "capabilities", "smsProvider"},
             PACKAGES / "veci-v2-runtime/veci2-wifi": {"status", "setVisibility", "setSsid", "setAutoChannel"},
-            PACKAGES / "veci-v2-runtime/veci2-lte-policy": {"status", "setFailover", "setApn"},
+            PACKAGES / "veci-v2-runtime/veci2-lte-policy": {"status", "setFailover", "setApn", "queueSim"},
             PACKAGES / "veci-v2-package-manager/veci2-apk": {"status", "search", "preflight", "install"},
             PACKAGES / "veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6": {"status", "save"},
             ROOT / "source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.sms": {"getConfig", "listMessages", "sendMessage"},

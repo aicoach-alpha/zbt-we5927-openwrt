@@ -242,6 +242,7 @@ function showLogin() {
   el('lte-apn').value = '';
   el('lte-apn').disabled = true;
   el('lte-apn-save').disabled = true;
+  el('lte-sim-switch').disabled = true;
   el('firmware-install-result').textContent = '';
   stableRelease = null;
   verifyRelease.hidden = true;
@@ -388,11 +389,12 @@ async function refreshLtePolicy(action, apn) {
   button.disabled = true;
   el('lte-apn').disabled = true;
   el('lte-apn-save').disabled = true;
+  el('lte-sim-switch').disabled = true;
   lteSaving = Boolean(action);
   status.textContent = action ? 'Menyimpan pilihan…' : 'Membaca pilihan…';
   try {
-    const method = action === 'setApn' ? 'setApn' : action ? 'setFailover' : 'status';
-    const args = method === 'setApn' ? {apn} : action ? {action} : {};
+    const method = action === 'queueSim' ? 'queueSim' : action === 'setApn' ? 'setApn' : action ? 'setFailover' : 'status';
+    const args = method === 'queueSim' ? {slot: apn} : method === 'setApn' ? {apn} : action ? {action} : {};
     const data = await rpc('veci.v2.lte', method, args, session);
     if (sequence !== ltePolicyRequest || sid !== session) return;
     if (data.ok !== true || typeof data.auto_failover !== 'boolean')
@@ -401,6 +403,19 @@ async function refreshLtePolicy(action, apn) {
     status.textContent = 'Slot tersimpan: ' + slot + '. Failover otomatis ' + (data.auto_failover ? 'aktif.' : 'nonaktif.');
     const selector = [1, 2].includes(data.selector_slot) ? 'SIM ' + data.selector_slot : 'belum terbaca';
     status.textContent += ' Posisi selektor: ' + selector + '.';
+    const switchMessages = {
+      queued: 'Perpindahan menunggu siklus manajer LTE.', switching: 'Sedang memindahkan SIM.',
+      interrupted: 'Perpindahan terhenti. Periksa posisi selektor sebelum mencoba kembali.', expired: 'Permintaan kedaluwarsa.', selector_changed: 'Posisi selektor berubah sebelum permintaan diproses.',
+      selection_failed: 'Pemilihan SIM gagal. Periksa log LTE.', interface_started: 'Antarmuka LTE telah dimulai pada SIM tujuan.',
+      restored: 'Inisialisasi gagal. SIM sebelumnya telah dipulihkan.', recovery_failed: 'Pemulihan koneksi gagal. Periksa log LTE.'
+    };
+    if (switchMessages[data.switch_state]) status.textContent += ' ' + switchMessages[data.switch_state];
+    const switchButton = el('lte-sim-switch');
+    if ([1, 2].includes(data.selector_slot) && !['queued', 'switching'].includes(data.switch_state)) {
+      switchButton.dataset.slot = String(3 - data.selector_slot);
+      switchButton.textContent = 'Pindah ke SIM ' + switchButton.dataset.slot;
+      switchButton.disabled = false;
+    }
     button.textContent = data.auto_failover ? 'Nonaktifkan failover' : 'Aktifkan failover';
     button.dataset.action = data.auto_failover ? 'DISABLE_FAILOVER' : 'ENABLE_FAILOVER';
     el('lte-apn').value = data.configured_apn || '';
@@ -685,6 +700,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (window.confirm('Simpan APN ' + input.value + ' untuk konfigurasi modem berikutnya?'))
       refreshLtePolicy('setApn', input.value);
+  });
+  el('lte-sim-refresh').addEventListener('click', () => refreshLtePolicy());
+  el('lte-sim-switch').addEventListener('click', event => {
+    const button = event.currentTarget;
+    const slot = button.dataset.slot;
+    if (!button.disabled && !lteSaving && ['1', '2'].includes(slot) &&
+        window.confirm('Pindah ke SIM ' + slot + '? Modem akan dimulai ulang dan koneksi LTE akan terputus sementara.'))
+      refreshLtePolicy('queueSim', slot);
   });
   el('lte-policy-change').addEventListener('click', event => {
     const button = event.currentTarget;

@@ -4,6 +4,7 @@ CFG=we5927_lte.main
 STATE=/tmp/we5927-lte.state
 STATUS_CACHE=/tmp/we5927-lte.status.json
 STATUS_CACHE_TS=/tmp/we5927-lte.status.ts
+SIM_REQUEST=/var/run/we5927-sim-request
 STATUS_CACHE_LOCK=/tmp/we5927-lte.status.lock
 
 log() {
@@ -335,6 +336,73 @@ set_sim() {
 	echo "sim=$slot" > "$STATE"
 	log "SIM selector changed to SIM$slot (GPIO$n value=$v)"
 }
+
+# The existing modem daemon consumes requests between recovery iterations.
+# Replace the record atomically so status readers and daemon restarts see one state.
+write_sim_request() {
+	local tmp
+	tmp="$(mktemp "${SIM_REQUEST}.XXXXXX")" || return 1
+	printf '%s %s %s %s\n' "$1" "$2" "$3" "$4" > "$tmp" &&
+		mv "$tmp" "$SIM_REQUEST" || { rm -f "$tmp"; return 1; }
+}
+
+sim_request_status() {
+	local state stamp unused now
+	if [ ! -f "$SIM_REQUEST" ]; then echo idle; return; fi
+	read -r state stamp unused < "$SIM_REQUEST" || return 1
+	if [ "$state" = queued ]; then
+		now="$(date +%s)" || return 1
+		if [ "$now" -lt "$stamp" ] || [ "$((now - stamp))" -gt 180 ]; then state=expired; fi
+	fi
+	echo "$state"
+}
+
+queue_sim() (
+	local slot="$1" old now state stamp unused
+	case "$slot" in 1|2) ;; *) return 2 ;; esac
+	exec 8<"$0" && flock -n 8 || return 1
+	enabled || return 1
+	old="$(selector_slot)" && [ "$slot" != "$old" ] || return 1
+	now="$(date +%s)" || return 1
+	if [ -f "$SIM_REQUEST" ] && read -r state stamp unused < "$SIM_REQUEST"; then
+		case "$state" in
+			queued) [ "$now" -lt "$stamp" ] || [ "$((now - stamp))" -gt 180 ] || return 1 ;;
+		esac
+	fi
+	write_sim_request queued "$now" "$old" "$slot"
+)
+
+consume_sim_request() (
+	local state stamp old slot now result
+	[ -f "$SIM_REQUEST" ] || return 1
+	exec 8<"$0" && flock -n 8 || return 1
+	read -r state stamp old slot < "$SIM_REQUEST" || return 1
+	# Only the consumer writes "switching" while holding this lock. A lingering
+	# record after acquiring it means the previous consumer was interrupted.
+	if [ "$state" = switching ]; then
+		write_sim_request interrupted "$stamp" "$old" "$slot"
+		return
+	fi
+	[ "$state" = queued ] || return 1
+	now="$(date +%s)" || return 1
+	if [ "$now" -lt "$stamp" ] || [ "$((now - stamp))" -gt 180 ]; then
+		result=expired
+	elif [ "$(selector_slot)" != "$old" ]; then
+		result=selector_changed
+	else
+		write_sim_request switching "$stamp" "$old" "$slot" || return 1
+		if ! set_sim "$slot"; then
+			result=selection_failed
+		elif start_selected_sim require_ready 8<&-; then
+			result=interface_started
+		elif set_sim "$old" && start_selected_sim restore 8<&-; then
+			result=restored
+		else
+			result=recovery_failed
+		fi
+	fi
+	write_sim_request "$result" "$stamp" "$old" "$slot"
+)
 
 power_on() {
 	local n active
@@ -1090,6 +1158,10 @@ daemon() {
  log "LTE performance-first monitor started; checks every $interval sec; threshold $threshold"
 
  while enabled; do
+   if consume_sim_request; then
+     failures=0
+     recoveries=0
+   fi
    if data_ok; then
      if [ "$failures" -gt 0 ] || [ "$recoveries" -gt 0 ]; then
        log "LTE connectivity restored"
@@ -1205,6 +1277,8 @@ case "$1" in
 		;;
 	at-port) at_port ;;
 	selector-slot) selector_slot ;;
+	queue-sim) queue_sim "$2" ;;
+	sim-request-status) sim_request_status ;;
 	rndis-state) rndis_state ;;
 	validate-apn) valid_apn "$2" ;;
 	status-fast)

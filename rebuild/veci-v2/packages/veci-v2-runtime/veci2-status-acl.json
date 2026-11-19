@@ -64,7 +64,8 @@
       "ubus": {
         "veci.v2.lte": [
           "setFailover",
-          "setApn"
+          "setApn",
+          "queueSim"
         ]
       }
     }
