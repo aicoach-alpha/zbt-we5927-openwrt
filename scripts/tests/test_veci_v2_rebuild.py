@@ -160,6 +160,19 @@ ip() {
                 self.assertIsNone(data['lte_ipv4'])
                 self.assertIsNone(data['internet_verified'])
 
+    def test_lte_monitor_only_reports_recent_known_stages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "monitor"
+            script = without_main(STATUS).replace("/tmp/veci-lte-performance.state", str(state))
+            for timestamp, stage, expected in [(820, 'sim_failover_failed', 'sim_failover_failed'),
+                                                (819, 'healthy', ''), (1001, 'healthy', ''),
+                                                (1000, 'private_data', ''), ('unknown', 'healthy', '')]:
+                with self.subTest(timestamp=timestamp, stage=stage):
+                    state.write_text(f"failures=0 recoveries=0 stage={stage} modem_phase=unknown timestamp={timestamp}\n")
+                    result = ash(script + "date() { echo 1000; }; lte_monitor_stage")
+                    result.check_returncode()
+                    self.assertEqual(result.stdout.strip(), expected)
+
     def test_ap_status_uses_present_radio_interfaces(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

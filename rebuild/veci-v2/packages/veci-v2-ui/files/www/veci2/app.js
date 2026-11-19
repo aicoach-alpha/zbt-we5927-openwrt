@@ -411,6 +411,19 @@ async function refreshEthernet() {
     root.textContent = 'Status switch belum terbaca.';
   }
 }
+const lteMonitorLabels = new Map([
+  ['healthy', 'Koneksi terdeteksi'], ['checking', 'Memeriksa koneksi'],
+  ['upstream_degraded', 'Gateway merespons, akses luar terganggu'],
+  ['icmp_degraded_https_ok', 'HTTPS berhasil, ping gagal'],
+  ['dhcp_renew', 'Memperbarui DHCP'], ['recovered_dhcp', 'Pulih setelah pembaruan DHCP'],
+  ['dhcp_cooldown', 'Menunggu percobaan DHCP berikutnya'],
+  ['interface_recovery', 'Memulihkan interface'], ['recovered_interface', 'Interface pulih'],
+  ['interface_cooldown', 'Menunggu percobaan pemulihan interface'],
+  ['modem_soft_reconnect', 'Menyambungkan ulang modem'], ['recovered_soft', 'Modem tersambung kembali'],
+  ['last_resort_power_cycle', 'Mengulang daya modem'], ['power_cycle_failed', 'Pengulangan daya modem gagal'],
+  ['power_cycle_cooldown', 'Menunggu percobaan pemulihan modem'],
+  ['opt_in_sim_failover', 'Mencoba SIM cadangan'], ['sim_failover_failed', 'Percobaan SIM cadangan gagal']
+]);
 async function refreshNetwork() {
   const root = el('network-status');
   root.replaceChildren(metric('Koneksi', 'Memeriksa...', 'warn'));
@@ -421,6 +434,7 @@ async function refreshNetwork() {
     root.replaceChildren(
       metric('LTE / IPv4', ...ipv4),
       metric('LTE / Gateway', ...gateway),
+      metric('Observasi terakhir monitor LTE', lteMonitorLabels.get(data.lte_monitor_stage) || 'Belum tersedia'),
       metric('Wi-Fi AP', ...primaryApStatus(data)),
       metric('Kanal AP utama', Number.isInteger(data.wifi_ap_channel)
         ? String(data.wifi_ap_channel) : 'Belum terbaca'),
