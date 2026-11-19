@@ -63,7 +63,7 @@ if [ "$operation" = apply ] && [ "$allow_install" != true ]; then
 fi
 receipt=/var/run/veci2-upgrade.receipt
 uptime_seconds() { cut -d. -f1 /proc/uptime; }
-ticket_hash() { printf '%s' "$session:$digest:$ota:$1" | sha256sum | cut -d' ' -f1; }
+ticket_hash() { printf '%s' "$session:$digest:$ota:$size:${tag:-}:${asset:-}:$1" | sha256sum | cut -d' ' -f1; }
 if [ "$operation" = apply ]; then
   conflict() { reply '409 Conflict' '{"error":"verification_expired_or_replaced"}'; }
   [ -f "$receipt" ] && read -r bound issued < "$receipt" || conflict
