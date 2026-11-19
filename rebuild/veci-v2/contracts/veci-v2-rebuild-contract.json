@@ -276,7 +276,7 @@
       "origin": "VeCI OTA",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_tested"
     },
     {
       "id": "addon_signed_package_manager",

@@ -55,6 +55,12 @@ fi
 verify=/usr/libexec/veci2-verify-image
 exec 9<"$verify"
 flock -n 9 || reply '409 Conflict' '{"error":"verification_busy"}'
+mode=$(cat /etc/veci2-update-policy 2>/dev/null) || mode=
+allow_install=false
+[ "$mode" != manual ] || allow_install=true
+if [ "$operation" = apply ] && [ "$allow_install" != true ]; then
+  reply '403 Forbidden' '{"error":"installation_locked"}'
+fi
 receipt=/var/run/veci2-upgrade.receipt
 uptime_seconds() { cut -d. -f1 /proc/uptime; }
 ticket_hash() { printf '%s' "$session:$digest:$ota:$1" | sha256sum | cut -d' ' -f1; }
@@ -105,4 +111,4 @@ head -c 32 /dev/urandom > "$work/nonce"
 [ "$(wc -c < "$work/nonce")" -eq 32 ] || reply '503 Service Unavailable' '{"error":"ticket_unavailable"}'
 ticket=$(sha256sum "$work/nonce" | cut -d' ' -f1)
 printf '%s %s\n' "$(ticket_hash "$ticket")" "$(uptime_seconds)" > "$receipt"
-reply '200 OK' "{\"verified\":true,\"sha256\":\"$digest\",\"ticket\":\"$ticket\"}"
+reply '200 OK' "{\"verified\":true,\"install_allowed\":$allow_install,\"sha256\":\"$digest\",\"ticket\":\"$ticket\"}"

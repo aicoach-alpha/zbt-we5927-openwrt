@@ -83,6 +83,11 @@
             <h2>Aplikasi &amp; firmware</h2>
             <p>Addon, pembaruan, backup dan pengaturan lanjutan dikelompokkan di sini—tidak memenuhi menu utama.</p>
             <button id="open-addons" type="button">Kelola Addon</button>
+            <label>Kebijakan pemasangan firmware
+              <select id="update-policy" disabled><option value="manual">Pemasangan manual dengan konfirmasi</option><option value="verify_only">Hanya verifikasi</option></select>
+            </label>
+            <button id="update-policy-save" type="button" disabled>Simpan kebijakan</button>
+            <output id="update-policy-status" aria-live="polite"></output>
             <h3>Firmware dari GitHub</h3>
             <button type="button" id="firmware-channel-check">Periksa kanal stabil</button>
             <button type="button" id="firmware-channel-verify" hidden>Unduh dan verifikasi di router</button>

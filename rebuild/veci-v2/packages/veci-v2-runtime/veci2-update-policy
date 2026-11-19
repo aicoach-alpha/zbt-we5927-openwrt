@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+umask 077
+policy=/etc/veci2-update-policy
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+read_mode() {
+  mode=$(cat "$policy") || fail policy_unavailable
+  case "$mode" in manual|verify_only) ;; *) fail policy_unavailable ;; esac
+}
+case "${1:-}:${2:-}" in
+  list:*) echo '{"status":{},"save":{"mode":"String"}}'; exit 0 ;;
+  call:status) read_mode ;;
+  call:save)
+    [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+    request=$(head -c 129)
+    [ "${#request}" -le 128 ] || fail invalid_request
+    desired=$(jsonfilter -s "$request" -e '@.mode') || fail invalid_request
+    case "$desired" in manual|verify_only) ;; *) fail invalid_mode ;; esac
+    exec 9</usr/libexec/veci2-verify-image
+    flock -n 9 || fail upgrade_busy
+    read_mode
+    if [ "$mode" != "$desired" ]; then
+      tmp=$(mktemp "$policy.XXXXXX") || fail save_failed
+      trap 'rm -f "$tmp"' EXIT
+      printf '%s\n' "$desired" > "$tmp" &&
+        rm -f /var/run/veci2-upgrade.receipt &&
+        mv "$tmp" "$policy" || fail save_failed
+      mode=$desired
+    fi ;;
+  *) fail unsupported_method ;;
+esac
+printf '{"ok":true,"mode":"%s"}\n' "$mode"

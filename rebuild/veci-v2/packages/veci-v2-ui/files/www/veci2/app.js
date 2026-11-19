@@ -48,6 +48,7 @@ async function firmwareError(response) {
   let code;
   try { code = (await response.json()).error; } catch { return fallback; }
   switch (code) {
+    case 'installation_locked': return 'Kebijakan router mengunci pemasangan firmware.';
     case 'incompatible_image': return 'Board, target, atau partisi flash tidak cocok dengan image.';
     case 'trust_anchor_failed': return 'Kunci tepercaya router tidak tersedia atau berbeda dari kunci rilis.';
     case 'signature_failed': return 'Signature firmware tidak dapat diverifikasi. Periksa sumber image.';
@@ -71,6 +72,7 @@ function offerInstall(receipt, payload, ota) {
   clearInstallCandidate();
   if (!/^[0-9a-f]{64}$/.test(receipt.ticket || ''))
     throw Error('Router tidak memberikan tiket instalasi yang valid.');
+  if (receipt.install_allowed === false) return;
   installCandidate = {digest: receipt.sha256, ticket: receipt.ticket, payload, ota};
   installButton.hidden = false;
 }
@@ -280,7 +282,7 @@ function showPage(id) {
     refreshLtePolicy();
   }
   if (id === 'sms') refreshSMS();
-  if (id === 'settings') refreshIPv6();
+  if (id === 'settings') { refreshIPv6(); refreshUpdatePolicy(); }
   if (id === 'apps') refreshPackages();
 }
 function primaryApStatus(data) {
@@ -453,6 +455,33 @@ async function refreshNetwork() {
   }
 }
 let savedIPv6 = null;
+let policySaving = false;
+let policyRequest = 0;
+async function refreshUpdatePolicy(save = false) {
+  if (policySaving) return;
+  const request = ++policyRequest;
+  const session = sid;
+  const select = el('update-policy');
+  const button = el('update-policy-save');
+  const status = el('update-policy-status');
+  const mode = select.value;
+  if (save && !window.confirm('Simpan kebijakan untuk upgrade manual dan OTA?')) return;
+  select.disabled = button.disabled = true;
+  policySaving = save;
+  try {
+    const data = await rpc('veci.v2.updatepolicy', save ? 'save' : 'status', save ? {mode} : {}, session);
+    if (sid !== session || request !== policyRequest) return;
+    if (!data.ok || !['manual', 'verify_only'].includes(data.mode)) throw Error(data.error || 'Kebijakan belum terbaca');
+    select.value = data.mode;
+    if (save || data.mode === 'verify_only') clearInstallCandidate();
+    status.textContent = data.mode === 'verify_only' ? 'Pemasangan terkunci. Verifikasi tersedia.' : 'Pemasangan membutuhkan konfirmasi.';
+    select.disabled = button.disabled = false;
+  } catch (error) {
+    if (sid === session && request === policyRequest) status.textContent = error.message;
+  } finally {
+    if (request === policyRequest) policySaving = false;
+  }
+}
 async function refreshIPv6() {
   const toggle = el('ipv6-enabled');
   const save = el('ipv6-save');
@@ -647,6 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.confirm(label + ' SSID utama pada konfigurasi tersimpan? Radio tetap berjalan.'))
       refreshVisibility('setVisibility', {action: configuredVisible ? 'HIDE_SSID' : 'SHOW_SSID'});
   });
+  el('update-policy-save').addEventListener('click', () => refreshUpdatePolicy(true));
   el('ipv6-save').addEventListener('click', saveIPv6);
   el('open-addons').addEventListener('click', () => showPage('apps'));
   el('back-settings').addEventListener('click', () => showPage('settings'));
