@@ -14,6 +14,7 @@
   <script src="/veci2/services.js" defer></script>
   <script src="/veci2/app.js" defer></script>
   <script src="/veci2/wifi-controls.js" defer></script>
+  <script src="/veci2/dhcp.js" defer></script>
 </head>
 <body>
   <div class="layout">
@@ -77,6 +78,29 @@
               </fieldset>
               <p id="wifi-extra-status" role="status"></p>
             </details>
+            <h3>DHCP dan DNS LAN</h3>
+            <button type="button" id="dhcp-read">Baca konfigurasi DHCP</button>
+            <p id="dhcp-msg" role="status"></p>
+            <fieldset id="dhcp-edit" disabled>
+              <legend>Pool alamat</legend>
+              <label>Offset awal <input id="dhcp-start" inputmode="numeric"></label>
+              <label>Jumlah alamat <input id="dhcp-limit" inputmode="numeric"></label>
+              <label>Durasi sewa <input id="dhcp-time" placeholder="12h"></label>
+              <button type="button" id="dhcp-pool">Simpan pool</button>
+              <h4>Reservasi alamat</h4>
+              <label>Reservasi <select id="dhcp-section"></select></label>
+              <label>Alamat MAC <input id="dhcp-mac"></label>
+              <label>Alamat IPv4 <input id="dhcp-ip"></label>
+              <label>Nama host <input id="dhcp-name" maxlength="63"></label>
+              <button type="button" id="dhcp-lease">Simpan reservasi</button>
+              <button type="button" id="dhcp-delete">Hapus reservasi</button>
+              <h4>DNS upstream</h4>
+              <p id="dhcp-servers"></p>
+              <label>Alamat IPv4 server <input id="dhcp-server"></label>
+              <button type="button" id="dhcp-add">Tambah DNS</button>
+              <button type="button" id="dhcp-remove">Hapus DNS</button>
+              <button type="button" id="dhcp-apply">Terapkan konfigurasi ke dnsmasq</button>
+            </fieldset>
             <h3>Port Ethernet</h3>
             <div id="ethernet-status" class="grid" aria-live="polite"></div>
             <p class="notice">Munculnya alamat IP tidak membuktikan akses internet dari klien. AP Wi-Fi harus memiliki hostapd/BSSID dan koneksi klien yang teruji.</p>

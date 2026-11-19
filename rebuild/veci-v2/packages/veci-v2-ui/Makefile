@@ -31,6 +31,7 @@ define Package/veci-v2-ui/install
 	$(INSTALL_DATA) ./files/www/veci2/index.html $(1)/www/veci2/index.html
 	$(INSTALL_DATA) ./files/www/veci2/wifi-controls.js $(1)/www/veci2/wifi-controls.js
 	$(INSTALL_DATA) ./files/www/veci2/app.js $(1)/www/veci2/app.js
+	$(INSTALL_DATA) ./files/www/veci2/dhcp.js $(1)/www/veci2/dhcp.js
 	$(INSTALL_DATA) ./files/www/veci2/sms-codec.js $(1)/www/veci2/sms-codec.js
 	$(INSTALL_DATA) ./files/www/veci2/sms-center.js $(1)/www/veci2/sms-center.js
 	$(INSTALL_DATA) ./files/www/veci2/services.js $(1)/www/veci2/services.js
