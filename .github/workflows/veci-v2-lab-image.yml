@@ -225,6 +225,7 @@ jobs:
           done
           test -x "$rom/usr/libexec/veci-sms-cmgs"
           cmp "$compiled_rom/usr/libexec/veci-sms-cmgs" "$rom/usr/libexec/veci-sms-cmgs"
+          test -x "$rom/usr/bin/curl"
           test -x "$rom/usr/sbin/we5927-lte"
           cmp "$GITHUB_WORKSPACE/source/we5927-lte/files/usr/sbin/we5927-lte" "$rom/usr/sbin/we5927-lte"
           test -x "$rom/usr/bin/ucert"

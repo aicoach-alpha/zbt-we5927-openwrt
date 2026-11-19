@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=we5927-lte
-PKG_RELEASE:=7
+PKG_RELEASE:=8
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -9,7 +9,7 @@ define Package/we5927-lte
   SECTION:=net
   CATEGORY:=Network
   TITLE:=ZBT WE5927 LTE / Dual-SIM manager
-  DEPENDS:=+rpcd +uhttpd +jsonfilter +kmod-usb-core +kmod-usb2 +kmod-usb-ohci +kmod-usb-net +kmod-usb-net-cdc-ether +kmod-usb-net-rndis +kmod-usb-serial +kmod-usb-serial-wwan +kmod-usb-serial-option
+  DEPENDS:=+curl +ca-bundle +rpcd +uhttpd +jsonfilter +kmod-usb-core +kmod-usb2 +kmod-usb-ohci +kmod-usb-net +kmod-usb-net-cdc-ether +kmod-usb-net-rndis +kmod-usb-serial +kmod-usb-serial-wwan +kmod-usb-serial-option
 endef
 
 define Package/we5927-lte/description
