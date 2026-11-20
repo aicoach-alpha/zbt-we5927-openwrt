@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-runtime
 PKG_VERSION:=0.1
-PKG_RELEASE:=14
+PKG_RELEASE:=15
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -33,8 +33,14 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_BIN) ./veci2-firewall $(1)/usr/libexec/rpcd/veci.v2.firewall
 	$(INSTALL_BIN) ./veci2-system-admin $(1)/usr/libexec/rpcd/veci.v2.system
 	$(INSTALL_BIN) ./veci2-status $(1)/usr/libexec/rpcd/veci.v2
+	$(INSTALL_BIN) ./veci2-interfaces $(1)/usr/libexec/rpcd/veci.v2.interfaces
+	$(INSTALL_BIN) ./veci2-routes $(1)/usr/libexec/rpcd/veci.v2.routes
+	$(INSTALL_BIN) ./veci2-access $(1)/usr/libexec/rpcd/veci.v2.access
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./veci2-status-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-runtime.json
+	$(INSTALL_DATA) ./veci2-access-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-access.json
+	$(INSTALL_DATA) ./veci2-routes-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-routes.json
+	$(INSTALL_DATA) ./veci2-interfaces-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-interfaces.json
 endef
 
 $(eval $(call BuildPackage,veci-v2-runtime))

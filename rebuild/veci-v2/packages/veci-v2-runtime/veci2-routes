@@ -1,0 +1,97 @@
+#!/bin/sh
+# IPv4 routes and policy rules staged for the next network startup.
+set -ef
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "$1:${2:-}" in
+  list:*) echo '{"status":{},"save":{"name":"String","kind":"String","prefix":"String","interface":"String","gateway":"String","table":"String","priority":"String","revision":"String"},"remove":{"name":"String","revision":"String"}}'; exit 0 ;;
+  call:status|call:save|call:remove) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail wrong_board
+. /usr/share/libubox/jshn.sh
+exec 9>/var/lock/veci2-ipv6.lock
+flock -n 9 || fail busy
+cfg=/etc/config/network
+[ -f "$cfg" ] && [ ! -L "$cfg" ] || fail config_unavailable
+revision() { digest=$(sha256sum "$cfg") || return 1; echo "${digest%% *}"; }
+clean() { pending=$(uci -q changes network) && [ -z "$pending" ]; }
+clean || fail pending_changes
+rev=$(revision) || fail config_unavailable
+get() { uci -q get "network.$1" || :; }
+valid_id() { case "$1" in ''|*[!a-zA-Z0-9_]*) return 1 ;; esac; [ "${#1}" -le 24 ]; }
+number() { case "$1" in ''|0*|*[!0-9]*) return 1 ;; esac; [ "${#1}" -le 5 ] && [ "$1" -le "$2" ]; }
+valid_ip() {
+  case "$1" in ""|*[!0-9./]*) return 1 ;; esac
+  printf '%s\n' "$1" | awk -F'[./]' -v mode="$2" '
+    {if ((mode=="prefix" && (NF!=5 || $5!~/^(0|[1-9][0-9]?)$/ || $5>32)) ||
+         (mode=="gateway" && NF!=4)) exit 1
+     for(i=1;i<=4;i++){if($i!~/^(0|[1-9][0-9]?[0-9]?)$/ || $i+0>255)exit 1; v=v*256+$i}
+     if(mode=="prefix"){block=1;for(i=$5;i<32;i++)block*=2;if(v % block != 0)exit 1}
+     if(mode=="gateway" && ($1==0 || $1==127 || $1>=224))exit 1}'
+}
+if [ "$2" != status ]; then
+  input=$(head -c 1025)
+  [ "${#input}" -le 1024 ] && json_load "$input" || fail invalid_request
+  json_get_var token revision ''; [ "$token" = "$rev" ] || fail stale_configuration
+  json_get_var name name ''; valid_id "$name" || fail invalid_name
+  section=veci2_route_$name
+  existing=$(get "$section")
+  if [ -n "$existing" ]; then
+    case "$existing:$(get "$section.veci2_managed")" in route:1|rule:1) ;; *) fail unmanaged_section ;; esac
+  fi
+  tmp=$(mktemp -d /tmp/veci2-routes.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  change() { uci -q -t "$tmp" "$@"; }
+  if [ "$2" = remove ]; then
+    [ -n "$existing" ] || fail missing_section
+    change delete "network.$section" || fail stage_failed
+  else
+    json_get_var kind kind ''; json_get_var prefix prefix ''; json_get_var table table ''
+    valid_ip "$prefix" prefix || fail invalid_prefix
+    number "$table" 254 && [ "$table" != 253 ] || fail invalid_table
+    [ -z "$existing" ] || [ "$kind" = "$existing" ] || fail kind_changed
+    case "$kind" in route|rule) ;; *) fail invalid_kind ;; esac
+    change set "network.$section=$kind" || fail stage_failed
+    put() { change set "network.$section.$1=$2" || fail stage_failed; }
+    case "$kind" in
+      route)
+        json_get_var iface interface ''; json_get_var gateway gateway ''
+        valid_id "$iface" && [ "$(get "$iface")" = interface ] || fail invalid_interface
+        put interface "$iface"; put target "$prefix"; put table "$table"
+        if [ -n "$gateway" ]; then valid_ip "$gateway" gateway || fail invalid_gateway; put gateway "$gateway"
+        elif change get "network.$section.gateway" >/dev/null; then change delete "network.$section.gateway" || fail stage_failed
+        fi ;;
+      rule)
+        json_get_var priority priority ''; number "$priority" 32765 || fail invalid_priority
+        [ "$prefix" != 0.0.0.0/0 ] || fail source_required
+        for other in $(uci -q show network | sed -nE 's/^network\.([^.=]+)=rule$/\1/p'); do
+          [ "$other" = "$section" ] || [ "$(get "$other.priority")" != "$priority" ] || fail priority_in_use
+        done
+        put src "$prefix"; put lookup "$table"; put priority "$priority" ;;
+      *) fail invalid_kind ;;
+    esac
+    put veci2_managed 1
+  fi
+  clean && [ "$(revision)" = "$rev" ] || fail stale_configuration
+  change commit network || fail commit_failed
+  rev=$(revision) || fail config_unavailable
+fi
+json_init
+json_add_boolean ok 1
+json_add_string revision "$rev"
+json_add_array entries
+sections=$(uci -q show network | sed -nE 's/^network\.([^.=]+)=(route|rule)$/\1/p')
+for key in $sections; do
+  json_add_object ''
+  json_add_string section "$key"; json_add_string kind "$(get "$key")"
+  editable=0
+  case "$key" in veci2_route_*) valid_id "${key#veci2_route_}" && [ "$(get "$key.veci2_managed")" = 1 ] && editable=1 ;; esac
+  json_add_boolean editable "$editable"
+  for option in target src dest lookup table priority gateway interface; do
+    value=$(get "$key.$option"); [ -z "$value" ] || json_add_string "$option" "$value"
+  done
+  json_close_object
+done
+json_close_array
+json_dump

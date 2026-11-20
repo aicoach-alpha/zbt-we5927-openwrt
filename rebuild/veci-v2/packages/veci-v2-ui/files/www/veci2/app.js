@@ -257,6 +257,9 @@ function showLogin() {
   el('firmware-channel-result').textContent = '';
   resetFirmwareResult();
   firmwareForm.reset();
+  globalThis.VeciInterfaces?.reset();
+  globalThis.VeciRoutes?.reset();
+  globalThis.VeciAccess?.reset();
   globalThis.VeciSmsCenter.logout();
   globalThis.VeciDnsSettings?.logout?.();
   globalThis.VeciOwnerControls?.logout?.();

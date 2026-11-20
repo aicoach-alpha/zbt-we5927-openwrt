@@ -14,6 +14,9 @@
   <script src="/veci2/dns-settings.js" defer></script>
   <script src="/veci2/owner-controls.js" defer></script>
   <script src="/veci2/app.js" defer></script>
+  <script src="/veci2/access.js" defer></script>
+  <script src="/veci2/routes.js" defer></script>
+  <script src="/veci2/interfaces.js" defer></script>
 </head>
 <body>
   <div class="layout">
@@ -91,12 +94,50 @@
             <button id="wifi-channel-auto" type="button" disabled>Gunakan kanal otomatis 2,4 GHz</button>
             <p id="wifi-visibility-status" role="status"></p>
             <button id="wifi-visibility-change" type="button" disabled>Ubah visibilitas</button>
+            <details><summary>Alamat IPv4 LAN dan WAN Ethernet</summary>
+              <button type="button" id="interface-read">Baca konfigurasi</button>
+              <form id="interface-form"><fieldset name="controls" disabled>
+                <label>Alamat LAN <input name="lan" required maxlength="15"></label>
+                <label>Mask atau prefiks LAN <input name="lan_mask" required maxlength="15"></label>
+                <label>Protokol WAN <select name="wan_mode"><option value="dhcp">DHCP</option><option value="static">IPv4 statis</option></select></label>
+                <fieldset id="interface-static" disabled>
+                  <label>Alamat WAN <input name="wan" required maxlength="15"></label>
+                  <label>Mask atau prefiks WAN <input name="wan_mask" required maxlength="15"></label>
+                  <label>Gateway WAN <input name="gateway" required maxlength="15"></label>
+                </fieldset><button>Simpan IPv4 untuk startup berikutnya</button>
+              </fieldset></form><p id="interface-message" role="status"></p>
+            </details>
+            <details><summary>Rute dan aturan IPv4</summary>
+              <button type="button" id="route-read">Baca konfigurasi routing</button>
+              <ul id="route-list"></ul>
+              <form id="route-form"><fieldset disabled id="route-fields">
+                <label>Nama entri <input name="name" maxlength="24" required></label>
+                <label>Jenis <select name="kind"><option value="route">Rute tujuan</option><option value="rule">Aturan alamat sumber</option></select></label>
+                <label>Jaringan IPv4/CIDR <input name="prefix" required placeholder="192.168.10.0/24"></label>
+                <label>Tabel <input name="table" value="254" required></label>
+                <label>Antarmuka rute <input name="interface" placeholder="wan"></label>
+                <label>Gateway rute (opsional) <input name="gateway"></label>
+                <label>Prioritas aturan <input name="priority"></label>
+                <button type="submit">Simpan untuk startup berikutnya</button>
+              </fieldset></form><p id="route-message" role="status"></p>
+            </details>
             <h3>Port Ethernet</h3>
             <div id="ethernet-status" class="grid" aria-live="polite"></div>
             <p class="notice">Munculnya alamat IP tidak membuktikan akses internet dari klien. AP Wi-Fi harus memiliki hostapd/BSSID dan koneksi klien yang teruji.</p>
           </article>
         </section>
         <section id="settings" class="page" aria-label="Pengaturan router" hidden>
+          <article class="panel">
+            <h2>Akses SSH dan HTTPS</h2>
+            <button id="access-read" type="button">Baca konfigurasi akses</button>
+            <p id="access-status" role="status"></p>
+            <fieldset id="access-fields" disabled>
+              <label for="access-idle">Batas sesi SSH tanpa aktivitas (detik, 0=tanpa batas)</label>
+              <input id="access-idle" type="number" min="0" max="86400" step="1">
+              <button id="access-save" type="button">Simpan batas sesi</button>
+              <button id="access-https" type="button">Aktifkan pengalihan HTTPS</button>
+            </fieldset>
+          </article>
           <article class="panel">
             <details>
               <summary><strong>Firewall — Port Forward &amp; DMZ</strong></summary>
