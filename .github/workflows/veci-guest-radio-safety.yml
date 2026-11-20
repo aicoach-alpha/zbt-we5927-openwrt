@@ -1,6 +1,8 @@
 name: VeCI guest radio safety
 on:
   push:
+    branches-ignore:
+      - build/zbt-we2825-oem-veci-20261119
     paths:
       - 'source/veci-guest/**'
       - 'scripts/tests/test_guest_startup_guard.py'

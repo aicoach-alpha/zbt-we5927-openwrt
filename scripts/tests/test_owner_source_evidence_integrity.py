@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import hashlib
+import tempfile
 import unittest
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -34,6 +35,16 @@ class FailClosedSourceEvidence(unittest.TestCase):
         problems=gate.audit(contract,evidence)
         self.assertIn("invalid_source_test_receipt:lte_ussd",problems)
         self.assertIn("test_not_scoped_to_module:lte_ussd",problems)
+
+    def test_unrelated_skipped_and_failed_receipts_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "receipt.txt"
+            for line in ("test_other (case.Other) ... ok",
+                         "test_target (case.Target) ... skipped 'unavailable'",
+                         "test_target (case.Target) ... FAIL"):
+                with self.subTest(line=line):
+                    log.write_text(line + "\nRan 1 test in 0.01s\n\nOK\n")
+                    self.assertFalse(gate.receipt_passed(log, ["test_target"]))
 
     def test_modified_source_and_path_traversal_are_refused(self):
         contract=json.loads(json.dumps(base))

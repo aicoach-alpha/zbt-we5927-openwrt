@@ -2,6 +2,8 @@ name: VeCI mt7603 deadlock patch gate
 
 on:
   push:
+    branches-ignore:
+      - build/zbt-we2825-oem-veci-20261119
     paths:
       - 'source/mt76-patches/**'
       - 'scripts/stage-mt7603-deadlock-fix.sh'

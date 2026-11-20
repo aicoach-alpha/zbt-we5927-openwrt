@@ -7,11 +7,22 @@ This script does not produce binaries, change router config or sign artifacts.
 from pathlib import Path
 import hashlib
 import json
+import re
 import sys
 
 BASE = Path(__file__).resolve().parents[1]
 CONTRACT = BASE / "contracts/veci-v2-rebuild-contract.json"
 EVIDENCE = BASE / "contracts/owner-final-source-evidence.json"
+
+
+def receipt_passed(log, methods):
+    """Accept only successful unittest runs that actually report each method."""
+    text = log.read_text(errors="replace")
+    passed = set(re.findall(r"^(test_\w+) \([^\n]+\) \.\.\. ok$", text, re.M))
+    return (bool(methods) and set(methods).issubset(passed)
+            and re.search(r"^Ran [1-9]\d* tests? in [\d.]+s$", text, re.M)
+            and text.rstrip().endswith("\nOK")
+            and not re.search(r"^FAILED(?: |$)", text, re.M))
 
 
 def audit(contract: dict, evidence: dict) -> list[str]:
@@ -81,7 +92,7 @@ def audit(contract: dict, evidence: dict) -> list[str]:
                     receipt.get("hardware_uat") != "not_run" or
                     not isinstance(log_rel,str) or not log.is_relative_to(root) or not log.is_file() or
                     hashlib.sha256(log.read_bytes()).hexdigest() != receipt.get("log_sha256") or
-                    b"OK" not in log.read_bytes() or b"Ran " not in log.read_bytes()):
+                    not receipt_passed(log, record["test_ids"])):
                 issues.append("invalid_source_test_receipt:" + name)
     return sorted(set(issues))
 

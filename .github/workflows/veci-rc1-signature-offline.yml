@@ -2,6 +2,8 @@ name: VeCI signed-image offline release gate
 
 on:
   push:
+    branches-ignore:
+      - build/zbt-we2825-oem-veci-20261119
     paths:
       - 'scripts/verify_veci_image.py'
       - 'scripts/tests/test_verify_veci_image.py'

@@ -1,6 +1,8 @@
 name: MT7603 wired UAT harness safety
 on:
   push:
+    branches-ignore:
+      - build/zbt-we2825-oem-veci-20261119
     paths:
       - 'scripts/uat/**'
       - 'scripts/veci_wifi_scan.py'

@@ -42,6 +42,8 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+      - name: Require source evidence before OpenWrt compilation
+        run: python3 rebuild/veci-v2/ci/source-completion-gate.py
       - name: Build environment
         run: |
           sudo apt-get update -qq

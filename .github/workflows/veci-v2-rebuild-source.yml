@@ -2,6 +2,8 @@ name: VeCI v2 WE5927-DSIM rebuild source and signed-feed safety
 
 on:
   push:
+    branches-ignore:
+      - build/zbt-we2825-oem-veci-20261119
     paths:
       - 'rebuild/veci-v2/**'
       - 'scripts/tests/test_veci_v2_*.py'

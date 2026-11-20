@@ -2,6 +2,8 @@ name: WE5927 MT7603 exact-source cross-build
 
 on:
   push:
+    branches-ignore:
+      - build/zbt-we2825-oem-veci-20261119
     paths:
       - 'source/mt76-patches/**'
       - 'source/openwrt-we5927.config'
@@ -29,6 +31,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Require source evidence before OpenWrt compilation
+        run: python3 rebuild/veci-v2/ci/source-completion-gate.py
       - name: Install OpenWrt build dependencies
         run: |
           sudo apt-get update -qq

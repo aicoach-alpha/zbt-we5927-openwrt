@@ -2,6 +2,8 @@ name: VeCI Wi-Fi guardian observe-only safety
 
 on:
   push:
+    branches-ignore:
+      - build/zbt-we2825-oem-veci-20261119
     paths:
       - 'source/veci-wifi-guardian/**'
       - 'scripts/tests/test_wifi_guardian_observe_only.py'

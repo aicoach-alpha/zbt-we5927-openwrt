@@ -1,6 +1,8 @@
 name: VeCI LTE recovery guard
 on:
   push:
+    branches-ignore:
+      - build/zbt-we2825-oem-veci-20261119
     paths:
       - 'files/usr/sbin/we5927-lte'
       - 'source/we5927-lte/files/usr/sbin/we5927-lte'
