@@ -19,10 +19,15 @@ class ExistingSourceReuse(unittest.TestCase):
     def test_all_27_requirements_provenance_documented_without_false_pass(self):
         doc = (ROOT / "docs/SOURCE_REUSE_27_MODULES.md").read_text()
         contract = json.loads((ROOT / "rebuild/veci-v2/contracts/veci-v2-rebuild-contract.json").read_text())
-        required = {entry["id"] for entry in contract["required_core"] if entry["v2_state"] == "not_ported_to_v2"}
+        index = {entry["id"]: entry for entry in contract["required_core"]}
         entries = re.findall(r"^\| ([a-z][a-z0-9_]*) \|", doc, re.M)
         self.assertEqual(len(entries), 27)
-        self.assertEqual(set(entries), required)
+        self.assertEqual(len(set(entries)), 27)
+        self.assertTrue(set(entries).issubset(index))
+        # Keep the ORIGINAL 27-member denominator after genuine source acceptance.
+        # Never drop an accepted module merely because it no longer says not_ported.
+        self.assertTrue(all(index[name]["v2_state"] in ("not_ported_to_v2","source_verified")
+                            for name in entries))
         self.assertIn("64900e756efa667774214f9c6b17c113222e01f7", doc)
         self.assertIn("DO NOT", doc.upper() if "DO NOT" in doc.upper() else doc.upper().replace("JANGAN", "DO NOT"))
         self.assertNotIn("27/27 PASS", doc)

@@ -6,6 +6,7 @@ means the feature works on hardware. The initial 27 are frozen by the owner
 source-reuse manifest so completed modules cannot vanish from the denominator.
 """
 import json
+import hashlib
 from pathlib import Path
 import re
 from datetime import datetime, timezone
@@ -50,19 +51,44 @@ PARTIAL = {
 
 
 def module_source_verified(entry, record, known_tests):
+    """Match the strict source gate; never promote an unverified claim."""
     if entry.get("v2_state") != "source_verified" or record.get("status") != "pass":
         return False
     files = record.get("implementation_files")
     tests = record.get("test_ids")
-    if not isinstance(files, list) or not isinstance(tests, list) or not files or not tests:
+    test_files = record.get("test_source_files")
+    hashes = record.get("source_sha256")
+    receipt = record.get("receipt")
+    if (not isinstance(files,list) or not files or not isinstance(tests,list) or not tests
+            or not isinstance(test_files,list) or not test_files
+            or not isinstance(hashes,dict) or not isinstance(receipt,dict)
+            or set(hashes) != set(files + test_files)):
         return False
-    for rel in files:
-        if not isinstance(rel, str) or rel.startswith("/") or ".." in Path(rel).parts:
+    for rel in files + test_files:
+        if not isinstance(rel,str) or Path(rel).is_absolute() or ".." in Path(rel).parts:
             return False
-        path = ROOT / rel
-        if not path.is_file() or path.stat().st_size == 0:
+        path = (ROOT / rel).resolve()
+        if not path.is_relative_to(ROOT) or not path.is_file() or not path.stat().st_size:
             return False
-    return all(isinstance(t, str) and t in known_tests for t in tests)
+        if hashlib.sha256(path.read_bytes()).hexdigest() != hashes.get(rel):
+            return False
+    # Test names must be defined within the evidence-scoped test source, not
+    # somewhere else in the suite with a coincidentally similar name.
+    declared = set()
+    for rel in test_files:
+        declared.update(re.findall(r"^\s*def (test_[A-Za-z0-9_]+)\(",(ROOT/rel).read_text(),flags=re.M))
+    if not all(isinstance(t,str) and t in known_tests and t in declared for t in tests):
+        return False
+    log_rel = receipt.get("log_file")
+    if not isinstance(log_rel,str) or Path(log_rel).is_absolute() or ".." in Path(log_rel).parts:
+        return False
+    log = (ROOT/log_rel).resolve()
+    if (not log.is_relative_to(ROOT) or not log.is_file() or
+            hashlib.sha256(log.read_bytes()).hexdigest() != receipt.get("log_sha256")
+            or receipt.get("kind") != "executed_source_tests"
+            or receipt.get("exit_code") != 0 or receipt.get("hardware_uat") != "not_run"):
+        return False
+    return b"Ran " in log.read_bytes() and b"OK" in log.read_bytes()
 
 
 def collect():

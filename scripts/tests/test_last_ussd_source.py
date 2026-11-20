@@ -33,4 +33,6 @@ class ExistingModuleIntegration(unittest.TestCase):
  def test_not_hardware_pass(self):
   contract=json.loads((ROOT/"rebuild/veci-v2/contracts/veci-v2-rebuild-contract.json").read_text())
   self.assertFalse(contract["flash_authorized"])
-  self.assertEqual(next(x["v2_state"] for x in contract["required_core"] if x["id"]==("lte_apn_pin_puk" if NAME=="pin" else "lte_ussd")),"not_ported_to_v2")
+  module=next(x for x in contract["required_core"] if x["id"]==("lte_apn_pin_puk" if NAME=="pin" else "lte_ussd"))
+  self.assertIn(module["v2_state"], ("not_ported_to_v2", "source_verified"))
+  self.assertEqual(module["physical_uat"], "not_run")
