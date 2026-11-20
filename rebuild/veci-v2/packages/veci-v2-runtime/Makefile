@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-runtime
 PKG_VERSION:=0.1
-PKG_RELEASE:=16
+PKG_RELEASE:=17
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -38,6 +38,11 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_DATA) ./veci2-cron.awk $(1)/usr/libexec/veci2-cron.awk
 	$(INSTALL_DATA) ./veci2-services-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-services.json
 	$(INSTALL_DATA) ./veci2-cron-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-cron.json
+	$(INSTALL_BIN) ./veci2-gpio-watchdog $(1)/usr/libexec/veci2-gpio-watchdog
+	$(INSTALL_BIN) ./veci2-watchdog-status $(1)/usr/libexec/rpcd/veci.v2.watchdog
+	$(INSTALL_DATA) ./veci2-watchdog-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-watchdog.json
+	$(INSTALL_BIN) ./veci2-guest-check $(1)/usr/libexec/rpcd/veci.v2.guest
+	$(INSTALL_DATA) ./veci2-guest-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-guest.json
 	$(INSTALL_BIN) ./veci2-status $(1)/usr/libexec/rpcd/veci.v2
 	$(INSTALL_BIN) ./veci2-interfaces $(1)/usr/libexec/rpcd/veci.v2.interfaces
 	$(INSTALL_BIN) ./veci2-routes $(1)/usr/libexec/rpcd/veci.v2.routes

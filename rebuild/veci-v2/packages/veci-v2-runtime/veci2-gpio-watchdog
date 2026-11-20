@@ -1,0 +1,24 @@
+#!/bin/sh
+# Read the kernel-owned watchdog class. Opening the character device can arm it.
+set -eu
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || exit 1
+found=0
+for wd in /sys/class/watchdog/watchdog[0-9]*; do
+  node=$wd/device/of_node
+  [ -r "$node/compatible" ] || continue
+  tr '\000' '\n' < "$node/compatible" | grep -Fxq linux,wdt-gpio || continue
+  # OF cells are big endian: controller phandle, GPIO index, polarity flags.
+  cells=$(od -An -tx1 -v "$node/gpios" 2>/dev/null | tr -d ' \n') || continue
+  case "$cells" in ????????0000002500000000) ;; *) continue ;; esac
+  [ "$(tr -d '\000' < "$node/hw_algo")" = toggle ] || continue
+  [ "$(od -An -tx1 -v "$node/hw_margin_ms" | tr -d ' \n')" = 000007d0 ] || continue
+  [ -e "$node/always-running" ] || continue
+  found=$((found + 1))
+  state=$(cat "$wd/state" 2>/dev/null) || state=unknown
+  case "$state" in active|inactive) ;; *) state=unknown ;; esac
+done
+case "$found" in
+  1) echo "gpio37_watchdog=registered"; echo "kernel_state=$state" ;;
+  0) echo "gpio37_watchdog=unconfirmed" ;;
+  *) echo "gpio37_watchdog=ambiguous" ;;
+esac

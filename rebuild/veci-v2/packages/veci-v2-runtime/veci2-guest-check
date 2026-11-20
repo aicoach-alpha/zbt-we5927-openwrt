@@ -1,0 +1,37 @@
+#!/bin/sh
+# Read-only guest separation inventory. Never claim Wi-Fi/firewall runtime PASS.
+set -eu
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "${1:-}:${2:-}" in
+  list:*) echo '{"status":{}}'; exit 0 ;;
+  call:status) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+installed=false
+configured=false
+enabled=false
+mode=not_installed
+if [ -x /usr/libexec/rpcd/veci.app.guest ]; then
+  installed=true
+  mode=not_configured
+  if [ "$(uci -q get wireless.veci_guest || :)" = wifi-iface ] &&
+     [ "$(uci -q get network.veci_guest || :)" = interface ] &&
+     [ "$(uci -q get dhcp.veci_guest || :)" = dhcp ] &&
+     [ "$(uci -q get firewall.veci_guest_zone || :)" = zone ]; then
+    configured=true
+    mode=configuration_needs_audit
+    if [ "$(uci -q get wireless.veci_guest.disabled || :)" = 0 ]; then
+      enabled=true
+    fi
+    # The default firewall source must not accept or forward directly to LAN.
+    if [ "$(uci -q get firewall.veci_guest_zone.input || :)" = REJECT ] &&
+       [ "$(uci -q get firewall.veci_guest_zone.forward || :)" = REJECT ] &&
+       [ "$(uci -q get wireless.veci_guest.network || :)" = veci_guest ] &&
+       [ "$(uci -q get firewall.veci_guest_zone.network || :)" = veci_guest ]; then
+      mode=configuration_separation_present
+    fi
+  fi
+fi
+# Isolasi runtime tidak dapat diklaim tanpa nft + actual guest/client UAT.
+printf '{"ok":true,"installed":%s,"configured":%s,"enabled_configured":%s,"configuration_state":"%s","guest_isolation_verified":null}\n' "$installed" "$configured" "$enabled" "$mode"

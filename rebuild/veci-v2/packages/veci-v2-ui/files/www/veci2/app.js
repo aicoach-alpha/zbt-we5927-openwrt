@@ -263,6 +263,8 @@ function showLogin() {
   globalThis.VeciRa?.reset?.();
   globalThis.VeciWifiControls?.reset?.();
   globalThis.VeciCron?.reset?.();
+  globalThis.VeciWatchdog?.reset?.();
+  globalThis.VeciGuestCheck?.reset?.();
   globalThis.VeciSmsCenter.logout();
   globalThis.VeciDnsSettings?.logout?.();
   globalThis.VeciOwnerControls?.logout?.();
@@ -577,6 +579,8 @@ document.addEventListener('DOMContentLoaded', () => {
       method === 'listMessages' ? 13000 : 8500;
     return rpc(object, method, args, sid, duration);
   });
+  let authenticating = false;
+  let signingOut = false;
   el('login-form').addEventListener('submit', async event => {
     event.preventDefault();
     notify('');
@@ -586,24 +590,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const username = el('username').value.trim();
     const password = el('password').value;
-    if (!username || !password) return;
+    if (!username || !password || authenticating || signingOut || sid) return;
+    authenticating = true;
     try {
       const answer = await rpc('session', 'login', {username, password}, ROOT_SID);
       const token = answer.ubus_rpc_session;
-      if (!/^[0-9a-f]{32}$/.test(token || '')) throw Error('Login ditolak');
+      if (typeof token !== 'string' || token === ROOT_SID ||
+          !/^[0-9a-f]{32}$/.test(token)) throw Error('Login ditolak');
       sid = token;
-      el('password').value = '';
+      const scopes = answer.acls && answer.acls['access-group'];
+      const groups = scopes && typeof scopes === 'object' ? Object.entries(scopes) : [];
+      const rights = groups.filter(([group, modes]) => group.startsWith('veci-v2-') &&
+        Array.isArray(modes)).map(([group, modes]) => {
+          const labels = [];
+          if (modes.includes('read')) labels.push('baca');
+          if (modes.includes('write')) labels.push('tulis');
+          return labels.length ? group + ' (' + labels.join(', ') + ')' : '';
+        }).filter(Boolean).sort();
+      el('session-permissions').textContent = rights.length ? rights.join(' · ') :
+        'Rincian grup VeCI tidak tersedia.';
+      el('session-account').textContent = username;
+      showPage('overview');
       showWorkspace();
       await refreshOverview();
     } catch (error) { notify(error.message || 'Login gagal'); }
+    finally { authenticating = false; el('password').value = ''; }
   });
   el('logout').addEventListener('click', async () => {
+    if (!sid || signingOut) return;
+    signingOut = true;
     const old = sid;
-    globalThis.VeciSmsCenter.logout();
-    sid = '';
     showLogin();
-    try { await rpc('session', 'destroy', {ubus_rpc_session: old}, old); }
-    catch { /* Local logout is already enforced. */ }
+    el('session-permissions').textContent = '';
+    el('session-account').textContent = '';
+    try { await rpc('session', 'destroy', {}, old); }
+    catch { window.alert('Anda sudah keluar di browser. Router belum mengonfirmasi penutupan sesi.'); }
+    finally { location.reload(); }
   });
   el('refresh').addEventListener('click', async () => {
     notify('');

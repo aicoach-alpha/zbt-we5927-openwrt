@@ -20,6 +20,10 @@ RUNTIME = "rebuild/veci-v2/packages/veci-v2-runtime/"
 # actually exist. Other modules stay pending, even if an unrelated test passes.
 PARTIAL = {
     "interface_wan_lan": [RUNTIME + "veci2-interfaces", "scripts/tests/test_owner_reuse_existing_source.py"],
+    "router_login_and_permissions": ["rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js", "scripts/tests/test_veci_ui_sessions.py"],
+    "lte_rndis_data": ["source/we5927-lte/files/usr/sbin/we5927-lte", "scripts/tests/test_lte_rndis_identity.py"],
+    "firmware_gpio_hardware_watchdog": [RUNTIME + "veci2-gpio-watchdog", "scripts/tests/test_gpio_watchdog_registration.py"],
+    "guest_wifi_isolation": [RUNTIME + "veci2-guest-check", "scripts/tests/test_guest_isolation_readonly.py"],
     "ipv6_ra_dhcpv6": ["rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra", "scripts/tests/test_parallel_network_source.py"],
     "wifi_ap_2g": [RUNTIME + "veci2-wifi-controls", "scripts/tests/test_parallel_radio_source.py"],
     "wifi_survey_channel": [RUNTIME + "veci2-wifi-controls", "scripts/tests/test_parallel_radio_source.py"],

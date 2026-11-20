@@ -14,6 +14,8 @@
   <script src="/veci2/dns-settings.js" defer></script>
   <script src="/veci2/owner-controls.js" defer></script>
   <script src="/veci2/app.js" defer></script>
+  <script src="/veci2/guest-check.js" defer></script>
+  <script src="/veci2/watchdog-status.js" defer></script>
   <script src="/veci2/backup.js" defer></script>
   <script src="/veci2/cron.js" defer></script>
   <script src="/veci2/services.js" defer></script>
@@ -42,6 +44,10 @@
         </form>
       </section>
       <section id="workspace" hidden>
+        <details><summary>Sesi dan izin akun</summary>
+          <p>Akun <strong id="session-account"></strong></p>
+          <p id="session-permissions"></p>
+        </details>
         <div class="intro"><div><h1>Router health</h1><p>Berbasis kondisi sistem yang terbaca, bukan perkiraan atau indikator cache.</p></div><button id="refresh" type="button">Perbarui</button></div>
         <nav class="tabs" aria-label="Menu utama VeCI">
           <button class="tab active" type="button" data-page="overview">Beranda</button>
@@ -54,6 +60,12 @@
           <p class="notice">Status internet yang belum diuji ditampilkan sebagai belum terverifikasi, bukan dipaksa menjadi offline. Beacon Wi-Fi tidak dianggap hidup hanya karena radio up.</p>
         </section>
         <section id="network" class="page" aria-label="Koneksi dan perangkat" hidden>
+          <article class="panel">
+            <h2>Guest Wi-Fi — Isolasi</h2>
+            <button id="guest-status-read" type="button">Periksa konfigurasi guest</button>
+            <p id="guest-status-result" role="status"></p>
+            <p class="notice">Audit konfigurasi saja; belum menjadi bukti isolasi runtime.</p>
+          </article>
           <article class="panel">
             <details id="wifi-extra"><summary>Klien, keamanan dan kanal Wi-Fi</summary>
               <fieldset id="wifi-controls" disabled>
@@ -146,6 +158,12 @@
           </article>
         </section>
         <section id="settings" class="page" aria-label="Pengaturan router" hidden>
+          <article class="panel">
+            <h2>Hardware Watchdog GPIO37</h2>
+            <button type="button" id="watchdog-read">Baca watchdog kernel</button>
+            <p id="watchdog-result" role="status"></p>
+            <p class="notice">Hanya memeriksa registrasi driver; tidak memicu watchdog atau restart router.</p>
+          </article>
           <article class="panel">
             <button type="button" id="backup-export">Unduh cadangan konfigurasi</button>
             <p>Arsip dapat memuat kata sandi dan kunci privat. Simpan di tempat aman.</p><p id="backup-message" role="status"></p>

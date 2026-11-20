@@ -135,16 +135,29 @@ driver_name() {
 	basename "$x"
 }
 
-rndis_data_ready() {
-	local net modem interface
+rndis_state() {
+	local net modem interface carrier
 	net="$(cfg data_if)"
 	[ -n "$net" ] || net=usb0
-	case "$net" in .|..|-*|*[!A-Za-z0-9_.-]*) return 1 ;; esac
-	modem="$(usb_device_dir)" || return 1
-	modem="$(readlink -f "$modem")" || return 1
-	interface="$(readlink -f "/sys/class/net/$net/device")" || return 1
-	[ "${interface%/*}" = "$modem" ] || return 1
-	[ "$(driver_name "$interface")" = rndis_host ]
+	case "$net" in .|..|-*|*[!A-Za-z0-9_.-]*) echo invalid_configuration; return ;; esac
+	modem="$(usb_device_dir)" && modem="$(readlink -f "$modem")" || { echo modem_missing; return; }
+	[ -e "/sys/class/net/$net/device" ] || { echo interface_missing; return; }
+	interface="$(readlink -f "/sys/class/net/$net/device")" || { echo interface_missing; return; }
+	[ "${interface%/*}" = "$modem" ] || { echo other_device; return; }
+	[ "$(driver_name "$interface")" = rndis_host ] || { echo driver_mismatch; return; }
+	carrier="$(cat "/sys/class/net/$net/carrier" 2>/dev/null)" || carrier=
+	case "$carrier" in
+		1) echo "carrier_up $net" ;;
+		0) echo "carrier_down $net" ;;
+		*) echo "carrier_unknown $net" ;;
+	esac
+}
+
+rndis_data_ready() {
+	case "$(rndis_state)" in
+		carrier_up\ *|carrier_down\ *|carrier_unknown\ *) return 0 ;;
+		*) return 1 ;;
+	esac
 }
 
 repair_rndis() {
@@ -1172,6 +1185,7 @@ case "$1" in
 		daemon
 		;;
 	at-port) at_port ;;
+	rndis-state) rndis_state ;;
 	selector-slot) selector_slot ;;
 	validate-apn) valid_apn "$2" ;;
 	status-fast)

@@ -1,0 +1,7 @@
+{
+  "veci-v2-guest-inspect": {
+    "description": "Guest configuration inventory, no write access",
+    "read": {"ubus": {"veci.v2.guest": ["status"]}},
+    "write": {"ubus": {}}
+  }
+}
