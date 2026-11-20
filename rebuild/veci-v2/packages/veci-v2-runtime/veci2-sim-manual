@@ -1,0 +1,61 @@
+#!/bin/sh
+# Authenticated manual SIM1/SIM2 selector for exact WE5927-DSIM.
+# Reuses existing we5927-lte service, not a second modem daemon.
+set -eu
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+[ "$#" -ge 1 ] || fail unsupported_method
+case "$1" in
+  list) echo '{"status":{},"switchSim":{"slot":"Integer","confirmation":"String"}}'; exit 0 ;;
+  call) [ "$#" -ge 2 ] || fail unsupported_method
+        case "$2" in status|switchSim) ;; *) fail unsupported_method ;; esac ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+CFG=we5927_lte.main
+[ "$(uci -q get "$CFG")" = modem ] || fail modem_config_missing
+[ "$(uci -q get "$CFG.sim_gpio")" = 46 ] || fail wrong_sim_selector
+[ "$(uci -q get "$CFG.sim1_value")" = 1 ] || fail unexpected_sim1_polarity
+[ "$(uci -q get "$CFG.sim2_value")" = 0 ] || fail unexpected_sim2_polarity
+[ "$(uci -q get "$CFG.usb_vid")" = 05c6 ] &&
+  [ "$(uci -q get "$CFG.usb_pid")" = 902e ] || fail wrong_modem_identity
+changes=$(uci -q changes we5927_lte) || fail pending_config_unknown
+[ -z "$changes" ] || fail pending_lte_changes
+selected=$(/usr/sbin/we5927-lte selector-slot 2>/dev/null) || fail selector_unreadable
+case "$selected" in 1|2) ;; *) fail selector_unknown ;; esac
+configured=$(uci -q get "$CFG.sim" || :)
+case "$configured" in 1|2) ;; *) fail configured_sim_unknown ;; esac
+[ "$configured" = "$selected" ] || fail selector_config_mismatch
+policy=$(uci -q get "$CFG.auto_failover" || :)
+case "$policy" in ''|0) ;; *) fail disable_auto_failover_first ;; esac
+if [ "$2" = switchSim ]; then
+  request=$(head -c 257)
+  [ "$(printf %s "$request" | wc -c)" -le 256 ] || fail request_too_long
+  slot=$(jsonfilter -s "$request" -e '@.slot') || fail invalid_request
+  confirm=$(jsonfilter -s "$request" -e '@.confirmation') || fail invalid_request
+  case "$slot:$confirm" in
+    1:SWITCH_SIM_1|2:SWITCH_SIM_2) ;;
+    *) fail explicit_confirmation_required ;;
+  esac
+  exec 9<"$0"
+  flock -n 9 || fail busy
+  [ -z "$(uci -q changes we5927_lte)" ] || fail pending_lte_changes
+  before=$(/usr/sbin/we5927-lte selector-slot 2>/dev/null) || fail selector_unreadable
+  case "$before" in 1|2) ;; *) fail selector_unknown ;; esac
+  if [ "$slot" != "$before" ]; then
+    if ! /usr/sbin/we5927-lte sim "$slot" >/dev/null 2>&1; then
+      after=$(/usr/sbin/we5927-lte selector-slot 2>/dev/null || :)
+      if [ "$after" = "$slot" ]; then
+        /usr/sbin/we5927-lte sim "$before" >/dev/null 2>&1 || :
+        fail reconnect_failed_rollback_attempted
+      fi
+      fail sim_switch_failed
+    fi
+    after=$(/usr/sbin/we5927-lte selector-slot 2>/dev/null || :)
+    [ "$after" = "$slot" ] || fail selector_not_confirmed
+  fi
+  selected=$slot
+  configured=$(uci -q get "$CFG.sim" || :)
+  [ "$configured" = "$slot" ] || fail sim_config_not_confirmed
+fi
+printf '{"ok":true,"selector_slot":%s,"configured_slot":%s,"auto_failover":false}\n' "$selected" "$configured"
