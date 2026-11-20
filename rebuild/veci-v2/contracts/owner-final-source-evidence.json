@@ -68,6 +68,64 @@
       "test_source_files": [
         "scripts/tests/test_owner_ussd_acceptance.py"
       ]
+    },
+    "system_services_startup": {
+      "implementation_files": [
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services-acl.json",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js"
+      ],
+      "receipt": {
+        "executed_utc": "2026-11-20T08:34:26+00:00",
+        "exit_code": 0,
+        "hardware_uat": "not_run",
+        "kind": "executed_source_tests",
+        "log_file": "docs/source-acceptance/system_services_startup.txt",
+        "log_sha256": "436cb1376e9eafc45b329f40a89064f42125f727a316aa33185f0d06e34d8f27"
+      },
+      "scope": "source_verified_no_hardware_uat",
+      "source_sha256": {
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services": "39b99178cd07efdc5759b4189765b69b7d3e11fed21ee9394aaee833a0f90db0",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services-acl.json": "f7152b5a56e12ba5fa6f2ac6cde0c2a3484d5fdf1edb20b3cd1a96cf848af42b",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js": "c3342292033bd096954e36d38ec11e6ceb1e4be7f1ce10d302e562355887ed2c",
+        "scripts/tests/test_owner_services_acceptance.py": "faa7cdcd68e987204cf944eb7abd5f7a1f71d5ed026f7c0afcc887a013a02881"
+      },
+      "status": "pass",
+      "test_ids": [
+        "test_real_provider_lifecycle_in_sandbox",
+        "test_no_unrestricted_lte_network_or_ssh_boot_changes"
+      ],
+      "test_source_files": [
+        "scripts/tests/test_owner_services_acceptance.py"
+      ]
+    },
+    "system_time_ntp": {
+      "implementation_files": [
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json"
+      ],
+      "receipt": {
+        "executed_utc": "2026-11-20T08:34:32+00:00",
+        "exit_code": 0,
+        "hardware_uat": "not_run",
+        "kind": "executed_source_tests",
+        "log_file": "docs/source-acceptance/system_time_ntp.txt",
+        "log_sha256": "e6431b6aaf65e75863fd4f294cdc25903ff99615659e5b3cfba44da897cc7bd4"
+      },
+      "scope": "source_verified_no_hardware_uat",
+      "source_sha256": {
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "686bc64199dbd441bfeb96d1a48a1aface03074df0d0538873d72802051365cc",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin": "b5ccce3c5a5d9bf4185a84ef5bbbded4557cd09bbb109f09b0b6eca720973375",
+        "scripts/tests/test_owner_ntp_acceptance.py": "e4bc64b625ed62e1d723f2b33fbf4285875f502f71a34a2051eb04da83c819d3"
+      },
+      "status": "pass",
+      "test_ids": [
+        "test_real_rpc_ntp_staging_and_rollback",
+        "test_uci_acl_and_no_radio_lte_modification"
+      ],
+      "test_source_files": [
+        "scripts/tests/test_owner_ntp_acceptance.py"
+      ]
     }
   }
 }
