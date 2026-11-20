@@ -2,14 +2,14 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-runtime
 PKG_VERSION:=0.1
-PKG_RELEASE:=13
+PKG_RELEASE:=14
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/veci-v2-runtime
   SECTION:=admin
   CATEGORY:=Administration
-  TITLE:=VeCI v2 read-only exact-board health provider (development)
+  TITLE:=VeCI v2 authenticated exact-board management backend (development)
   DEPENDS:=+we5927-lte +veci-wifi-guardian +rpcd +jsonfilter +swconfig +flock +fwtool +ucert
 endef
 
@@ -28,6 +28,10 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_BIN) ./veci2-lte-policy $(1)/usr/libexec/rpcd/veci.v2.lte
 	$(INSTALL_BIN) ./veci2-wifi $(1)/usr/libexec/rpcd/veci.v2.wifi
 	$(INSTALL_BIN) ./veci2-dns $(1)/usr/libexec/rpcd/veci.v2.dns
+	$(INSTALL_BIN) ./veci2-static-leases $(1)/usr/libexec/rpcd/veci.v2.dhcp
+	$(INSTALL_BIN) ./veci2-sim-manual $(1)/usr/libexec/rpcd/veci.v2.sim
+	$(INSTALL_BIN) ./veci2-firewall $(1)/usr/libexec/rpcd/veci.v2.firewall
+	$(INSTALL_BIN) ./veci2-system-admin $(1)/usr/libexec/rpcd/veci.v2.system
 	$(INSTALL_BIN) ./veci2-status $(1)/usr/libexec/rpcd/veci.v2
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./veci2-status-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-runtime.json

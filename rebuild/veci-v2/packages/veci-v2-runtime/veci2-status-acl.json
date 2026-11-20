@@ -1,4 +1,22 @@
 {
+  "veci-v2-dhcp": {
+    "description": "Exact-board user-authorized native VeCI administration",
+    "read": {
+      "ubus": {
+        "veci.v2.dhcp": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.dhcp": [
+          "add",
+          "delete"
+        ]
+      }
+    }
+  },
   "veci-v2-dns": {
     "description": "Manage upstream DNS via authenticated local dnsmasq",
     "read": {
@@ -12,6 +30,25 @@
       "ubus": {
         "veci.v2.dns": [
           "set"
+        ]
+      }
+    }
+  },
+  "veci-v2-firewall": {
+    "description": "Exact-board user-authorized native VeCI administration",
+    "read": {
+      "ubus": {
+        "veci.v2.firewall": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.firewall": [
+          "addForward",
+          "deleteForward",
+          "setDmz"
         ]
       }
     }
@@ -59,6 +96,43 @@
     },
     "write": {
       "ubus": {}
+    }
+  },
+  "veci-v2-sim": {
+    "description": "Exact-board user-authorized native VeCI administration",
+    "read": {
+      "ubus": {
+        "veci.v2.sim": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.sim": [
+          "switchSim"
+        ]
+      }
+    }
+  },
+  "veci-v2-system": {
+    "description": "Exact-board user-authorized native VeCI administration",
+    "read": {
+      "ubus": {
+        "veci.v2.system": [
+          "ntp",
+          "logs",
+          "leds",
+          "observability"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.system": [
+          "setNtp"
+        ]
+      }
     }
   },
   "veci-v2-wifi": {

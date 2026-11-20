@@ -259,6 +259,7 @@ function showLogin() {
   firmwareForm.reset();
   globalThis.VeciSmsCenter.logout();
   globalThis.VeciDnsSettings?.logout?.();
+  globalThis.VeciOwnerControls?.logout?.();
   sid = '';
   verifiedPackage = '';
   el('logout').hidden = true;
@@ -275,13 +276,14 @@ function showPage(id) {
     tab.setAttribute('aria-current', selected ? 'page' : 'false');
   }
   if (id === 'network') {
+    globalThis.VeciOwnerControls?.refreshNetwork?.();
     refreshNetwork();
     refreshEthernet();
     refreshVisibility();
     refreshLtePolicy();
   }
   if (id === 'sms') refreshSMS();
-  if (id === 'settings') { refreshIPv6(); globalThis.VeciDnsSettings?.refresh?.(); }
+  if (id === 'settings') { refreshIPv6(); globalThis.VeciDnsSettings?.refresh?.(); globalThis.VeciOwnerControls?.refreshSettings?.(); }
   if (id === 'apps') refreshPackages();
 }
 function primaryApStatus(data) {
@@ -562,6 +564,7 @@ async function onPackageInstall() {
   finally { button.disabled = false; }
 }
 document.addEventListener('DOMContentLoaded', () => {
+  globalThis.VeciOwnerControls?.init?.((object, method, args = {}, ms = 8500) => rpc(object, method, args, sid, ms), () => Boolean(sid));
   globalThis.VeciDnsSettings?.init?.((object, method, args = {}) => rpc(object, method, args, sid), () => Boolean(sid));
   globalThis.VeciSmsCenter.init((object, method, args = {}) => {
     const duration = method === 'sendMessage' ? 46000 :

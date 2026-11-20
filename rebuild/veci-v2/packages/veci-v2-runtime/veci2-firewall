@@ -56,7 +56,19 @@ status() {
     json_close_object
     i=$((i+1))
   done
-  json_close_array; json_dump; echo
+  named=$(uci -q show firewall | grep -E '^firewall[.]veci_port_(tcp|udp)_[0-9]+=redirect$' | cut -d= -f1 | cut -d. -f2 || :)
+  for owner in $named; do
+    json_add_object ""
+    json_add_string name "$owner"
+    json_add_string source_port "$(uci -q get "firewall.$owner.src_dport" || :)"
+    json_add_string destination "$(uci -q get "firewall.$owner.dest_ip" || :)"
+    json_add_string destination_port "$(uci -q get "firewall.$owner.dest_port" || :)"
+    json_add_string protocol "$(uci -q get "firewall.$owner.proto" || :)"
+    json_close_object
+  done
+  json_close_array
+  json_add_string dmz_destination "$(uci -q get firewall.veci_owner_dmz.dest_ip || :)"
+  json_dump; echo
 }
 if [ "$2" = status ]; then status; exit 0; fi
 request=$(head -c 513)

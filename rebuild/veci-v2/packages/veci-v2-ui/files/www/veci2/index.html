@@ -12,6 +12,7 @@
   <script src="/veci2/sms-center.js" defer></script>
   <script src="/veci2/speed-test.js" defer></script>
   <script src="/veci2/dns-settings.js" defer></script>
+  <script src="/veci2/owner-controls.js" defer></script>
   <script src="/veci2/app.js" defer></script>
 </head>
 <body>
@@ -46,6 +47,32 @@
         </section>
         <section id="network" class="page" aria-label="Koneksi dan perangkat" hidden>
           <article class="panel">
+            <details>
+              <summary><strong>Dual-SIM — Ganti kartu secara manual</strong></summary>
+              <p>Perpindahan SIM merestart modem LTE dan dapat memutus internet beberapa menit. Nonaktifkan auto-failover terlebih dahulu. Tidak berjalan otomatis.</p>
+              <p id="owner-sim-status" class="result" role="status">Memuat SIM…</p>
+              <form id="owner-sim-form">
+                <label>Pilih SIM <select id="owner-sim-slot"><option value="1">SIM1</option><option value="2">SIM2</option></select></label>
+                <button id="owner-sim-submit" type="submit" disabled>Ganti SIM dengan konfirmasi</button>
+              </form>
+            </details>
+          </article>
+          <article class="panel">
+            <details>
+              <summary><strong>DHCP — Reservasi IP statis</strong></summary>
+              <p>Pasangkan alamat MAC perangkat dengan IP lokal. DNS/DHCP direstart sebentar; LTE dan Wi-Fi tidak direstart.</p>
+              <form id="owner-lease-form">
+                <label>MAC <input id="owner-lease-mac" maxlength="17" placeholder="aa:bb:cc:dd:ee:ff" required></label>
+                <label>IPv4 LAN <input id="owner-lease-ip" maxlength="15" placeholder="192.168.1.100" required></label>
+                <label>Nama perangkat <input id="owner-lease-name" maxlength="32" placeholder="office-pc"></label>
+                <button type="submit">Tambah reservasi</button>
+              </form>
+              <label>Hapus reservasi <select id="owner-lease-delete"><option value="">Pilih reservasi</option></select></label>
+              <button id="owner-lease-delete-btn" class="quiet" type="button">Hapus reservasi terpilih</button>
+              <p id="owner-lease-status" class="result" role="status"></p>
+            </details>
+          </article>
+          <article class="panel">
             <h2>Koneksi</h2>
             <p>Satu tempat untuk LTE dua SIM, Wi-Fi, LAN/WAN, DHCP dan perangkat. Fitur detail mengikuti modul yang benar-benar tersedia.</p>
             <div id="network-status" class="grid" aria-live="polite"></div>
@@ -70,6 +97,43 @@
           </article>
         </section>
         <section id="settings" class="page" aria-label="Pengaturan router" hidden>
+          <article class="panel">
+            <details>
+              <summary><strong>Firewall — Port Forward &amp; DMZ</strong></summary>
+              <p>Aturan port forwarding ke perangkat LAN. Router tetap menolak koneksi masuk WAN secara default; DMZ mengekspos banyak port dan dinonaktifkan jika tidak diperlukan.</p>
+              <form id="owner-forward-form">
+                <label>Port eksternal <input id="owner-port-external" type="number" min="1" max="65535" required></label>
+                <label>Port tujuan <input id="owner-port-internal" type="number" min="1" max="65535" required></label>
+                <label>Protokol <select id="owner-port-protocol"><option value="tcp">TCP</option><option value="udp">UDP</option></select></label>
+                <label>IP LAN tujuan <input id="owner-port-dest" type="text" maxlength="15" placeholder="192.168.1.100" required></label>
+                <button type="submit">Tambah port forward</button>
+              </form>
+              <div id="owner-forward-list" class="result"></div>
+              <label>Hapus port forward VeCI <select id="owner-forward-delete"><option value="">Pilih port</option></select></label>
+              <button id="owner-forward-delete-btn" type="button" class="quiet">Hapus port terpilih</button>
+              <form id="owner-dmz-form">
+                <label>DMZ (berisiko tinggi): IP perangkat LAN <input id="owner-dmz-dest" maxlength="15" placeholder="192.168.1.100" required></label>
+                <button type="submit">Aktifkan DMZ</button>
+              </form>
+              <button id="owner-dmz-disable" type="button" class="quiet">Matikan DMZ</button>
+              <p id="owner-firewall-status" class="result" role="status" aria-live="polite"></p>
+            </details>
+          </article>
+          <article class="panel">
+            <details>
+              <summary><strong>Sistem — NTP, LED &amp; Logs</strong></summary>
+              <p>Sinkronisasi waktu dan kondisi perangkat. Perubahan NTP tidak me-restart Wi-Fi atau LTE.</p>
+              <form id="owner-ntp-form">
+                <label>Server waktu utama <input id="owner-ntp-first" maxlength="253" value="pool.ntp.org" required></label>
+                <label>Server kedua (opsional) <input id="owner-ntp-second" maxlength="253"></label>
+                <button type="submit">Simpan NTP</button>
+              </form>
+              <p id="owner-ntp-status" role="status"></p>
+              <button id="owner-system-refresh" type="button" class="quiet">Perbarui status</button>
+              <div id="owner-system-summary" class="result"></div>
+              <details><summary>Log terakhir (admin)</summary><pre id="owner-system-log" class="owner-log"></pre></details>
+            </details>
+          </article>
           <article class="panel">
             <h2>DNS Settings</h2>
             <p>Atur DNS upstream yang digunakan dnsmasq untuk perangkat LAN. Mode otomatis mengikuti DNS operator; mode manual memakai DNS IPv4 pilihan. Tidak mengubah modem atau APN.</p>

@@ -70,3 +70,11 @@ footer { text-align:center; color:var(--muted); padding:18px; font-size:11px }
 #dns-form select,#dns-form input { width:100%; border:1px solid #bdcbd6; color:var(--ink); background:#fff; border-radius:8px; padding:10px; font:inherit }
 #dns-save { margin-top:14px }
 #speedtest-history { white-space:pre-line; font-size:13px; color:var(--muted) }
+
+/* Compact, collapsed owner administration sections */
+.page summary { cursor:pointer; padding:6px 0 12px; color:var(--ink) }
+.page details details { margin-top:12px }
+.owner-log { white-space:pre-wrap; overflow:auto; max-height:300px; font-size:12px; padding:12px; background:var(--bg) }
+.page select { border:1px solid #bdcbd6; border-radius:8px; background:#fff; color:var(--ink); font:inherit; padding:10px }
+.page details form { max-width:520px; margin:10px 0 16px }
+.page details form input,.page details form select { width:100%; }
