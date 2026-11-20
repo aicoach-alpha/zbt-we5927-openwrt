@@ -17,6 +17,8 @@ UAT = ROOT / "scripts/uat"
 
 class OwnerWifi(unittest.TestCase):
     def setUp(self):
+        if not os.environ.get("VECI_HOST_UCI") or not os.environ.get("VECI_LIBUBOX_PREFIX"):
+            self.skipTest("host UCI and libubox fixture dependencies must be supplied")
         self.uci = Path(os.environ["VECI_HOST_UCI"]).resolve(strict=True)
         self.prefix = Path(os.environ["VECI_LIBUBOX_PREFIX"]).resolve(strict=True)
         self.env = {**os.environ, "LD_LIBRARY_PATH": str(self.prefix / "lib") + ":" + os.environ.get("LD_LIBRARY_PATH", "")}
