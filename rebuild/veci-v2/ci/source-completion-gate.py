@@ -5,6 +5,7 @@ Hardware UAT comes later; source completion is a distinct prerequisite.
 This script does not produce binaries, change router config or sign artifacts.
 """
 from pathlib import Path
+import hashlib
 import json
 import sys
 
@@ -40,13 +41,48 @@ def audit(contract: dict, evidence: dict) -> list[str]:
             issues.append("missing_implementation_or_test_evidence:" + name)
             continue
         for rel in record["implementation_files"]:
-            path = BASE.parents[1] / rel
-            if not path.is_file() or not path.stat().st_size:
-                issues.append("missing_implementation_file:" + name)
+            path = (root / rel).resolve() if isinstance(rel,str) else root
+            if not isinstance(rel,str) or not path.is_relative_to(root) or not path.is_file() or not path.stat().st_size:
+                issues.append("missing_or_unsafe_implementation_file:" + name)
                 break
         for test_id in record["test_ids"]:
             if not isinstance(test_id, str) or test_id not in known_tests:
                 issues.append("invalid_test_reference:" + name)
+        # Evidence for verified modules must be reproducible and tied to the
+        # exact version of the source/test inputs. A module is NOT accepted
+        # by placing a generic test name and a package file in the manifest.
+        if item["v2_state"] == "source_verified":
+            files = record.get("source_sha256")
+            test_files = record.get("test_source_files")
+            receipt = record.get("receipt")
+            if (not isinstance(files,dict) or not isinstance(test_files,list)
+                    or not test_files or not isinstance(receipt,dict)):
+                issues.append("missing_scoped_source_acceptance:" + name)
+                continue
+            refs = record["implementation_files"] + test_files
+            if set(files) != set(refs):
+                issues.append("source_hash_manifest_mismatch:" + name)
+                continue
+            for rel in refs:
+                path = (root / rel).resolve() if isinstance(rel,str) else root
+                if (not isinstance(rel,str) or not path.is_relative_to(root) or not path.is_file()
+                        or hashlib.sha256(path.read_bytes()).hexdigest() != files.get(rel)):
+                    issues.append("source_hash_mismatch:" + name)
+                    break
+            resolved_tests = [path for method in record["test_ids"]
+                              for path in known_tests.get(method,[])]
+            if not resolved_tests or not all(path.resolve().relative_to(root).as_posix() in test_files
+                                             for path in resolved_tests):
+                issues.append("test_not_scoped_to_module:" + name)
+            log_rel = receipt.get("log_file")
+            log = (root / log_rel).resolve() if isinstance(log_rel,str) else root
+            if (receipt.get("kind") != "executed_source_tests" or
+                    receipt.get("exit_code") != 0 or
+                    receipt.get("hardware_uat") != "not_run" or
+                    not isinstance(log_rel,str) or not log.is_relative_to(root) or not log.is_file() or
+                    hashlib.sha256(log.read_bytes()).hexdigest() != receipt.get("log_sha256") or
+                    b"OK" not in log.read_bytes() or b"Ran " not in log.read_bytes()):
+                issues.append("invalid_source_test_receipt:" + name)
     return sorted(set(issues))
 
 
