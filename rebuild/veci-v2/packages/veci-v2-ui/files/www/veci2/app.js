@@ -55,6 +55,7 @@ async function firmwareError(response) {
     case 'sysupgrade_test_failed': return 'Router menolak image saat uji sysupgrade -T.';
     case 'verification_expired_or_replaced': return 'Tiket sudah kedaluwarsa atau diganti. Verifikasi ulang firmware.';
     case 'verification_busy': return 'Router sedang memproses firmware. Tunggu hingga proses selesai.';
+    case 'upload_timeout': return 'Transfer image melewati batas waktu. Pilih kembali file untuk mengulang verifikasi.';
     case 'insufficient_tmp_space': return 'Ruang sementara router tidak cukup untuk memeriksa image.';
     case 'release_download_failed': return 'Router gagal mengunduh aset rilis GitHub. Periksa koneksi router.';
     default: return fallback;

@@ -83,7 +83,13 @@ if [ "$ota" = true ]; then
   head -c "$((size + 1))" < "$work/download" > "$work/image"
   wait "$downloader" || reply '502 Bad Gateway' '{"error":"release_download_failed"}'
 else
-  head -c "$size" > "$work/image"
+  # A stalled upload must release the verification/policy lock.
+  timeout 90 head -c "$size" > "$work/image" || {
+    case "$?" in
+      124|143) reply '408 Request Timeout' '{"error":"upload_timeout"}' ;;
+      *) reply '500 Internal Server Error' '{"error":"upload_read_failed"}' ;;
+    esac
+  }
 fi
 [ "$(wc -c < "$work/image")" -eq "$size" ] || bad
 if ! "$verify" "$work/image" "$digest" > "$work/result" 2>&1; then

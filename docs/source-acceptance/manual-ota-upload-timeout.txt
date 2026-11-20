@@ -1,0 +1,18 @@
+test_stalled_body_releases_lock_and_removes_partial_image (scripts.tests.test_veci_manual_upload_timeout.ManualUploadTimeoutTests.test_stalled_body_releases_lock_and_removes_partial_image) ... ok
+test_rejected_upload_reports_only_known_failure_categories (scripts.tests.test_veci_upgrade_feedback.UpgradeFeedbackTests.test_rejected_upload_reports_only_known_failure_categories) ... ok
+test_saved_policy_controls_both_apply_paths (scripts.tests.test_veci_update_policy.PolicyTest.test_saved_policy_controls_both_apply_paths) ... ok
+test_exact_supported_device_required (scripts.tests.test_veci_upgrade_layout.UpgradeCompatibilityTests.test_exact_supported_device_required) ... ok
+test_layout_uses_label_and_accepts_different_mtd_index (scripts.tests.test_veci_upgrade_layout.UpgradeCompatibilityTests.test_layout_uses_label_and_accepts_different_mtd_index) ... ok
+test_rejects_stream_error_even_if_consumer_succeeds (scripts.tests.test_veci_upgrade_layout.UpgradeCompatibilityTests.test_rejects_stream_error_even_if_consumer_succeeds) ... ok
+test_rejects_unconfirmed_or_different_partition (scripts.tests.test_veci_upgrade_layout.UpgradeCompatibilityTests.test_rejects_unconfirmed_or_different_partition) ... ok
+test_rejects_verifier_error_with_complete_stream (scripts.tests.test_veci_upgrade_layout.UpgradeCompatibilityTests.test_rejects_verifier_error_with_complete_stream) ... ok
+test_wrong_image_target (scripts.tests.test_veci_upgrade_layout.UpgradeCompatibilityTests.test_wrong_image_target) ... ok
+test_latest_operator_selection_owns_install_button (scripts.tests.test_veci_upgrade_selection.UpgradeSelectionTests.test_latest_operator_selection_owns_install_button) ... ok
+test_channel_manifest_and_request (scripts.tests.test_veci_v2_firmware_channel.FirmwareChannelTests.test_channel_manifest_and_request) ... ok
+test_admin_scoped_policy_and_scripts (scripts.tests.test_owner_verify_only_default.VerifyOnlyDefault.test_admin_scoped_policy_and_scripts) ... ok
+test_policy_default_and_fail_closed_cgi (scripts.tests.test_owner_verify_only_default.VerifyOnlyDefault.test_policy_default_and_fail_closed_cgi) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 3.375s
+
+OK
