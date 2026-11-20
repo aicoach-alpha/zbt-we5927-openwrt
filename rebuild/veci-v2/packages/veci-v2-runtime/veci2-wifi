@@ -8,6 +8,8 @@ check_ap() {
   [ "$(uci -q get "$ap")" = wifi-iface ] &&
     [ "$(uci -q get "$ap.device")" = radio0 ] &&
     [ "$(uci -q get "$ap.mode")" = ap ] || fail primary_ap_unavailable
+  [ "$(uci -q get wireless.radio0)" = wifi-device ] &&
+    [ "$(uci -q get wireless.radio0.band)" = 2g ] || fail channel_unavailable
   changes=$(uci -q changes wireless) || fail config_unavailable
   [ -z "$changes" ] || fail pending_wireless_changes
 }
