@@ -38,10 +38,10 @@ def main():
                        "-p", suite, "-v"]
                 env = {**os.environ, "PYTHONOPTIMIZE": "", "PYTHONDONTWRITEBYTECODE": "1"}
                 result = subprocess.run(cmd, cwd=ROOT, env=env, text=True,
-                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
-                if result.returncode or not re.search(r"^OK$", result.stdout, re.M):
-                    raise SystemExit(result.stdout)
-                cache[suite] = result.stdout
+                                        capture_output=True, timeout=180)
+                if result.returncode or not re.search(r"^OK$", result.stderr, re.M):
+                    raise SystemExit(result.stdout + result.stderr)
+                cache[suite] = result.stdout + "\n" + result.stderr
             output.append(cache[suite])
         log = "\n".join(output)
         passed = set(re.findall(r"^(test_\w+) \([^\n]+\) \.\.\. ok$", log, re.M))

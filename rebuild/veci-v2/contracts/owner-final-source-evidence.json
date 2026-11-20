@@ -1,5 +1,52 @@
 {
   "modules": {
+    "ipv6_ra_dhcpv6": {
+      "implementation_files": [
+        "rebuild/veci-v2/packages/veci-v2-ipv6/Makefile",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/config/veci2_ipv6",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/init.d/veci2-ipv6",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/uci-defaults/90-veci2-ipv6-initial",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/ipv6-ra.js",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html"
+      ],
+      "receipt": {
+        "exit_code": 0,
+        "hardware_uat": "not_run",
+        "kind": "executed_source_tests",
+        "log_file": "docs/source-acceptance/ipv6_ra_dhcpv6.txt",
+        "log_sha256": "92a9393a5925648583a2999e1c8ebfb654719ad89f021997f2b4311fb38b5f19"
+      },
+      "scope": "source_verified_no_hardware_uat",
+      "source_sha256": {
+        "rebuild/veci-v2/packages/veci-v2-ipv6/Makefile": "88255f45923682aa94bb89ce9f632ca9104cf0fa636f8eb0adcc1a0defff705f",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/config/veci2_ipv6": "e01f6df464d8e5c0c60c977785936f0469ddafc368696f40071fa454d1e6d592",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/init.d/veci2-ipv6": "89bef3ab59319a7854f3a9b73c45710df647adb14a9278bde0e8121423e33330",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/uci-defaults/90-veci2-ipv6-initial": "239c9a59cc08a59feef347a2e31a893637ff068adc7cd06ba6fdddb1cc749829",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6": "038862684426c507120a1e40b22d2f7016fcc57da08ce542c53bd73667c7329b",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra": "0c1797aabfd2c7e343e42afe5d96dae74e418bc2d3a637e1b010be264369c273",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json": "eb74a43c6b3cb8364ee7ada9c910c7840f5b6d08314b1821020ea7158c89a455",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "9f9570c478f2c1ccc2a570676779a8e74a38977eafeafd335dbf5d79d1d89a17",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "fff6f9d16cd204d973ceffeb63ca6a15b4fa071c4982e6f6d9026366a58b2fa5",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/ipv6-ra.js": "0b0a010ed70e4f5b430c81b981f1cac8cd9a5865adc3d75f39a3fc8b3a032ac6",
+        "scripts/tests/test_owner_ipv6_native_acceptance.py": "6626c148d389271f9071142e06b3c0897602a5ddac40bb5a75f78db777dbe0d7",
+        "scripts/tests/test_veci_v2_ipv6_simple_menu.py": "af915af07a85e972b567e979d147fbfecdb7f52b5c0316e6f57157706b790f55",
+        "scripts/uat/test-ipv6-host.py": "843c519daec13a118c42d42a3b284b358897c726d9dbc70433c26f45b584b235"
+      },
+      "status": "pass",
+      "test_ids": [
+        "test_native_ipv6_provision_toggle_rollback_and_ra_profiles",
+        "test_read_api_reports_configuration_and_runtime_separately"
+      ],
+      "test_source_files": [
+        "scripts/tests/test_owner_ipv6_native_acceptance.py",
+        "scripts/tests/test_veci_v2_ipv6_simple_menu.py",
+        "scripts/uat/test-ipv6-host.py"
+      ]
+    },
     "lte_apn_pin_puk": {
       "implementation_files": [
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lte-policy",
@@ -67,6 +114,133 @@
       ],
       "test_source_files": [
         "scripts/tests/test_owner_ussd_acceptance.py"
+      ]
+    },
+    "static_routes_policy": {
+      "implementation_files": [
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-routes",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-routes-acl.json",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/routes.js",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html"
+      ],
+      "receipt": {
+        "exit_code": 0,
+        "hardware_uat": "not_run",
+        "kind": "executed_source_tests",
+        "log_file": "docs/source-acceptance/static_routes_policy.txt",
+        "log_sha256": "0ee464b1eb1aa829df82f339917f4c644162be5c18df19b31d990da47788fce4"
+      },
+      "scope": "source_verified_no_hardware_uat",
+      "source_sha256": {
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "080afe57e0d287b06c0baa10ef85073ad75ffd7036184a2fe4f5846aacc14f8b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-routes": "aab2b4b592e71d96f34cc856bab6d47c75c41fc26661f9b193b179619bfc981b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-routes-acl.json": "f4ceaff61b58e31ac7c93484055d88bce670da1799fdd1aa81ea0b38257efa18",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "9f9570c478f2c1ccc2a570676779a8e74a38977eafeafd335dbf5d79d1d89a17",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "fff6f9d16cd204d973ceffeb63ca6a15b4fa071c4982e6f6d9026366a58b2fa5",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/routes.js": "a6ee9fb3134c3012fe1e9531b58f7ef0aa0c60886cb9bda83c403ee948034849",
+        "scripts/tests/test_owner_routes_acceptance.py": "fb98751125c9837ed914ef2fdbd7dcddf76daf94640ac788cf1454229b4f8292",
+        "scripts/uat/test-routes-host.py": "53c03356230d969a861067085040081f501cde012e991b3d7b4605155c051c14"
+      },
+      "status": "pass",
+      "test_ids": [
+        "test_real_rpc_route_and_policy_crud_and_transaction_failure",
+        "test_native_route_form_rpc_installation_and_least_privilege_acl"
+      ],
+      "test_source_files": [
+        "scripts/tests/test_owner_routes_acceptance.py",
+        "scripts/uat/test-routes-host.py"
+      ]
+    },
+    "system_ipv6_guarded_settings_toggle": {
+      "implementation_files": [
+        "rebuild/veci-v2/packages/veci-v2-ipv6/Makefile",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/config/veci2_ipv6",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/init.d/veci2-ipv6",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/uci-defaults/90-veci2-ipv6-initial",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html"
+      ],
+      "receipt": {
+        "exit_code": 0,
+        "hardware_uat": "not_run",
+        "kind": "executed_source_tests",
+        "log_file": "docs/source-acceptance/system_ipv6_guarded_settings_toggle.txt",
+        "log_sha256": "92a9393a5925648583a2999e1c8ebfb654719ad89f021997f2b4311fb38b5f19"
+      },
+      "scope": "source_verified_no_hardware_uat",
+      "source_sha256": {
+        "rebuild/veci-v2/packages/veci-v2-ipv6/Makefile": "88255f45923682aa94bb89ce9f632ca9104cf0fa636f8eb0adcc1a0defff705f",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/config/veci2_ipv6": "e01f6df464d8e5c0c60c977785936f0469ddafc368696f40071fa454d1e6d592",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/init.d/veci2-ipv6": "89bef3ab59319a7854f3a9b73c45710df647adb14a9278bde0e8121423e33330",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/uci-defaults/90-veci2-ipv6-initial": "239c9a59cc08a59feef347a2e31a893637ff068adc7cd06ba6fdddb1cc749829",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6": "038862684426c507120a1e40b22d2f7016fcc57da08ce542c53bd73667c7329b",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra": "0c1797aabfd2c7e343e42afe5d96dae74e418bc2d3a637e1b010be264369c273",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json": "eb74a43c6b3cb8364ee7ada9c910c7840f5b6d08314b1821020ea7158c89a455",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "9f9570c478f2c1ccc2a570676779a8e74a38977eafeafd335dbf5d79d1d89a17",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "3777e0b18888b5f01cc3ff7c5fc9fdb7bd6ad0d351994f28d14f05cd89820b51",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "fff6f9d16cd204d973ceffeb63ca6a15b4fa071c4982e6f6d9026366a58b2fa5",
+        "scripts/tests/test_owner_ipv6_native_acceptance.py": "6626c148d389271f9071142e06b3c0897602a5ddac40bb5a75f78db777dbe0d7",
+        "scripts/tests/test_veci_v2_ipv6_simple_menu.py": "af915af07a85e972b567e979d147fbfecdb7f52b5c0316e6f57157706b790f55",
+        "scripts/uat/test-ipv6-host.py": "843c519daec13a118c42d42a3b284b358897c726d9dbc70433c26f45b584b235"
+      },
+      "status": "pass",
+      "test_ids": [
+        "test_native_ipv6_provision_toggle_rollback_and_ra_profiles",
+        "test_acl_never_exposes_default_write_to_guest",
+        "test_ui_shows_apply_only_on_reboot_and_trusts_live_status"
+      ],
+      "test_source_files": [
+        "scripts/tests/test_owner_ipv6_native_acceptance.py",
+        "scripts/tests/test_veci_v2_ipv6_simple_menu.py",
+        "scripts/uat/test-ipv6-host.py"
+      ]
+    },
+    "system_ipv6_off_by_default": {
+      "implementation_files": [
+        "rebuild/veci-v2/packages/veci-v2-ipv6/Makefile",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/config/veci2_ipv6",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/init.d/veci2-ipv6",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/uci-defaults/90-veci2-ipv6-initial",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json"
+      ],
+      "receipt": {
+        "exit_code": 0,
+        "hardware_uat": "not_run",
+        "kind": "executed_source_tests",
+        "log_file": "docs/source-acceptance/system_ipv6_off_by_default.txt",
+        "log_sha256": "92a9393a5925648583a2999e1c8ebfb654719ad89f021997f2b4311fb38b5f19"
+      },
+      "scope": "source_verified_no_hardware_uat",
+      "source_sha256": {
+        "rebuild/veci-v2/packages/veci-v2-ipv6/Makefile": "88255f45923682aa94bb89ce9f632ca9104cf0fa636f8eb0adcc1a0defff705f",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/config/veci2_ipv6": "e01f6df464d8e5c0c60c977785936f0469ddafc368696f40071fa454d1e6d592",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/init.d/veci2-ipv6": "89bef3ab59319a7854f3a9b73c45710df647adb14a9278bde0e8121423e33330",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/etc/uci-defaults/90-veci2-ipv6-initial": "239c9a59cc08a59feef347a2e31a893637ff068adc7cd06ba6fdddb1cc749829",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6": "038862684426c507120a1e40b22d2f7016fcc57da08ce542c53bd73667c7329b",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra": "0c1797aabfd2c7e343e42afe5d96dae74e418bc2d3a637e1b010be264369c273",
+        "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json": "eb74a43c6b3cb8364ee7ada9c910c7840f5b6d08314b1821020ea7158c89a455",
+        "scripts/tests/test_owner_ipv6_native_acceptance.py": "6626c148d389271f9071142e06b3c0897602a5ddac40bb5a75f78db777dbe0d7",
+        "scripts/tests/test_veci_v2_ipv6_simple_menu.py": "af915af07a85e972b567e979d147fbfecdb7f52b5c0316e6f57157706b790f55",
+        "scripts/uat/test-ipv6-host.py": "843c519daec13a118c42d42a3b284b358897c726d9dbc70433c26f45b584b235"
+      },
+      "status": "pass",
+      "test_ids": [
+        "test_native_ipv6_provision_toggle_rollback_and_ra_profiles",
+        "test_default_is_ipv6_off_with_one_time_initializer",
+        "test_boot_ipv6_mode_is_before_network_only"
+      ],
+      "test_source_files": [
+        "scripts/tests/test_owner_ipv6_native_acceptance.py",
+        "scripts/tests/test_veci_v2_ipv6_simple_menu.py",
+        "scripts/uat/test-ipv6-host.py"
       ]
     },
     "system_services_startup": {
