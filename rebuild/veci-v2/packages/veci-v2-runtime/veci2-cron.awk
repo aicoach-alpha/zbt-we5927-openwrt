@@ -18,7 +18,7 @@ function valid(s, a) {
 }
 BEGIN {
   marker="# VeCI paused: "
-  if (mode=="edit" && !valid(schedule)) exit 2
+  if ((mode=="save" || mode=="add") && !valid(schedule)) { invalid=1; exit 2 }
 }
 {
   original=$0
@@ -41,13 +41,18 @@ BEGIN {
     sub(/[ \t].*$/,"",command)
     sub(/^.*\//,"",command)
     if (command!~/^[A-Za-z0-9_.-]+$/) command="job"
+    if (remaining=="/bin/busybox uptime | /bin/busybox logger -t veci-cron-uptime") command="uptime"
+    if (remaining=="/bin/busybox free | /bin/busybox logger -t veci-cron-memory") command="memory"
     print NR "\t" enabled "\t" old "\t" command
   }
-  if (mode=="edit") {
-    if (NR==row && supported) {
-      print (active=="1"?"":marker) schedule " " remaining
+  if (mode!="list") {
+    if (mode!="add" && NR==row && supported) {
+      if (mode=="save") print (active=="1"?"":marker) schedule " " remaining
       changed=1
     } else print original
   }
 }
-END { if (mode=="edit" && !changed) exit 2 }
+END {
+  if (mode=="add" && !invalid) print (active=="1"?"":marker) schedule " " cmd
+  if ((mode=="save" || mode=="remove") && !changed) exit 2
+}

@@ -228,7 +228,7 @@
           <article class="panel">
             <h3>Jadwal cron</h3>
             <button type="button" id="cron-read">Baca jadwal</button>
-            <form id="cron-form"><fieldset id="cron-fields" disabled><label>Tugas<select id="cron-job"></select></label><label>Menit, jam, tanggal, bulan, hari<input id="cron-schedule" required maxlength="100"></label><label><input type="checkbox" id="cron-enabled"> Aktif</label><button>Simpan jadwal</button></fieldset></form>
+            <form id="cron-form"><fieldset id="cron-fields" disabled><label>Tugas<select id="cron-job"></select></label><label>Menit, jam, tanggal, bulan, hari<input id="cron-schedule" required maxlength="100"></label><label><input type="checkbox" id="cron-enabled"> Aktif</label><button id="cron-save">Simpan perubahan</button><button type="button" id="cron-remove">Hapus tugas terpilih</button><label>Tugas baru<select id="cron-task"><option value="uptime">Catat uptime</option><option value="memory">Catat penggunaan memori</option></select></label><button type="button" id="cron-add">Tambah dengan jadwal di atas</button></fieldset></form>
             <p role="status" id="cron-status"></p>
           </article>
           <article class="panel">
