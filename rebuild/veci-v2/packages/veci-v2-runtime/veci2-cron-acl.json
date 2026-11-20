@@ -1,0 +1,7 @@
+{
+  "veci-v2-cron": {
+    "description": "View and edit schedules without changing the commands",
+    "read": {"ubus": {"veci.v2.cron": ["status"]}},
+    "write": {"ubus": {"veci.v2.cron": ["save"]}}
+  }
+}

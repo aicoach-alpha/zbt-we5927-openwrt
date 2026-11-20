@@ -20,6 +20,13 @@ RUNTIME = "rebuild/veci-v2/packages/veci-v2-runtime/"
 # actually exist. Other modules stay pending, even if an unrelated test passes.
 PARTIAL = {
     "interface_wan_lan": [RUNTIME + "veci2-interfaces", "scripts/tests/test_owner_reuse_existing_source.py"],
+    "ipv6_ra_dhcpv6": ["rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra", "scripts/tests/test_parallel_network_source.py"],
+    "wifi_ap_2g": [RUNTIME + "veci2-wifi-controls", "scripts/tests/test_parallel_radio_source.py"],
+    "wifi_survey_channel": [RUNTIME + "veci2-wifi-controls", "scripts/tests/test_parallel_radio_source.py"],
+    "wifi_clients_access_control": [RUNTIME + "veci2-wifi-controls", "scripts/tests/test_parallel_radio_source.py"],
+    "system_cron_scheduler": [RUNTIME + "veci2-cron", "scripts/tests/test_parallel_system_source.py"],
+    "system_services_startup": [RUNTIME + "veci2-services", "scripts/tests/test_parallel_system_source.py"],
+    "system_backup_restore": ["rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-backup", "scripts/tests/test_parallel_security_source.py"],
     "dhcp_dns_static_leases": [RUNTIME + "veci2-dns", RUNTIME + "veci2-static-leases", "scripts/tests/test_owner_static_leases_source.py"],
     "firewall_zones_nat": [RUNTIME + "veci2-firewall", "scripts/tests/test_owner_firewall_source.py"],
     "port_forward_dmz": [RUNTIME + "veci2-firewall", "scripts/tests/test_owner_firewall_source.py"],

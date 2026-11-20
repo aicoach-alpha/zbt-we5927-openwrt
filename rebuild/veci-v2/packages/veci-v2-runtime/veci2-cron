@@ -1,0 +1,49 @@
+#!/bin/sh
+set -e
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "$1:${2:-}" in
+  list:*) echo '{"status":{},"save":{"row":"String","schedule":"String","enabled":"String","revision":"String"}}'; exit 0 ;;
+  call:status|call:save) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+tab=/etc/crontabs/root
+parser=/usr/libexec/veci2-cron.awk
+exec 9<"$0"; flock -n 9 || fail busy
+[ ! -L "$tab" ] || fail unsupported_layout
+if [ ! -e "$tab" ]; then
+  [ "$2" = status ] || fail stale_configuration
+  echo '{"ok":true,"revision":"","jobs":[]}'; exit 0
+fi
+[ -f "$tab" ] && [ "$(wc -c < "$tab")" -le 32768 ] || fail unsupported_layout
+tmp=$(mktemp -d /tmp/veci2-cron.XXXXXX) || fail temporary_storage
+trap 'rm -rf "$tmp"' EXIT
+cp "$tab" "$tmp/current" || fail unreadable
+hash() { sha256sum "$1" | cut -d' ' -f1; }
+revision=$(hash "$tmp/current")
+. /usr/share/libubox/jshn.sh
+if [ "$2" = save ]; then
+  request=$(head -c 513)
+  [ "${#request}" -le 512 ] || fail invalid_request
+  json_load "$request" || fail invalid_request
+  json_get_var expected revision; json_get_var row row; json_get_var schedule schedule; json_get_var active enabled
+  [ "$revision" = "$expected" ] || fail stale_configuration
+  case "$row" in ''|0*|*[!0-9]*) fail invalid_row ;; esac
+  case "$active" in 0|1) ;; *) fail invalid_mode ;; esac
+  case "$schedule" in ''|*[!0-9\ \*/,-]*) fail invalid_schedule ;; esac
+  [ "$(tail -c 1 "$tmp/current" | wc -l)" -eq 1 ] || fail unsupported_layout
+  awk -v mode=edit -v active="$active" -v row="$row" -v schedule="$schedule" -f "$parser" "$tmp/current" > "$tmp/next" || fail invalid_schedule_or_row
+  [ "$(hash "$tab")" = "$revision" ] || fail stale_configuration
+  /usr/bin/crontab "$tmp/next" || fail install_failed
+  revision=$(hash "$tmp/next")
+  [ "$(hash "$tab")" = "$revision" ] || fail concurrent_update
+  mv "$tmp/next" "$tmp/current"
+fi
+awk -v mode=list -f "$parser" "$tmp/current" > "$tmp/jobs" || fail unreadable
+json_init; json_add_boolean ok 1; json_add_string revision "$revision"; json_add_array jobs
+while IFS="$(printf '\t')" read -r row active schedule label; do
+  json_add_object ''; json_add_string row "$row"; json_add_boolean enabled "$active"
+  json_add_string schedule "$schedule"; json_add_string label "$label"; json_close_object
+done < "$tmp/jobs"
+json_close_array; json_dump

@@ -1,7 +1,25 @@
 {
   "veci-v2-ipv6-admin": {
     "description": "VeCI IPv6 status and staged configuration with explicit confirmation",
-    "read": { "ubus": { "veci.v2.ipv6": ["status"] } },
-    "write": { "ubus": { "veci.v2.ipv6": ["save"] } }
+    "read": {
+      "ubus": {
+        "veci.v2.ipv6": [
+          "status"
+        ],
+        "veci.v2.ra": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.ipv6": [
+          "save"
+        ],
+        "veci.v2.ra": [
+          "save"
+        ]
+      }
+    }
   }
 }

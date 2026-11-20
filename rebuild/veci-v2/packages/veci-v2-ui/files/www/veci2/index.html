@@ -14,6 +14,11 @@
   <script src="/veci2/dns-settings.js" defer></script>
   <script src="/veci2/owner-controls.js" defer></script>
   <script src="/veci2/app.js" defer></script>
+  <script src="/veci2/backup.js" defer></script>
+  <script src="/veci2/cron.js" defer></script>
+  <script src="/veci2/services.js" defer></script>
+  <script src="/veci2/wifi-controls.js" defer></script>
+  <script src="/veci2/ipv6-ra.js" defer></script>
   <script src="/veci2/access.js" defer></script>
   <script src="/veci2/routes.js" defer></script>
   <script src="/veci2/interfaces.js" defer></script>
@@ -49,6 +54,20 @@
           <p class="notice">Status internet yang belum diuji ditampilkan sebagai belum terverifikasi, bukan dipaksa menjadi offline. Beacon Wi-Fi tidak dianggap hidup hanya karena radio up.</p>
         </section>
         <section id="network" class="page" aria-label="Koneksi dan perangkat" hidden>
+          <article class="panel">
+            <details id="wifi-extra"><summary>Klien, keamanan dan kanal Wi-Fi</summary>
+              <fieldset id="wifi-controls" disabled>
+                <button type="button" id="stations-refresh">Perbarui klien</button><p id="station-list"></p>
+                <form id="station-acl"><label>Filter MAC <select name="mode"><option value="disable">Nonaktif</option><option value="allow">Hanya izinkan daftar</option><option value="deny">Blokir daftar</option></select></label>
+                  <label>Alamat MAC, satu per baris<textarea name="addresses" maxlength="608"></textarea></label><button>Simpan filter</button></form>
+                <form id="wifi-auth"><label>Keamanan<select name="mode"><option value="psk2">WPA2</option><option value="sae">WPA3</option><option value="sae-mixed">WPA2/WPA3</option></select></label>
+                  <label>Sandi baru<input type="password" name="key" required minlength="8" maxlength="63" autocomplete="new-password"></label><button>Simpan keamanan</button></form>
+                <form id="wifi-fixed"><label>Kanal tetap<select name="channel" required></select></label><button>Simpan kanal</button></form>
+                <button type="button" id="wifi-scan">Survei jaringan sekitar</button><pre id="scan-results"></pre>
+              </fieldset>
+              <p id="wifi-extra-status" role="status"></p>
+            </details>
+          </article>
           <article class="panel">
             <details>
               <summary><strong>Dual-SIM — Ganti kartu secara manual</strong></summary>
@@ -127,6 +146,33 @@
           </article>
         </section>
         <section id="settings" class="page" aria-label="Pengaturan router" hidden>
+          <article class="panel">
+            <button type="button" id="backup-export">Unduh cadangan konfigurasi</button>
+            <p>Arsip dapat memuat kata sandi dan kunci privat. Simpan di tempat aman.</p><p id="backup-message" role="status"></p>
+          </article>
+          <article class="panel">
+            <h2>Layanan saat startup</h2>
+            <button id="startup-read" type="button">Baca layanan</button>
+            <p id="startup-status" role="status"></p>
+            <ul id="startup-services"></ul>
+          </article>
+          <article class="panel">
+            <h3>Jadwal cron</h3>
+            <button type="button" id="cron-read">Baca jadwal</button>
+            <form id="cron-form"><fieldset id="cron-fields" disabled><label>Tugas<select id="cron-job"></select></label><label>Menit, jam, tanggal, bulan, hari<input id="cron-schedule" required maxlength="100"></label><label><input type="checkbox" id="cron-enabled"> Aktif</label><button>Simpan jadwal</button></fieldset></form>
+            <p role="status" id="cron-status"></p>
+          </article>
+          <article class="panel">
+            <details><summary>Router Advertisement dan DHCPv6 LAN</summary>
+              <button type="button" id="ra-read">Baca profil LAN</button>
+              <label>Profil layanan IPv6 LAN <select id="ra-profile" disabled>
+                <option value="">Pilih profil</option><option value="disabled">Nonaktif</option>
+                <option value="slaac">SLAAC</option><option value="mixed">SLAAC dan DHCPv6</option>
+              </select></label>
+              <button id="ra-save" type="button" disabled>Simpan profil LAN</button>
+              <p id="ra-message" role="status"></p>
+            </details>
+          </article>
           <article class="panel">
             <h2>Akses SSH dan HTTPS</h2>
             <button id="access-read" type="button">Baca konfigurasi akses</button>

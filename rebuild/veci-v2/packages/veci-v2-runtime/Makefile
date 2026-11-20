@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-runtime
 PKG_VERSION:=0.1
-PKG_RELEASE:=15
+PKG_RELEASE:=16
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -10,7 +10,7 @@ define Package/veci-v2-runtime
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=VeCI v2 authenticated exact-board management backend (development)
-  DEPENDS:=+we5927-lte +veci-wifi-guardian +rpcd +jsonfilter +swconfig +flock +fwtool +ucert
+  DEPENDS:=+iw +we5927-lte +veci-wifi-guardian +rpcd +jsonfilter +swconfig +flock +fwtool +ucert
 endef
 
 define Build/Compile
@@ -32,6 +32,12 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_BIN) ./veci2-sim-manual $(1)/usr/libexec/rpcd/veci.v2.sim
 	$(INSTALL_BIN) ./veci2-firewall $(1)/usr/libexec/rpcd/veci.v2.firewall
 	$(INSTALL_BIN) ./veci2-system-admin $(1)/usr/libexec/rpcd/veci.v2.system
+	$(INSTALL_DATA) ./veci2-wifi-controls $(1)/usr/libexec/veci2-wifi-controls
+	$(INSTALL_BIN) ./veci2-cron $(1)/usr/libexec/rpcd/veci.v2.cron
+	$(INSTALL_BIN) ./veci2-services $(1)/usr/libexec/rpcd/veci.v2.services
+	$(INSTALL_DATA) ./veci2-cron.awk $(1)/usr/libexec/veci2-cron.awk
+	$(INSTALL_DATA) ./veci2-services-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-services.json
+	$(INSTALL_DATA) ./veci2-cron-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-cron.json
 	$(INSTALL_BIN) ./veci2-status $(1)/usr/libexec/rpcd/veci.v2
 	$(INSTALL_BIN) ./veci2-interfaces $(1)/usr/libexec/rpcd/veci.v2.interfaces
 	$(INSTALL_BIN) ./veci2-routes $(1)/usr/libexec/rpcd/veci.v2.routes

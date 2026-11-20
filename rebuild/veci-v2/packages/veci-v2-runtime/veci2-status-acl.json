@@ -1,4 +1,14 @@
 {
+  "veci-v2-backup": {
+    "description": "Export private OpenWrt configuration",
+    "write": {
+      "ubus": {
+        "veci.v2.backup": [
+          "export"
+        ]
+      }
+    }
+  },
   "veci-v2-dhcp": {
     "description": "Exact-board user-authorized native VeCI administration",
     "read": {
@@ -140,7 +150,8 @@
     "read": {
       "ubus": {
         "veci.v2.wifi": [
-          "status"
+          "status",
+          "info"
         ]
       }
     },
@@ -149,7 +160,11 @@
         "veci.v2.wifi": [
           "setVisibility",
           "setSsid",
-          "setAutoChannel"
+          "setAutoChannel",
+          "survey",
+          "setChannel",
+          "setAccess",
+          "setAuth"
         ]
       }
     }

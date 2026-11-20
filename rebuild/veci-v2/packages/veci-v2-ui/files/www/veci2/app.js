@@ -260,6 +260,9 @@ function showLogin() {
   globalThis.VeciInterfaces?.reset();
   globalThis.VeciRoutes?.reset();
   globalThis.VeciAccess?.reset();
+  globalThis.VeciRa?.reset?.();
+  globalThis.VeciWifiControls?.reset?.();
+  globalThis.VeciCron?.reset?.();
   globalThis.VeciSmsCenter.logout();
   globalThis.VeciDnsSettings?.logout?.();
   globalThis.VeciOwnerControls?.logout?.();

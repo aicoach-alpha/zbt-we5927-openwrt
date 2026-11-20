@@ -24,7 +24,7 @@ class ProgressReporting(unittest.TestCase):
             if item["status"] == "source_verified":
                 self.assertEqual(item["contract_state"], "source_verified")
                 self.assertTrue(item["source_evidence"])
-        self.assertEqual(len(PROGRESS.PARTIAL), 11)
+        self.assertEqual(len(PROGRESS.PARTIAL), 18)
 
     def test_no_false_promotion_when_evidence_missing(self):
         m = {"v2_state": "not_ported_to_v2"}

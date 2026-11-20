@@ -1,0 +1,22 @@
+{
+  "track": "radio",
+  "reused_byte_identical_sources": [
+    {
+      "commit": "2a7ba25",
+      "path": "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls",
+      "sha256": "0fe50a2af635734887cf285e8ebdb00d0d2f43bf586237e8455fc8fae375ebaa"
+    },
+    {
+      "commit": "2a7ba25",
+      "path": "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js",
+      "sha256": "695621488b7f3efc84ffee358fecff5fea01880d59b2e8efa6078ae0750ea672"
+    },
+    {
+      "commit": "2a7ba25",
+      "path": "scripts/uat/test-wifi-controls-host.py",
+      "sha256": "d0afd2db2a52a0576fbca1ec9560ea66262bb920c539237d9381b5bbc6284023"
+    }
+  ],
+  "hardware_uat": "not_run",
+  "full_module_verified": false
+}

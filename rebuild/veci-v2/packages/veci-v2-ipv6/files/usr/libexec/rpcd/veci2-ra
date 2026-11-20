@@ -1,0 +1,61 @@
+#!/bin/sh
+set -eu
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "$1:${2:-}" in
+  list:*) echo '{"status":{},"save":{"profile":"String","revision":"String","confirm":"String"}}'; exit 0 ;;
+  call:save|call:status) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail board_mismatch
+exec 9>/var/lock/veci2-ipv6.lock
+flock -n 9 || fail busy
+for cfg in dhcp veci2_ipv6; do
+  pending=$(uci -q changes "$cfg") || fail config_unavailable
+  [ -z "$pending" ] || fail pending_changes
+done
+enabled=$(uci -q get veci2_ipv6.main.enabled) || fail config_unavailable
+case "$enabled" in 0|1) ;; *) fail config_unavailable ;; esac
+[ "$(uci -q get dhcp.lan)" = dhcp ] && [ "$(uci -q get dhcp.lan.interface)" = lan ] || fail unsupported_layout
+digest() { sum=$(sha256sum /etc/config/dhcp) || return 1; echo "${sum%% *}"; }
+rev=$(digest) || fail config_unavailable
+if [ "$2" = save ]; then
+  [ "$enabled" = 1 ] || fail ipv6_disabled
+  data=$(head -c 513); [ "${#data}" -le 512 ] || fail invalid_request
+  field() { jsonfilter -s "$data" -e "@.$1"; }
+  [ "$(field revision)" = "$rev" ] || fail stale_configuration
+  [ "$(field confirm)" = SAVE_RA ] || fail confirmation_required
+  profile=$(field profile) || fail invalid_profile
+  case "$profile" in
+    disabled) ra=disabled; dhcp=disabled ;;
+    slaac) ra=server; dhcp=disabled ;;
+    mixed) ra=server; dhcp=server ;;
+    *) fail invalid_profile ;;
+  esac
+  tmp=$(mktemp -d /tmp/veci2-ra.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  change() { uci -q -t "$tmp" "$@"; }
+  for option in master upstream; do
+    case "$(change get "dhcp.lan.$option" || :)" in ''|0) ;; *) fail upstream_interface ;; esac
+  done
+  change set "dhcp.lan.ra=$ra" && change set "dhcp.lan.dhcpv6=$dhcp" &&
+    change set dhcp.lan.ndp=disabled && change set dhcp.lan.ra_slaac=1 &&
+    change set "dhcp.lan.veci2_ipv6_profile=$profile" || fail stage_failed
+  if change get dhcp.lan.ra_flags >/dev/null; then change delete dhcp.lan.ra_flags || fail stage_failed; fi
+  if [ "$profile" = mixed ]; then
+    change add_list dhcp.lan.ra_flags=managed-config && change add_list dhcp.lan.ra_flags=other-config || fail stage_failed
+  else
+    change add_list dhcp.lan.ra_flags=none || fail stage_failed
+  fi
+  change commit dhcp || fail commit_failed
+  rev=$(digest) || fail config_unavailable
+fi
+ra=$(uci -q get dhcp.lan.ra || :); dhcp=$(uci -q get dhcp.lan.dhcpv6 || :)
+flags=$(uci -q get dhcp.lan.ra_flags || :); slaac=$(uci -q get dhcp.lan.ra_slaac || :)
+case "$ra:$dhcp:$slaac:$flags" in
+  disabled:disabled:*) profile=disabled ;;
+  server:disabled:1:none) profile=slaac ;;
+  server:server:1:'managed-config other-config'|server:server:1:'other-config managed-config') profile=mixed ;;
+  *) profile=custom ;;
+esac
+printf '{"ok":true,"enabled":%s,"profile":"%s","revision":"%s"}\n' "$enabled" "$profile" "$rev"
