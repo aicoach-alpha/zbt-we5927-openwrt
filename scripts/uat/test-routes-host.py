@@ -39,7 +39,8 @@ config interface 'lte'
         "/etc/config/network", str(network)).replace("/tmp/sysinfo/board_name", str(board))
         .replace("/var/lock/veci2-ipv6.lock", str(lock)).replace("/usr/share/libubox/jshn.sh", str(jshn)))
     uci = root / "uci"
-    uci.write_text(f'#!/bin/sh\nexec "{binary}" -c "{config}" -t "{delta}" "$@"\n')
+    failure = root / "fail-commit"
+    uci.write_text(f'#!/bin/sh\nif test -f "{failure}"; then for arg do test "$arg" != commit || exit 1; done; fi\nexec "{binary}" -c "{config}" -t "{delta}" "$@"\n')
     uci.chmod(0o700)
     env = dict(os.environ, PATH=f"{root}:" + os.environ["PATH"])
     def call(method, params=None):
@@ -50,6 +51,9 @@ config interface 'lte'
     with network.open('a') as stream:
         stream.write("config rule\n option priority '555'\n option lookup '150'\n"
                      "config route 'veci2_route_legacy'\n option target '203.0.113.0/24'\n")
+    acl = json.loads((pkg / "veci2-routes-acl.json").read_text())["veci-v2-routes"]
+    assert acl["read"] == {"ubus": {"veci.v2.routes": ["status"]}}
+    assert acl["write"] == {"ubus": {"veci.v2.routes": ["save", "remove"]}}
     initial = call("status")
     assert len(initial["entries"]) == 2 and not any(e["editable"] for e in initial["entries"])
     route = dict(revision=initial["revision"], name="office", kind="route", interface="wan",
@@ -57,12 +61,17 @@ config interface 'lte'
     before = network.read_bytes()
     for values in (dict(prefix="1.2.3.4/24"), dict(prefix="10.0.0.0/33"), dict(table="255"),
                    dict(name="../lan"), dict(interface="missing"), dict(gateway="224.0.0.1"),
-                   dict(kind="interface"), dict(name="legacy"), dict(revision="old")):
+                   dict(prefix="192.0.2.0.24"), dict(prefix="192/0/2/0/24"),
+                   dict(gateway="192/168/1/2"), dict(kind="interface"), dict(name="legacy"), dict(revision="old")):
         assert not call("save", route | values)["ok"], values
         assert network.read_bytes() == before
     with lock.open("w") as held:
         fcntl.flock(held, fcntl.LOCK_EX)
         assert call("save", route)["error"] == "busy"
+    failure.touch()
+    assert call("save", route)["error"] == "commit_failed"
+    assert before == network.read_bytes() and call("status") == initial
+    failure.unlink()
     result = call("save", route)
     assert result["ok"] and get("veci2_route_office.table") == "120"
     assert call("save", route)["error"] == "stale_configuration"
@@ -84,4 +93,5 @@ config interface 'lte'
     board.write_text("unrelated\n")
     assert call("status")["error"] == "wrong_board"
     print("PASS native UCI routing: IPv4 CIDR and gateway validation, interface/table/priority,"
-          " stale revision, shared lock, external rules, managed CRUD, pending network preservation")
+          " stale revision, shared lock, external rules, managed CRUD, pending network preservation,"
+          " failed commit preserves config bytes, malformed separators rejected, least-privilege ACL")

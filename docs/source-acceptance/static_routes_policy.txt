@@ -1,0 +1,1 @@
+PASS native UCI routing: IPv4 CIDR and gateway validation, interface/table/priority, stale revision, shared lock, external rules, managed CRUD, pending network preservation, failed commit preserves config bytes, malformed separators rejected, least-privilege ACL

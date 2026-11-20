@@ -24,7 +24,9 @@ number() { case "$1" in ''|0*|*[!0-9]*) return 1 ;; esac; [ "${#1}" -le 5 ] && [
 valid_ip() {
   case "$1" in ""|*[!0-9./]*) return 1 ;; esac
   printf '%s\n' "$1" | awk -F'[./]' -v mode="$2" '
-    {if ((mode=="prefix" && (NF!=5 || $5!~/^(0|[1-9][0-9]?)$/ || $5>32)) ||
+    {if (mode=="prefix" && $0 !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/) exit 1
+     if (mode=="gateway" && $0 !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) exit 1
+     if ((mode=="prefix" && (NF!=5 || $5!~/^(0|[1-9][0-9]?)$/ || $5>32)) ||
          (mode=="gateway" && NF!=4)) exit 1
      for(i=1;i<=4;i++){if($i!~/^(0|[1-9][0-9]?[0-9]?)$/ || $i+0>255)exit 1; v=v*256+$i}
      if(mode=="prefix"){block=1;for(i=$5;i<32;i++)block*=2;if(v % block != 0)exit 1}
