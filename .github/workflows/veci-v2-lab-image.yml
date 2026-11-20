@@ -2,6 +2,8 @@ name: VeCI v2 WE5927-DSIM laboratory full image (NEVER FLASH)
 
 on:
   push:
+    branches-ignore:
+      - build/zbt-we2825-oem-veci-20261119
     paths:
       - '.github/workflows/veci-v2-lab-image.yml'
       - 'rebuild/veci-v2/packages/**'
@@ -31,6 +33,16 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+
+      # PRE-COMPILE FAIL-CLOSED. No apt/dependency install and no OpenWrt image
+      # build until every mandatory VeCI core feature has source+test evidence.
+      - name: Block incomplete owner firmware builds before any compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 rebuild/veci-v2/ci/source-completion-gate.py
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -q
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py' -q
 
       - name: Install OpenWrt host dependencies
         shell: bash
