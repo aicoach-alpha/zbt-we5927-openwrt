@@ -35,7 +35,7 @@ const startManual = () => form.submit({preventDefault(){}});
 async function respond(url, sha) {
   for(let i=0; !pending.has(url) && i<100; i++) await new Promise(r=>setTimeout(r,1));
   assert.ok(pending.has(url));
-  pending.get(url)({ok:true,json:async()=>({verified:true,sha256:sha,ticket:'b'.repeat(64)})});
+  pending.get(url)({ok:true,json:async()=>({verified:true,install_allowed:true,sha256:sha,ticket:'b'.repeat(64)})});
   pending.delete(url);
 }
 const candidate = () => vm.runInContext('installCandidate?.digest',ctx);

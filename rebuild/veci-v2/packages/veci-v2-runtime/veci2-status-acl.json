@@ -74,6 +74,23 @@
       }
     }
   },
+  "veci-v2-firmware-policy": {
+    "description": "Guard manual firmware installation, fail-closed by default",
+    "read": {
+      "ubus": {
+        "veci.v2.updatepolicy": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.updatepolicy": [
+          "save"
+        ]
+      }
+    }
+  },
   "veci-v2-lte": {
     "description": "Read cellular preferences and change automatic SIM failover",
     "read": {
@@ -87,7 +104,8 @@
       "ubus": {
         "veci.v2.lte": [
           "setFailover",
-          "setApn"
+          "setApn",
+          "setMonitor"
         ]
       }
     }

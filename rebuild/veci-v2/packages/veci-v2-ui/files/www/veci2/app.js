@@ -69,6 +69,7 @@ function clearInstallCandidate() {
 }
 function offerInstall(receipt, payload, ota) {
   clearInstallCandidate();
+  if (receipt.install_allowed !== true) return;
   if (!/^[0-9a-f]{64}$/.test(receipt.ticket || ''))
     throw Error('Router tidak memberikan tiket instalasi yang valid.');
   installCandidate = {digest: receipt.sha256, ticket: receipt.ticket, payload, ota};
@@ -265,6 +266,9 @@ function showLogin() {
   globalThis.VeciCron?.reset?.();
   globalThis.VeciWatchdog?.reset?.();
   globalThis.VeciGuestCheck?.reset?.();
+  globalThis.VeciMonitor?.reset?.();
+  globalThis.VeciAddonProfiles?.reset?.();
+  globalThis.VeciUpdatePolicy?.reset?.();
   globalThis.VeciSmsCenter.logout();
   globalThis.VeciDnsSettings?.logout?.();
   globalThis.VeciOwnerControls?.logout?.();

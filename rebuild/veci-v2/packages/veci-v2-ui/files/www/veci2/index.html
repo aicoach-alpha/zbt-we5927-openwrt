@@ -14,6 +14,9 @@
   <script src="/veci2/dns-settings.js" defer></script>
   <script src="/veci2/owner-controls.js" defer></script>
   <script src="/veci2/app.js" defer></script>
+  <script src="/veci2/monitor-settings.js" defer></script>
+  <script src="/veci2/addon-profiles.js" defer></script>
+  <script src="/veci2/update-policy.js" defer></script>
   <script src="/veci2/guest-check.js" defer></script>
   <script src="/veci2/watchdog-status.js" defer></script>
   <script src="/veci2/backup.js" defer></script>
@@ -60,6 +63,15 @@
           <p class="notice">Status internet yang belum diuji ditampilkan sebagai belum terverifikasi, bukan dipaksa menjadi offline. Beacon Wi-Fi tidak dianggap hidup hanya karena radio up.</p>
         </section>
         <section id="network" class="page" aria-label="Koneksi dan perangkat" hidden>
+          <article class="panel">
+            <h2>Monitor LTE</h2>
+            <p>Interval pemeriksaan koneksi modem yang sudah ada; tidak menjalankan ulang daemon.</p>
+            <button type="button" id="monitor-read">Baca interval</button>
+            <label for="monitor-interval">Interval (5–120 detik)</label>
+            <input id="monitor-interval" type="number" min="5" max="120" step="1" disabled>
+            <button id="monitor-save" type="button" disabled>Simpan interval</button>
+            <p id="monitor-result" role="status"></p>
+          </article>
           <article class="panel">
             <h2>Guest Wi-Fi — Isolasi</h2>
             <button id="guest-status-read" type="button">Periksa konfigurasi guest</button>
@@ -158,6 +170,23 @@
           </article>
         </section>
         <section id="settings" class="page" aria-label="Pengaturan router" hidden>
+          <article class="panel">
+            <h2>Addon yang terpasang</h2>
+            <button type="button" id="addon-profiles-read">Periksa profil addon</button>
+            <ul id="addon-profiles-list"></ul>
+            <p class="notice">Pilihan WireGuard hanya mengatur startup berikutnya, tidak menghubungkan VPN saat ini.</p>
+            <p id="addon-profiles-status" role="status"></p>
+          </article>
+          <article class="panel">
+            <h2>Kebijakan instalasi firmware</h2>
+            <button id="update-policy-read" type="button">Baca kebijakan</button>
+            <select id="update-policy-mode" disabled>
+              <option value="verify_only">Verifikasi saja (tanpa instalasi)</option>
+              <option value="manual">Izinkan instalasi manual setelah verifikasi</option>
+            </select>
+            <button id="update-policy-save" type="button" disabled>Simpan kebijakan</button>
+            <p id="update-policy-status" role="status"></p>
+          </article>
           <article class="panel">
             <h2>Hardware Watchdog GPIO37</h2>
             <button type="button" id="watchdog-read">Baca watchdog kernel</button>

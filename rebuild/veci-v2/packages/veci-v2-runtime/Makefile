@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-runtime
 PKG_VERSION:=0.1
-PKG_RELEASE:=17
+PKG_RELEASE:=19
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -22,7 +22,13 @@ define Package/veci-v2-runtime/description
   without real evidence. Source-only until field acceptance.
 endef
 
+define Package/veci-v2-runtime/conffiles
+/etc/veci2-update-policy
+endef
+
 define Package/veci-v2-runtime/install
+	$(INSTALL_DIR) $(1)/etc
+	$(INSTALL_CONF) ./update-policy.default $(1)/etc/veci2-update-policy
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
 	$(INSTALL_BIN) ./veci2-verify-image $(1)/usr/libexec/veci2-verify-image
 	$(INSTALL_BIN) ./veci2-lte-policy $(1)/usr/libexec/rpcd/veci.v2.lte
@@ -43,6 +49,10 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_DATA) ./veci2-watchdog-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-watchdog.json
 	$(INSTALL_BIN) ./veci2-guest-check $(1)/usr/libexec/rpcd/veci.v2.guest
 	$(INSTALL_DATA) ./veci2-guest-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-guest.json
+	$(INSTALL_BIN) ./veci2-update-policy $(1)/usr/libexec/rpcd/veci.v2.updatepolicy
+	$(INSTALL_DATA) ./veci2-addon-profiles $(1)/usr/libexec/veci2-addon-profiles
+	$(INSTALL_BIN) ./veci2-addon $(1)/usr/libexec/rpcd/veci.v2.addon
+	$(INSTALL_DATA) ./veci2-addon-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-addon.json
 	$(INSTALL_BIN) ./veci2-status $(1)/usr/libexec/rpcd/veci.v2
 	$(INSTALL_BIN) ./veci2-interfaces $(1)/usr/libexec/rpcd/veci.v2.interfaces
 	$(INSTALL_BIN) ./veci2-routes $(1)/usr/libexec/rpcd/veci.v2.routes

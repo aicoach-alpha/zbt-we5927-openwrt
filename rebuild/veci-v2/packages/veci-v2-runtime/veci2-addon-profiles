@@ -1,0 +1,53 @@
+# Optional applications without independently toggleable procd services.
+installed_app() {
+  [ -f "/usr/share/veci/apps-installed/$1" ] && [ -x "/usr/libexec/rpcd/veci.app.$1" ]
+}
+vpn_state() {
+  vpn=absent
+  installed_app wireguard || return 0
+  vpn=unconfigured
+  command -v wg >/dev/null && [ "$(uci -q get network.veci_wg.proto)" = wireguard ] &&
+    [ "$(uci -q get network.veci_wg)" = interface ] &&
+    uci -q get network.veci_wg.addresses | grep -q . &&
+    uci -q get network.veci_wg.private_key | wg pubkey >/dev/null 2>&1 || return 0
+  case "$(uci -q get network.veci_wg.auto || :)" in
+    ''|1|on|yes|true) vpn=enabled ;;
+    0|off|no|false) vpn=disabled ;;
+  esac
+}
+profile_status() {
+  vpn_state
+  guest=absent; voucher=absent
+  if installed_app guest; then
+    guest=unconfigured
+    if uci -q get uspot.veci_guest >/dev/null; then
+      guest=disabled
+      if [ "$(uci -q get wireless.veci_guest.disabled)" = 0 ] &&
+         [ "$(uci -q get uhttpd.veci_guest.enabled)" = 1 ]; then guest=enabled; fi
+    fi
+  fi
+  if installed_app voucher; then
+    voucher=unconfigured
+    if [ "$guest" = enabled ] && [ "$(uci -q get uspot.veci_guest.auth_mode)" = credentials ]; then voucher=enabled; fi
+  fi
+  printf '{"ok":true,"wireguard":"%s","guest":"%s","voucher":"%s"}\n' "$vpn" "$guest" "$voucher"
+}
+set_vpn_startup() {
+  exec 9>/var/lock/veci2-ipv6.lock
+  flock -n 9 || fail busy
+  pending=$(uci -q changes network) || fail network_unavailable
+  [ -z "$pending" ] || fail pending_changes
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var action action
+  json_get_var expected expected
+  vpn_state
+  case "$vpn" in enabled|disabled) ;; *) fail profile_unavailable ;; esac
+  [ "$expected" = "$vpn" ] || fail stale_selection
+  case "$action" in ENABLE_WIREGUARD_NEXT_BOOT) value=1 ;; DISABLE_WIREGUARD_NEXT_BOOT) value=0 ;; *) fail confirmation_required ;; esac
+  tmp=$(mktemp -d /tmp/veci-vpn.XXXXXX) || fail save_failed
+  trap 'rm -rf "$tmp"' EXIT
+  uci -q -t "$tmp" set "network.veci_wg.auto=$value" && uci -q -t "$tmp" commit network || fail save_failed
+  [ "$(uci -q get network.veci_wg.auto)" = "$value" ] || fail save_failed
+  profile_status
+}

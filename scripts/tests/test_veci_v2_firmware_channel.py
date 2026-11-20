@@ -34,7 +34,7 @@ const fetch = async (url, options) => {
     assert.equal(options.method,'POST');
     assert.equal(options.credentials,'omit');
     assert.equal(await options.body.text(), '1'.repeat(32) + base.sha256 + '7995392' + String.fromCharCode(10) + 'v2' + String.fromCharCode(10) + 'fw.bin' + String.fromCharCode(10));
-    return {ok:true, json:async () => ({verified:true,sha256:base.sha256,ticket:'b'.repeat(64)})};
+    return {ok:true, json:async () => ({verified:true,install_allowed:true,sha256:base.sha256,ticket:'b'.repeat(64)})};
   }
   assert.equal(url,'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json');
   assert.equal(options.credentials,'omit');
