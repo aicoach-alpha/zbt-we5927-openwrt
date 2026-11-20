@@ -1,0 +1,99 @@
+#!/bin/sh
+# Native VeCI system administration for exact board: NTP/log/LED observability.
+set -eu
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+valid_host() {
+  [ -n "$1" ] || return 1
+  [ "$(printf %s "$1" | wc -c)" -le 253 ] || return 1
+  case "$1" in -*|.*|*..*|*.|-*|*[!A-Za-z0-9.-]*) return 1 ;; esac
+  return 0
+}
+[ "$#" -ge 1 ] || fail unsupported_method
+case "$1" in
+  list) echo '{"ntp":{},"setNtp":{"first":"String","second":"String","confirmation":"String"},"logs":{},"leds":{},"observability":{}}'; exit 0 ;;
+  call) [ "$#" -ge 2 ] || fail unsupported_method
+    case "$2" in ntp|setNtp|logs|leds|observability) ;; *) fail unsupported_method ;; esac ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+. /usr/share/libubox/jshn.sh
+ntp_status() {
+  [ "$(uci -q get system.ntp)" = timeserver ] || fail ntp_configuration_missing
+  json_init; json_add_boolean ok 1
+  json_add_string enabled "$(uci -q get system.ntp.enabled || :)"
+  json_add_array servers
+  for server in $(uci -q get system.ntp.server || :); do
+    json_add_string "" "$server"
+  done
+  json_close_array
+  json_dump; echo
+}
+logs_status() {
+  json_init; json_add_boolean ok 1
+  if command -v logread >/dev/null 2>&1; then
+    # Redact possible identity/key fields; do not expose serial/private data to UI logs.
+    recent=$(logread -l 50 2>/dev/null | sed -E 's/([Pp]assword|[Ii][Mm][Ee][Ii]|[Ii][Cc][Cc][Ii][Dd]|[Ii][Mm][Ss][Ii]|[Aa][Pp][Ii][-_ ]?[Kk][Ee][Yy]|[Tt]oken)[=: ]+[^ ]+/\1=[REDACTED]/g' | tail -n 50)
+    json_add_string logs "$recent"
+  else
+    json_add_string logs ""
+  fi
+  json_dump; echo
+}
+leds_status() {
+  json_init; json_add_boolean ok 1; json_add_array leds
+  for path in /sys/class/leds/*; do
+    [ -d "$path" ] || continue
+    json_add_object ""
+    json_add_string name "$(basename "$path")"
+    json_add_string brightness "$(cat "$path/brightness" 2>/dev/null || :)"
+    json_close_object
+  done
+  json_close_array; json_dump; echo
+}
+obs_status() {
+  json_init; json_add_boolean ok 1
+  json_add_string uptime_seconds "$(cut -d. -f1 /proc/uptime 2>/dev/null || :)"
+  json_add_string loadavg "$(cat /proc/loadavg 2>/dev/null || :)"
+  json_add_string memory_available_kib "$(awk '/^MemAvailable:/ {print $2; exit}' /proc/meminfo 2>/dev/null || :)"
+  json_add_string lte_link "$(cat /sys/class/net/usb0/operstate 2>/dev/null || :)"
+  json_add_string wifi_link "$(cat /sys/class/net/wlan0/operstate 2>/dev/null || :)"
+  json_add_string ssh_listening "$(pidof dropbear >/dev/null 2>&1 && echo yes || echo no)"
+  json_dump; echo
+}
+case "$2" in
+  ntp) ntp_status; exit 0 ;;
+  logs) logs_status; exit 0 ;;
+  leds) leds_status; exit 0 ;;
+  observability) obs_status; exit 0 ;;
+esac
+request=$(head -c 257)
+[ "$(printf %s "$request" | wc -c)" -le 256 ] || fail request_too_large
+first=$(jsonfilter -s "$request" -e '@.first') || fail invalid_request
+second=$(jsonfilter -s "$request" -e '@.second' 2>/dev/null || :)
+confirmation=$(jsonfilter -s "$request" -e '@.confirmation') || fail invalid_request
+[ "$confirmation" = SET_NTP ] || fail confirmation_required
+valid_host "$first" || fail invalid_first_ntp
+if [ -n "$second" ]; then
+  valid_host "$second" || fail invalid_second_ntp
+  [ "$first" != "$second" ] || fail duplicate_ntp
+fi
+exec 9<"$0"; flock -n 9 || fail busy
+[ "$(uci -q get system.ntp)" = timeserver ] || fail ntp_configuration_missing
+changes=$(uci -q changes system) || fail system_state_unknown
+[ -z "$changes" ] || fail pending_system_changes
+tmp=$(mktemp -d /tmp/veci2-ntp.XXXXXX) || fail cannot_stage
+trap 'rm -rf "$tmp"' EXIT
+trap 'exit 1' HUP INT TERM
+cp /etc/config/system "$tmp/original" || fail backup_failed
+uci -q -t "$tmp" delete system.ntp.server 2>/dev/null || :
+uci -q -t "$tmp" set system.ntp.enabled=1 || fail stage_failed
+uci -q -t "$tmp" add_list "system.ntp.server=$first" || fail stage_failed
+if [ -n "$second" ]; then uci -q -t "$tmp" add_list "system.ntp.server=$second" || fail stage_failed; fi
+if ! uci -q -t "$tmp" commit system ||
+   ! /etc/init.d/sysntpd restart >/dev/null 2>&1; then
+  cp "$tmp/original" /etc/config/system || fail rollback_failed
+  /etc/init.d/sysntpd restart >/dev/null 2>&1 || fail rollback_failed
+  fail ntp_apply_failed_rollback_attempted
+fi
+ntp_status
