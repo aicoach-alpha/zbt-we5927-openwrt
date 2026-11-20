@@ -3,6 +3,7 @@
 (() => {
   const el = id => document.getElementById(id);
   let rpc, authenticated, epoch = 0, busy = false, simReady = false;
+  let leaseRevision = '';
   const set = (id, value) => { const node = el(id); if (node) node.textContent = value; };
   const ip4 = value => {
     if (!/^(0|[1-9][0-9]{0,2})(\.(0|[1-9][0-9]{0,2})){3}$/.test(value)) return false;
@@ -12,10 +13,10 @@
   const mac = value => /^[a-f0-9]{2}(:[a-f0-9]{2}){5}$/i.test(value);
   const port = value => Number.isInteger(Number(value)) && Number(value) >= 1 &&
     Number(value) <= 65535 && /^[1-9][0-9]{0,4}$/.test(value);
-  function optionList(id, values, label, placeholder) {
+  function optionList(id, values, label, placeholder, value = item => item.name || String(item.index)) {
     const sel = el(id);
     sel.replaceChildren(new Option(placeholder, ''));
-    for (const item of values) sel.add(new Option(label(item), item.name || String(item.index)));
+    for (const item of values) sel.add(new Option(label(item), value(item)));
   }
   async function call(object, method, args = {}, timeout = 11000) {
     if (!authenticated() || !rpc) throw Error('Login diperlukan');
@@ -24,6 +25,7 @@
     return response;
   }
   function resetAuth() {
+    leaseRevision = '';
     epoch++; busy = false; simReady = false;
     for (const id of ['owner-lease-status','owner-sim-status','owner-firewall-status','owner-ntp-status',
       'owner-system-summary','owner-system-log','owner-forward-list']) set(id, 'Login diperlukan.');
@@ -53,9 +55,10 @@
       set('owner-sim-status', 'Status SIM belum terverifikasi: ' + sim.reason.message);
     }
     const lease = results[1];
+    leaseRevision = lease.status === 'fulfilled' ? lease.value.revision : '';
     if (lease.status === 'fulfilled') {
       const list = Array.isArray(lease.value.leases) ? lease.value.leases : [];
-      optionList('owner-lease-delete', list, x => [x.name || '', x.mac || '', x.ip || ''].filter(Boolean).join(' · '), 'Pilih reservasi');
+      optionList('owner-lease-delete', list, x => [x.name || '', x.mac || '', x.ip || ''].filter(Boolean).join(' · '), 'Pilih reservasi', x => String(x.index));
       set('owner-lease-status', list.length + ' reservasi statis tersimpan');
     } else {
       set('owner-lease-status', 'Reservasi belum bisa dibaca: ' + lease.reason.message);
@@ -140,10 +143,10 @@
     });
     el('owner-lease-delete-btn').addEventListener('click', event => {
       const value=el('owner-lease-delete').value;
-      if (!/^(0|[1-9][0-9]{0,2})$/.test(value)) return;
+      if (!leaseRevision || !/^(0|[1-9][0-9]{0,2})$/.test(value)) return;
       if (!window.confirm('Hapus reservasi DHCP pilihan? Perangkat mungkin menerima IP berbeda.')) return;
       invoke(event.currentTarget,'owner-lease-status','veci.v2.dhcp','delete',
-        {index:Number(value),confirmation:'DELETE_LEASE_'+value},15000,refreshNetwork);
+        {index:Number(value),revision:leaseRevision,confirmation:'DELETE_LEASE_'+value},15000,refreshNetwork);
     });
     el('owner-forward-form').addEventListener('submit', event => {
       event.preventDefault();

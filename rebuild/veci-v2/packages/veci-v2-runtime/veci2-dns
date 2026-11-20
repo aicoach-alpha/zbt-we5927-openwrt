@@ -41,12 +41,21 @@ if [ "$2" = set ]; then
   else
     primary=; secondary=
   fi
-  exec 9<"$0"
+  exec 9>>/var/lock/veci2-dhcp.lock
   flock -n 9 || fail busy
 fi
 pending=$(uci -q changes dhcp) || fail config_unavailable
 [ -z "$pending" ] || fail pending_dhcp_changes
 if [ "$2" = set ]; then
+  existing=$(uci -q get "$D.server" || :)
+  policy=$(uci -q get "$D.noresolv" || :)
+  # Preserve conditional forwarding, mixed upstream policies and custom ports.
+  case "$policy" in
+    1) set -- $existing; [ "$#" -ge 1 ] && [ "$#" -le 2 ] || fail unsupported_dns_config
+       for value in "$@"; do valid_ipv4 "$value" || fail unsupported_dns_config; done ;;
+    0|'') [ -z "$existing" ] || fail unsupported_dns_config ;;
+    *) fail unsupported_dns_config ;;
+  esac
   tmp=$(mktemp -d /tmp/veci2-dns.XXXXXX) || fail save_failed
   trap 'rm -rf "$tmp"' EXIT
   trap 'exit 1' HUP INT TERM
@@ -64,6 +73,7 @@ if [ "$2" = set ]; then
   if ! uci -q -t "$tmp" commit dhcp || ! /etc/init.d/dnsmasq restart >/dev/null 2>&1 || ! pidof dnsmasq >/dev/null 2>&1; then
     cp "$tmp/original" /etc/config/dhcp || fail rollback_failed
     /etc/init.d/dnsmasq restart >/dev/null 2>&1 || fail rollback_failed
+    pidof dnsmasq >/dev/null || fail rollback_failed
     fail apply_failed_restored
   fi
 fi
