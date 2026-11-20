@@ -1,0 +1,99 @@
+#!/bin/sh
+# Exact-board static DHCP reservations: UCI with rollback on dnsmasq failure.
+set -eu
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+valid_ip() {
+  case "$1" in ''|*[!0-9.]*|.*|*..*|*.) return 1 ;; esac
+  old=$IFS; IFS=.; set -- $1; IFS=$old
+  [ "$#" -eq 4 ] || return 1
+  for octet in "$@"; do
+    case "$octet" in 0|[1-9]|[1-9][0-9]|[1-9][0-9][0-9]) ;; *) return 1 ;; esac
+    [ "$octet" -le 255 ] || return 1
+  done
+  [ "$1" -gt 0 ] && [ "$1" -lt 224 ] && [ "$1" -ne 127 ]
+}
+valid_mac() {
+  printf '%s\n' "$1" | grep -Eiq '^[0-9a-f]{2}(:[0-9a-f]{2}){5}$'
+}
+valid_name() {
+  [ -z "$1" ] && return 0
+  [ "$(printf '%s' "$1" | wc -c)" -le 32 ] || return 1
+  case "$1" in -*|*--*|*[!A-Za-z0-9-]*) return 1 ;; esac
+  return 0
+}
+[ "$#" -ge 1 ] || fail unsupported_method
+case "$1" in
+  list) echo '{"status":{},"add":{"mac":"String","ip":"String","name":"String"},"delete":{"index":"Integer","confirmation":"String"}}'; exit 0 ;;
+  call) [ "$#" -ge 2 ] || fail unsupported_method
+    case "$2" in status|add|delete) ;; *) fail unsupported_method ;; esac ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+[ -n "$(uci -q get network.lan.ipaddr)" ] || fail lan_not_configured
+[ "$(uci -q get dhcp.lan)" = dhcp ] || fail dhcp_lan_missing
+read_status() {
+  . /usr/share/libubox/jshn.sh
+  json_init
+  json_add_boolean ok 1
+  json_add_array leases
+  idx=0
+  while [ "$idx" -lt 256 ] && [ "$(uci -q get "dhcp.@host[$idx]" || :)" = host ]; do
+    json_add_object ""
+    json_add_int index "$idx"
+    json_add_string mac "$(uci -q get "dhcp.@host[$idx].mac" || :)"
+    json_add_string ip "$(uci -q get "dhcp.@host[$idx].ip" || :)"
+    json_add_string name "$(uci -q get "dhcp.@host[$idx].name" || :)"
+    json_close_object
+    idx=$((idx+1))
+  done
+  json_close_array
+  json_dump
+  echo
+}
+if [ "$2" = status ]; then read_status; exit 0; fi
+data=$(head -c 257)
+[ "$(printf '%s' "$data" | wc -c)" -le 256 ] || fail request_too_long
+exec 9<"$0"
+flock -n 9 || fail busy
+pending=$(uci -q changes dhcp) || fail dhcp_changes_unknown
+[ -z "$pending" ] || fail pending_dhcp_changes
+tmp=$(mktemp -d /tmp/veci2-dhcp.XXXXXX) || fail cannot_prepare
+trap 'rm -rf "$tmp"' EXIT
+trap 'exit 1' HUP INT TERM
+cp /etc/config/dhcp "$tmp/original" || fail backup_failed
+if [ "$2" = add ]; then
+  mac=$(jsonfilter -s "$data" -e '@.mac') || fail invalid_request
+  ip=$(jsonfilter -s "$data" -e '@.ip') || fail invalid_request
+  name=$(jsonfilter -s "$data" -e '@.name' 2>/dev/null || :)
+  valid_mac "$mac" || fail invalid_mac
+  valid_ip "$ip" || fail invalid_ip
+  valid_name "$name" || fail invalid_hostname
+  [ "$ip" != "$(uci -q get network.lan.ipaddr)" ] || fail ip_is_router_address
+  idx=0
+  while [ "$idx" -lt 256 ] && [ "$(uci -q get "dhcp.@host[$idx]" || :)" = host ]; do
+    oldmac=$(uci -q get "dhcp.@host[$idx].mac" || :)
+    oldip=$(uci -q get "dhcp.@host[$idx].ip" || :)
+    [ "$oldmac" != "$mac" ] && [ "$oldip" != "$ip" ] || fail duplicate_static_lease
+    idx=$((idx+1))
+  done
+  section=$(uci -q -t "$tmp" add dhcp host) || fail save_failed
+  uci -q -t "$tmp" set "dhcp.$section.mac=$mac" || fail save_failed
+  uci -q -t "$tmp" set "dhcp.$section.ip=$ip" || fail save_failed
+  if [ -n "$name" ]; then uci -q -t "$tmp" set "dhcp.$section.name=$name" || fail save_failed; fi
+else
+  index=$(jsonfilter -s "$data" -e '@.index') || fail invalid_request
+  confirmation=$(jsonfilter -s "$data" -e '@.confirmation') || fail invalid_request
+  case "$index" in 0|[1-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]) ;; *) fail invalid_index ;; esac
+  [ "$confirmation" = "DELETE_LEASE_$index" ] || fail confirmation_required
+  [ "$(uci -q get "dhcp.@host[$index]" || :)" = host ] || fail unknown_lease
+  uci -q -t "$tmp" delete "dhcp.@host[$index]" || fail save_failed
+fi
+if ! uci -q -t "$tmp" commit dhcp ||
+   ! /etc/init.d/dnsmasq restart >/dev/null 2>&1 ||
+   ! pidof dnsmasq >/dev/null 2>&1; then
+  cp "$tmp/original" /etc/config/dhcp || fail rollback_failed
+  /etc/init.d/dnsmasq restart >/dev/null 2>&1 || fail rollback_failed
+  fail dhcp_apply_failed_rollback_attempted
+fi
+read_status
