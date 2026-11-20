@@ -80,10 +80,10 @@ if [ "$2" = addForward ]; then
   lan_host "$dest" || fail invalid_lan_destination
   [ "$confirm" = "FORWARD_$from" ] || fail confirmation_required
   case "$from" in 22|23) fail refuse_router_management_port ;; esac
-  name="veci_port_$proto_$from"
+  name=$(printf "veci_port_%s_%s" "$proto" "$from")
   [ -z "$(uci -q get "firewall.$name" || :)" ] || fail port_forward_already_exists
   uci -q -t "$tmp" set "firewall.$name=redirect" || fail stage_failed
-  uci -q -t "$tmp" set "firewall.$name.name=VeCI_$proto_$from" || fail stage_failed
+  uci -q -t "$tmp" set "firewall.$name.name=VeCI_$proto-$from" || fail stage_failed
   uci -q -t "$tmp" set "firewall.$name.src=wan" || fail stage_failed
   uci -q -t "$tmp" set "firewall.$name.dest=lan" || fail stage_failed
   uci -q -t "$tmp" set "firewall.$name.proto=$proto" || fail stage_failed
