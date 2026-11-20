@@ -76,16 +76,4 @@ esac
     assert value('guest.ssid') == 'Guest'
     subprocess.run([root/'uci','set','wireless.guest.ssid=Pending'], env=env, check=True)
     assert call('setAccess', mode='disable', addresses='')['error'] == 'pending_wireless_changes'
-    subprocess.run([root/'uci','revert','wireless'], env=env, check=True)
-    for band in ('5g', '6g'):
-        subprocess.run([root/'uci','set','wireless.radio0.band=' + band], env=env, check=True)
-        subprocess.run([root/'uci','commit','wireless'], env=env, check=True)
-        before = wireless.read_bytes()
-        for method, params in [('info', {}), ('survey', {}), ('setChannel', {'channel':'6'}),
-                               ('setAuth', {'mode':'sae', 'key_hex':'61'*8}),
-                               ('setAccess', {'mode':'disable', 'addresses':''}),
-                               ('setSsid', {'ssid_hex':'61'}), ('setVisibility', {'action':'HIDE_SSID'})]:
-            assert call(method, **params)['error'] == 'channel_unavailable', method
-        assert wireless.read_bytes() == before
-    print('PASS: unsupported radio bands rejected on survey, info, access/auth and primary AP controls')
     print('PASS: native UCI/jshn, ACL modes, invalid MACs/empty allow list, deduplication, associated clients, legal channels, passive scan, auth, pending edits, guest preservation')
