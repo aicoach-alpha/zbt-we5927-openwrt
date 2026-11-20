@@ -4,10 +4,18 @@ set -eu
 umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 valid_host() {
-  [ -n "$1" ] || return 1
-  [ "$(printf %s "$1" | wc -c)" -le 253 ] || return 1
-  case "$1" in -*|.*|*..*|*.|-*|*[!A-Za-z0-9.-]*) return 1 ;; esac
-  return 0
+  [ -n "$1" ] && [ "$(printf %s "$1" | wc -c)" -le 253 ] || return 1
+  # Native OpenWrt hostname-only NTP entries; reject empty labels,
+  # label boundary '-' and command/control characters in each label.
+  printf '%s\n' "$1" | awk -F. '
+    {
+      for (i=1; i<=NF; i++) {
+        label=$i
+        if (length(label)<1 || length(label)>63 ||
+            label !~ /^[A-Za-z0-9-]+$/ ||
+            label ~ /^-/ || label ~ /-$/) exit 1
+      }
+    }'
 }
 [ "$#" -ge 1 ] || fail unsupported_method
 case "$1" in
