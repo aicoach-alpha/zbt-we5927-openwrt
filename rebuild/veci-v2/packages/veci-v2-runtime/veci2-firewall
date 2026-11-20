@@ -1,0 +1,126 @@
+#!/bin/sh
+# Exact-board owner-controlled WAN -> LAN forwarding.
+# Never modify default WAN input policy or expose router admin itself.
+set -eu
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+valid_ipv4() {
+  case "$1" in ''|*[!0-9.]*|.*|*..*|*.) return 1 ;; esac
+  old=$IFS; IFS=.; set -- $1; IFS=$old
+  [ "$#" -eq 4 ] || return 1
+  for x in "$@"; do
+    case "$x" in 0|[1-9]|[1-9][0-9]|[1-9][0-9][0-9]) ;; *) return 1 ;; esac
+    [ "$x" -le 255 ] || return 1
+  done
+  [ "$1" -gt 0 ] && [ "$1" -ne 127 ] && [ "$1" -lt 224 ]
+}
+valid_port() {
+  case "$1" in ''|*[!0-9]*|0*) return 1 ;; esac
+  [ "$(printf %s "$1" | wc -c)" -le 5 ] || return 1
+  [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
+}
+lan_host() {
+  valid_ipv4 "$1" || return 1
+  [ "$1" != "$(uci -q get network.lan.ipaddr)" ] || return 1
+  ipcalc.sh "$(uci -q get network.lan.ipaddr)" "$(uci -q get network.lan.netmask)" 2>/dev/null |
+    grep -Eq '^NETWORK=' || return 1
+  # Firewall must not be changed for an unconfigured or unknown LAN subnet.
+  ip route get "$1" 2>/dev/null | grep -Eq 'dev (br-lan|lan|eth0)' || return 1
+}
+[ "$#" -ge 1 ] || fail unsupported_method
+case "$1" in
+  list) echo '{"status":{},"addForward":{"from_port":"Integer","to_port":"Integer","protocol":"String","destination":"String","confirmation":"String"},"deleteForward":{"name":"String","confirmation":"String"},"setDmz":{"destination":"String","confirmation":"String"}}'; exit 0 ;;
+  call) [ "$#" -ge 2 ] || fail unsupported_method
+    case "$2" in status|addForward|deleteForward|setDmz) ;; *) fail unsupported_method ;; esac ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+[ "$(uci -q get firewall.@zone[0].name)" = lan ] || fail lan_zone_mismatch
+[ "$(uci -q get firewall.@zone[1].name)" = wan ] || fail wan_zone_mismatch
+[ "$(uci -q get firewall.@zone[1].input)" = REJECT ] || fail unsafe_wan_policy
+status() {
+  . /usr/share/libubox/jshn.sh
+  json_init; json_add_boolean ok 1
+  json_add_string wan_input "$(uci -q get firewall.@zone[1].input)"
+  json_add_string wan_forward "$(uci -q get firewall.@zone[1].forward)"
+  json_add_array forwards
+  i=0
+  while [ "$i" -lt 128 ] && [ "$(uci -q get "firewall.@redirect[$i]" || :)" = redirect ]; do
+    json_add_object ""
+    json_add_int index "$i"
+    json_add_string name "$(uci -q get "firewall.@redirect[$i].name" || :)"
+    json_add_string source_port "$(uci -q get "firewall.@redirect[$i].src_dport" || :)"
+    json_add_string destination "$(uci -q get "firewall.@redirect[$i].dest_ip" || :)"
+    json_add_string destination_port "$(uci -q get "firewall.@redirect[$i].dest_port" || :)"
+    json_add_string protocol "$(uci -q get "firewall.@redirect[$i].proto" || :)"
+    json_close_object
+    i=$((i+1))
+  done
+  json_close_array; json_dump; echo
+}
+if [ "$2" = status ]; then status; exit 0; fi
+request=$(head -c 513)
+[ "$(printf %s "$request" | wc -c)" -le 512 ] || fail request_too_large
+exec 9<"$0"
+flock -n 9 || fail busy
+pending=$(uci -q changes firewall) || fail config_state_unknown
+[ -z "$pending" ] || fail pending_firewall_changes
+tmp=$(mktemp -d /tmp/veci2-firewall.XXXXXX) || fail tmp_failed
+trap 'rm -rf "$tmp"' EXIT
+trap 'exit 1' HUP INT TERM
+cp /etc/config/firewall "$tmp/previous" || fail backup_failed
+if [ "$2" = addForward ]; then
+  from=$(jsonfilter -s "$request" -e '@.from_port') || fail invalid_request
+  to=$(jsonfilter -s "$request" -e '@.to_port') || fail invalid_request
+  proto=$(jsonfilter -s "$request" -e '@.protocol') || fail invalid_request
+  dest=$(jsonfilter -s "$request" -e '@.destination') || fail invalid_request
+  confirm=$(jsonfilter -s "$request" -e '@.confirmation') || fail invalid_request
+  valid_port "$from" && valid_port "$to" || fail invalid_port
+  case "$proto" in tcp|udp) ;; *) fail invalid_protocol ;; esac
+  lan_host "$dest" || fail invalid_lan_destination
+  [ "$confirm" = "FORWARD_$from" ] || fail confirmation_required
+  case "$from" in 22|23) fail refuse_router_management_port ;; esac
+  name="veci_port_$proto_$from"
+  [ -z "$(uci -q get "firewall.$name" || :)" ] || fail port_forward_already_exists
+  uci -q -t "$tmp" set "firewall.$name=redirect" || fail stage_failed
+  uci -q -t "$tmp" set "firewall.$name.name=VeCI_$proto_$from" || fail stage_failed
+  uci -q -t "$tmp" set "firewall.$name.src=wan" || fail stage_failed
+  uci -q -t "$tmp" set "firewall.$name.dest=lan" || fail stage_failed
+  uci -q -t "$tmp" set "firewall.$name.proto=$proto" || fail stage_failed
+  uci -q -t "$tmp" set "firewall.$name.src_dport=$from" || fail stage_failed
+  uci -q -t "$tmp" set "firewall.$name.dest_ip=$dest" || fail stage_failed
+  uci -q -t "$tmp" set "firewall.$name.dest_port=$to" || fail stage_failed
+  uci -q -t "$tmp" set "firewall.$name.target=DNAT" || fail stage_failed
+elif [ "$2" = deleteForward ]; then
+  name=$(jsonfilter -s "$request" -e '@.name') || fail invalid_request
+  confirm=$(jsonfilter -s "$request" -e '@.confirmation') || fail invalid_request
+  case "$name" in veci_port_tcp_*|veci_port_udp_*) ;; *) fail not_owner_redirect ;; esac
+  case "$name" in *[!A-Za-z0-9_]*) fail invalid_name ;; esac
+  [ "$confirm" = "DELETE_$name" ] || fail confirmation_required
+  [ "$(uci -q get "firewall.$name" || :)" = redirect ] || fail unknown_forward
+  uci -q -t "$tmp" delete "firewall.$name" || fail stage_failed
+else
+  dest=$(jsonfilter -s "$request" -e '@.destination') || fail invalid_request
+  confirm=$(jsonfilter -s "$request" -e '@.confirmation') || fail invalid_request
+  if [ "$dest" = DISABLE ]; then
+    [ "$confirm" = DISABLE_DMZ ] || fail confirmation_required
+    [ "$(uci -q get firewall.veci_owner_dmz || :)" = redirect ] || fail no_owner_dmz
+    uci -q -t "$tmp" delete firewall.veci_owner_dmz || fail stage_failed
+  else
+    lan_host "$dest" || fail invalid_lan_destination
+    [ "$confirm" = "ENABLE_DMZ_$dest" ] || fail confirmation_required
+    [ -z "$(uci -q get firewall.veci_owner_dmz || :)" ] || fail dmz_already_exists
+    uci -q -t "$tmp" set firewall.veci_owner_dmz=redirect || fail stage_failed
+    uci -q -t "$tmp" set firewall.veci_owner_dmz.name=VeCI_DMZ || fail stage_failed
+    uci -q -t "$tmp" set firewall.veci_owner_dmz.src=wan || fail stage_failed
+    uci -q -t "$tmp" set firewall.veci_owner_dmz.dest=lan || fail stage_failed
+    uci -q -t "$tmp" set "firewall.veci_owner_dmz.dest_ip=$dest" || fail stage_failed
+    uci -q -t "$tmp" set firewall.veci_owner_dmz.target=DNAT || fail stage_failed
+  fi
+fi
+if ! uci -q -t "$tmp" commit firewall || ! /etc/init.d/firewall reload >/dev/null 2>&1; then
+  cp "$tmp/previous" /etc/config/firewall || fail rollback_failed
+  /etc/init.d/firewall reload >/dev/null 2>&1 || fail rollback_failed
+  fail firewall_apply_failed_rollback_attempted
+fi
+status
