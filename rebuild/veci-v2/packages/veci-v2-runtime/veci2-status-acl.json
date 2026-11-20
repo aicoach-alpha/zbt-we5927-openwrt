@@ -97,6 +97,12 @@
       "ubus": {
         "veci.v2.lte": [
           "status"
+        ],
+        "veci.v2.simlock": [
+          "status"
+        ],
+        "veci.v2.ussd": [
+          "status"
         ]
       }
     },
@@ -106,6 +112,13 @@
           "setFailover",
           "setApn",
           "setMonitor"
+        ],
+        "veci.v2.simlock": [
+          "unlock"
+        ],
+        "veci.v2.ussd": [
+          "send",
+          "cancel"
         ]
       }
     }

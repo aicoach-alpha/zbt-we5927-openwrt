@@ -39,6 +39,8 @@ PARTIAL = {
     "port_forward_dmz": [RUNTIME + "veci2-firewall", "scripts/tests/test_owner_firewall_source.py"],
     "static_routes_policy": [RUNTIME + "veci2-routes", "scripts/tests/test_owner_reuse_existing_source.py"],
     "lte_dual_sim_manual": [RUNTIME + "veci2-sim-manual", "scripts/tests/test_owner_manual_sim_source.py"],
+    "lte_apn_pin_puk": [RUNTIME + "veci2-sim-lock", "scripts/tests/test_sim_unlock.py"],
+    "lte_ussd": [RUNTIME + "veci2-ussd", "scripts/tests/test_last_ussd_source.py"],
     "system_logs_diagnostics": [RUNTIME + "veci2-system-admin", "scripts/tests/test_owner_system_admin_source.py"],
     "system_time_ntp": [RUNTIME + "veci2-system-admin", "scripts/tests/test_owner_system_admin_source.py"],
     "system_leds_buttons": [RUNTIME + "veci2-system-admin", "scripts/tests/test_owner_system_admin_source.py"],

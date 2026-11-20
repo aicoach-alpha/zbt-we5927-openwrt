@@ -269,6 +269,8 @@ function showLogin() {
   globalThis.VeciMonitor?.reset?.();
   globalThis.VeciAddonProfiles?.reset?.();
   globalThis.VeciUpdatePolicy?.reset?.();
+  globalThis.VeciSimLock?.reset?.();
+  globalThis.VeciUssd?.reset?.();
   globalThis.VeciSmsCenter.logout();
   globalThis.VeciDnsSettings?.logout?.();
   globalThis.VeciOwnerControls?.logout?.();

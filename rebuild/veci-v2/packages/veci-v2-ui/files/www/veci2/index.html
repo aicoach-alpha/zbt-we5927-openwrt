@@ -14,6 +14,8 @@
   <script src="/veci2/dns-settings.js" defer></script>
   <script src="/veci2/owner-controls.js" defer></script>
   <script src="/veci2/app.js" defer></script>
+  <script src="/veci2/ussd.js" defer></script>
+  <script src="/veci2/sim-lock.js" defer></script>
   <script src="/veci2/monitor-settings.js" defer></script>
   <script src="/veci2/addon-profiles.js" defer></script>
   <script src="/veci2/update-policy.js" defer></script>
@@ -63,6 +65,26 @@
           <p class="notice">Status internet yang belum diuji ditampilkan sebagai belum terverifikasi, bukan dipaksa menjadi offline. Beacon Wi-Fi tidak dianggap hidup hanya karena radio up.</p>
         </section>
         <section id="network" class="page" aria-label="Koneksi dan perangkat" hidden>
+          <article class="panel">
+            <details><summary>USSD operator</summary>
+              <button id="ussd-check" type="button">Periksa dukungan modem</button>
+              <form id="ussd-form" hidden autocomplete="off"><label>Kode operator <input id="ussd-code" maxlength="32" required autocomplete="off"></label><button>Kirim sekali</button></form>
+              <button type="button" id="ussd-cancel" hidden>Akhiri sesi USSD</button>
+              <p id="ussd-status" role="status"></p>
+            </details>
+          </article>
+          <article class="panel">
+            <details><summary>PIN dan PUK SIM</summary>
+              <button type="button" id="sim-lock-read">Baca status kunci</button>
+              <p id="sim-lock-status" role="status"></p>
+              <form id="sim-lock-form" autocomplete="off" hidden>
+                <label id="sim-code-label" for="sim-code">Kode</label>
+                <input id="sim-code" type="password" inputmode="numeric" maxlength="8" required autocomplete="off">
+                <label id="sim-new-label" hidden>PIN baru <input id="sim-new-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></label>
+                <button type="submit">Kirim satu percobaan</button>
+              </form>
+            </details>
+          </article>
           <article class="panel">
             <h2>Monitor LTE</h2>
             <p>Interval pemeriksaan koneksi modem yang sudah ada; tidak menjalankan ulang daemon.</p>

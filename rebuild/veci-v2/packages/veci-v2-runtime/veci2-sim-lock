@@ -1,0 +1,54 @@
+#!/bin/sh
+set -eu
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "${1:-}:${2:-}" in
+ list:*) echo '{"status":{},"unlock":{"slot":"String","mode":"String","remaining":"String","code":"String","new_pin":"String","confirm":"String"}}'; exit 0 ;;
+ call:status|call:unlock) ;;
+ *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+manager=/usr/sbin/we5927-lte
+at=/usr/sbin/we5927-at
+exec 8<"$manager"; flock -n 8 || fail sim_busy
+exec 9>/var/lock/we5927-at.lock; flock -n 9 || fail modem_busy
+slot=$("$manager" selector-slot) || fail unknown_selector
+case "$slot" in 1|2) ;; *) fail unknown_selector ;; esac
+port=$("$manager" at-port) || fail modem_unavailable
+raw=$("$at" "$port" 'AT+CPIN?' 1200) || fail lock_state_unavailable
+state=$(printf '%s\n' "$raw" | tr -d '\r' | sed -n 's/^+CPIN: *//p')
+case "$state" in 'SIM PIN') mode=pin ;; 'SIM PUK') mode=puk ;; READY) mode=ready ;; *) mode=unknown ;; esac
+remaining=null
+if [ "$mode" = pin ] || [ "$mode" = puk ]; then
+ if raw=$("$at" "$port" "AT+CPINR=\"$state\"" 1400); then
+   count=$(printf '%s\n' "$raw" | tr -d '\r' | awk -F, -v state="$state" '
+     {for (i=1;i<=NF;i++) {sub(/^ +/,"",$i); sub(/ +$/,"",$i)}}
+     ($1=="+CPINR: "state || $1=="+CPINR: \""state"\"") && (NF==2 || NF==3) && $2~/^([0-9]|[1-9][0-9])$/ {print $2}')
+   case "$count" in [0-9]|[1-9][0-9]) remaining=$count ;; esac
+ fi
+fi
+if [ "$2" = status ]; then
+ printf '{"ok":true,"slot":%s,"mode":"%s","remaining":%s}\n' "$slot" "$mode" "$remaining"
+ exit 0
+fi
+request=$(head -c 257)
+[ "${#request}" -le 256 ] || fail invalid_request
+field() { printf '%s' "$request" | jsonfilter -e "@.$1"; }
+[ "$(field confirm)" = UNLOCK_SIM_ONCE ] || fail confirmation_required
+[ "$(field slot)" = "$slot" ] && [ "$(field mode)" = "$mode" ] || fail sim_changed
+case "$mode" in pin|puk) ;; *) fail unlock_unavailable ;; esac
+[ "$remaining" != null ] && [ "$remaining" -gt 1 ] || fail retry_protection
+[ "$(field remaining)" = "$remaining" ] || fail retry_count_changed
+code=$(field code) || fail invalid_code
+case "$code" in ''|*[!0-9]*) fail invalid_code ;; esac
+[ "$("$manager" selector-slot)" = "$slot" ] || fail sim_changed
+if [ "$mode" = pin ]; then
+ [ "${#code}" -ge 4 ] && [ "${#code}" -le 8 ] || fail invalid_code
+ printf '%s\n' "$code" | "$at" "$port" --sim-pin-stdin 2500 || fail attempt_unconfirmed
+else
+ new_pin=$(field new_pin) || fail invalid_new_pin
+ case "$new_pin" in ''|*[!0-9]*) fail invalid_new_pin ;; esac
+ [ "${#code}" = 8 ] && [ "${#new_pin}" -ge 4 ] && [ "${#new_pin}" -le 8 ] || fail invalid_code
+ printf '%s %s\n' "$code" "$new_pin" | "$at" "$port" --sim-puk-stdin 2500 || fail attempt_unconfirmed
+fi
+echo '{"ok":true,"submitted":true}'

@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-ui
 PKG_VERSION:=0.1
-PKG_RELEASE:=16
+PKG_RELEASE:=17
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -49,6 +49,8 @@ define Package/veci-v2-ui/install
 	$(INSTALL_DATA) ./files/www/veci2/update-policy.js $(1)/www/veci2/update-policy.js
 	$(INSTALL_DATA) ./files/www/veci2/addon-profiles.js $(1)/www/veci2/addon-profiles.js
 	$(INSTALL_DATA) ./files/www/veci2/monitor-settings.js $(1)/www/veci2/monitor-settings.js
+	$(INSTALL_DATA) ./files/www/veci2/sim-lock.js $(1)/www/veci2/sim-lock.js
+	$(INSTALL_DATA) ./files/www/veci2/ussd.js $(1)/www/veci2/ussd.js
 	$(INSTALL_DATA) ./files/www/veci2/app.css $(1)/www/veci2/app.css
 endef
 

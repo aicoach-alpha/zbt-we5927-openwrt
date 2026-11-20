@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-runtime
 PKG_VERSION:=0.1
-PKG_RELEASE:=19
+PKG_RELEASE:=20
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -53,6 +53,8 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_DATA) ./veci2-addon-profiles $(1)/usr/libexec/veci2-addon-profiles
 	$(INSTALL_BIN) ./veci2-addon $(1)/usr/libexec/rpcd/veci.v2.addon
 	$(INSTALL_DATA) ./veci2-addon-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-addon.json
+	$(INSTALL_BIN) ./veci2-sim-lock $(1)/usr/libexec/rpcd/veci.v2.simlock
+	$(INSTALL_BIN) ./veci2-ussd $(1)/usr/libexec/rpcd/veci.v2.ussd
 	$(INSTALL_BIN) ./veci2-status $(1)/usr/libexec/rpcd/veci.v2
 	$(INSTALL_BIN) ./veci2-interfaces $(1)/usr/libexec/rpcd/veci.v2.interfaces
 	$(INSTALL_BIN) ./veci2-routes $(1)/usr/libexec/rpcd/veci.v2.routes
