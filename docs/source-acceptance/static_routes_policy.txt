@@ -1,8 +1,9 @@
+$ python3 -m unittest discover -s /home/andre/projects/zbt-we2825-veci-openwrt/worktrees/parallel-accept-staging-20261123/scripts/tests -p test_owner_routes_acceptance.py -v
 
 test_native_route_form_rpc_installation_and_least_privilege_acl (test_owner_routes_acceptance.NativeRoutingAcceptance.test_native_route_form_rpc_installation_and_least_privilege_acl) ... ok
 test_real_rpc_route_and_policy_crud_and_transaction_failure (test_owner_routes_acceptance.NativeRoutingAcceptance.test_real_rpc_route_and_policy_crud_and_transaction_failure) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 1.662s
+Ran 2 tests in 1.665s
 
 OK

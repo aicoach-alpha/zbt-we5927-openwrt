@@ -73,7 +73,7 @@
       "origin": "LuCI Administration",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_verified"
     },
     {
       "id": "interface_wan_lan",
@@ -248,7 +248,7 @@
       "origin": "LuCI Administration",
       "physical_uat": "not_run",
       "required": true,
-      "v2_state": "not_ported_to_v2"
+      "v2_state": "source_verified"
     },
     {
       "id": "system_backup_restore",
