@@ -215,6 +215,9 @@ jobs:
           # returns exit code 2 even when regular files are extracted.
           # Extract as root so device-node errors remain a hard gate.
           sudo unsquashfs -no-progress -d "$rom" "$squash"
+          # Verify all 40 required modules' exact reviewed source payloads
+          # in the FINAL extracted image, not merely package metadata.
+          python3 "$GITHUB_WORKSPACE/rebuild/veci-v2/ci/check-all-core-rom.py" "$rom"
           test -s "$rom/usr/libexec/rpcd/veci.v2" || {
             echo 'FINAL_SQUASHFS_MISSING_RPCD_V2' >&2; exit 1;
           }
@@ -300,7 +303,7 @@ jobs:
       # Deliberately restricted to an explicitly requested, reviewed build
       # branch. Only manual explicit export or a marked build commit exports; ordinary pushes/PR runs cannot.
       - name: Prepare verified unsigned VeCI v2 image for offline signing
-        if: ${{ ((github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))) || (github.ref == 'refs/heads/build/zbt-we2825-oem-veci-20261119' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]'))))) }}
+        if: ${{ (github.ref == 'refs/heads/development/we2825-all13-integration-20261123' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (((github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))) || (github.ref == 'refs/heads/build/zbt-we2825-oem-veci-20261119' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))))) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -386,7 +389,7 @@ jobs:
           printf '%s\n' 'UNSIGNED LABORATORY IMAGE. DO NOT FLASH.' 'Hardware UAT, offline signing, router trust anchor, recovery validation still required.' > "$out/DO_NOT_FLASH.txt"
 
       - name: Upload explicit unsigned image for independent offline verification
-        if: ${{ ((github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))) || (github.ref == 'refs/heads/build/zbt-we2825-oem-veci-20261119' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]'))))) }}
+        if: ${{ (github.ref == 'refs/heads/development/we2825-all13-integration-20261123' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (((github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))) || (github.ref == 'refs/heads/build/zbt-we2825-oem-veci-20261119' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))))) }}
         uses: actions/upload-artifact@v4
         with:
           name: veci-v2-we5927-2sim-unsigned-${{ github.sha }}
