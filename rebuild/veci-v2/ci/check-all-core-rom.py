@@ -8,6 +8,8 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import re
+import subprocess
 import sys
 
 ROOT=Path(__file__).resolve().parents[3]
@@ -81,6 +83,34 @@ FEATURES={
  "ui_four_group_navigation":[(UI+"veci2/index.html","www/veci2/index.html")]
 }
 
+def _squashfs_digest(path: Path) -> str:
+    """Hash ROM bytes without changing the sensitive permissions in the image.
+
+    unsquashfs must run with root privileges to reconstruct /dev/console. It
+    also recreates owner-only (0600) configuration files, intentionally
+    unreadable to the ordinary CI user. Prefer a normal read, and for those
+    protected files only ask sudo to calculate their SHA-256 digest. Never
+    execute checked-out Python code as root and never print config contents.
+    """
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except PermissionError:
+        try:
+            result = subprocess.run(
+                ["sudo", "-n", "sha256sum", "--", str(path)],
+                capture_output=True,
+                text=True,
+                timeout=12,
+                check=True,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError("PROTECTED_ROM_HASH_UNAVAILABLE") from exc
+        digest = result.stdout.split(maxsplit=1)[0] if result.stdout else ""
+        if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise RuntimeError("PROTECTED_ROM_HASH_INVALID")
+        return digest
+
+
 def check(rom:Path)->list[str]:
     errors=[]
     ids=[x["id"] for x in json.loads(CONTRACT.read_text())["required_core"]]
@@ -103,7 +133,15 @@ def check(rom:Path)->list[str]:
             if not dst.is_file() or dst.is_symlink() or dst.stat().st_size!=src.stat().st_size:
                 errors.append("ROM_MISSING_OR_WRONG_SIZE:"+name+":"+relative_rom)
                 continue
-            if hashlib.sha256(src.read_bytes()).digest()!=hashlib.sha256(dst.read_bytes()).digest():
+            try:
+                expected_digest = hashlib.sha256(src.read_bytes()).hexdigest()
+                image_digest = _squashfs_digest(dst)
+            except (OSError, RuntimeError) as exc:
+                # A missing sudo privilege, malformed digest, or inaccessible
+                # protected file is a HARD FAIL rather than a silent skip.
+                errors.append("ROM_HASH_UNAVAILABLE:"+name+":"+relative_rom+":"+str(exc))
+                continue
+            if expected_digest != image_digest:
                 errors.append("ROM_DIFFERENT_FROM_VERIFIED_SOURCE:"+name+":"+relative_rom)
     for forbidden in ("www/cgi-bin/luci","www/luci-static","usr/share/luci"):
         if (rom/forbidden).exists():
