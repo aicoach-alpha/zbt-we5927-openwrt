@@ -51,4 +51,4 @@ class BackupExport(unittest.TestCase):
             archive.write_bytes(b"broken archive")
             self.assertIn(b"500 Internal Server Error", call()[0])
             acl = json.loads((PACKAGES / "veci-v2-runtime/veci2-status-acl.json").read_text())
-            self.assertEqual(acl["veci-v2-backup"]["write"]["ubus"]["veci.v2.backup"], ["export"])
+            self.assertEqual(acl["veci-v2-backup"]["write"]["ubus"]["veci.v2.backup"], ["export","inspect","restore"])

@@ -33,6 +33,9 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historical OEM/VeCI source provenance tests read original commits.
+          fetch-depth: 0
 
       # PRE-COMPILE FAIL-CLOSED. No apt/dependency install and no OpenWrt image
       # build until every mandatory VeCI core feature has source+test evidence.
@@ -40,9 +43,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The source-only gate is intentionally first. It neither fetches
+          # nor compiles OpenWrt firmware and rejects incomplete modules.
           python3 rebuild/veci-v2/ci/source-completion-gate.py
-          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -q
-          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py' -q
 
       - name: Install OpenWrt host dependencies
         shell: bash
@@ -51,8 +54,28 @@ jobs:
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential clang bison flex gawk gettext git gcc-multilib \
-            libncurses-dev libssl-dev rsync subversion swig unzip wget \
+            libncurses-dev libssl-dev libjson-c-dev cmake pkg-config busybox \
+            rsync subversion swig unzip wget \
             zlib1g-dev python3 python3-setuptools file xz-utils zstd squashfs-tools
+
+      # Host-only test dependencies are compiled AFTER the 40/40 source gate.
+      # These are native UCI/json tools, NOT firmware or flashable artifacts.
+      - name: Provision pinned native UCI and libubox test environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/provision-native-uci-tests.sh "$RUNNER_TEMP/veci-host-test-tools"
+
+      - name: Execute all native source tests before OpenWrt firmware build
+        shell: bash
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/veci-host-test-tools/native-test-env.sh"
+          test -x "$VECI_HOST_UCI"
+          test -x "$VECI_LIBUBOX_PREFIX/bin/jshn"
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -q
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py' -q
+          echo SOURCE_NATIVE_REGRESSION_COMPLETE=PASS
 
       - name: Pin, stage and verify exact 2SIM board sources
         shell: bash

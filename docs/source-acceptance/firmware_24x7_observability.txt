@@ -1,0 +1,36 @@
+
+test_failclosed_other_board_symlink_and_no_router_controls (test_owner_24x7_observability_native.Native24x7Observability.test_failclosed_other_board_symlink_and_no_router_controls) ... ok
+test_native_healthy_degraded_three_samples_unknown_and_no_internet_claim (test_owner_24x7_observability_native.Native24x7Observability.test_native_healthy_degraded_three_samples_unknown_and_no_internet_claim) ... ok
+test_privacy_bounded_tmpfs_and_root_only_permissions (test_owner_24x7_observability_native.Native24x7Observability.test_privacy_bounded_tmpfs_and_root_only_permissions) ... ok
+test_procd_startup_bounded_rpc_acl_and_installed_files (test_owner_24x7_observability_native.Native24x7Observability.test_procd_startup_bounded_rpc_acl_and_installed_files) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.827s
+
+OK
+
+
+test_bad_telemetry_cannot_inflate_72h_coverage (test_veci_link_monitor.Tests.test_bad_telemetry_cannot_inflate_72h_coverage) ... ok
+test_bad_timestamp_does_not_crash_or_expand_coverage (test_veci_link_monitor.Tests.test_bad_timestamp_does_not_crash_or_expand_coverage) ... ok
+test_dhcp_release_is_suspected_only (test_veci_link_monitor.Tests.test_dhcp_release_is_suspected_only) ... ok
+test_disconnected_monitor_gap_is_not_a_proven_wan_down_edge (test_veci_link_monitor.Tests.test_disconnected_monitor_gap_is_not_a_proven_wan_down_edge) ... ok
+test_duplicates_cannot_fake_99_percent_coverage (test_veci_link_monitor.Tests.test_duplicates_cannot_fake_99_percent_coverage) ... ok
+test_first_failed_poll_anchors_window_even_if_ssh_recovers_late (test_veci_link_monitor.Tests.test_first_failed_poll_anchors_window_even_if_ssh_recovers_late) ... ok
+test_gap_recovery_must_not_invent_outage_edge (test_veci_link_monitor.Tests.test_gap_recovery_must_not_invent_outage_edge) ... ok
+test_invalid_or_failed_scan_never_claims_router_visible (test_veci_link_monitor.Tests.test_invalid_or_failed_scan_never_claims_router_visible) ... ok
+test_long_window_monitor_ignores_same_ssid_from_other_ap (test_veci_link_monitor.Tests.test_long_window_monitor_ignores_same_ssid_from_other_ap) ... ok
+test_missing_usb_interface_is_a_valid_observation_not_missing_data (test_veci_link_monitor.Tests.test_missing_usb_interface_is_a_valid_observation_not_missing_data) ... ok
+test_no_false_root_cause_from_ping (test_veci_link_monitor.Tests.test_no_false_root_cause_from_ping) ... ok
+test_outside_requested_window_cannot_repair_missing_coverage (test_veci_link_monitor.Tests.test_outside_requested_window_cannot_repair_missing_coverage) ... ok
+test_period_requires_multiple_cycles (test_veci_link_monitor.Tests.test_period_requires_multiple_cycles) ... ok
+test_single_gap_not_evidence (test_veci_link_monitor.Tests.test_single_gap_not_evidence) ... ok
+test_snapshot_filters_private_fields (test_veci_link_monitor.Tests.test_snapshot_filters_private_fields) ... ok
+test_successful_ssh_with_unparsed_metrics_is_not_valid_telemetry (test_veci_link_monitor.Tests.test_successful_ssh_with_unparsed_metrics_is_not_valid_telemetry) ... ok
+test_uat_coverage_uses_full_requested_72h_not_only_success_span (test_veci_link_monitor.Tests.test_uat_coverage_uses_full_requested_72h_not_only_success_span) ... ok
+test_unordered_logs_are_sorted_before_outage_classification (test_veci_link_monitor.Tests.test_unordered_logs_are_sorted_before_outage_classification) ... ok
+test_wifi_visibility_must_be_observed_externally (test_veci_link_monitor.Tests.test_wifi_visibility_must_be_observed_externally) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.012s
+
+OK

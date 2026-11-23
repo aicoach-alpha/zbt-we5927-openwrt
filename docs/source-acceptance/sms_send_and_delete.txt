@@ -1,0 +1,37 @@
+
+test_codec_exactly_tracks_reviewed_v1_parser_function_block (test_veci_v2_sms_ui.SmsCenterV2.test_codec_exactly_tracks_reviewed_v1_parser_function_block) ... ok
+test_gsm_ucs2_and_three_part_pdu_vector (test_veci_v2_sms_ui.SmsCenterV2.test_gsm_ucs2_and_three_part_pdu_vector) ... ok
+test_html_dom_and_package_includes_all_sms_modules (test_veci_v2_sms_ui.SmsCenterV2.test_html_dom_and_package_includes_all_sms_modules) ... ok
+test_inbox_sent_and_draft_rpc_contract (test_veci_v2_sms_ui.SmsCenterV2.test_inbox_sent_and_draft_rpc_contract) ... ok
+test_sms_private_data_cleared_on_logout (test_veci_v2_sms_ui.SmsCenterV2.test_sms_private_data_cleared_on_logout) ... ok
+test_sms_requires_user_action_and_never_retries_unknown_outcome (test_veci_v2_sms_ui.SmsCenterV2.test_sms_requires_user_action_and_never_retries_unknown_outcome) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.411s
+
+OK
+
+
+test_delete_matching_message (test_sms_port_transaction.SmsPortTransaction.test_delete_matching_message) ... ok
+test_port_change_before_delete (test_sms_port_transaction.SmsPortTransaction.test_port_change_before_delete) ... ok
+test_port_change_before_submit (test_sms_port_transaction.SmsPortTransaction.test_port_change_before_submit) ... ok
+test_send_once_and_restore_sms_mode (test_sms_port_transaction.SmsPortTransaction.test_send_once_and_restore_sms_mode) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 1.595s
+
+OK
+
+
+test_firmware_package_releases_updated_wrapper (test_veci_sms_cmgs_result.CMGSResultTests.test_firmware_package_releases_updated_wrapper) ... ok
+test_invalid_report_receipt_rejected_without_claiming_delivery (test_veci_sms_cmgs_result.CMGSResultTests.test_invalid_report_receipt_rejected_without_claiming_delivery) ... ok
+test_known_negative_receipts_preserved (test_veci_sms_cmgs_result.CMGSResultTests.test_known_negative_receipts_preserved) ... ok
+test_nonzero_transport_exit_does_not_claim_acceptance (test_veci_sms_cmgs_result.CMGSResultTests.test_nonzero_transport_exit_does_not_claim_acceptance) ... ok
+test_plain_success_kept (test_veci_sms_cmgs_result.CMGSResultTests.test_plain_success_kept) ... ok
+test_requested_report_receipt_is_still_modem_accepted (test_veci_sms_cmgs_result.CMGSResultTests.test_requested_report_receipt_is_still_modem_accepted) ... ok
+test_unknown_or_broken_receipt_is_uncertain_not_send_unavailable (test_veci_sms_cmgs_result.CMGSResultTests.test_unknown_or_broken_receipt_is_uncertain_not_send_unavailable) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.068s
+
+OK

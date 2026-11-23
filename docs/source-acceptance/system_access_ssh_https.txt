@@ -1,9 +1,8 @@
-$ python3 -m unittest discover -s /home/andre/projects/zbt-we2825-veci-openwrt/worktrees/parallel-accept-staging-20261123/scripts/tests -p test_owner_access_acceptance.py -v
 
 test_access_rpc_writes_only_config_without_restarting_network (test_owner_access_acceptance.NativeAccessAcceptance.test_access_rpc_writes_only_config_without_restarting_network) ... ok
 test_original_uat_with_isolated_config_and_complete_crud (test_owner_access_acceptance.NativeAccessAcceptance.test_original_uat_with_isolated_config_and_complete_crud) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 16.392s
+Ran 2 tests in 17.608s
 
 OK

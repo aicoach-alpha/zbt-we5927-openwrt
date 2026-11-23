@@ -5,7 +5,7 @@
   const output = document.getElementById('addon-profiles-status');
   if (!button || !list || !output) return;
   let busy = false;
-  async function refresh(action, expected) {
+  async function refresh(action, expected, objectMethod = 'setVpnStartup') {
     if (!sid || busy) return;
     const session = sid;
     busy = true; button.disabled = true;
@@ -13,7 +13,7 @@
     output.textContent = 'Memeriksa addon…';
     try {
       if (action) {
-        const ack = await rpc('veci.v2.addon','setVpnStartup',{action,expected},session);
+        const ack = await rpc('veci.v2.addon',objectMethod,{action,expected},session);
         if (!ack.ok) throw Error(ack.error || 'Gagal menyimpan startup');
       }
       const result = await rpc('veci.v2.addon','status',{},session);
@@ -22,6 +22,19 @@
       for (const [key,name] of [['wireguard','WireGuard'],['guest','Guest Portal'],['voucher','Voucher']]) {
         const row = document.createElement('li');
         row.textContent = name + ': ' + (result[key] || 'unknown');
+        if (['guest','voucher'].includes(key) && ['enabled','disabled'].includes(result[key])) {
+          const control = document.createElement('button');
+          control.type = 'button';
+          control.textContent = result[key] === 'enabled' ? 'Nonaktifkan' : 'Aktifkan';
+          control.addEventListener('click', () => {
+            if (session !== sid || !window.confirm(control.textContent + ' ' + name + '? Perubahan portal dapat memengaruhi konektivitas tamu.')) return;
+            let command;
+            if (key === 'guest') command = result[key] === 'enabled' ? 'DISABLE_PORTAL_AP' : 'ENABLE_PORTAL_AP';
+            else command = result[key] === 'enabled' ? 'ALLOW_CLICK_THROUGH' : 'REQUIRE_VOUCHER';
+            refresh(command,result[key],'setPortalStartup');
+          });
+          row.append(control);
+        }
         if (key === 'wireguard' && ['enabled','disabled'].includes(result[key])) {
           const control = document.createElement('button');
           control.type = 'button';

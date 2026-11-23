@@ -22,8 +22,8 @@ UI = PACKAGES / "veci-v2-ui"
 class NativeRoutingAcceptance(unittest.TestCase):
     def test_real_rpc_route_and_policy_crud_and_transaction_failure(self):
         env = os.environ.copy()
-        prefix = Path(env.get("VECI_LIBUBOX_PREFIX", "/home/andre/projects/veci/signing-tools/prefix"))
-        uci = Path(env.get("VECI_HOST_UCI", "/tmp/veci-host-uci.cr9ZfQ/build/uci"))
+        prefix = Path(env.get("VECI_LIBUBOX_PREFIX") or "/missing-native-libubox")
+        uci = Path(env.get("VECI_HOST_UCI") or "/missing-native-uci")
         jshn = prefix / "share/libubox/jshn.sh"
         self.assertTrue(shutil.which("busybox"), "busybox with ash is required")
         for tool in (uci, prefix / "bin/jshn", jshn):

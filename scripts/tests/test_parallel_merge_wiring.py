@@ -50,11 +50,13 @@ class ParallelMergeWiring(unittest.TestCase):
         self.assertNotIn("5180",controls)
         self.assertIn("HTTPS", (UI/"files/www/cgi-bin/veci2-backup").read_text())
 
-    def test_not_ready_for_final_build_even_with_source_presence(self):
+    def test_source_complete_still_cannot_claim_flash_authorization(self):
         items=json.loads((ROOT/"rebuild/veci-v2/contracts/veci-v2-rebuild-contract.json").read_text())
         self.assertEqual(len(items["required_core"]),40)
+        self.assertTrue(all(x["v2_state"]=="source_verified" for x in items["required_core"]))
+        self.assertTrue(all(x["physical_uat"]=="not_run" for x in items["required_core"]))
         self.assertFalse(items["flash_authorized"])
-        self.assertTrue(any(x["v2_state"]=="not_ported_to_v2" for x in items["required_core"]))
+        self.assertEqual(items["release_state"],"DEVELOPMENT_NOT_FLASHABLE")
 
 
 if __name__=="__main__":

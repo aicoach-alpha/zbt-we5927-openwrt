@@ -17,7 +17,7 @@ class FailClosedSourceEvidence(unittest.TestCase):
     def test_real_missing_40_core_evidence_still_blocks(self):
         problems=gate.audit(base,{})
         self.assertTrue(any("source_evidence_missing_or_extra_modules"==x for x in problems))
-        self.assertTrue(any("not_source_verified" in x for x in problems))
+        self.assertTrue(any("missing_implementation_or_test_evidence:" in x for x in problems))
 
     def test_verified_module_cannot_use_an_unrelated_test_or_fake_log(self):
         contract=json.loads(json.dumps(base))
