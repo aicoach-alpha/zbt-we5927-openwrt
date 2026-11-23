@@ -1,0 +1,9 @@
+
+test_cron_rpc_native_transactions_preserve_external_changes (test_owner_cron_acceptance.CronAcceptance.test_cron_rpc_native_transactions_preserve_external_changes) ... ok
+test_native_ui_add_edit_remove_confirmation_and_acl (test_owner_cron_acceptance.CronAcceptance.test_native_ui_add_edit_remove_confirmation_and_acl) ... ok
+test_parser_add_remove_preserves_oem_and_rejects_invalid_ranges (test_owner_cron_acceptance.CronAcceptance.test_parser_add_remove_preserves_oem_and_rejects_invalid_ranges) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 1.253s
+
+OK

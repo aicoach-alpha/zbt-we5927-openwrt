@@ -1,4 +1,48 @@
 {
+  "dhcp_dns_static_leases": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-dns",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-static-leases",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lan-bounds",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/dns-settings.js"
+    ],
+    "suites": [
+      "test_owner_dhcp_dns_acceptance.py"
+    ],
+    "test_ids": [
+      "test_existing_dns_dhcp_native_uci_lock_and_rollback",
+      "test_existing_native_rpc_gui_acl_and_no_lte_mutations"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_dhcp_dns_acceptance.py",
+      "scripts/uat/test-owner-dhcp-dns.py"
+    ]
+  },
+  "interface_wan_lan": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-interfaces",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-interfaces-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/interfaces.js"
+    ],
+    "suites": [
+      "test_owner_interfaces_acceptance.py"
+    ],
+    "test_ids": [
+      "test_existing_wan_lan_rpc_native_uci_and_preserves_lte_ipv6",
+      "test_native_ui_rpc_acl_and_installation"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_interfaces_acceptance.py",
+      "scripts/uat/test-interfaces-host.py"
+    ]
+  },
   "ipv6_ra_dhcpv6": {
     "implementation_files": [
       "rebuild/veci-v2/packages/veci-v2-ipv6/Makefile",
@@ -45,6 +89,29 @@
     "test_source_files": [
       "scripts/tests/test_owner_routes_acceptance.py",
       "scripts/uat/test-routes-host.py"
+    ]
+  },
+  "system_cron_scheduler": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron.awk",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/cron.js"
+    ],
+    "suites": [
+      "test_owner_cron_acceptance.py"
+    ],
+    "test_ids": [
+      "test_cron_rpc_native_transactions_preserve_external_changes",
+      "test_parser_add_remove_preserves_oem_and_rejects_invalid_ranges",
+      "test_native_ui_add_edit_remove_confirmation_and_acl"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_cron_acceptance.py",
+      "scripts/uat/test-cron-host.py"
     ]
   },
   "system_ipv6_guarded_settings_toggle": {
@@ -98,6 +165,84 @@
       "scripts/tests/test_owner_ipv6_native_acceptance.py",
       "scripts/tests/test_veci_v2_ipv6_simple_menu.py",
       "scripts/uat/test-ipv6-host.py"
+    ]
+  },
+  "wifi_ap_2g": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js"
+    ],
+    "suites": [
+      "test_owner_wifi_acceptance.py"
+    ],
+    "test_ids": [
+      "test_primary_ap_native_uci",
+      "test_channel_survey_acl_and_auth_native_uci",
+      "test_incompatible_band_and_failed_commit_preserve_configuration",
+      "test_privileged_actions_have_write_acl"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_wifi_acceptance.py",
+      "scripts/uat/test-wifi-name-host.py",
+      "scripts/uat/test-wifi-controls-host.py"
+    ]
+  },
+  "wifi_clients_access_control": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js"
+    ],
+    "suites": [
+      "test_owner_wifi_acceptance.py"
+    ],
+    "test_ids": [
+      "test_primary_ap_native_uci",
+      "test_channel_survey_acl_and_auth_native_uci",
+      "test_incompatible_band_and_failed_commit_preserve_configuration",
+      "test_privileged_actions_have_write_acl"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_wifi_acceptance.py",
+      "scripts/uat/test-wifi-name-host.py",
+      "scripts/uat/test-wifi-controls-host.py"
+    ]
+  },
+  "wifi_survey_channel": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js"
+    ],
+    "suites": [
+      "test_owner_wifi_acceptance.py"
+    ],
+    "test_ids": [
+      "test_primary_ap_native_uci",
+      "test_channel_survey_acl_and_auth_native_uci",
+      "test_incompatible_band_and_failed_commit_preserve_configuration",
+      "test_privileged_actions_have_write_acl"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_wifi_acceptance.py",
+      "scripts/uat/test-wifi-name-host.py",
+      "scripts/uat/test-wifi-controls-host.py"
     ]
   }
 }
