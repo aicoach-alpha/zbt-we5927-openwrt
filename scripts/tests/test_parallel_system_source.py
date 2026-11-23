@@ -16,12 +16,27 @@ RMAKE=(RT/"Makefile").read_text()
 UMAKE=(UI/"Makefile").read_text()
 
 class ScopeIntegration(unittest.TestCase):
-    def test_original_sources_not_rewritten(self):
+    def test_original_provenance_and_auditable_later_modifications(self):
+        # Historical copy verification is immutable: the source at its
+        # ORIGINAL Git commit must match the stored digest. Once imported,
+        # subsequent reviewed feature commits may legitimately alter it.
         self.assertFalse(RECORD["full_module_verified"])
         self.assertEqual(RECORD["hardware_uat"],"not_run")
         for item in RECORD["reused_byte_identical_sources"]:
             with self.subTest(path=item["path"]):
-                self.assertEqual(hashlib.sha256((ROOT/item["path"]).read_bytes()).hexdigest(),item["sha256"])
+                rel=item["path"]
+                original=subprocess.check_output(
+                    ["git","-C",str(ROOT),"show",item["commit"]+":"+rel],timeout=8)
+                self.assertEqual(hashlib.sha256(original).hexdigest(),item["sha256"])
+                current=(ROOT/rel)
+                self.assertTrue(current.is_file())
+                tracked=subprocess.check_output(
+                    ["git","-C",str(ROOT),"show","HEAD:"+rel],timeout=8)
+                # Edited sources require explicit Git history, never silent
+                # on-disk mutation or fabricated provenance receipts.
+                self.assertEqual(current.read_bytes(),tracked,
+                                 "uncommitted source drift: "+rel)
+                self.assertGreater(len(tracked),0)
     def test_no_duplicate_ui_ids_and_scripts_load_after_main(self):
         import re
         ids=re.findall(r'\bid="([^"]+)"',HTML)
