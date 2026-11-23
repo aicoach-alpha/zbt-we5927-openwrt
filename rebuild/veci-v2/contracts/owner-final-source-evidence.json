@@ -990,7 +990,7 @@
         "hardware_uat": "not_run",
         "kind": "executed_source_tests",
         "log_file": "docs/source-acceptance/system_access_ssh_https.txt",
-        "log_sha256": "991a81500fecaa55f0aed63c486960cb55e1ebf5b3aa808df8999786ef14cd89"
+        "log_sha256": "02e15c881390bc9705edf32431b65ae50e3582da6cb110f5bada94e6508f497a"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -1001,7 +1001,7 @@
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/access.js": "1c51b4c95a651b9373fa23c6e5fef39299bd9c6dd73a80451aefe5c0753c3e77",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "e6c81b7bcf8409defb5a89414db3055796dbfad40d1b5a0a8591ae17052878fa",
         "scripts/tests/fixtures/uci_access_sandbox.py": "dbb03ce1e5fdeea0ae9b3aed1a3677d8249336c137d5a036abd5314056a3a116",
-        "scripts/tests/test_owner_access_acceptance.py": "97cf2f76061e459502d14186836d504fda93072778b9c607151c268356d4efb3",
+        "scripts/tests/test_owner_access_acceptance.py": "218572960927bd122cd8bda101e1b1a49ef69c1810abcc32bd55196e91e2e9c9",
         "scripts/uat/test-access-host.py": "e7a66da6a9298c0d95774507d3826872180b79b2a920bbb7068102a4062d8f3d"
       },
       "status": "pass",

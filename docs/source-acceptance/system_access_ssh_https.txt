@@ -3,6 +3,6 @@ test_access_rpc_writes_only_config_without_restarting_network (test_owner_access
 test_original_uat_with_isolated_config_and_complete_crud (test_owner_access_acceptance.NativeAccessAcceptance.test_original_uat_with_isolated_config_and_complete_crud) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 17.608s
+Ran 2 tests in 13.587s
 
 OK
