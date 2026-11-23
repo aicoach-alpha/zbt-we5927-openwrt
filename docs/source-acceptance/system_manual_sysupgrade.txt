@@ -11,7 +11,7 @@ test_wrong_hash_refused (test_verify_veci_image.FailClosedImageTests.test_wrong_
 test_wrong_release_refused (test_verify_veci_image.FailClosedImageTests.test_wrong_release_refused) ... ok
 
 ----------------------------------------------------------------------
-Ran 10 tests in 0.028s
+Ran 10 tests in 0.029s
 
 OK
 
@@ -19,7 +19,7 @@ OK
 test_saved_policy_controls_both_apply_paths (test_veci_update_policy.PolicyTest.test_saved_policy_controls_both_apply_paths) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.575s
+Ran 1 test in 1.135s
 
 OK
 
@@ -30,6 +30,6 @@ test_updates_failures_distinguish_no_network_from_bad_manifest (test_veci_single
 test_updates_only_in_updates_page (test_veci_single_firmware_update_ui.NativeUXGate.test_updates_only_in_updates_page) ... ok
 
 ----------------------------------------------------------------------
-Ran 4 tests in 0.003s
+Ran 4 tests in 0.005s
 
 OK

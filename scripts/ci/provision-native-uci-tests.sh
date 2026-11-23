@@ -13,7 +13,7 @@ esac
 mkdir -p "$root"
 root="$(cd "$root" && pwd -P)"
 prefix="$root/prefix"
-libubox_commit=a396f38a8568a1d670c240465cd8d24fdf6463
+libubox_commit=a396f38a8568a1d670c240465cd8d24fdfdf6463
 uci_commit=74f6277aabffc943d026f406df57c22595134c42
 libubox_override=$(printenv VECI_NATIVE_SOURCE_LIBUBOX || :)
 uci_override=$(printenv VECI_NATIVE_SOURCE_UCI || :)

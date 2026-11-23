@@ -47,7 +47,9 @@ else:
             def apply(query):
                 tail = b"1\nv1\nimage.bin\n" if query == "stable-apply" else b"x"
                 body = b"1"*32 + b"a"*64 + b"b"*64 + tail
-                result = subprocess.check_output(["sh", "-c", cgi], input=body, timeout=3,
+                # A two-second background sysupgrade worker can retain stdio while
+                # the test shell exits; allow for concurrent native suites.
+                result = subprocess.check_output(["sh", "-c", cgi], input=body, timeout=12,
                     env=dict(env, HTTPS="on", REQUEST_METHOD="POST", CONTENT_TYPE="application/octet-stream",
                              QUERY_STRING=query, CONTENT_LENGTH=str(len(body))))
                 return json.loads(result.split(b"\r\n\r\n")[1])

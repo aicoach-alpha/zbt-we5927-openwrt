@@ -1269,7 +1269,7 @@
         "hardware_uat": "not_run",
         "kind": "executed_source_tests",
         "log_file": "docs/source-acceptance/system_manual_sysupgrade.txt",
-        "log_sha256": "8d2fb2eeb904c5785664ef18dcb9bf62321ab52f1590d390c1beff9fa6700b38"
+        "log_sha256": "f8d6cc4468f4d516bfc2f517a7d923891a16b291e716e6e78024fab50c9b5b67"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -1280,7 +1280,7 @@
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "758d44c9af27b7bb235c66856fafb039d00fc9371d82d6a8a50a7644b1dc76d2",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "3777e0b18888b5f01cc3ff7c5fc9fdb7bd6ad0d351994f28d14f05cd89820b51",
         "scripts/tests/test_veci_single_firmware_update_ui.py": "3cfd99b13f701935003dd473f779b7c0c77e801d5515234dff25b8801d6ce396",
-        "scripts/tests/test_veci_update_policy.py": "3610d1c6b3ae5d322eaeb9c1b85e5d265260cdd5076a78b7bdbb47be83edc491",
+        "scripts/tests/test_veci_update_policy.py": "d989fb51592d63731d0b7c3eecd9a51e099385339da91894d2b05c0c5f401db6",
         "scripts/tests/test_verify_veci_image.py": "2c3e1ba1e16bb1567a3de2e042e44fd58d21e512ad2787969bc5078c20ead5de"
       },
       "status": "pass",
@@ -1409,7 +1409,7 @@
         "hardware_uat": "not_run",
         "kind": "executed_source_tests",
         "log_file": "docs/source-acceptance/system_update_policy.txt",
-        "log_sha256": "189d680eacb5d50654198c69a924cd76039b9feb05a159cfbd0230e5f9150c26"
+        "log_sha256": "1284b7ecc6566b8b0edb50c1a17fd760e0902db74e994bfbe49df22c185e2e7a"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -1421,7 +1421,7 @@
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/update-policy.js": "af5f344dcfc37c1aed7e1a0cfe54f3c85659cb7db5b4ec6390166cb7b8af5b1c",
         "scripts/tests/test_owner_verify_only_default.py": "2c59532168fc38387c43f3d88bd0b35e18ae22823f5432f5d7f904ac7044836a",
         "scripts/tests/test_veci_single_firmware_update_ui.py": "3cfd99b13f701935003dd473f779b7c0c77e801d5515234dff25b8801d6ce396",
-        "scripts/tests/test_veci_update_policy.py": "3610d1c6b3ae5d322eaeb9c1b85e5d265260cdd5076a78b7bdbb47be83edc491"
+        "scripts/tests/test_veci_update_policy.py": "d989fb51592d63731d0b7c3eecd9a51e099385339da91894d2b05c0c5f401db6"
       },
       "status": "pass",
       "test_ids": [
