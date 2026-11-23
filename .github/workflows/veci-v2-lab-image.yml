@@ -73,6 +73,10 @@ jobs:
           source "$RUNNER_TEMP/veci-host-test-tools/native-test-env.sh"
           test -x "$VECI_HOST_UCI"
           test -x "$VECI_LIBUBOX_PREFIX/bin/jshn"
+          # Check every referenced original commit, immutable remote tag and
+          # source checksum; full git history alone does not fetch dangling
+          # local commits absent from GitHub refs.
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/ci/verify-provenance-refs.py
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -q
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py' -q
           echo SOURCE_NATIVE_REGRESSION_COMPLETE=PASS
