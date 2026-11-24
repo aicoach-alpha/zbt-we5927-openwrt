@@ -44,14 +44,14 @@ class HardwareWifiGuard(unittest.TestCase):
                        "wireless.default_radio0.encryption=psk2",
                        "wireless.radio0.disabled=0",
                        "wireless.default_radio0.disabled=0",
-                       "wifi up radio0","hostapd_ap_not_enabled_rollback",
+                       "network.wireless up","hostapd_ap_not_enabled_rollback",
                        "wireless.default_radio0.network=lan",
-                       "sleep 75","success_flag","busybox timeout",
+                       "sleep 75","success_flag","ubus -S -t 12",
                        "cp -p"]:
             self.assertIn(prereq,s,prereq)
         commands="\n".join(line for line in s.splitlines() if not line.lstrip().startswith("#"))
         for dangerous in ["sysupgrade","reboot","ifdown","ifup","wifi reload",
-                          "service network restart","/etc/init.d/network restart",
+                          "service network restart","/etc/init.d/network restart","network reload",
                           "AT+CFUN","mtd write","uci -q commit network"]:
             self.assertNotIn(dangerous,commands,dangerous)
         test=subprocess.run(["sh",str(p)],capture_output=True,text=True)
@@ -76,6 +76,19 @@ class HardwareWifiGuard(unittest.TestCase):
         self.assertIn("$ExitCode = $LASTEXITCODE",s)
         self.assertIn("AUDIT_END=OK",s)
         self.assertIn("WIFI_REPAIR_STATUS=AP_STARTED_CONFIGURATION_SAVED",s)
+        self.assertIn("$SafePayload = $Text.TrimEnd([char[]]@([char]10,[char]13))",s)
+        self.assertIn("'exit $?'",s)
+
+    def test_terminal_cr_causes_127_and_append_exit_preserves_success(self):
+        # Reproduces Windows PowerShell native stdin's terminal CR (ash sees
+        # it as a command) and demonstrates the fail-closed transport fix.
+        bad = subprocess.run(["sh","-s"],input="echo AUDIT_END=OK\n\r\n",
+                             capture_output=True,text=True)
+        self.assertEqual(bad.returncode,127)
+        good = subprocess.run(["sh","-s"],input="echo AUDIT_END=OK\nexit $?\n\r\n",
+                              capture_output=True,text=True)
+        self.assertEqual(good.returncode,0)
+        self.assertIn("AUDIT_END=OK",good.stdout)
 
     def test_first_boot_does_not_create_open_ap_and_wizard_still_required(self):
         s=FIRMWARE.read_text()

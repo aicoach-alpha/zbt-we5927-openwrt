@@ -39,3 +39,18 @@ Read-only factual on-device snapshot (owner report: E:/Documents/VeCI-Router-Aud
 - timeout executable absent on owner router in earlier terminal. Signed firmware BusyBox binary has timeout applet string; guarded repair now tests busybox --list for timeout and invokes it only if available. Check on hardware before enabling radio.
 
 No Wi-Fi repair execution or post-repair results exist yet. Do not claim hardware PASS. The next live execution must pin SHA256 to approved code, preserve original router state on failed preflight, and report full diagnostic reasons.
+
+
+## Owner physical audit 2026-11-24 03:40:29 UTC and correction of unsafe assumptions
+
+Owner's second verified Windows run: uptime 4443 seconds; free RAM 15004 KiB; free overlay 1804 KiB; root password YES; LTE HTTPS bound USB0 PASS HTTP 200; LAN/DHCP/NAT intact. Primary AP disabled=1, encryption=none, no PSK. phy0 and mt7603e present, network.wireless up=true, but no AP netdev observed. SMS RPC registered, SMS configuration disabled. Wi-Fi is NOT hardware PASS.
+
+Read-only audit reached AUDIT_END=OK then SSH exit=127 with shell 'CR not found'. A reproducer shows a carriage-return-only line after a POSIX script produces exit 127, whereas a literal exit with prior status placed BEFORE that terminal CR preserves success. PowerShell stdin transport now appends that explicit POSIX exit statement, retaining real nonzero results and success-token checks.
+
+Owner hardware reports WIFI_TIMEOUT_HELPER=unavailable. No standalone timeout command or supported BusyBox timeout applet is available in the runtime. Previous guarded repair would safely abort before touching settings. Revised repair uses built-in bounded RPC timeout: ubus -S -t 12 call network.wireless up, targeting radio0 only.
+
+Crucial new source finding from the signed ROM /sbin/wifi itself: wifi up radio0 triggers ubus call network reload, which may perturb functioning LTE/LAN. The prior repair script assumption of radio-only behavior was INCORRECT. That call is now removed. Targeted network.wireless up may legitimately do nothing if radio0 is already reported up. If AP BSS/hostapd cannot be proven, restore original wireless UCI and report failure; do not force radio down or reset. The original backup is retained, and rollback includes UCI revert plus file verification.
+
+This is a source-level safety correction, NOT executed on the physical router. Historical owner evidence includes MT76 MCU timeouts after radio down/up, so kernel deadlock cannot be excluded or made safe by a user-space watchdog. Do not claim physical Wi-Fi PASS until beacon/client-DHCP/DNS/HTTPS is observed. No new firmware image was flashed.
+
+Next build permanent regression: no wifi up calling full network reload, no unbounded Wi-Fi action, no unsafely enabled open SSID, no fabricated AP-ready from phy0/ubus; add secured first-use AP wizard and real hardware tests.

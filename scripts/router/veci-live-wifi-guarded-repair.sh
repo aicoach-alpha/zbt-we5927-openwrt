@@ -18,17 +18,12 @@ get() { uci -q get "$1" 2>/dev/null || :; }
 [ -d /sys/class/net/br-lan ] || die wired_lan_missing
 ip -4 route show default | grep -q ' dev usb0 ' || die lte_default_route_missing
 command -v wpad >/dev/null 2>&1 || die wpad_missing
-command -v wifi >/dev/null 2>&1 || die wifi_command_missing
-# OpenWrt includes a BusyBox timeout applet in this signed ROM but no
-# /usr/bin/timeout link, so use that exact applet without installing anything.
-if command -v timeout >/dev/null 2>&1; then
-  :
-elif busybox --list 2>/dev/null | grep -Fxq timeout; then
-  timeout() { busybox timeout "$@"; }
-else
-  die bounded_timeout_unavailable
-fi
+# Never execute /sbin/wifi up: the shipped OpenWrt helper also triggers
+# 'ubus call network reload' and can interrupt the working LTE connection.
+# Keep the attempt explicitly restricted to netifd's radio0 object.
 command -v ubus >/dev/null 2>&1 || die ubus_missing
+ubus -S -t 3 list network.wireless 2>/dev/null | grep -Fxq network.wireless ||
+  die network_wireless_ubus_missing
 command -v jsonfilter >/dev/null 2>&1 || die jsonfilter_missing
 [ -z "$(uci -q changes wireless 2>/dev/null || :)" ] || die pending_wireless_changes
 if dmesg 2>/dev/null | grep -Eiq 'mt76.*(mcu.*timeout|reset failed|timed out)|mt7603.*(timeout|failed)'; then
@@ -57,10 +52,12 @@ rollback_flag="$root/rollback"
 (
   sleep 75
   if [ ! -f "$success_flag" ]; then
+    uci -q revert wireless >/dev/null 2>&1 || :
     cp -p "$backup" /etc/config/wireless || :
-    timeout 8 wifi down radio0 >/dev/null 2>&1 || :
+    # Restore UCI only. Do NOT command a radio reset or restart netifd:
+    # known MT76 MCU hang may make such operations unsafe.
     touch "$rollback_flag"
-    logger -t "$tag" "WiFi configuration auto-rollback: AP not verified within 75s" || :
+    logger -t "$tag" "WiFi UCI restored; radio runtime may require separate diagnosis" || :
   fi
 ) </dev/null >/dev/null 2>&1 &
 watchdog_pid=$!
@@ -68,10 +65,15 @@ restored=no
 restore_now() {
   [ "$restored" = yes ] && return
   restored=yes
-  cp -p "$backup" /etc/config/wireless || :
-  timeout 8 wifi down radio0 >/dev/null 2>&1 || :
+  uci -q revert wireless >/dev/null 2>&1 || :
+  if cp -p "$backup" /etc/config/wireless &&
+     cmp -s "$backup" /etc/config/wireless; then
+    echo 'WIFI_UCI_ROLLBACK=PASS'
+  else
+    echo 'WIFI_UCI_ROLLBACK=FAILED_MANUAL_REVIEW_REQUIRED'
+  fi
   touch "$rollback_flag"
-  logger -t "$tag" "WiFi configuration restored after guarded apply failure" || :
+  logger -t "$tag" "WiFi UCI restored after guarded attempt failure; no radio reset" || :
 }
 cleanup() {
   status="$?"
@@ -117,8 +119,11 @@ uci -q set 'wireless.radio0.disabled=0' || die set_radio_failed
 uci -q set 'wireless.default_radio0.disabled=0' || die set_ap_failed
 uci -q commit wireless || die commit_failed
 
-echo 'WIFI_APPLY_ATTEMPT=guarded_wifi_up_radio0_no_restart'
-timeout 22 wifi up radio0 >/dev/null 2>&1 || die wifi_up_failed_or_timeout
+echo 'WIFI_APPLY_ATTEMPT=bounded_ubus_only_radio0_no_network_reload'
+# If radio0 was already reported up but had no AP interface, this method
+# may legitimately be a no-op. Do not force a down/reload or a driver reset.
+ubus -S -t 12 call network.wireless up '{"device":"radio0"}' >/dev/null 2>&1 ||
+  die radio0_targeted_up_rpc_failed
 attempt=0
 confirmed=no
 while [ "$attempt" -lt 9 ]; do
