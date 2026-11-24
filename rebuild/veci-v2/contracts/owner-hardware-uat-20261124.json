@@ -470,6 +470,23 @@
       "mitigation_source": "scripts/router/veci-netifd-orphan-guarded-mitigation-20261124.sh",
       "mitigation_physically_executed": false,
       "avoid": "killall, kill parent ash, restart canonical netifd, ifup/ifdown LTE, modem reset, network reload, flash"
+    },
+    "fifteenth_owner_guarded_orphan_mitigation_safe_stop": {
+      "source": "owner real physical router SSH output",
+      "script": "scripts/router/veci-netifd-orphan-guarded-mitigation-20261124.sh",
+      "source_commit": "2fb533bd1e0b0bc4c614c9f446935b5959dca176",
+      "source_sha256": "2ee85d917482a8d7b338ad173374be0951279c5bca548424895e994c8e6a2233",
+      "procd_network_pid": 1366,
+      "mitigation_stop": "lte_ipv4_already_assigned_do_not_touch",
+      "ssh_exit": 3,
+      "lte_usb0_ipv4": "ASSIGNED_AT_PRECHECK",
+      "lte_default_route": "UNKNOWN",
+      "lte_egress": "NOT_VERIFIED",
+      "orphan_process_stopped": false,
+      "router_mutation": false,
+      "safety_precheck": "WORKED",
+      "next": "read-only repeat LTE route+direct HTTP+HTTPS and netifd processes from cached sha-pinned script",
+      "do_not": "rerun SIGTERM mitigation, reboot, reload network or flash while IPv4 has returned"
     }
   }
 }
