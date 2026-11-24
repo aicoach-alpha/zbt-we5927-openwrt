@@ -220,6 +220,20 @@
       "post_rollback_router_state": "UNKNOWN",
       "wifi_change_from_attempt": false,
       "next": "Windows Ethernet link IP route gateway ping and TCP 443/22 diagnostics"
+    },
+    "seventh_user_windows_lan_reachability_20261124_1215_wib": {
+      "ethernet": "Up 100 Mbps",
+      "source_address": "192.168.1.223",
+      "destination_router": "192.168.1.1",
+      "route": "onlink 192.168.1.0/24",
+      "ping": "3/3 replies 0 percent loss latency <1 to 1ms",
+      "arp_state": "Probe (transient)",
+      "tcp_443": "PASS",
+      "tcp_22": "PASS",
+      "prior_ssh_timeout": "TRANSIENT_OR_UNRESOLVED_NO_CURRENT_PORT_REACHABILITY_FAILURE",
+      "authenticated_ssh": "NOT_TESTED_IN_THIS_SNAPSHOT",
+      "wifi_radio": "NOT_RETESTED",
+      "next": "run already downloaded SHA256-validated read-only triage via SSH; no WiFi activation"
     }
   }
 }
