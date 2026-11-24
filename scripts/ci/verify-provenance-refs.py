@@ -45,9 +45,10 @@ def verify():
                 raise ValueError("PROVENANCE_SOURCE_DIGEST_MISMATCH:" + item["path"])
             if not (ROOT / item["path"]).is_file():
                 raise ValueError("CURRENT_SOURCE_MISSING:" + item["path"])
+    # Historical USSD commit remains pinned for source-lineage auditing only;
+    # the owner retired USSD, so it must never be required in the new ROM.
     for short, names in (
         ("aa1b0b8", ("veci2-sim-lock", "sim-lock.js")),
-        ("331ebf7", ("veci2-ussd", "ussd.js")),
     ):
         for name in names:
             if name.endswith(".js"):
@@ -57,6 +58,13 @@ def verify():
             original = git("show", PINS[short] + ":" + relative)
             if (ROOT / relative).read_bytes() != original:
                 raise ValueError("ORIGINAL_PIN_OR_USSD_DRIFT:" + relative)
+    retired = (
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-ussd",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/ussd.js",
+    )
+    for rel in retired:
+        if (ROOT / rel).exists():
+            raise ValueError("RETIRED_USSD_REINTRODUCED:" + rel)
     print("ALL_5_PROVENANCE_REFS_AND_ORIGINAL_DIGESTS=PASS")
 
 if __name__ == "__main__":
