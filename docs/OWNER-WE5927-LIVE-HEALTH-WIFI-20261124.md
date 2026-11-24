@@ -24,3 +24,18 @@ Evidence is classified: prior on-device user UAT, confirmed bytes in signed ROM,
 3. Never reset LTE, switch SIM GPIO, restart full networking, flash or reboot to enable Wi-Fi. Keep original configs backed up, refuse unknown PHY/driver error.
 4. Source CI must regress the first-boot disabled security rule, guarded remediation and audit correctness; release remains fail-closed without real hardware proof. Router only has 2.4-GHz Wi-Fi.
 5. SMS and previously reported SIM/APN errors remain separate release-blocking issues. Signing/trust, sysupgrade -T, and real 72-hour stability remain mandatory before final release.
+
+## Owner physical audit evidence 2026-11-24 03:33:45 UTC
+
+Owner ran pinned PowerShell on Windows machine wired to ZBT WE5927. Read-only audit completed through AUDIT_END=OK; PowerShell aborted before Wi-Fi repair because native SSH stderr was emitted as terminating NativeCommandError under global ErrorActionPreference=Stop. This is a Windows wrapper bug, not an observed router kernel crash. Branch update captures both native SSH streams under scoped Continue, restores preference, gates on SSH exit code and completion sentinel, and preserves diagnostics in sanitized report.
+
+Read-only factual on-device snapshot (owner report: E:/Documents/VeCI-Router-Audits):
+- board zbtlink,zbt-we5927, OpenWrt 25.12.6 kernel 6.12.112, uptime 4040s, CPU load 0.07/0.04/0.01, MemAvailable 15164 KiB, overlay 1804 KiB. This hardware has tight resource headroom.
+- LAN 192.168.1.1/24, br-lan yes, DHCP running, masquerade enabled, LTE usb0 IPv4/default route present and USB0-bound HTTPS HTTP 200. Do not alter established LTE/LAN path.
+- wireless config present, radio0 band=2g, primary AP default_radio0 disabled=1, encryption=none, no PSK, network=lan; phy0 present, mt7603e loaded, wpad installed, hostapd/wpad process present, no WLAN kernel netdev found by original audit scanner. network.wireless returned up=true. None of these establish AP readiness. No MCU timeout signatures observed so far this boot.
+- veci.sms ubus object registered, veci_sms.main.enabled=0. This is a source-backed status of SMS config; physical SMS send/receive remains unproven, do not auto-enable or send.
+- SSH and uhttpd running, firmware trust anchor present; NTP service unknown, clock accurate UTC. Root password audit returned empty due BusyBox awk portability; owner previously successfully changed password. Updated audit will return yes/no/unknown.
+- historical SIM selector audit key was wrong and updated to we5927_lte.main.sim.
+- timeout executable absent on owner router in earlier terminal. Signed firmware BusyBox binary has timeout applet string; guarded repair now tests busybox --list for timeout and invokes it only if available. Check on hardware before enabling radio.
+
+No Wi-Fi repair execution or post-repair results exist yet. Do not claim hardware PASS. The next live execution must pin SHA256 to approved code, preserve original router state on failed preflight, and report full diagnostic reasons.

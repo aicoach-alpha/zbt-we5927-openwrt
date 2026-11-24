@@ -19,7 +19,15 @@ get() { uci -q get "$1" 2>/dev/null || :; }
 ip -4 route show default | grep -q ' dev usb0 ' || die lte_default_route_missing
 command -v wpad >/dev/null 2>&1 || die wpad_missing
 command -v wifi >/dev/null 2>&1 || die wifi_command_missing
-command -v timeout >/dev/null 2>&1 || die timeout_missing
+# OpenWrt includes a BusyBox timeout applet in this signed ROM but no
+# /usr/bin/timeout link, so use that exact applet without installing anything.
+if command -v timeout >/dev/null 2>&1; then
+  :
+elif busybox --list 2>/dev/null | grep -Fxq timeout; then
+  timeout() { busybox timeout "$@"; }
+else
+  die bounded_timeout_unavailable
+fi
 command -v ubus >/dev/null 2>&1 || die ubus_missing
 command -v jsonfilter >/dev/null 2>&1 || die jsonfilter_missing
 [ -z "$(uci -q changes wireless 2>/dev/null || :)" ] || die pending_wireless_changes

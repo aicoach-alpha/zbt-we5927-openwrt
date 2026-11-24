@@ -24,7 +24,9 @@ printf 'CPU_LOAD=%s\n' "$(cut -d' ' -f1-3 /proc/loadavg)"
 printf 'MEM_AVAILABLE_KIB=%s\n' "$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
 printf 'FLASH_OVERLAY_KIB=%s\n' "$(df -Pk /overlay 2>/dev/null | awk 'NR==2 {print $4}')"
 printf 'MTD_FIRMWARE_BYTES_HEX=%s\n' "$(awk '$0 ~ /"firmware"/ {print $2;exit}' /proc/mtd)"
-printf 'ROOT_PASSWORD_CONFIGURED=%s\n' "$(awk -F: '$1=="root" {print $2=="*"||$2=="!"||$2=="" ? "no":"yes"}' /etc/shadow 2>/dev/null)"
+root_pass_status="$(awk -F: '$1=="root" { if ($2=="" || $2=="*" || $2=="!") print "no"; else print "yes"; exit }' /etc/shadow 2>/dev/null || :)"
+[ -n "$root_pass_status" ] || root_pass_status=unknown
+printf 'ROOT_PASSWORD_CONFIGURED=%s\n' "$root_pass_status"
 printf 'ROOT_SSH_SERVICE=%s\n' "$(if pidof dropbear >/dev/null 2>&1; then echo running; else echo missing; fi)"
 printf 'HTTPS_SERVICE=%s\n' "$(if pidof uhttpd >/dev/null 2>&1; then echo running; else echo missing; fi)"
 printf 'SYSTEM_CLOCK_UTC=%s\n' "$(date -u '+%Y-%m-%d %H:%M:%S' 2>/dev/null)"
@@ -45,11 +47,23 @@ printf 'NTP_SERVICE=%s\n' "$(if pidof sysntpd >/dev/null 2>&1; then echo running
 printf 'WIRELESS_CONFIG=%s\n' "$(present /etc/config/wireless)"
 printf 'WIFI_RADIO_SECTION=%s\n' "$(get wireless.radio0)"
 printf 'WIFI_RADIO_BAND=%s\n' "$(get wireless.radio0.band)"
-printf 'WIFI_RADIO_DISABLED=%s\n' "$(flag "$(get wireless.radio0.disabled)")"
+case "$(get wireless.radio0.disabled)" in
+  1|true|on|yes) radio_disabled=yes ;;
+  0|false|off|no) radio_disabled=no ;;
+  '') radio_disabled=not_set ;;
+  *) radio_disabled=invalid ;;
+esac
+printf 'WIFI_RADIO_DISABLED=%s\n' "$radio_disabled"
 printf 'WIFI_AP_SECTION=%s\n' "$(get wireless.default_radio0)"
 printf 'WIFI_AP_DEVICE=%s\n' "$(get wireless.default_radio0.device)"
 printf 'WIFI_AP_MODE=%s\n' "$(get wireless.default_radio0.mode)"
-printf 'WIFI_AP_DISABLED=%s\n' "$(flag "$(get wireless.default_radio0.disabled)")"
+case "$(get wireless.default_radio0.disabled)" in
+  1|true|on|yes) ap_disabled=yes ;;
+  0|false|off|no) ap_disabled=no ;;
+  '') ap_disabled=not_set ;;
+  *) ap_disabled=invalid ;;
+esac
+printf 'WIFI_AP_DISABLED=%s\n' "$ap_disabled"
 printf 'WIFI_AP_NETWORK=%s\n' "$(get wireless.default_radio0.network)"
 printf 'WIFI_AP_SECURITY=%s\n' "$(get wireless.default_radio0.encryption)"
 apkey="$(get wireless.default_radio0.key)"
@@ -58,8 +72,15 @@ unset apkey
 printf 'WIFI_PHY0=%s\n' "$(present /sys/class/ieee80211/phy0)"
 printf 'WIFI_MT7603E=%s\n' "$(if grep -q '^mt7603e ' /proc/modules 2>/dev/null; then echo loaded; else echo not_loaded; fi)"
 printf 'WIFI_WPAD=%s\n' "$(cmd wpad)"
+if command -v timeout >/dev/null 2>&1; then
+  echo 'WIFI_TIMEOUT_HELPER=timeout'
+elif busybox --list 2>/dev/null | grep -Fxq timeout; then
+  echo 'WIFI_TIMEOUT_HELPER=busybox_timeout'
+else
+  echo 'WIFI_TIMEOUT_HELPER=unavailable'
+fi
 printf 'WIFI_HOSTAPD_PROCESS=%s\n' "$(if pidof hostapd >/dev/null 2>&1 || pidof wpad >/dev/null 2>&1; then echo present; else echo absent; fi)"
-printf 'WIFI_KERNEL_DEVICE_COUNT=%s\n' "$(find /sys/class/net -maxdepth 2 -name phy80211 2>/dev/null | wc -l)"
+printf 'WIFI_KERNEL_DEVICE_COUNT=%s\n' "$(ls -d /sys/class/net/*/phy80211 2>/dev/null | wc -l)"
 wireless="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null || :)"
 if [ -n "$wireless" ] && command -v jsonfilter >/dev/null 2>&1; then
   printf 'WIFI_RADIO_RUNTIME_UP=%s\n' "$(printf '%s' "$wireless" | jsonfilter -e '@.radio0.up' 2>/dev/null || echo unknown)"
@@ -81,7 +102,7 @@ else
 fi
 printf 'SMS_RPC_REGISTERED=%s\n' "$(if ubus -S -t 3 list veci.sms 2>/dev/null | grep -Fxq veci.sms; then echo yes; else echo no; fi)"
 printf 'SMS_CONFIG_ENABLED=%s\n' "$(flag "$(get veci_sms.main.enabled)")"
-printf 'SIM_SELECTOR_CONFIG=%s\n' "$(get veci_lte.main.sim_slot)"
+printf 'SIM_SELECTOR_CONFIG=%s\n' "$(get we5927_lte.main.sim)"
 printf 'TRUST_ANCHOR=%s\n' "$(present /etc/opkg/keys/1d8759d36251c36c)"
 if command -v curl >/dev/null 2>&1 && [ -d /sys/class/net/usb0 ]; then
   code="$(curl --disable --ipv4 --noproxy '*' --interface 'if!usb0' --silent --output /dev/null --connect-timeout 3 --max-time 7 --write-out '%{http_code}' 'https://www.cloudflare.com/cdn-cgi/trace' 2>/dev/null || :)"

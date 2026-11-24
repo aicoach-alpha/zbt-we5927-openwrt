@@ -26,6 +26,10 @@ class HardwareWifiGuard(unittest.TestCase):
             self.assertNotIn(dangerous,s,dangerous)
         self.assertNotIn('printf %s "$(get wireless.default_radio0.key)"',s)
         self.assertIn("WIFI_AP_PSK_CONFIGURED",s)
+        self.assertIn("ROOT_PASSWORD_CONFIGURED",s)
+        self.assertIn("we5927_lte.main.sim",s)
+        self.assertIn("WIFI_TIMEOUT_HELPER",s)
+        self.assertIn("WIFI_RADIO_DISABLED",s)
         test=subprocess.run(["sh",str(p)],capture_output=True,text=True)
         self.assertNotEqual(test.returncode,0)
         self.assertIn("AUDIT_ABORT=wrong_board",test.stdout)
@@ -42,7 +46,7 @@ class HardwareWifiGuard(unittest.TestCase):
                        "wireless.default_radio0.disabled=0",
                        "wifi up radio0","hostapd_ap_not_enabled_rollback",
                        "wireless.default_radio0.network=lan",
-                       "sleep 75","success_flag",
+                       "sleep 75","success_flag","busybox timeout",
                        "cp -p"]:
             self.assertIn(prereq,s,prereq)
         commands="\n".join(line for line in s.splitlines() if not line.lstrip().startswith("#"))
@@ -67,6 +71,11 @@ class HardwareWifiGuard(unittest.TestCase):
             hash=hashlib.sha256((ROUTER/name).read_bytes()).hexdigest()
             self.assertIn(hash,s,name)
         self.assertNotIn("StrictHostKeyChecking=no",s)
+        self.assertIn("$SavedPreference = $ErrorActionPreference",s)
+        self.assertIn("$ErrorActionPreference = 'Continue'",s)
+        self.assertIn("$ExitCode = $LASTEXITCODE",s)
+        self.assertIn("AUDIT_END=OK",s)
+        self.assertIn("WIFI_REPAIR_STATUS=AP_STARTED_CONFIGURATION_SAVED",s)
 
     def test_first_boot_does_not_create_open_ap_and_wizard_still_required(self):
         s=FIRMWARE.read_text()
