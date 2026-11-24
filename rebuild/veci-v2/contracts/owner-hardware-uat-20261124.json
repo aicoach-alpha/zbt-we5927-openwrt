@@ -281,6 +281,37 @@
       "router_state_changed": false,
       "intermittent_history": "prior TCP22/443 reachable, later SSH login succeeded, now timed out again",
       "next": "Windows-side timed LAN/ICMP/TCP22/TCP443 check, do not retry radio or kill netifd"
+    },
+    "tenth_owner_windows_three_probe_20261124_134526_134536_wib": {
+      "source": "owner PowerShell TCP/ping result",
+      "ethernet": "UP 100 Mbps",
+      "windows_ipv4": "192.168.1.223",
+      "router": "192.168.1.1",
+      "times_local": [
+        "13:45:26",
+        "13:45:31",
+        "13:45:36"
+      ],
+      "ping": [
+        true,
+        true,
+        true
+      ],
+      "tcp_22": [
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "tcp_443": [
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "tcp_reachability": "3/3 snapshots passed",
+      "authenticated_ssh": "NOT_PROVEN_BY_PORT_PROBES",
+      "lte_usb0_egress": "NOT_PROVEN_BY_PORT_PROBES",
+      "next": "single harmless authenticated SSH echo, then already SHA-pinned read-only netifd LTE script",
+      "router_changes": false
     }
   }
 }
