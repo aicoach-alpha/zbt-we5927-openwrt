@@ -612,6 +612,27 @@
       "netifd_kill": false,
       "new_risk": "Do not equate assigned modem-side IP and route with LTE internet",
       "next": "read-only local modem gateway vs public numeric IP TLS, no DNS needed; check resolver without secrets"
+    },
+    "twentieth_owner_gateway_timeout_no_ipv4_output": {
+      "source": "owner no-download physically authenticated router SSH one-off check",
+      "triage": "TRIAGE_END_OK_SSH_EXIT_0",
+      "usb0_ipv4_lines": "NONE_PRINTED",
+      "ip_default_route_lines": "NONE_PRINTED",
+      "usb0_physical_netdev": "UNVERIFIED",
+      "qualcomm_usb_05c6_902e": "UNVERIFIED",
+      "gateway_neighbor_output": "NONE",
+      "gateway_ping_exit": 1,
+      "gateway_http_code": "000",
+      "gateway_http_exit": 28,
+      "public_tls_ip_code": "000",
+      "public_tls_ip_exit": 28,
+      "resolv_conf_nameserver": "NO_NAMESERVER_LINES",
+      "diagnosis": "LTE route/gateway unavailable at snapshot, whether USB modem disappeared or DHCP/IP failed still unknown",
+      "router_mutation": false,
+      "release_gate": "LTE_FAIL_WIFI_NOT_PASSED",
+      "next_readonly_probe": "scripts/router/veci-lte-usb-link-readonly-20261124.sh",
+      "next_probe_physically_executed": false,
+      "safety": "NO_MODEM_RESET_NETWORK_RELOAD_KILL_REBOOT_FLASH"
     }
   }
 }
