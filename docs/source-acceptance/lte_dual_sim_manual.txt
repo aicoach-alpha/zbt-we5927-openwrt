@@ -1,0 +1,40 @@
+
+test_acl_scoping_and_derived_modem_config_guards (test_owner_manual_sim_native_acceptance.ManualSimNativeAcceptance.test_acl_scoping_and_derived_modem_config_guards) ... ok
+test_native_manual_sim_switch_confirmation_and_uci_consistency (test_owner_manual_sim_native_acceptance.ManualSimNativeAcceptance.test_native_manual_sim_switch_confirmation_and_uci_consistency) ... ok
+test_rollback_pending_and_wrong_board_fail_closed (test_owner_manual_sim_native_acceptance.ManualSimNativeAcceptance.test_rollback_pending_and_wrong_board_fail_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 1.311s
+
+OK
+
+
+test_failed_new_apn_restores_old_slot_once (test_lte_sim_switch_failure.SimSwitchFailureTests.test_failed_new_apn_restores_old_slot_once) ... ok
+test_failed_rollback_stops_before_second_cycle (test_lte_sim_switch_failure.SimSwitchFailureTests.test_failed_rollback_stops_before_second_cycle) ... ok
+test_gpio_failure_stops_before_sim_reconnect (test_lte_sim_switch_failure.SimSwitchFailureTests.test_gpio_failure_stops_before_sim_reconnect) ... ok
+test_manual_reconnect_stops_at_failed_stage (test_lte_sim_switch_failure.SimSwitchFailureTests.test_manual_reconnect_stops_at_failed_stage) ... ok
+test_manual_selector_failure_preserves_error_and_stops (test_lte_sim_switch_failure.SimSwitchFailureTests.test_manual_selector_failure_preserves_error_and_stops) ... ok
+test_manual_success_runs_expected_reconnect_steps (test_lte_sim_switch_failure.SimSwitchFailureTests.test_manual_success_runs_expected_reconnect_steps) ... ok
+test_pending_configuration_leaves_gpio_untouched (test_lte_sim_switch_failure.SimSwitchFailureTests.test_pending_configuration_leaves_gpio_untouched) ... ok
+test_persistence_failure_does_not_report_success (test_lte_sim_switch_failure.SimSwitchFailureTests.test_persistence_failure_does_not_report_success) ... ok
+test_same_slot_with_pending_edits_preserves_hardware (test_lte_sim_switch_failure.SimSwitchFailureTests.test_same_slot_with_pending_edits_preserves_hardware) ... ok
+test_selector_readback_handles_polarity_and_missing_line (test_lte_sim_switch_failure.SimSwitchFailureTests.test_selector_readback_handles_polarity_and_missing_line) ... ok
+test_standalone_cycle_requests_rndis_even_without_at (test_lte_sim_switch_failure.SimSwitchFailureTests.test_standalone_cycle_requests_rndis_even_without_at) ... ok
+test_successful_trial_checks_data_after_starting_new_slot (test_lte_sim_switch_failure.SimSwitchFailureTests.test_successful_trial_checks_data_after_starting_new_slot) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.152s
+
+OK
+
+
+test_manual_preconditions (test_owner_manual_sim_source.ManualSimReview.test_manual_preconditions) ... ok
+test_no_implicit_switch (test_owner_manual_sim_source.ManualSimReview.test_no_implicit_switch) ... ok
+test_rpc_schema_no_device_access (test_owner_manual_sim_source.ManualSimReview.test_rpc_schema_no_device_access) ... ok
+test_syntax (test_owner_manual_sim_source.ManualSimReview.test_syntax) ... ok
+test_untrusted_methods_fail (test_owner_manual_sim_source.ManualSimReview.test_untrusted_methods_fail) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.009s
+
+OK

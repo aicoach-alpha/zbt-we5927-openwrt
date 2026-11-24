@@ -1,0 +1,10 @@
+
+test_exact_oem_gpio37_reset38_lan_leds_and_sim46_not_confused (test_owner_board_hardware_acceptance.BoardHardwareAcceptance.test_exact_oem_gpio37_reset38_lan_leds_and_sim46_not_confused) ... ok
+test_led_button_runtime_uses_kernel_sysfs_and_no_gpio_writes (test_owner_board_hardware_acceptance.BoardHardwareAcceptance.test_led_button_runtime_uses_kernel_sysfs_and_no_gpio_writes) ... ok
+test_readonly_watchdog_status_rpc_uses_registered_helper (test_owner_board_hardware_acceptance.BoardHardwareAcceptance.test_readonly_watchdog_status_rpc_uses_registered_helper) ... ok
+test_sysfs_watchdog_probe_matches_only_expected_gpio37 (test_owner_board_hardware_acceptance.BoardHardwareAcceptance.test_sysfs_watchdog_probe_matches_only_expected_gpio37) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.064s
+
+OK

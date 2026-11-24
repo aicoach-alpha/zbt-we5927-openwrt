@@ -34,6 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Historical signed owner provenance requires complete history.
           fetch-depth: 0
 
       # PRE-COMPILE FAIL-CLOSED. No apt/dependency install and no OpenWrt image

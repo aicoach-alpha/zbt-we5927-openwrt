@@ -1,0 +1,39 @@
+
+test_even_fake_pass_evidence_cannot_override_contract (test_veci_v2_contract.FeatureContract.test_even_fake_pass_evidence_cannot_override_contract) ... ok
+test_exact_oem_luci_openwrt_pins_and_counts (test_veci_v2_contract.FeatureContract.test_exact_oem_luci_openwrt_pins_and_counts) ... ok
+test_flash_denied_without_real_hardware_proof (test_veci_v2_contract.FeatureContract.test_flash_denied_without_real_hardware_proof) ... ok
+test_gate_requires_boolean_evidence_and_integer_byte_count (test_veci_v2_contract.FeatureContract.test_gate_requires_boolean_evidence_and_integer_byte_count) ... ok
+test_key_requirements_represented_in_contract (test_veci_v2_contract.FeatureContract.test_key_requirements_represented_in_contract) ... ok
+test_no_false_claim_about_luci_full_migration (test_veci_v2_contract.FeatureContract.test_no_false_claim_about_luci_full_migration) ... ok
+test_owner_endurance_starts_after_flash (test_veci_v2_contract.FeatureContract.test_owner_endurance_starts_after_flash) ... ok
+test_sandbox_staging_preserves_verified_sms_source (test_veci_v2_contract.FeatureContract.test_sandbox_staging_preserves_verified_sms_source) ... ok
+test_sms_v2_package_does_not_depend_on_v1_ui (test_veci_v2_contract.FeatureContract.test_sms_v2_package_does_not_depend_on_v1_ui) ... ok
+test_ui_requires_explicit_auth_no_persistent_session (test_veci_v2_contract.FeatureContract.test_ui_requires_explicit_auth_no_persistent_session) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.011s
+
+OK
+
+
+test_login_permissions_and_logout (test_veci_ui_sessions.UiSessions.test_login_permissions_and_logout) ... ok
+test_runtime_read_role_grants_only_self_logout_and_diagnostics (test_veci_ui_sessions.UiSessions.test_runtime_read_role_grants_only_self_logout_and_diagnostics) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.369s
+
+OK
+
+
+test_firewall_shows_owner_named_rules (test_owner_controls_native_integration.NativeOwnerControlsIntegration.test_firewall_shows_owner_named_rules) ... ok
+test_group_navigation_remains_simple (test_owner_controls_native_integration.NativeOwnerControlsIntegration.test_group_navigation_remains_simple) ... ok
+test_gui_hooks_valid_and_authenticated (test_owner_controls_native_integration.NativeOwnerControlsIntegration.test_gui_hooks_valid_and_authenticated) ... ok
+test_provider_files_installed_and_acl_typed (test_owner_controls_native_integration.NativeOwnerControlsIntegration.test_provider_files_installed_and_acl_typed) ... ok
+test_dhcp_static_validators (test_owner_controls_native_integration.ValidatorBehaviors.test_dhcp_static_validators) ... ok
+test_firewall_port_and_ip_validators (test_owner_controls_native_integration.ValidatorBehaviors.test_firewall_port_and_ip_validators) ... ok
+test_ntp_hostname_rejections (test_owner_controls_native_integration.ValidatorBehaviors.test_ntp_hostname_rejections) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.604s
+
+OK

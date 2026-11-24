@@ -4,7 +4,9 @@
     "write": {
       "ubus": {
         "veci.v2.backup": [
-          "export"
+          "export",
+          "inspect",
+          "restore"
         ]
       }
     }
@@ -164,7 +166,8 @@
           "ntp",
           "logs",
           "leds",
-          "observability"
+          "observability",
+          "diagnostics"
         ]
       }
     },
