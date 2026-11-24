@@ -113,8 +113,8 @@ def _squashfs_digest(path: Path) -> str:
 def check(rom:Path)->list[str]:
     errors=[]
     ids=[x["id"] for x in json.loads(CONTRACT.read_text())["required_core"]]
-    if len(ids)!=40 or set(ids)!=set(FEATURES):
-        return ["FEATURE_MAP_NOT_EXACTLY_40"]
+    if len(ids)!=39 or len(set(ids))!=39 or "lte_ussd" in ids or set(ids)!=set(FEATURES):
+        return ["FEATURE_MAP_NOT_EXACTLY_39_ACTIVE"]
     if not rom.is_dir() or rom.is_symlink():
         return ["INVALID_IMAGE_ROOT"]
     checked=0
@@ -146,7 +146,7 @@ def check(rom:Path)->list[str]:
         if (rom/forbidden).exists():
             errors.append("LUCI_PRESENT:"+forbidden)
     if not errors:
-        print(f"EXACT_40_CORE_ROM_PAYLOADS=PASS checked_files={checked}")
+        print(f"EXACT_39_ACTIVE_CORE_ROM_PAYLOADS=PASS checked_files={checked}")
         print("NOT_A_HARDWARE_UAT_NOT_SIGNED_NOT_FLASH_APPROVED")
     return errors
 

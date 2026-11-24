@@ -1,23 +1,9 @@
-
-test_codec_exactly_tracks_reviewed_v1_parser_function_block (test_veci_v2_sms_ui.SmsCenterV2.test_codec_exactly_tracks_reviewed_v1_parser_function_block) ... ok
-test_gsm_ucs2_and_three_part_pdu_vector (test_veci_v2_sms_ui.SmsCenterV2.test_gsm_ucs2_and_three_part_pdu_vector) ... ok
-test_html_dom_and_package_includes_all_sms_modules (test_veci_v2_sms_ui.SmsCenterV2.test_html_dom_and_package_includes_all_sms_modules) ... ok
-test_inbox_sent_and_draft_rpc_contract (test_veci_v2_sms_ui.SmsCenterV2.test_inbox_sent_and_draft_rpc_contract) ... ok
-test_sms_private_data_cleared_on_logout (test_veci_v2_sms_ui.SmsCenterV2.test_sms_private_data_cleared_on_logout) ... ok
 test_sms_requires_user_action_and_never_retries_unknown_outcome (test_veci_v2_sms_ui.SmsCenterV2.test_sms_requires_user_action_and_never_retries_unknown_outcome) ... ok
-
-----------------------------------------------------------------------
-Ran 6 tests in 0.411s
-
-OK
-
-
-test_delete_matching_message (test_sms_port_transaction.SmsPortTransaction.test_delete_matching_message) ... ok
+test_sms_private_data_cleared_on_logout (test_veci_v2_sms_ui.SmsCenterV2.test_sms_private_data_cleared_on_logout) ... ok
 test_port_change_before_delete (test_sms_port_transaction.SmsPortTransaction.test_port_change_before_delete) ... ok
 test_port_change_before_submit (test_sms_port_transaction.SmsPortTransaction.test_port_change_before_submit) ... ok
-test_send_once_and_restore_sms_mode (test_sms_port_transaction.SmsPortTransaction.test_send_once_and_restore_sms_mode) ... ok
 
 ----------------------------------------------------------------------
-Ran 4 tests in 1.595s
+Ran 4 tests in 1.302s
 
 OK

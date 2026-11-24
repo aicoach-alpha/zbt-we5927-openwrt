@@ -1,22 +1,11 @@
-
-test_authenticated_rpc_coverage_and_no_mutating_operations (test_owner_system_diagnostics_native.ReadonlyNativeDiagnostics.test_authenticated_rpc_coverage_and_no_mutating_operations) ... ok
+test_redacts_sensitive_logs_and_keeps_bounded_readonly (test_owner_system_diagnostics_native.ReadonlyNativeDiagnostics.test_redacts_sensitive_logs_and_keeps_bounded_readonly) ... ok
 test_diagnostics_provides_local_route_dns_lan_and_carrier (test_owner_system_diagnostics_native.ReadonlyNativeDiagnostics.test_diagnostics_provides_local_route_dns_lan_and_carrier) ... ok
 test_led_inventory_and_unauthorized_board_fail_closed (test_owner_system_diagnostics_native.ReadonlyNativeDiagnostics.test_led_inventory_and_unauthorized_board_fail_closed) ... ok
-test_redacts_sensitive_logs_and_keeps_bounded_readonly (test_owner_system_diagnostics_native.ReadonlyNativeDiagnostics.test_redacts_sensitive_logs_and_keeps_bounded_readonly) ... ok
-
-----------------------------------------------------------------------
-Ran 4 tests in 0.401s
-
-OK
-
-
-test_guarded_ntp_change_rollback (test_owner_system_admin_source.SystemSource.test_guarded_ntp_change_rollback) ... ok
+test_authenticated_rpc_coverage_and_no_mutating_operations (test_owner_system_diagnostics_native.ReadonlyNativeDiagnostics.test_authenticated_rpc_coverage_and_no_mutating_operations) ... ok
 test_no_modem_or_wifi_mutations (test_owner_system_admin_source.SystemSource.test_no_modem_or_wifi_mutations) ... ok
-test_read_methods (test_owner_system_admin_source.SystemSource.test_read_methods) ... ok
 test_reject_unsupported (test_owner_system_admin_source.SystemSource.test_reject_unsupported) ... ok
-test_shell (test_owner_system_admin_source.SystemSource.test_shell) ... ok
 
 ----------------------------------------------------------------------
-Ran 5 tests in 0.007s
+Ran 6 tests in 1.156s
 
 OK

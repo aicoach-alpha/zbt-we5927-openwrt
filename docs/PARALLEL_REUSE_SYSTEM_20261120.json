@@ -44,7 +44,10 @@
     {
       "commit": "f438b7d",
       "path": "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services",
-      "sha256": "39b99178cd07efdc5759b4189765b69b7d3e11fed21ee9394aaee833a0f90db0"
+      "sha256": "39b99178cd07efdc5759b4189765b69b7d3e11fed21ee9394aaee833a0f90db0",
+      "merged_successor_commit": "61b370d1ef3981a52f9946a2489ca1f192f55007",
+      "merged_successor_sha256": "147f548b37c3fd33b40abc22c9ca5d3c297a4df69ef0348f0d7c1f7a6f47ab28",
+      "merged_successor_scope": "Previously source-verified module restored from 2bb593a; current source bytes pinned to two-parent merge 61b370d. No hardware UAT."
     },
     {
       "commit": "f438b7d",
@@ -54,7 +57,10 @@
     {
       "commit": "f438b7d",
       "path": "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js",
-      "sha256": "c3342292033bd096954e36d38ec11e6ceb1e4be7f1ce10d302e562355887ed2c"
+      "sha256": "c3342292033bd096954e36d38ec11e6ceb1e4be7f1ce10d302e562355887ed2c",
+      "merged_successor_commit": "61b370d1ef3981a52f9946a2489ca1f192f55007",
+      "merged_successor_sha256": "58462393bfc28fba3c619b78224d4e3e085d672b749642a913a6017366b94be2",
+      "merged_successor_scope": "Previously source-verified module restored from 2bb593a; current source bytes pinned to two-parent merge 61b370d. No hardware UAT."
     },
     {
       "commit": "f438b7d",

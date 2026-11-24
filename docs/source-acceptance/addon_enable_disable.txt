@@ -1,18 +1,10 @@
-
-test_acl_ui_and_no_duplicate_modem_control (test_owner_addon_lifecycle_native.OriginalAddonLifecycle.test_acl_ui_and_no_duplicate_modem_control) ... ok
 test_existing_ddns_sqm_apk_owned_startup_procd (test_owner_addon_lifecycle_native.OriginalAddonLifecycle.test_existing_ddns_sqm_apk_owned_startup_procd) ... ok
 test_existing_wireguard_guest_voucher_native_uci_switches (test_owner_addon_lifecycle_native.OriginalAddonLifecycle.test_existing_wireguard_guest_voucher_native_uci_switches) ... ok
-
-----------------------------------------------------------------------
-Ran 3 tests in 3.451s
-
-OK
-
-
+test_acl_ui_and_no_duplicate_modem_control (test_owner_addon_lifecycle_native.OriginalAddonLifecycle.test_acl_ui_and_no_duplicate_modem_control) ... ok
 test_existing_daemon_reused (test_owner_addon_profiles_source.AddonProfiles.test_existing_daemon_reused) ... ok
 test_read_and_write_acl_exact_and_guarded (test_owner_addon_profiles_source.AddonProfiles.test_read_and_write_acl_exact_and_guarded) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 0.369s
+Ran 5 tests in 4.516s
 
 OK

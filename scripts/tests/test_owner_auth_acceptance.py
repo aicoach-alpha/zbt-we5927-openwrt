@@ -52,7 +52,8 @@ class OwnerLoginAcceptance(unittest.TestCase):
         self.assertEqual(base["write"]["ubus"],{})
         self.assertEqual(base["read"]["ubus"]["session"],["destroy"])
         self.assertEqual(set(base["read"]["ubus"]["veci.v2"]),
-                         {"status","capabilities","smsProvider","ethernetPorts"})
+                         {"status","capabilities","smsProvider","ethernetPorts",
+                          "traffic","internetCheck","smsDiagnostics","networkHealth"})
         self.assertNotIn("unauthenticated",acl)
         protected={
             "veci.v2.firewall":"veci-v2-firewall",

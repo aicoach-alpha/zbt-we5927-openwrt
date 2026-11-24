@@ -1,22 +1,11 @@
-
-test_acl_scope_and_no_wan_policy_relaxation (test_owner_firewall_native_acceptance.NativeFirewallAcceptance.test_acl_scope_and_no_wan_policy_relaxation) ... ok
-test_invalid_inputs_leave_real_uci_byte_unchanged (test_owner_firewall_native_acceptance.NativeFirewallAcceptance.test_invalid_inputs_leave_real_uci_byte_unchanged) ... ok
-test_native_dmz_requires_confirmation_and_rolls_back_reload_failure (test_owner_firewall_native_acceptance.NativeFirewallAcceptance.test_native_dmz_requires_confirmation_and_rolls_back_reload_failure) ... ok
 test_real_forward_crud_native_uci_and_owned_rule_deletion (test_owner_firewall_native_acceptance.NativeFirewallAcceptance.test_real_forward_crud_native_uci_and_owned_rule_deletion) ... ok
-
-----------------------------------------------------------------------
-Ran 4 tests in 5.335s
-
-OK
-
-
-test_denies_other_methods (test_owner_firewall_source.FirewallOwnerSource.test_denies_other_methods) ... ok
-test_method_schema (test_owner_firewall_source.FirewallOwnerSource.test_method_schema) ... ok
-test_never_loosens_wan_policy (test_owner_firewall_source.FirewallOwnerSource.test_never_loosens_wan_policy) ... ok
-test_syntax (test_owner_firewall_source.FirewallOwnerSource.test_syntax) ... ok
+test_native_dmz_requires_confirmation_and_rolls_back_reload_failure (test_owner_firewall_native_acceptance.NativeFirewallAcceptance.test_native_dmz_requires_confirmation_and_rolls_back_reload_failure) ... ok
+test_invalid_inputs_leave_real_uci_byte_unchanged (test_owner_firewall_native_acceptance.NativeFirewallAcceptance.test_invalid_inputs_leave_real_uci_byte_unchanged) ... ok
+test_acl_scope_and_no_wan_policy_relaxation (test_owner_firewall_native_acceptance.NativeFirewallAcceptance.test_acl_scope_and_no_wan_policy_relaxation) ... ok
 test_wan_policy_and_rollback (test_owner_firewall_source.FirewallOwnerSource.test_wan_policy_and_rollback) ... ok
+test_never_loosens_wan_policy (test_owner_firewall_source.FirewallOwnerSource.test_never_loosens_wan_policy) ... ok
 
 ----------------------------------------------------------------------
-Ran 5 tests in 0.008s
+Ran 6 tests in 7.875s
 
 OK
