@@ -4,7 +4,7 @@ PASS native UCI: initialization, retry, boot, confirmation, pending edits, rollb
 test_native_ipv6_provision_toggle_rollback_and_ra_profiles (test_owner_ipv6_native_acceptance.NativeIpv6Acceptance.test_native_ipv6_provision_toggle_rollback_and_ra_profiles) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 4.983s
+Ran 1 test in 6.829s
 
 OK
 
@@ -20,6 +20,6 @@ test_ui_shows_apply_only_on_reboot_and_trusts_live_status (test_veci_v2_ipv6_sim
 test_v2_source_staging_and_ui_dependency_include_ipv6 (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_v2_source_staging_and_ui_dependency_include_ipv6) ... ok
 
 ----------------------------------------------------------------------
-Ran 9 tests in 0.007s
+Ran 9 tests in 0.008s
 
 OK

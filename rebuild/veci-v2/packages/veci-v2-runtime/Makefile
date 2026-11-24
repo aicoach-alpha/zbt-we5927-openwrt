@@ -30,7 +30,9 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_DIR) $(1)/etc
 	$(INSTALL_CONF) ./update-policy.default $(1)/etc/veci2-update-policy
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
+	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_BIN) ./veci2-verify-image $(1)/usr/libexec/veci2-verify-image
+	$(INSTALL_BIN) ./veci2-restore-check $(1)/usr/libexec/veci2-restore-check
 	$(INSTALL_BIN) ./veci2-lte-policy $(1)/usr/libexec/rpcd/veci.v2.lte
 	$(INSTALL_BIN) ./veci2-wifi $(1)/usr/libexec/rpcd/veci.v2.wifi
 	$(INSTALL_BIN) ./veci2-dns $(1)/usr/libexec/rpcd/veci.v2.dns
@@ -39,6 +41,11 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_BIN) ./veci2-sim-manual $(1)/usr/libexec/rpcd/veci.v2.sim
 	$(INSTALL_BIN) ./veci2-firewall $(1)/usr/libexec/rpcd/veci.v2.firewall
 	$(INSTALL_BIN) ./veci2-system-admin $(1)/usr/libexec/rpcd/veci.v2.system
+	$(INSTALL_BIN) ./veci2-observe $(1)/usr/libexec/veci2-observe
+	$(INSTALL_BIN) ./veci2-observe-rpc $(1)/usr/libexec/rpcd/veci.v2.observability
+	$(INSTALL_DATA) ./veci2-observe-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-observability.json
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/etc/init.d/veci2-observe $(1)/etc/init.d/veci2-observe
 	$(INSTALL_DATA) ./veci2-wifi-controls $(1)/usr/libexec/veci2-wifi-controls
 	$(INSTALL_BIN) ./veci2-cron $(1)/usr/libexec/rpcd/veci.v2.cron
 	$(INSTALL_BIN) ./veci2-services $(1)/usr/libexec/rpcd/veci.v2.services
@@ -64,6 +71,11 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_DATA) ./veci2-access-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-access.json
 	$(INSTALL_DATA) ./veci2-routes-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-routes.json
 	$(INSTALL_DATA) ./veci2-interfaces-acl.json $(1)/usr/share/rpcd/acl.d/veci-v2-interfaces.json
+endef
+
+define Package/veci-v2-runtime/postinst
+#!/bin/sh
+[ -n "$$IPKG_INSTROOT" ] || /etc/init.d/veci2-observe enable >/dev/null 2>&1 || true
 endef
 
 $(eval $(call BuildPackage,veci-v2-runtime))

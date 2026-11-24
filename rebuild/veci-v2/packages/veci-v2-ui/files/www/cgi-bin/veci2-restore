@@ -1,0 +1,89 @@
+#!/bin/sh
+# Authenticated, exact-board two-phase OpenWrt config restore.
+# Never restores without a separate successful inspection and expiring token.
+set -eu
+umask 077
+export LC_ALL=C
+reply() {
+  printf 'Status: %s\r\nContent-Type: application/json\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\r\n{"ok":false,"error":"%s"}\n' "$1" "$2"
+  exit 0
+}
+bad() { reply '400 Bad Request' invalid_request; }
+deny() { reply '403 Forbidden' access_denied; }
+[ "$HTTPS" = on ] || deny
+[ "$REQUEST_METHOD" = POST ] && [ "$CONTENT_TYPE" = application/octet-stream ] || bad
+case "$QUERY_STRING" in
+  inspect) action=inspect; header=96 ;;
+  apply) action=restore; header=160 ;;
+  *) bad ;;
+esac
+length=$CONTENT_LENGTH
+case "$length" in ''|*[!0-9]*) bad ;; esac
+[ "$length" -gt "$header" ] && [ "$length" -le $((2097152 + header)) ] || bad
+session=$(dd bs=1 count=32 2>/dev/null)
+[ "$(printf %s "$session" | wc -c)" -eq 32 ] || deny
+printf %s "$session" | grep -Eq '^[a-f0-9]{32}$' || deny
+[ "$session" != 00000000000000000000000000000000 ] || deny
+digest=$(dd bs=1 count=64 2>/dev/null)
+printf %s "$digest" | grep -Eq '^[a-f0-9]{64}$' || bad
+ticket=
+if [ "$action" = restore ]; then
+  ticket=$(dd bs=1 count=64 2>/dev/null)
+  printf %s "$ticket" | grep -Eq '^[a-f0-9]{64}$' || bad
+fi
+authorized() {
+  permitted=$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"ubus\",\"object\":\"veci.v2.backup\",\"function\":\"$action\"}" 9>&- |
+      jsonfilter -e '@.access' 9>&-) || deny
+  [ "$permitted" = true ] || deny
+}
+authorized
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || reply '409 Conflict' unsupported_board
+lock=/var/run/veci2-restore.action.lock
+exec 9>"$lock"
+flock -n 9 || reply '409 Conflict' restore_busy
+size=$((length-header))
+free=$(df -Pk /tmp | awk 'NR==2{print $4}')
+[ "$free" -ge $((size / 1024 + 5120)) ] || reply '507 Insufficient Storage' insufficient_tmp_space
+work=$(mktemp -d /tmp/veci2-restore.XXXXXX) || reply '507 Insufficient Storage' no_tmp_space
+trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
+timeout 90 head -c "$size" 9>&- > "$work/config.tgz" || reply '408 Request Timeout' upload_timeout
+[ "$(wc -c < "$work/config.tgz")" -eq "$size" ] || bad
+actual=$(sha256sum "$work/config.tgz" | cut -d' ' -f1)
+[ "$actual" = "$digest" ] || reply '409 Conflict' checksum_mismatch
+/usr/libexec/veci2-restore-check "$work/config.tgz" 9>&- >/dev/null 2>&1 ||
+  reply '409 Conflict' archive_not_safe_or_wrong_board
+authorized
+receipt=/var/run/veci2-restore.receipt
+now=$(cut -d. -f1 /proc/uptime)
+case "$now" in ''|*[!0-9]*) reply '500 Internal Server Error' clock_unavailable ;; esac
+if [ "$action" = inspect ]; then
+  ticket=$(printf '%s' "$session:$digest:$now" | sha256sum | cut -d' ' -f1)
+  file=$(mktemp "$receipt.XXXXXX") || reply '500 Internal Server Error' receipt_failed
+  printf '%s %s\n' "$ticket" "$now" > "$file" || reply '500 Internal Server Error' receipt_failed
+  chmod 600 "$file"
+  mv "$file" "$receipt" || reply '500 Internal Server Error' receipt_failed
+  printf 'Content-Type: application/json\r\nCache-Control: no-store\r\n\r\n{"ok":true,"archive_checked":true,"requires_confirmation":true,"ticket":"%s"}\n' "$ticket"
+  exec 9>&-
+  exit 0
+fi
+[ -f "$receipt" ] && [ ! -L "$receipt" ] || reply '409 Conflict' inspection_required
+read -r previous issued < "$receipt" || reply '409 Conflict' inspection_required
+[ "$previous" = "$ticket" ] && [ "$now" -ge "$issued" ] &&
+  [ $((now-issued)) -le 600 ] || reply '409 Conflict' inspection_expired_or_replaced
+[ "$ticket" = "$(printf '%s' "$session:$digest:$issued" | sha256sum | cut -d' ' -f1)" ] ||
+  reply '409 Conflict' inspection_not_bound_to_session
+rm -f "$receipt" || reply '500 Internal Server Error' receipt_failed
+# Restore is explicitly user-triggered, and original backup is retained in RAM
+# for a best-effort rollback if sysupgrade -r reports failure.
+timeout 60 sysupgrade -b "$work/pre-restore.tgz" 9>&- >/dev/null 2>&1 ||
+  reply '507 Insufficient Storage' pre_restore_backup_failed
+authorized
+if timeout 90 sysupgrade -r "$work/config.tgz" 9>&- >/dev/null 2>&1; then
+  printf 'Content-Type: application/json\r\nCache-Control: no-store\r\n\r\n{"ok":true,"restore_applied":true,"reboot_required":true,"hardware_uat":"not_run"}\n'
+else
+  if timeout 90 sysupgrade -r "$work/pre-restore.tgz" 9>&- >/dev/null 2>&1; then
+    reply '500 Internal Server Error' restore_failed_rollback_attempted
+  fi
+  reply '500 Internal Server Error' restore_failed_rollback_incomplete
+fi

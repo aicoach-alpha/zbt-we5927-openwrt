@@ -39,6 +39,9 @@ esac
 [ "$(uci -q get firewall.@zone[1].name)" = wan ] || fail wan_zone_mismatch
 [ "$(uci -q get firewall.@zone[1].input)" = REJECT ] || fail unsafe_wan_policy
 status() {
+  # libubox jshn internally unsets JSON namespace variables during init.
+  # Read-only JSON serialization must not abort when nounset is active.
+  set +u
   . /usr/share/libubox/jshn.sh
   json_init; json_add_boolean ok 1
   json_add_string wan_input "$(uci -q get firewall.@zone[1].input)"

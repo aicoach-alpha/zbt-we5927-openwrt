@@ -1,0 +1,52 @@
+
+test_ap_status_uses_present_radio_interfaces (test_veci_v2_rebuild.V2BuildTests.test_ap_status_uses_present_radio_interfaces) ... ok
+test_channel_only_from_enabled_primary_bss (test_veci_v2_rebuild.V2BuildTests.test_channel_only_from_enabled_primary_bss) ... ok
+test_ethernet_reads_only_external_switch_ports (test_veci_v2_rebuild.V2BuildTests.test_ethernet_reads_only_external_switch_ports) ... ok
+test_ethernet_unavailable_for_wrong_board_or_switch_error (test_veci_v2_rebuild.V2BuildTests.test_ethernet_unavailable_for_wrong_board_or_switch_error) ... ok
+test_install_needs_explicit_confirmation_before_apk (test_veci_v2_rebuild.V2BuildTests.test_install_needs_explicit_confirmation_before_apk) ... ok
+test_lte_default_device_route_and_failed_queries (test_veci_v2_rebuild.V2BuildTests.test_lte_default_device_route_and_failed_queries) ... ok
+test_lte_link_checks_only_the_active_managed_device (test_veci_v2_rebuild.V2BuildTests.test_lte_link_checks_only_the_active_managed_device) ... ok
+test_lte_monitor_only_reports_recent_known_stages (test_veci_v2_rebuild.V2BuildTests.test_lte_monitor_only_reports_recent_known_stages) ... ok
+test_oem_inventory_only_allows_non_sensitive_config_fields (test_veci_v2_rebuild.V2BuildTests.test_oem_inventory_only_allows_non_sensitive_config_fields) ... ok
+test_oem_is_exact_dualsim_original_binary_evidence (test_veci_v2_rebuild.V2BuildTests.test_oem_is_exact_dualsim_original_binary_evidence) ... ok
+test_package_rejects_core_luci_and_kernel_mutations (test_veci_v2_rebuild.V2BuildTests.test_package_rejects_core_luci_and_kernel_mutations) ... ok
+test_primary_ap_configuration_and_runtime_are_independent (test_veci_v2_rebuild.V2BuildTests.test_primary_ap_configuration_and_runtime_are_independent) ... ok
+test_signed_repository_allowlist_and_resource_guards (test_veci_v2_rebuild.V2BuildTests.test_signed_repository_allowlist_and_resource_guards) ... ok
+test_single_source_package_ownership_no_duplicate_backend (test_veci_v2_rebuild.V2BuildTests.test_single_source_package_ownership_no_duplicate_backend) ... ok
+test_sms_contract_uses_existing_serialized_transport_not_double_AT (test_veci_v2_rebuild.V2BuildTests.test_sms_contract_uses_existing_serialized_transport_not_double_AT) ... ok
+test_status_contract_detects_missing_bss_and_never_infers_internet (test_veci_v2_rebuild.V2BuildTests.test_status_contract_detects_missing_bss_and_never_infers_internet) ... ok
+test_status_never_runs_mutating_network_commands (test_veci_v2_rebuild.V2BuildTests.test_status_never_runs_mutating_network_commands) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 2.784s
+
+OK
+
+
+test_failed_single_target_coverage_is_unverified_not_proven_offline (test_cellular_link_status_truth.LinkVsInternet.test_failed_single_target_coverage_is_unverified_not_proven_offline) ... ok
+test_frontend_does_not_confuse_stale_watchdog_with_link (test_cellular_link_status_truth.LinkVsInternet.test_frontend_does_not_confuse_stale_watchdog_with_link) ... ok
+test_probe_timeout_bounds_are_not_less_than_field_test (test_cellular_link_status_truth.LinkVsInternet.test_probe_timeout_bounds_are_not_less_than_field_test) ... ok
+test_provider_exposes_independent_link_and_verification (test_cellular_link_status_truth.LinkVsInternet.test_provider_exposes_independent_link_and_verification) ... ok
+test_successful_probe_is_reachable_and_cached (test_cellular_link_status_truth.LinkVsInternet.test_successful_probe_is_reachable_and_cached) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.022s
+
+OK
+
+
+test_even_fake_pass_evidence_cannot_override_contract (test_veci_v2_contract.FeatureContract.test_even_fake_pass_evidence_cannot_override_contract) ... ok
+test_exact_oem_luci_openwrt_pins_and_counts (test_veci_v2_contract.FeatureContract.test_exact_oem_luci_openwrt_pins_and_counts) ... ok
+test_flash_denied_without_real_hardware_proof (test_veci_v2_contract.FeatureContract.test_flash_denied_without_real_hardware_proof) ... ok
+test_gate_requires_boolean_evidence_and_integer_byte_count (test_veci_v2_contract.FeatureContract.test_gate_requires_boolean_evidence_and_integer_byte_count) ... ok
+test_key_requirements_represented_in_contract (test_veci_v2_contract.FeatureContract.test_key_requirements_represented_in_contract) ... ok
+test_no_false_claim_about_luci_full_migration (test_veci_v2_contract.FeatureContract.test_no_false_claim_about_luci_full_migration) ... ok
+test_owner_endurance_starts_after_flash (test_veci_v2_contract.FeatureContract.test_owner_endurance_starts_after_flash) ... ok
+test_sandbox_staging_preserves_verified_sms_source (test_veci_v2_contract.FeatureContract.test_sandbox_staging_preserves_verified_sms_source) ... ok
+test_sms_v2_package_does_not_depend_on_v1_ui (test_veci_v2_contract.FeatureContract.test_sms_v2_package_does_not_depend_on_v1_ui) ... ok
+test_ui_requires_explicit_auth_no_persistent_session (test_veci_v2_contract.FeatureContract.test_ui_requires_explicit_auth_no_persistent_session) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.011s
+
+OK

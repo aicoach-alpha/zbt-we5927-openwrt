@@ -15,21 +15,34 @@ vpn_state() {
     0|off|no|false) vpn=disabled ;;
   esac
 }
+portal_states() {
+  guest=absent; voucher=absent
+  installed_app voucher && voucher=unconfigured
+  installed_app guest || return 0
+  guest=unconfigured
+  eq() { [ "$(uci -q get "$1" || :)" = "$2" ]; }
+  # Only the previously provisioned optional captive portal owns this layout.
+  eq wireless.veci_guest.veci2_managed '' &&
+    eq wireless.veci_guest.device radio0 && eq wireless.veci_guest.mode ap &&
+    eq wireless.veci_guest.network veci_guest && eq network.veci_guest.ipaddr 10.20.0.1 &&
+    eq uspot.veci_guest.interface veci_guest && eq uspot.veci_guest.setname uspot &&
+    eq uhttpd.veci_guest.enabled 1 && eq uhttpd.veci_guest.home /www-uspot &&
+    eq uhttpd.veci_guest.listen_http 10.20.0.1:80 &&
+    eq firewall.veci_guest_zone.network veci_guest && eq firewall.veci_guest_zone.input REJECT &&
+    eq firewall.veci_guest_zone.forward REJECT && eq firewall.veci_guest_forward.src veci_guest &&
+    eq firewall.veci_guest_forward.dest wan && eq firewall.veci_guest_forward.ipset uspot &&
+    eq firewall.veci_guest_forward.target ACCEPT || return 0
+  case "$(uci -q get wireless.veci_guest.disabled || :)" in
+    0) guest=enabled ;; 1) guest=disabled ;; *) return 0 ;;
+  esac
+  [ "$voucher" != absent ] || return 0
+  case "$(uci -q get uspot.veci_guest.auth_mode || :)" in
+    credentials) voucher=enabled ;; click-to-continue) voucher=disabled ;;
+  esac
+}
 profile_status() {
   vpn_state
-  guest=absent; voucher=absent
-  if installed_app guest; then
-    guest=unconfigured
-    if uci -q get uspot.veci_guest >/dev/null; then
-      guest=disabled
-      if [ "$(uci -q get wireless.veci_guest.disabled)" = 0 ] &&
-         [ "$(uci -q get uhttpd.veci_guest.enabled)" = 1 ]; then guest=enabled; fi
-    fi
-  fi
-  if installed_app voucher; then
-    voucher=unconfigured
-    if [ "$guest" = enabled ] && [ "$(uci -q get uspot.veci_guest.auth_mode)" = credentials ]; then voucher=enabled; fi
-  fi
+  portal_states
   printf '{"ok":true,"wireguard":"%s","guest":"%s","voucher":"%s"}\n' "$vpn" "$guest" "$voucher"
 }
 set_vpn_startup() {
@@ -49,5 +62,40 @@ set_vpn_startup() {
   trap 'rm -rf "$tmp"' EXIT
   uci -q -t "$tmp" set "network.veci_wg.auto=$value" && uci -q -t "$tmp" commit network || fail save_failed
   [ "$(uci -q get network.veci_wg.auto)" = "$value" ] || fail save_failed
+  profile_status
+}
+
+set_portal_startup() {
+  exec 9>/var/lock/veci2-ipv6.lock
+  flock -n 9 || fail busy
+  exec 8</usr/libexec/rpcd/veci.v2.wifi
+  flock -n 8 || fail busy
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var action action
+  json_get_var expected expected
+  for config in uspot network wireless uhttpd firewall; do
+    changes=$(uci -q changes "$config") || fail config_unavailable
+    [ -z "$changes" ] || fail pending_changes
+  done
+  tmp=$(mktemp -d /tmp/veci2-portal.XXXXXX) || fail save_failed
+  trap 'rm -rf "$tmp"' EXIT
+  voucher_lock=/tmp/veci-voucher-batch.lock
+  mkdir "$voucher_lock" || fail busy
+  trap 'rmdir "$voucher_lock"; rm -rf "$tmp"' EXIT
+  portal_states
+  case "$action" in
+    ENABLE_PORTAL_AP|DISABLE_PORTAL_AP)
+      before=$guest; option=wireless.veci_guest.disabled
+      if [ "$action" = ENABLE_PORTAL_AP ]; then value=0; else value=1; fi ;;
+    REQUIRE_VOUCHER|ALLOW_CLICK_THROUGH)
+      before=$voucher; option=uspot.veci_guest.auth_mode
+      if [ "$action" = REQUIRE_VOUCHER ]; then value=credentials; else value=click-to-continue; fi ;;
+    *) fail confirmation_required ;;
+  esac
+  case "$before" in enabled|disabled) ;; *) fail profile_unavailable ;; esac
+  [ "$expected" = "$before" ] || fail stale_selection
+  uci -q -t "$tmp" set "$option=$value" && uci -q -t "$tmp" commit "${option%%.*}" || fail save_failed
+  eq "$option" "$value" || fail save_failed
   profile_status
 }

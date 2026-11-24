@@ -30,7 +30,7 @@ class NativeOwnerControlsIntegration(unittest.TestCase):
             "veci2-static-leases":("veci.v2.dhcp","veci-v2-dhcp",["status"],["add","delete"]),
             "veci2-sim-manual":("veci.v2.sim","veci-v2-sim",["status"],["switchSim"]),
             "veci2-firewall":("veci.v2.firewall","veci-v2-firewall",["status"],["addForward","deleteForward","setDmz"]),
-            "veci2-system-admin":("veci.v2.system","veci-v2-system",["ntp","logs","leds","observability"],["setNtp"])
+            "veci2-system-admin":("veci.v2.system","veci-v2-system",["ntp","logs","leds","observability","diagnostics"],["setNtp"])
         }
         for filename,(rpc,key,reads,writes) in providers.items():
             with self.subTest(provider=filename):

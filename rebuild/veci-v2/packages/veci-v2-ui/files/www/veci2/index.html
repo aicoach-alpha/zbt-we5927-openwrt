@@ -20,6 +20,7 @@
   <script src="/veci2/update-policy.js" defer></script>
   <script src="/veci2/guest-check.js" defer></script>
   <script src="/veci2/watchdog-status.js" defer></script>
+  <script src="/veci2/observability.js" defer></script>
   <script src="/veci2/backup.js" defer></script>
   <script src="/veci2/cron.js" defer></script>
   <script src="/veci2/services.js" defer></script>
@@ -260,7 +261,21 @@
             <p class="notice">Hanya memeriksa registrasi driver; tidak memicu watchdog atau restart router.</p>
           </article>
           <article class="panel" data-group="system">
+            <h2>Riwayat kesehatan 24×7</h2>
+            <p>Menampilkan sampel observabilitas yang benar-benar tercatat di router, bukan status rekaan.</p>
+            <button type="button" id="obs-24x7-read">Baca riwayat kesehatan</button>
+            <p id="obs-24x7-result" role="status" aria-live="polite">Belum ada data terverifikasi.</p>
+          </article>
+          <article class="panel" data-group="system">
             <button type="button" id="backup-export">Unduh cadangan konfigurasi</button>
+            <label>Pilih arsip cadangan VeCI (.tar.gz, maks. 2 MiB)
+              <input id="backup-restore-file" type="file" accept=".tgz,.gz,application/gzip">
+            </label>
+            <button id="backup-restore-check" type="button">Periksa keamanan arsip</button>
+            <button id="backup-restore-apply" type="button" disabled>Terapkan restore konfigurasi</button>
+            <p id="backup-restore-message" role="status"></p>
+            <p class="notice">Restore hanya setelah inspeksi terautentikasi. Perubahan perlu reboot manual dan berisiko memutus koneksi.</p>
+
             <p>Arsip dapat memuat kata sandi dan kunci privat. Simpan di tempat aman.</p><p id="backup-message" role="status"></p>
           </article>
           <article class="panel" data-group="system">

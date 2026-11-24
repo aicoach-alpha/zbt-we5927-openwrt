@@ -1,0 +1,29 @@
+
+test_codec_exactly_tracks_reviewed_v1_parser_function_block (test_veci_v2_sms_ui.SmsCenterV2.test_codec_exactly_tracks_reviewed_v1_parser_function_block) ... ok
+test_gsm_ucs2_and_three_part_pdu_vector (test_veci_v2_sms_ui.SmsCenterV2.test_gsm_ucs2_and_three_part_pdu_vector) ... ok
+test_html_dom_and_package_includes_all_sms_modules (test_veci_v2_sms_ui.SmsCenterV2.test_html_dom_and_package_includes_all_sms_modules) ... ok
+test_inbox_sent_and_draft_rpc_contract (test_veci_v2_sms_ui.SmsCenterV2.test_inbox_sent_and_draft_rpc_contract) ... ok
+test_sms_private_data_cleared_on_logout (test_veci_v2_sms_ui.SmsCenterV2.test_sms_private_data_cleared_on_logout) ... ok
+test_sms_requires_user_action_and_never_retries_unknown_outcome (test_veci_v2_sms_ui.SmsCenterV2.test_sms_requires_user_action_and_never_retries_unknown_outcome) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.411s
+
+OK
+
+
+test_even_fake_pass_evidence_cannot_override_contract (test_veci_v2_contract.FeatureContract.test_even_fake_pass_evidence_cannot_override_contract) ... ok
+test_exact_oem_luci_openwrt_pins_and_counts (test_veci_v2_contract.FeatureContract.test_exact_oem_luci_openwrt_pins_and_counts) ... ok
+test_flash_denied_without_real_hardware_proof (test_veci_v2_contract.FeatureContract.test_flash_denied_without_real_hardware_proof) ... ok
+test_gate_requires_boolean_evidence_and_integer_byte_count (test_veci_v2_contract.FeatureContract.test_gate_requires_boolean_evidence_and_integer_byte_count) ... ok
+test_key_requirements_represented_in_contract (test_veci_v2_contract.FeatureContract.test_key_requirements_represented_in_contract) ... ok
+test_no_false_claim_about_luci_full_migration (test_veci_v2_contract.FeatureContract.test_no_false_claim_about_luci_full_migration) ... ok
+test_owner_endurance_starts_after_flash (test_veci_v2_contract.FeatureContract.test_owner_endurance_starts_after_flash) ... ok
+test_sandbox_staging_preserves_verified_sms_source (test_veci_v2_contract.FeatureContract.test_sandbox_staging_preserves_verified_sms_source) ... ok
+test_sms_v2_package_does_not_depend_on_v1_ui (test_veci_v2_contract.FeatureContract.test_sms_v2_package_does_not_depend_on_v1_ui) ... ok
+test_ui_requires_explicit_auth_no_persistent_session (test_veci_v2_contract.FeatureContract.test_ui_requires_explicit_auth_no_persistent_session) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.011s
+
+OK

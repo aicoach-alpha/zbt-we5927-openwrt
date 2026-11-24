@@ -1,0 +1,109 @@
+#!/bin/sh
+# Validate a sysupgrade config archive BEFORE any root filesystem restore.
+# BusyBox ash/tar compatible, no extraction into the running filesystem.
+set -eu
+export LC_ALL=C
+[ "$#" -eq 1 ] && [ -f "$1" ] && [ ! -L "$1" ] || exit 1
+archive=$1
+gzip -t "$archive" || exit 1
+tmp=$(mktemp -d /tmp/veci-restore-check.XXXXXX) || exit 1
+trap 'rm -rf "$tmp"' EXIT
+# Validate complete archive contents, no member paths outside approved config
+# locations, path duplicates, control characters, or special entry types.
+tar -tzf "$archive" >"$tmp/names" || exit 1
+tar -tvzf "$archive" >"$tmp/details" || exit 1
+awk '
+  BEGIN {count=0;seen=0;bad=0;limit=0}
+  {
+    name=$0
+    sub(/^\.\//,"",name)
+    if (name=="" || name==".") next
+    count++
+    if (count>400 || length(name)>180 || name !~ /^[A-Za-z0-9_.\/-]+$/ ||
+        name ~ /^\// || name ~ /(^|\/)\.\.($|\/)/ || name ~ /\/\// ||
+        name ~ /(^|\/)\.($|\/)/) bad=1
+    if (names[name]++) bad=1
+    if (name ~ /^etc\/config\/[a-zA-Z0-9_-]+$/ ||
+        name ~ /^etc\/dropbear\/[a-zA-Z0-9_.-]+$/ ||
+        name ~ /^etc\/crontabs\/[a-zA-Z0-9_-]+$/ ||
+        name=="etc/hosts" || name=="etc/passwd" ||
+        name=="etc/group" || name=="etc/shadow" ||
+        name=="etc/rc.local" || name=="etc/sysupgrade.conf" ||
+        name=="etc/config" || name=="etc/dropbear" ||
+        name=="etc/crontabs" || name=="etc" ) { }
+    else bad=1
+    if (name=="etc/config/we5927_lte") seen=1
+  }
+  END {if (bad || count<2 || !seen) exit 1}
+' "$tmp/names" || exit 1
+# Reject all hard/symbolic links, special devices and non-regular entries.
+# BusyBox tar -v and GNU tar both start with a Unix mode file type.
+awk '
+  BEGIN {bytes=0;bad=0}
+  {
+    type=substr($1,1,1)
+    if (type!="-" && type!="d") bad=1
+    if (type=="-") {
+      # BusyBox and GNU tar print size in the third column for common
+      # listing layouts. If ambiguous, fail rather than trust compressed size.
+      size=$3
+      if (size !~ /^[0-9]+$/) bad=1
+      else bytes+=size
+    }
+  }
+  END {if (NR<2 || bad || bytes>8388608) exit 1}
+' "$tmp/details" || exit 1
+# BusyBox tar -t can normalize malicious absolute and .. paths before
+# printing names. Inspect RAW POSIX tar headers, not only tar -t output.
+# Enforce 8 MiB maximum uncompressed size in tmpfs.
+gzip -dc "$archive" | head -c 8388609 > "$tmp/raw" || exit 1
+raw_bytes=$(wc -c < "$tmp/raw")
+[ "$raw_bytes" -le 8388608 ] && [ $((raw_bytes % 512)) -eq 0 ] || exit 1
+blocks=$((raw_bytes / 512))
+[ "$blocks" -ge 4 ] || exit 1
+dd if=/dev/zero of="$tmp/zero" bs=512 count=1 2>/dev/null || exit 1
+index=0
+count=0
+seen_raw=0
+while [ "$index" -lt "$blocks" ]; do
+  dd if="$tmp/raw" of="$tmp/header" bs=512 skip="$index" count=1 2>/dev/null || exit 1
+  if cmp -s "$tmp/header" "$tmp/zero"; then break; fi
+  count=$((count+1))
+  [ "$count" -le 400 ] || exit 1
+  name=$(dd if="$tmp/header" bs=1 count=100 2>/dev/null | tr -d '\000')
+  type=$(dd if="$tmp/header" bs=1 skip=156 count=1 2>/dev/null | tr -d '\000')
+  sizeoct=$(dd if="$tmp/header" bs=1 skip=124 count=12 2>/dev/null | tr -d '\000 ')
+  prefix=$(dd if="$tmp/header" bs=1 skip=345 count=155 2>/dev/null | tr -d '\000')
+  link=$(dd if="$tmp/header" bs=1 skip=157 count=100 2>/dev/null | tr -d '\000')
+  [ -z "$prefix" ] && [ -z "$link" ] || exit 1
+  case "$type" in ''|0|5) ;; *) exit 1 ;; esac
+  case "$sizeoct" in ''|*[!0-7]*) exit 1 ;; esac
+  [ "$(printf %s "$sizeoct" | wc -c)" -le 11 ] || exit 1
+  bytes=$((0$sizeoct))
+  [ "$bytes" -le 8388608 ] || exit 1
+  # Convert harmless directory trailing slash for matching.
+  case "$type" in 5) name=$(printf '%s' "$name" | sed 's,/$,,');; esac
+  printf '%s\n' "$name" | grep -Eq '^[a-zA-Z0-9_./-]+$' || exit 1
+  case "$name" in /*|*/../*|../*|*/..|.|*//*|*'./'*)
+    exit 1 ;;
+  esac
+  # Raw and rendered tar names must represent the same file.
+  grep -Fxq "$name" "$tmp/names" ||
+    grep -Fxq "$name/" "$tmp/names" ||
+    grep -Fxq "./$name" "$tmp/names" ||
+    grep -Fxq "./$name/" "$tmp/names" || exit 1
+  if [ "$name" = etc/config/we5927_lte ]; then seen_raw=1; fi
+  [ "$type" != 5 ] || [ "$bytes" -eq 0 ] || exit 1
+  index=$((index+1+(bytes+511)/512))
+  [ "$index" -le "$blocks" ] || exit 1
+done
+[ "$count" -ge 2 ] && [ "$seen_raw" -eq 1 ] || exit 1
+# Archives built on another device must never replace these exact board settings.
+tar -xzOf "$archive" etc/config/we5927_lte > "$tmp/lte" 2>/dev/null ||
+  tar -xzOf "$archive" ./etc/config/we5927_lte > "$tmp/lte" 2>/dev/null || exit 1
+grep -Eq "^[[:space:]]*option[[:space:]]+usb_vid[[:space:]]+['\"]?05c6['\"]?[[:space:]]*$" "$tmp/lte" || exit 1
+grep -Eq "^[[:space:]]*option[[:space:]]+usb_pid[[:space:]]+['\"]?902e['\"]?[[:space:]]*$" "$tmp/lte" || exit 1
+grep -Eq "^[[:space:]]*option[[:space:]]+sim_gpio[[:space:]]+['\"]?46['\"]?[[:space:]]*$" "$tmp/lte" || exit 1
+grep -Eq "^[[:space:]]*option[[:space:]]+sim1_value[[:space:]]+['\"]?1['\"]?[[:space:]]*$" "$tmp/lte" || exit 1
+grep -Eq "^[[:space:]]*option[[:space:]]+sim2_value[[:space:]]+['\"]?0['\"]?[[:space:]]*$" "$tmp/lte" || exit 1
+echo VALIDATED_EXACT_BOARD_CONFIG_BACKUP

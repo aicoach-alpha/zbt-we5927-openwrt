@@ -19,12 +19,15 @@ valid_host() {
 }
 [ "$#" -ge 1 ] || fail unsupported_method
 case "$1" in
-  list) echo '{"ntp":{},"setNtp":{"first":"String","second":"String","confirmation":"String"},"logs":{},"leds":{},"observability":{}}'; exit 0 ;;
+  list) echo '{"ntp":{},"setNtp":{"first":"String","second":"String","confirmation":"String"},"logs":{},"diagnostics":{},"leds":{},"observability":{}}'; exit 0 ;;
   call) [ "$#" -ge 2 ] || fail unsupported_method
-    case "$2" in ntp|setNtp|logs|leds|observability) ;; *) fail unsupported_method ;; esac ;;
+    case "$2" in ntp|setNtp|logs|diagnostics|leds|observability) ;; *) fail unsupported_method ;; esac ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+# libubox jshn internally unsets JSON namespace fields during json_init.
+# Disable nounset for serialization, retaining errexit on command failures.
+set +u
 . /usr/share/libubox/jshn.sh
 ntp_status() {
   [ "$(uci -q get system.ntp)" = timeserver ] || fail ntp_configuration_missing
@@ -46,6 +49,23 @@ logs_status() {
   else
     json_add_string logs ""
   fi
+  json_dump; echo
+}
+diagnostics_status() {
+  # Local read-only diagnostics; no arbitrary user-supplied commands.
+  json_init; json_add_boolean ok 1
+  route=$(ip -4 route show default 2>/dev/null | head -n 1 | cut -c 1-180 || :)
+  lan=$(ip -4 addr show dev br-lan 2>/dev/null | awk '/^[[:space:]]*inet / {print $2; exit}' || :)
+  lte=$(cat /sys/class/net/usb0/carrier 2>/dev/null || echo unknown)
+  case "$lte" in 0|1) ;; *) lte=unknown ;; esac
+  resolv=$(awk '$1=="nameserver" && NR<=30 { print $2; exit }' /tmp/resolv.conf.d/resolv.conf.auto 2>/dev/null || :)
+  [ -n "$lan" ] || lan=unavailable
+  [ -n "$resolv" ] || resolv=unavailable
+  json_add_string default_route "$route"
+  json_add_string lan_ipv4 "$lan"
+  json_add_string lte_carrier "$lte"
+  json_add_string first_dns "$resolv"
+  json_add_string state "observation_only"
   json_dump; echo
 }
 leds_status() {
@@ -72,6 +92,7 @@ obs_status() {
 case "$2" in
   ntp) ntp_status; exit 0 ;;
   logs) logs_status; exit 0 ;;
+  diagnostics) diagnostics_status; exit 0 ;;
   leds) leds_status; exit 0 ;;
   observability) obs_status; exit 0 ;;
 esac

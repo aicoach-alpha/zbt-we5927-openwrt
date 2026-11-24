@@ -13,7 +13,16 @@ esac
 init=/etc/init.d
 rc=/etc/rc.d
 [ -d "$init" ] && [ -d "$rc" ] || fail init_unavailable
-manageable() { case "$1" in cron|sysntpd) return 0 ;; *) return 1 ;; esac; }
+addon_package() {
+  case "$1" in ddns) echo ddns-scripts ;; sqm) echo sqm-scripts ;; *) return 1 ;; esac
+}
+addon_present() {
+  local package files
+  package=$(addon_package "$1") || return 1
+  files=$(apk info -L "$package" 2>/dev/null) || return 1
+  printf '%s\n' "$files" | grep -Fxq -e "etc/init.d/$1" -e "/etc/init.d/$1"
+}
+manageable() { case "$1" in cron|sysntpd) return 0 ;; *) addon_present "$1" ;; esac; }
 boot_enabled() {
   local link
   for link in "$rc"/S[0-9][0-9]"$1"; do
@@ -55,6 +64,9 @@ for script in "$init"/*; do
   json_add_string name "$name"
   json_add_boolean enabled "$enabled"
   json_add_boolean mutable "$mutable"
+  if [ "$mutable" = 1 ] && package=$(addon_package "$name"); then
+    json_add_string package "$package"
+  fi
   json_close_object
 done
 json_close_array

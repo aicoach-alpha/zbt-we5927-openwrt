@@ -1,4 +1,284 @@
 {
+  "addon_enable_disable": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-addon",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-addon-profiles",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-addon-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/addon-profiles.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js",
+      "rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk"
+    ],
+    "suites": [
+      "test_owner_addon_lifecycle_native.py",
+      "test_owner_addon_profiles_source.py"
+    ],
+    "test_ids": [
+      "test_existing_ddns_sqm_apk_owned_startup_procd",
+      "test_existing_wireguard_guest_voucher_native_uci_switches",
+      "test_acl_ui_and_no_duplicate_modem_control",
+      "test_existing_daemon_reused",
+      "test_read_and_write_acl_exact_and_guarded"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_addon_lifecycle_native.py",
+      "scripts/tests/test_owner_addon_profiles_source.py",
+      "scripts/uat/test-owner-addon-services-host.py",
+      "scripts/uat/test-addon-profiles-host.py"
+    ]
+  },
+  "addon_signed_package_manager": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk",
+      "rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-package-manager/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status"
+    ],
+    "suites": [
+      "test_veci_v2_rebuild.py",
+      "test_veci_compiled_apk_gate.py"
+    ],
+    "test_ids": [
+      "test_package_rejects_core_luci_and_kernel_mutations",
+      "test_install_needs_explicit_confirmation_before_apk",
+      "test_signed_repository_allowlist_and_resource_guards",
+      "test_exact_files_from_package_recipes"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_v2_rebuild.py",
+      "scripts/tests/test_veci_compiled_apk_gate.py"
+    ]
+  },
+  "dashboard_status": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html"
+    ],
+    "suites": [
+      "test_veci_v2_rebuild.py",
+      "test_cellular_link_status_truth.py",
+      "test_veci_v2_contract.py"
+    ],
+    "test_ids": [
+      "test_status_contract_detects_missing_bss_and_never_infers_internet",
+      "test_primary_ap_configuration_and_runtime_are_independent",
+      "test_lte_link_checks_only_the_active_managed_device",
+      "test_lte_default_device_route_and_failed_queries",
+      "test_lte_monitor_only_reports_recent_known_stages",
+      "test_provider_exposes_independent_link_and_verification",
+      "test_ui_requires_explicit_auth_no_persistent_session"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_v2_rebuild.py",
+      "scripts/tests/test_cellular_link_status_truth.py",
+      "scripts/tests/test_veci_v2_contract.py"
+    ]
+  },
+  "dhcp_dns_static_leases": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-dns",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-static-leases",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lan-bounds",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/dns-settings.js"
+    ],
+    "suites": [
+      "test_owner_dhcp_dns_acceptance.py"
+    ],
+    "test_ids": [
+      "test_existing_dns_dhcp_native_uci_lock_and_rollback",
+      "test_existing_native_rpc_gui_acl_and_no_lte_mutations"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_dhcp_dns_acceptance.py",
+      "scripts/uat/test-owner-dhcp-dns.py"
+    ]
+  },
+  "ethernet_port_status": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html"
+    ],
+    "suites": [
+      "test_veci_v2_rebuild.py"
+    ],
+    "test_ids": [
+      "test_ethernet_reads_only_external_switch_ports",
+      "test_ethernet_unavailable_for_wrong_board_or_switch_error",
+      "test_status_never_runs_mutating_network_commands"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_v2_rebuild.py"
+    ]
+  },
+  "firewall_zones_nat": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-firewall",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/owner-controls.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html"
+    ],
+    "suites": [
+      "test_owner_firewall_native_acceptance.py",
+      "test_owner_firewall_source.py"
+    ],
+    "test_ids": [
+      "test_real_forward_crud_native_uci_and_owned_rule_deletion",
+      "test_native_dmz_requires_confirmation_and_rolls_back_reload_failure",
+      "test_invalid_inputs_leave_real_uci_byte_unchanged",
+      "test_acl_scope_and_no_wan_policy_relaxation",
+      "test_wan_policy_and_rollback",
+      "test_never_loosens_wan_policy"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_firewall_native_acceptance.py",
+      "scripts/tests/test_owner_firewall_source.py"
+    ]
+  },
+  "firmware_24x7_observability": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-observe",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-observe-rpc",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-observe-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-runtime/files/etc/init.d/veci2-observe",
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/observability.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "scripts/veci-link-wired-monitor.py",
+      "scripts/veci-link-analyze.py"
+    ],
+    "suites": [
+      "test_owner_24x7_observability_native.py",
+      "test_veci_link_monitor.py"
+    ],
+    "test_ids": [
+      "test_native_healthy_degraded_three_samples_unknown_and_no_internet_claim",
+      "test_privacy_bounded_tmpfs_and_root_only_permissions",
+      "test_failclosed_other_board_symlink_and_no_router_controls",
+      "test_procd_startup_bounded_rpc_acl_and_installed_files",
+      "test_bad_telemetry_cannot_inflate_72h_coverage",
+      "test_no_false_root_cause_from_ping",
+      "test_uat_coverage_uses_full_requested_72h_not_only_success_span"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_24x7_observability_native.py",
+      "scripts/tests/test_veci_link_monitor.py"
+    ]
+  },
+  "firmware_gpio_hardware_watchdog": {
+    "implementation_files": [
+      "source/mt7628an_zbtlink_zbt-we5927.dts",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-gpio-watchdog",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-watchdog-status",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-watchdog-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile"
+    ],
+    "suites": [
+      "test_owner_board_hardware_acceptance.py",
+      "test_gpio_watchdog_registration.py"
+    ],
+    "test_ids": [
+      "test_sysfs_watchdog_probe_matches_only_expected_gpio37",
+      "test_readonly_watchdog_status_rpc_uses_registered_helper",
+      "test_only_exact_board_controller_and_parameters_are_reported",
+      "test_exact_oem_gpio37_reset38_lan_leds_and_sim46_not_confused"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_board_hardware_acceptance.py",
+      "scripts/tests/test_gpio_watchdog_registration.py"
+    ]
+  },
+  "firmware_network_watchdog": {
+    "implementation_files": [
+      "source/we5927-lte/files/usr/sbin/we5927-lte",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lte-policy",
+      "source/we5927-lte/Makefile",
+      "source/we5927-lte/files/etc/config/we5927_lte",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/monitor-settings.js"
+    ],
+    "suites": [
+      "test_lte_dhcp_recovery_cooldown.py",
+      "test_lte_recovery_guard.py",
+      "test_owner_network_monitor_settings.py",
+      "test_veci_link_monitor.py"
+    ],
+    "test_ids": [
+      "test_renew_only_once_in_two_minutes",
+      "test_interface_teardown_at_most_once_in_five_minutes",
+      "test_daemon_cooldown_teardown_does_not_escalate",
+      "test_manual_reconnect_skips_healthy_gateway_even_if_public_ping_fails",
+      "test_monitor_reuses_existing_modem_and_validates",
+      "test_bad_telemetry_cannot_inflate_72h_coverage",
+      "test_no_false_root_cause_from_ping"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_lte_dhcp_recovery_cooldown.py",
+      "scripts/tests/test_lte_recovery_guard.py",
+      "scripts/tests/test_owner_network_monitor_settings.py",
+      "scripts/tests/test_veci_link_monitor.py"
+    ]
+  },
+  "guest_wifi_isolation": {
+    "implementation_files": [
+      "source/veci-app-guest/Makefile",
+      "source/veci-app-guest/files/usr/libexec/rpcd/veci.app.guest",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-check",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-acl.json",
+      "source/veci-app-guest/files/www/veci-apps/guest.js"
+    ],
+    "suites": [
+      "test_owner_guest_native_acceptance.py",
+      "test_guest_isolation_readonly.py",
+      "test_guest_startup_guard.py"
+    ],
+    "test_ids": [
+      "test_real_guest_provisioning_is_disabled_and_no_lan_forward",
+      "test_source_has_fail_closed_guest_rollback_and_packet_scope",
+      "test_configuration_states_using_fake_uci",
+      "test_provision_does_not_restart_wifi_network",
+      "test_failed_provision_rolls_back_without_wifi_reload",
+      "test_inactive_guest_cleanup_does_not_restart_network"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_guest_native_acceptance.py",
+      "scripts/tests/test_guest_isolation_readonly.py",
+      "scripts/tests/test_guest_startup_guard.py"
+    ]
+  },
+  "interface_wan_lan": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-interfaces",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-interfaces-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/interfaces.js"
+    ],
+    "suites": [
+      "test_owner_interfaces_acceptance.py"
+    ],
+    "test_ids": [
+      "test_existing_wan_lan_rpc_native_uci_and_preserves_lte_ipv6",
+      "test_native_ui_rpc_acl_and_installation"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_interfaces_acceptance.py",
+      "scripts/uat/test-interfaces-host.py"
+    ]
+  },
   "ipv6_ra_dhcpv6": {
     "implementation_files": [
       "rebuild/veci-v2/packages/veci-v2-ipv6/Makefile",
@@ -26,6 +306,281 @@
       "scripts/uat/test-ipv6-host.py"
     ]
   },
+  "lte_apn_pin_puk": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lte-policy",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-sim-lock",
+      "source/we5927-lte/files/usr/sbin/we5927-lte",
+      "source/we5927-lte/src/we5927-at.c",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sim-lock.js"
+    ],
+    "suites": [
+      "test_owner_apn_acceptance.py",
+      "test_sim_unlock.py"
+    ],
+    "test_ids": [
+      "test_actual_oem_apn_validator",
+      "test_real_rpc_provider_uci_staging_and_no_modem_restart",
+      "test_private_sim_and_apn_acl_and_board_safety",
+      "test_guarded_transport"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_apn_acceptance.py",
+      "scripts/tests/test_sim_unlock.py"
+    ]
+  },
+  "lte_dual_sim_manual": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-sim-manual",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "source/we5927-lte/files/usr/sbin/we5927-lte",
+      "source/we5927-lte/files/etc/config/we5927_lte",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/owner-controls.js"
+    ],
+    "suites": [
+      "test_owner_manual_sim_native_acceptance.py",
+      "test_lte_sim_switch_failure.py",
+      "test_owner_manual_sim_source.py"
+    ],
+    "test_ids": [
+      "test_native_manual_sim_switch_confirmation_and_uci_consistency",
+      "test_rollback_pending_and_wrong_board_fail_closed",
+      "test_acl_scoping_and_derived_modem_config_guards",
+      "test_failed_new_apn_restores_old_slot_once",
+      "test_gpio_failure_stops_before_sim_reconnect",
+      "test_manual_success_runs_expected_reconnect_steps",
+      "test_selector_readback_handles_polarity_and_missing_line"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_manual_sim_native_acceptance.py",
+      "scripts/tests/test_lte_sim_switch_failure.py",
+      "scripts/tests/test_owner_manual_sim_source.py"
+    ]
+  },
+  "lte_rndis_data": {
+    "implementation_files": [
+      "source/we5927-lte/files/usr/sbin/we5927-lte",
+      "source/we5927-lte/files/etc/config/we5927_lte",
+      "source/we5927-lte/Makefile"
+    ],
+    "suites": [
+      "test_lte_rndis_identity.py",
+      "test_lte_coldboot_phase.py",
+      "test_lte_recovery_guard.py"
+    ],
+    "test_ids": [
+      "test_configured_network_must_belong_to_selected_modem",
+      "test_cli_reports_usb_registration_binding_and_link",
+      "test_rndis_local_link_not_claimed_as_public_internet",
+      "test_invalid_lte_protocol_fails_closed",
+      "test_missing_usb_interface",
+      "test_manual_reconnect_skips_healthy_internet",
+      "test_manual_reconnect_renews_missing_local_gateway_first",
+      "test_detached_modem_allows_reset"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_lte_rndis_identity.py",
+      "scripts/tests/test_lte_coldboot_phase.py",
+      "scripts/tests/test_lte_recovery_guard.py"
+    ]
+  },
+  "lte_ussd": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-ussd",
+      "source/we5927-lte/src/we5927-at.c",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/ussd.js"
+    ],
+    "suites": [
+      "test_owner_ussd_acceptance.py"
+    ],
+    "test_ids": [
+      "test_pty_fake_modem_one_shot_timeout_cancel_and_rejects",
+      "test_at_helper_rejects_input_injection_without_opening_modem",
+      "test_rpc_is_scoped_and_fails_closed"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_ussd_acceptance.py"
+    ]
+  },
+  "port_forward_dmz": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-firewall",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/owner-controls.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html"
+    ],
+    "suites": [
+      "test_owner_firewall_native_acceptance.py",
+      "test_owner_firewall_source.py"
+    ],
+    "test_ids": [
+      "test_real_forward_crud_native_uci_and_owned_rule_deletion",
+      "test_native_dmz_requires_confirmation_and_rolls_back_reload_failure",
+      "test_invalid_inputs_leave_real_uci_byte_unchanged",
+      "test_acl_scope_and_no_wan_policy_relaxation",
+      "test_wan_policy_and_rollback",
+      "test_never_loosens_wan_policy"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_firewall_native_acceptance.py",
+      "scripts/tests/test_owner_firewall_source.py"
+    ]
+  },
+  "router_login_and_permissions": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json"
+    ],
+    "suites": [
+      "test_owner_auth_acceptance.py",
+      "test_veci_ui_sessions.py"
+    ],
+    "test_ids": [
+      "test_real_login_logout_session_state_machine",
+      "test_session_token_scope_and_no_credential_persistence",
+      "test_read_only_acl_and_write_scopes_are_separated",
+      "test_rpc_uses_token_with_server_side_permission_checks",
+      "test_login_permissions_and_logout",
+      "test_runtime_read_role_grants_only_self_logout_and_diagnostics"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_auth_acceptance.py",
+      "scripts/tests/test_veci_ui_sessions.py",
+      "scripts/tests/fixtures/veci_ui_sessions.js"
+    ]
+  },
+  "sms_inbox": {
+    "implementation_files": [
+      "source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.sms",
+      "rebuild/veci-v2/packages/veci-v2-sms/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-sms/veci-v2-sms-acl.json",
+      "rebuild/veci-v2/ci/stage-v2-source.sh",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-center.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-codec.js",
+      "source/veci-cellular-we5927/files/usr/libexec/veci-sms-parse"
+    ],
+    "suites": [
+      "test_veci_v2_sms_ui.py",
+      "test_veci_v2_contract.py"
+    ],
+    "test_ids": [
+      "test_inbox_sent_and_draft_rpc_contract",
+      "test_html_dom_and_package_includes_all_sms_modules",
+      "test_sms_v2_package_does_not_depend_on_v1_ui"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_v2_sms_ui.py",
+      "scripts/tests/test_veci_v2_contract.py"
+    ]
+  },
+  "sms_multipart_pdu": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-codec.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-center.js",
+      "source/veci-core/veci/js/pages/cellular.js",
+      "source/veci-cellular-we5927/files/usr/libexec/veci-sms-parse"
+    ],
+    "suites": [
+      "test_veci_v2_sms_ui.py"
+    ],
+    "test_ids": [
+      "test_codec_exactly_tracks_reviewed_v1_parser_function_block",
+      "test_gsm_ucs2_and_three_part_pdu_vector"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_v2_sms_ui.py"
+    ]
+  },
+  "sms_security_and_storage": {
+    "implementation_files": [
+      "source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.sms",
+      "rebuild/veci-v2/packages/veci-v2-sms/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-sms/veci-v2-sms-acl.json",
+      "rebuild/veci-v2/ci/stage-v2-source.sh",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-center.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-codec.js",
+      "source/veci-cellular-we5927/files/usr/libexec/veci-sms-sent-history",
+      "source/veci-cellular-we5927/files/usr/libexec/veci-sms-drafts",
+      "source/veci-cellular-we5927/files/usr/libexec/veci-sms-delete-one",
+      "source/veci-cellular-we5927/files/etc/config/veci_sms",
+      "source/veci-cellular-we5927/files/etc/uci-defaults/97-veci-sms-userdata"
+    ],
+    "suites": [
+      "test_veci_v2_sms_ui.py",
+      "test_sms_port_transaction.py"
+    ],
+    "test_ids": [
+      "test_sms_requires_user_action_and_never_retries_unknown_outcome",
+      "test_sms_private_data_cleared_on_logout",
+      "test_port_change_before_delete",
+      "test_port_change_before_submit"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_v2_sms_ui.py",
+      "scripts/tests/test_sms_port_transaction.py"
+    ]
+  },
+  "sms_send_and_delete": {
+    "implementation_files": [
+      "source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.sms",
+      "rebuild/veci-v2/packages/veci-v2-sms/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-sms/veci-v2-sms-acl.json",
+      "rebuild/veci-v2/ci/stage-v2-source.sh",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-center.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-codec.js",
+      "source/veci-cellular-we5927/files/usr/libexec/veci-sms-delete-one",
+      "source/veci-cellular-we5927/files/usr/libexec/veci-sms-send-one",
+      "source/we5927-lte/src/we5927-at.c",
+      "source/we5927-lte/src/veci-sms-cmgs.c"
+    ],
+    "suites": [
+      "test_veci_v2_sms_ui.py",
+      "test_sms_port_transaction.py",
+      "test_veci_sms_cmgs_result.py"
+    ],
+    "test_ids": [
+      "test_send_once_and_restore_sms_mode",
+      "test_delete_matching_message",
+      "test_port_change_before_delete",
+      "test_port_change_before_submit",
+      "test_sms_requires_user_action_and_never_retries_unknown_outcome",
+      "test_nonzero_transport_exit_does_not_claim_acceptance",
+      "test_unknown_or_broken_receipt_is_uncertain_not_send_unavailable"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_v2_sms_ui.py",
+      "scripts/tests/test_sms_port_transaction.py",
+      "scripts/tests/test_veci_sms_cmgs_result.py"
+    ]
+  },
+  "sms_sent_and_drafts": {
+    "implementation_files": [
+      "source/veci-cellular-we5927/files/usr/libexec/rpcd/veci.sms",
+      "rebuild/veci-v2/packages/veci-v2-sms/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-sms/veci-v2-sms-acl.json",
+      "rebuild/veci-v2/ci/stage-v2-source.sh",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-center.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-codec.js",
+      "source/veci-cellular-we5927/files/usr/libexec/veci-sms-sent-history",
+      "source/veci-cellular-we5927/files/usr/libexec/veci-sms-drafts",
+      "source/veci-cellular-we5927/files/etc/uci-defaults/97-veci-sms-userdata"
+    ],
+    "suites": [
+      "test_veci_v2_sms_ui.py",
+      "test_veci_v2_contract.py"
+    ],
+    "test_ids": [
+      "test_inbox_sent_and_draft_rpc_contract",
+      "test_sms_private_data_cleared_on_logout",
+      "test_sms_v2_package_does_not_depend_on_v1_ui"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_v2_sms_ui.py",
+      "scripts/tests/test_veci_v2_contract.py"
+    ]
+  },
   "static_routes_policy": {
     "implementation_files": [
       "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
@@ -45,6 +600,78 @@
     "test_source_files": [
       "scripts/tests/test_owner_routes_acceptance.py",
       "scripts/uat/test-routes-host.py"
+    ]
+  },
+  "system_access_ssh_https": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-access",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-access-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/access.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile"
+    ],
+    "suites": [
+      "test_owner_access_acceptance.py"
+    ],
+    "test_ids": [
+      "test_original_uat_with_isolated_config_and_complete_crud",
+      "test_access_rpc_writes_only_config_without_restarting_network"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_access_acceptance.py",
+      "scripts/tests/fixtures/uci_access_sandbox.py",
+      "scripts/uat/test-access-host.py"
+    ]
+  },
+  "system_backup_restore": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-restore-check",
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-backup",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-restore",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/backup.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile"
+    ],
+    "suites": [
+      "test_owner_backup_restore_native.py",
+      "test_veci_backup_export.py"
+    ],
+    "test_ids": [
+      "test_exact_board_ordinary_archive_passes_without_writing_router",
+      "test_rejects_wrong_board_traversal_symlinks_and_unknown_entries",
+      "test_https_admin_digest_and_two_phase_receipt",
+      "test_ui_acl_install_and_shell_syntax",
+      "test_export_requires_live_grant_and_intact_archive"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_backup_restore_native.py",
+      "scripts/tests/test_veci_backup_export.py"
+    ]
+  },
+  "system_cron_scheduler": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron.awk",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/cron.js"
+    ],
+    "suites": [
+      "test_owner_cron_acceptance.py"
+    ],
+    "test_ids": [
+      "test_cron_rpc_native_transactions_preserve_external_changes",
+      "test_parser_add_remove_preserves_oem_and_rejects_invalid_ranges",
+      "test_native_ui_add_edit_remove_confirmation_and_acl"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_cron_acceptance.py",
+      "scripts/uat/test-cron-host.py"
     ]
   },
   "system_ipv6_guarded_settings_toggle": {
@@ -98,6 +725,264 @@
       "scripts/tests/test_owner_ipv6_native_acceptance.py",
       "scripts/tests/test_veci_v2_ipv6_simple_menu.py",
       "scripts/uat/test-ipv6-host.py"
+    ]
+  },
+  "system_leds_buttons": {
+    "implementation_files": [
+      "source/mt7628an_zbtlink_zbt-we5927.dts",
+      "source/openwrt-we5927.config",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin"
+    ],
+    "suites": [
+      "test_owner_board_hardware_acceptance.py"
+    ],
+    "test_ids": [
+      "test_exact_oem_gpio37_reset38_lan_leds_and_sim46_not_confused",
+      "test_led_button_runtime_uses_kernel_sysfs_and_no_gpio_writes"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_board_hardware_acceptance.py"
+    ]
+  },
+  "system_logs_diagnostics": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/owner-controls.js",
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile"
+    ],
+    "suites": [
+      "test_owner_system_diagnostics_native.py",
+      "test_owner_system_admin_source.py"
+    ],
+    "test_ids": [
+      "test_redacts_sensitive_logs_and_keeps_bounded_readonly",
+      "test_diagnostics_provides_local_route_dns_lan_and_carrier",
+      "test_led_inventory_and_unauthorized_board_fail_closed",
+      "test_authenticated_rpc_coverage_and_no_mutating_operations",
+      "test_no_modem_or_wifi_mutations",
+      "test_reject_unsupported"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_system_diagnostics_native.py",
+      "scripts/tests/test_owner_system_admin_source.py"
+    ]
+  },
+  "system_manual_sysupgrade": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-verify-image",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-update-policy",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile"
+    ],
+    "suites": [
+      "test_verify_veci_image.py",
+      "test_veci_update_policy.py",
+      "test_veci_single_firmware_update_ui.py"
+    ],
+    "test_ids": [
+      "test_wrong_hash_refused",
+      "test_signature_missing_refused",
+      "test_size_limit_refused",
+      "test_wrong_board_refused",
+      "test_missing_trust_anchor_refused",
+      "test_saved_policy_controls_both_apply_paths",
+      "test_updates_only_in_updates_page"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_verify_veci_image.py",
+      "scripts/tests/test_veci_update_policy.py",
+      "scripts/tests/test_veci_single_firmware_update_ui.py"
+    ]
+  },
+  "system_services_startup": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js"
+    ],
+    "suites": [
+      "test_owner_services_acceptance.py"
+    ],
+    "test_ids": [
+      "test_real_provider_lifecycle_in_sandbox",
+      "test_no_unrestricted_lte_network_or_ssh_boot_changes"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_services_acceptance.py"
+    ]
+  },
+  "system_signed_github_ota": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-verify-image",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-update-policy",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
+      "rebuild/veci-v2/ci/stage-v2-source.sh"
+    ],
+    "suites": [
+      "test_veci_v2_firmware_channel.py",
+      "test_verify_veci_image.py",
+      "test_veci_single_firmware_update_ui.py"
+    ],
+    "test_ids": [
+      "test_channel_manifest_and_request",
+      "test_wrong_release_refused",
+      "test_wrong_board_refused",
+      "test_missing_verifier_refused_even_with_key_file",
+      "test_updates_failures_distinguish_no_network_from_bad_manifest"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_v2_firmware_channel.py",
+      "scripts/tests/test_verify_veci_image.py",
+      "scripts/tests/test_veci_single_firmware_update_ui.py"
+    ]
+  },
+  "system_time_ntp": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json"
+    ],
+    "suites": [
+      "test_owner_ntp_acceptance.py"
+    ],
+    "test_ids": [
+      "test_real_rpc_ntp_staging_and_rollback",
+      "test_uci_acl_and_no_radio_lte_modification"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_ntp_acceptance.py"
+    ]
+  },
+  "system_update_policy": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-update-policy",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-verify-image",
+      "rebuild/veci-v2/packages/veci-v2-runtime/update-policy.default",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/update-policy.js"
+    ],
+    "suites": [
+      "test_veci_update_policy.py",
+      "test_owner_verify_only_default.py",
+      "test_veci_single_firmware_update_ui.py"
+    ],
+    "test_ids": [
+      "test_saved_policy_controls_both_apply_paths",
+      "test_policy_default_and_fail_closed_cgi",
+      "test_admin_scoped_policy_and_scripts",
+      "test_updates_only_in_updates_page",
+      "test_updates_failures_distinguish_no_network_from_bad_manifest",
+      "test_lte_modem_and_sms_preserved"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_update_policy.py",
+      "scripts/tests/test_owner_verify_only_default.py",
+      "scripts/tests/test_veci_single_firmware_update_ui.py"
+    ]
+  },
+  "ui_four_group_navigation": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile"
+    ],
+    "suites": [
+      "test_veci_v2_contract.py",
+      "test_veci_ui_sessions.py",
+      "test_owner_controls_native_integration.py"
+    ],
+    "test_ids": [
+      "test_ui_requires_explicit_auth_no_persistent_session",
+      "test_login_permissions_and_logout",
+      "test_gui_hooks_valid_and_authenticated",
+      "test_group_navigation_remains_simple"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_veci_v2_contract.py",
+      "scripts/tests/test_veci_ui_sessions.py",
+      "scripts/tests/test_owner_controls_native_integration.py"
+    ]
+  },
+  "wifi_ap_2g": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js"
+    ],
+    "suites": [
+      "test_owner_wifi_acceptance.py"
+    ],
+    "test_ids": [
+      "test_primary_ap_native_uci",
+      "test_channel_survey_acl_and_auth_native_uci",
+      "test_incompatible_band_and_failed_commit_preserve_configuration",
+      "test_privileged_actions_have_write_acl"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_wifi_acceptance.py",
+      "scripts/uat/test-wifi-name-host.py",
+      "scripts/uat/test-wifi-controls-host.py"
+    ]
+  },
+  "wifi_clients_access_control": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js"
+    ],
+    "suites": [
+      "test_owner_wifi_acceptance.py"
+    ],
+    "test_ids": [
+      "test_primary_ap_native_uci",
+      "test_channel_survey_acl_and_auth_native_uci",
+      "test_incompatible_band_and_failed_commit_preserve_configuration",
+      "test_privileged_actions_have_write_acl"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_wifi_acceptance.py",
+      "scripts/uat/test-wifi-name-host.py",
+      "scripts/uat/test-wifi-controls-host.py"
+    ]
+  },
+  "wifi_survey_channel": {
+    "implementation_files": [
+      "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls",
+      "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js",
+      "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js"
+    ],
+    "suites": [
+      "test_owner_wifi_acceptance.py"
+    ],
+    "test_ids": [
+      "test_primary_ap_native_uci",
+      "test_channel_survey_acl_and_auth_native_uci",
+      "test_incompatible_band_and_failed_commit_preserve_configuration",
+      "test_privileged_actions_have_write_acl"
+    ],
+    "test_source_files": [
+      "scripts/tests/test_owner_wifi_acceptance.py",
+      "scripts/uat/test-wifi-name-host.py",
+      "scripts/uat/test-wifi-controls-host.py"
     ]
   }
 }

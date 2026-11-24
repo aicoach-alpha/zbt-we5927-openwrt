@@ -16,7 +16,10 @@ RMAKE=(RT/"Makefile").read_text()
 UMAKE=(UI/"Makefile").read_text()
 
 class ScopeIntegration(unittest.TestCase):
-    def test_original_sources_not_rewritten(self):
+    def test_original_provenance_and_auditable_later_modifications(self):
+        # Historical copy verification is immutable: the source at its
+        # ORIGINAL Git commit must match the stored digest. Once imported,
+        # subsequent reviewed feature commits may legitimately alter it.
         self.assertFalse(RECORD["full_module_verified"])
         self.assertEqual(RECORD["hardware_uat"],"not_run")
         for item in RECORD["reused_byte_identical_sources"]:
