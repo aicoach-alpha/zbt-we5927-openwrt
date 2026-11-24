@@ -633,6 +633,37 @@
       "next_readonly_probe": "scripts/router/veci-lte-usb-link-readonly-20261124.sh",
       "next_probe_physically_executed": false,
       "safety": "NO_MODEM_RESET_NETWORK_RELOAD_KILL_REBOOT_FLASH"
+    },
+    "twentyfirst_owner_modem_present_public_egress_still_down_scope_recovery_staged": {
+      "source": "owner real physical no-download USB modem/usb0 local read-only check",
+      "triage": "TRIAGE_END=OK,AUDIT_SSH_EXIT=0",
+      "usb0_netdev": "present",
+      "usb0_operstate": "unknown",
+      "usb0_carrier": "1",
+      "qualcomm_vidpid_05c6_902e": "present",
+      "usb0_ipv4": "assigned",
+      "usb0_default_route": "present",
+      "lte_ubus_status": "UNPARSEABLE_EMPTY_OR_TIMEOUT; not proof of up/down",
+      "canonical_netifd": {
+        "pid": 1366,
+        "state": "S"
+      },
+      "extra_netifd": {
+        "pid": 16862,
+        "state": "S"
+      },
+      "udhcpc_pids": [
+        17485,
+        17483
+      ],
+      "mem_available_kib": 15152,
+      "public_internet": "PREVIOUS_HTTP_HTTPS_AND_GATEWAY_TESTS_FAILED; NO_NEW_SUCCESS_PROOF",
+      "proposed_fix_source": "scripts/router/veci-lte-interface-scoped-recovery-20261124.sh",
+      "fix": "ONE per-interface network.interface.lte restart only, no global reload, guarded by procd+LAN+mem",
+      "physical_fix_executed": false,
+      "fix_success": "NOT_YET_VERIFIED",
+      "device_access": "only owner Windows PowerShell to physical router over LAN; NAS on different network",
+      "firmware_release": "NOT_PASSED"
     }
   }
 }
