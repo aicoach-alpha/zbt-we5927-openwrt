@@ -746,6 +746,67 @@
       "repetition": "DO_NOT_REPEAT_PROCESS_TERMINATION_OR_LTE_RESTART_WHILE_LINK_WORKS",
       "source_reference_commit": "0ceddadfd5ec6519490e8e704f194b10998922a9",
       "exact_source_equality": "NOT_ASSERTED_OWNER_PASTED_SHORTER_VARIANT"
+    },
+    "twentyfifth_source_lte_permanent_fix_and_professional_gui_20261124": {
+      "scope": "SOURCE DEVELOPMENT ONLY NOT RUN ON PHYSICAL ROUTER",
+      "hardware_field_basis": "confirmed owner 2026-11-24 one-shot orphan netifd SIGTERM+LTE down/up with 301 and 200 public HTTPS exit 0",
+      "source_file": "source/we5927-lte/files/usr/sbin/we5927-lte",
+      "source_mirror": "files/usr/sbin/we5927-lte",
+      "fixes": [
+        "validate one procd-owned netifd before LTE recovery",
+        "reject duplicate/unowned netifd and report network_manager_anomaly",
+        "suppress automatic modem radio reset/CFUN/SIM switches when manager invalid",
+        "replace generic ifup and ifdown with ubus network.interface.lte up/down only",
+        "keep physical LAN unchanged; no auto kill or arbitrary PID termination",
+        "record root cause and actual hardware recovery evidence for future regressions"
+      ],
+      "gui": {
+        "four_main_menus": [
+          "Beranda",
+          "Koneksi",
+          "SMS Center",
+          "Pengaturan"
+        ],
+        "nested_navigation": true,
+        "desktop_sidebar_and_mobile_responsive": true,
+        "real_lte_rx_tx_chart": true,
+        "real_kernel_memory_chart": true,
+        "live_procd_netifd_owner_rpc": true,
+        "no_vendor_copied_assets_or_external_cdn": true,
+        "on_device_visual_uat": "NOT_TESTED",
+        "hardware_sms_and_wifi_uat": "NOT_TESTED"
+      },
+      "packages": {
+        "we5927-lte_release": 12,
+        "veci-v2-runtime_release": 21,
+        "veci-v2-ui_release": 2
+      },
+      "tests": {
+        "scripts_tests": 419,
+        "scripts_skipped": 5,
+        "scripts_failures": 0,
+        "tests_repo": 38,
+        "tests_repo_failures": 0
+      },
+      "source_completion_gate": {
+        "build_permitted": false,
+        "core_total": 39,
+        "source_verified": 7,
+        "blockers": 70,
+        "blocker_categories": {
+          "missing_implementation_or_test_evidence": 32,
+          "not_source_verified": 32,
+          "source_evidence_missing_or_extra_modules": 1,
+          "source_hash_mismatch": 5
+        },
+        "active_core_contract_corrected": 39,
+        "retired_ussd_protection": "ADDED_RETIRED_CORE_REINTRODUCTION_HARD_FAIL"
+      },
+      "signed_image_available": false,
+      "physical_router_flash_performed": false,
+      "physical_new_firmware_test_performed": false,
+      "next": "legitimately resolve remaining 39-core source evidence, then signed candidate image, sysupgrade -T and hardware UAT",
+      "do_not": "bypass gate or claim release PASS without proof"
     }
   }
 }

@@ -19,6 +19,16 @@ class OwnerBuildBlockedUntilComplete(unittest.TestCase):
         self.assertLess(FLOW.index("Block incomplete owner firmware builds"),
                         FLOW.index("Install OpenWrt host dependencies"))
 
+    def test_owner_retired_ussd_core_count_matches_release_gate(self):
+        self.assertEqual(MODULE.ACTIVE_CORE_COUNT, 39)
+        self.assertEqual(len(CONTRACT["required_core"]), 39)
+        self.assertNotIn("lte_ussd", [x["id"] for x in CONTRACT["required_core"]])
+        missing = MODULE.audit(CONTRACT, {"modules": {}})
+        self.assertNotIn("required_core_wrong_count_or_duplicates", missing)
+        retired = json.loads(json.dumps(CONTRACT))
+        retired["required_core"][0]["id"] = "lte_ussd"
+        self.assertIn("retired_module_reintroduced", MODULE.audit(retired, {}))
+
     def test_missing_module_blocks(self):
         issues = MODULE.audit(CONTRACT, {})
         self.assertTrue(any("not_source_verified:" in x for x in issues))

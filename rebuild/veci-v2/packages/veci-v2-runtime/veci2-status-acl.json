@@ -130,7 +130,8 @@
           "ethernetPorts",
           "traffic",
           "internetCheck",
-          "smsDiagnostics"
+          "smsDiagnostics",
+          "networkHealth"
         ]
       }
     },

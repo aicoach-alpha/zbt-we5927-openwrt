@@ -53,7 +53,7 @@ lte_monitor_stage() {
       stage = substr($3,7)
       age = now - substr($5,11)
       if (age >= 0 && age <= 180 &&
-          stage ~ /^(healthy|checking|upstream_degraded|icmp_degraded_https_ok|dhcp_renew|recovered_dhcp|dhcp_cooldown|interface_recovery|recovered_interface|interface_cooldown|modem_soft_reconnect|recovered_soft|last_resort_power_cycle|power_cycle_failed|power_cycle_cooldown|opt_in_sim_failover|sim_failover_failed)$/)
+          stage ~ /^(healthy|network_manager_anomaly|checking|upstream_degraded|icmp_degraded_https_ok|dhcp_renew|recovered_dhcp|dhcp_cooldown|interface_recovery|recovered_interface|interface_cooldown|modem_soft_reconnect|recovered_soft|last_resort_power_cycle|power_cycle_failed|power_cycle_cooldown|opt_in_sim_failover|sim_failover_failed)$/)
         print stage
     }' /tmp/veci-lte-performance.state 2>/dev/null
 }
@@ -88,7 +88,7 @@ ethernet_ports() {
 main() {
   case "${1:-}:${2:-}" in
     list:*)
-      printf '{ "status": {}, "capabilities": {}, "smsProvider": {}, "ethernetPorts": {}, "traffic": {}, "internetCheck": {}, "smsDiagnostics": {} }\n'
+      printf '{ "status": {}, "capabilities": {}, "smsProvider": {}, "ethernetPorts": {}, "traffic": {}, "internetCheck": {}, "smsDiagnostics": {}, "networkHealth": {} }\n'
       ;;
     call:status)
       board_ok=false; version_ok=false
@@ -145,6 +145,56 @@ main() {
       # Internet is UNKNOWN here, not inferred from a modem lease.
       printf '{"schema":2,"board_supported":%s,"openwrt_supported":%s,"lte_usb_state":"%s","lte_monitor_stage":%s,"lte_ipv4":%s,"lte_default_route":%s,"internet_verified":null,"wifi_ap_configured":%s,"wifi_radio_config_up":%s,"wifi_ap_enabled":%s,"wifi_ap_missing":%s,"wifi_ap_channel":%s,"wifi_beacon_verified":null,"netifd_count":%s,"overlay_free_kb":%s,"memory_available_kb":%s}\n' \
         "$board_ok" "$version_ok" "$usb_state" "$stage_json" "$lte_address" "$lte_route" "$expected" "$radio" "$ap" "$ap_missing" "$ap_channel" "$n" "$overlay_kb" "$mem_kb"
+      ;;
+    call:networkHealth)
+      # Read-only hardware truth. Never spawn a network manager or leak
+      # interface addresses, SIM identifiers, client devices or secrets.
+      n=0; owner_present=false; extra=null; owner=null; owner_state=null
+      all_pids="$(pidof netifd 2>/dev/null || true)"
+      for pid in $all_pids; do
+        case "$pid" in ''|*[!0-9]*) continue ;; esac
+        n=$((n + 1))
+      done
+      procd_owner="$(ubus -S -t 3 call service list '{"name":"network","verbose":true}' 2>/dev/null |
+        jsonfilter -e '@.network.instances[*].pid' 2>/dev/null || true)"
+      case "$procd_owner" in ''|*[!0-9]*) procd_owner= ;; esac
+      if [ -n "$procd_owner" ] && [ -r "/proc/$procd_owner/status" ]; then
+        status_name="$(awk '$1=="Name:" {print $2}' "/proc/$procd_owner/status" 2>/dev/null || true)"
+        executable="$(readlink "/proc/$procd_owner/exe" 2>/dev/null || true)"
+        state="$(awk '$1=="State:" {print $2}' "/proc/$procd_owner/status" 2>/dev/null || true)"
+        if [ "$status_name" = netifd ] && [ "$executable" = /sbin/netifd ]; then
+          for pid in $all_pids; do
+            if [ "$pid" = "$procd_owner" ]; then
+              owner_present=true
+            fi
+          done
+          if [ "$owner_present" = true ]; then
+            owner="$procd_owner"
+            extra=$((n-1))
+            case "$state" in S|R|D|T|Z) owner_state="\"$state\"" ;; esac
+          fi
+        fi
+      fi
+      owner_confirmed=false
+      if [ "$owner_present" = true ]; then owner_confirmed=true; fi
+      dhcp=0
+      for pid in $(pidof udhcpc 2>/dev/null || true); do
+        case "$pid" in ''|*[!0-9]*) continue ;; esac
+        dhcp=$((dhcp + 1))
+      done
+      mem_free="$(numeric "$(awk '$1=="MemAvailable:" {print $2}' /proc/meminfo 2>/dev/null || true)")"
+      uptime="$(awk '{printf "%.0f", $1}' /proc/uptime 2>/dev/null || echo 0)"
+      uptime="$(numeric "$uptime")"
+      load_1m="$(awk 'NR==1 && $1 ~ /^[0-9]+[.][0-9]+$/ {print $1}' /proc/loadavg 2>/dev/null || true)"
+      case "$load_1m" in ''|*[!0-9.]*) load_1m=null ;; esac
+      address=false
+      route=false
+      if [ -d /sys/class/net/usb0 ]; then
+        if ip -4 addr show dev usb0 2>/dev/null | grep -q ' inet '; then address=true; fi
+        if ip -4 route show default dev usb0 2>/dev/null | grep -q '^default '; then route=true; fi
+      fi
+      printf '{"schema":1,"source":"live_procfs_procd_kernel","netifd_count":%s,"procd_netifd_owner_confirmed":%s,"procd_netifd_pid":%s,"procd_netifd_state":%s,"unmanaged_netifd_count":%s,"udhcpc_process_count":%s,"memory_available_kb":%s,"uptime_seconds":%s,"load1":%s,"lte_ipv4":%s,"lte_default_route":%s}\n' \
+        "$n" "$owner_confirmed" "$owner" "$owner_state" "$extra" "$dhcp" "$mem_free" "$uptime" "$load_1m" "$address" "$route"
       ;;
     call:traffic)
       # Only kernel counters; never estimate throughput from link speed or cache.

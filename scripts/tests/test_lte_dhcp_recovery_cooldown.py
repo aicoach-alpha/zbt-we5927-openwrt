@@ -49,8 +49,8 @@ date() { echo "$now"; }
 log() { :; }
 sleep() { :; }
 gateway_ok() { return 1; }
-ifdown() { down=$((down+1)); }
-ifup() { up=$((up+1)); }
+lte_netifd_call() { case "$1" in down) down=$((down+1));; up) up=$((up+1));; esac; }
+lan_bridge_present() { :; }
 """
         code = """
 repair_lte_interface; first=$?
@@ -89,7 +89,8 @@ usb_repair() { :; }
 wait_at() { :; }
 sim_ready() { :; }
 apply_apn_at_ready() { :; }
-ifup() { :; }
+lte_netifd_call() { :; }
+network_manager_safe() { :; }
 modem_readiness_phase() { echo at_busy_or_unavailable; }
 log() { :; }
 sleep() { :; }

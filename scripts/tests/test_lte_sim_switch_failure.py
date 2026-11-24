@@ -9,7 +9,8 @@ FUNCTIONS, DISPATCH = SOURCE.rsplit('\ncase "$1" in', 1)
 
 
 def simulate(stubs, command, *args):
-    return subprocess.run(["sh", "-c", FUNCTIONS + "\n" + stubs + "\n" + command,
+    safe = "network_manager_safe() { :; }\n"
+    return subprocess.run(["sh", "-c", FUNCTIONS + "\n" + safe + stubs + "\n" + command,
                            "we5927-lte", *args], capture_output=True, text=True, timeout=5)
 
 
@@ -100,7 +101,7 @@ cycle_modem_power() { echo power >&3; [ "$failed" != power ]; }
 wait_at() { [ "$failed" != at ]; }
 log() { :; }
 apply_apn_at_ready() { echo apn >&3; [ "$failed" != apn ]; }
-ifup() { echo ifup >&3; [ "$failed" != ifup ]; }
+lte_netifd_call() { echo ifup >&3; [ "$failed" != ifup ]; }
 exec 3>&1
 """
             result = simulate(stubs + 'failed=' + failed, 'case "$1" in' + DISPATCH, 'sim', '2')
@@ -115,7 +116,7 @@ log() { :; }
 sleep() { :; }
 usb_repair() { :; }
 wait_at() { echo wait; }
-ifup() { :; }
+lte_netifd_call() { :; }
 gpio_set() { echo "gpio $2"; [ "$2" != "$failed" ]; }
 """
             result = simulate(stubs + 'failed=' + failed, 'power_cycle')
@@ -129,7 +130,7 @@ cycle_modem_power() { echo "cycle $slot"; }
 wait_at() { :; }
 sim_ready_at_port() { :; }
 apply_apn_at_ready() { echo "apn $slot"; [ "$slot" = 1 ]; }
-ifup() { echo "up $slot" >&3; }
+lte_netifd_call() { echo "up $slot" >&3; }
 data_ok() { echo unexpected_probe; return 0; }
 log() { :; }
 exec 3>&1
@@ -143,12 +144,12 @@ exec 3>&1
         stubs = """
 cycle_modem_power() { :; }
 wait_at() { return 1; }
-ifup() { echo "$1" >&3; }
+lte_netifd_call() { echo "$1" >&3; }
 exec 3>&1
 """
         result = simulate(stubs, 'power_cycle')
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(result.stdout.splitlines(), ['lte'])
+        self.assertEqual(result.stdout.splitlines(), ['up'])
 
     def test_successful_trial_checks_data_after_starting_new_slot(self):
         stubs = """
@@ -157,7 +158,7 @@ cycle_modem_power() { echo power; }
 wait_at() { echo at; }
 sim_ready_at_port() { echo ready; }
 apply_apn_at_ready() { echo apn; }
-ifup() { echo "up $1" >&3; }
+lte_netifd_call() { echo "up lte" >&3; }
 data_ok() { echo probe; }
 log() { :; }
 exec 3>&1
@@ -173,7 +174,7 @@ set_sim() { echo "select $1"; }
 cycle_modem_power() { echo power; }
 wait_at() { :; }
 apply_apn_at_ready() { echo apn; }
-ifup() { :; }
+lte_netifd_call() { :; }
 """
         result = simulate(stubs, 'case "$1" in' + DISPATCH, 'sim', '2')
         self.assertEqual(result.returncode, 0)

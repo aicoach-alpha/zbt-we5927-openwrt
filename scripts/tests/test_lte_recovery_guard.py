@@ -20,9 +20,9 @@ def run(target, ubus_ok=True, gateway_after=3):
 u=0; g=0; up=0; down=0
 ubus() {{ u=$((u+1)); [ {int(ubus_ok)} -eq 1 ]; }}
 sleep() {{ :; }}
+lan_bridge_present() {{ :; }}
 log() {{ :; }}
-ifup() {{ up=$((up+1)); }}
-ifdown() {{ down=$((down+1)); }}
+lte_netifd_call() {{ case "$1" in up) up=$((up+1));; down) down=$((down+1));; esac; }}
 gateway_ok() {{ g=$((g+1)); [ "$g" -ge {gateway_after} ]; }}
 """
     body = fn(SOURCE.read_text(), target)
@@ -58,6 +58,7 @@ data_ok() {{ [ {int(data_up)} -eq 1 ]; }}
 gateway_ok() {{ [ {int(gateway_up)} -eq 1 ]; }}
 renew_lte() {{ renew_calls=$((renew_calls+1)); [ {int(renew_ok)} -eq 1 ]; }}
 repair_lte_interface() {{ repair_calls=$((repair_calls+1)); [ {int(repair_ok)} -eq 1 ]; }}
+network_manager_safe() {{ :; }}
 radio_or_link_lost() {{ radio_calls=$((radio_calls+1)); [ {int(detached)} -eq 1 ]; }}
 soft_reconnect() {{ cfun_calls=$((cfun_calls+1)); }}
 log() {{ :; }}

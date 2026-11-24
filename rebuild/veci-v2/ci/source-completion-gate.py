@@ -14,6 +14,11 @@ BASE = Path(__file__).resolve().parents[1]
 CONTRACT = BASE / "contracts/veci-v2-rebuild-contract.json"
 EVIDENCE = BASE / "contracts/owner-final-source-evidence.json"
 
+# Owner permanently retired USSD. 39 (not historical 40) is the only
+# accepted source inventory; a future feature addition requires owner approval.
+ACTIVE_CORE_COUNT = 39
+RETIRED_CORE = {"lte_ussd"}
+
 
 def receipt_passed(log, methods):
     """Accept only successful unittest runs that actually report each method."""
@@ -28,8 +33,11 @@ def receipt_passed(log, methods):
 def audit(contract: dict, evidence: dict) -> list[str]:
     issues = []
     required = contract.get("required_core", [])
-    if len(required) != 40 or len({x["id"] for x in required}) != 40:
+    ids = [x["id"] for x in required]
+    if len(required) != ACTIVE_CORE_COUNT or len(set(ids)) != ACTIVE_CORE_COUNT:
         issues.append("required_core_wrong_count_or_duplicates")
+    if RETIRED_CORE.intersection(ids):
+        issues.append("retired_module_reintroduced")
     index = evidence.get("modules", {})
     if set(index) != {x["id"] for x in required}:
         issues.append("source_evidence_missing_or_extra_modules")

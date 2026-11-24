@@ -348,22 +348,24 @@ cycle_modem_power() {
 }
 
 power_cycle() {
-	local ready=0
+ local ready=0
+ network_manager_safe || { log "Modem power cycle held: network manager conflict"; return 3; }
 	cycle_modem_power || return 1
 	wait_at && ready=1
 	# Independent RNDIS DHCP can proceed even while serial control is unavailable.
-	ifup lte >/dev/null 2>&1 || { log "LTE interface start failed"; return 1; }
+	lte_netifd_call up || { log "LTE interface start failed; preserving LAN"; return 1; }
 	[ "$ready" = 1 ]
 }
 
 start_selected_sim() {
-	cycle_modem_power || return 1
+ network_manager_safe || { log "SIM reconnect held: network manager conflict"; return 3; }
+ cycle_modem_power || return 1
 	wait_at || { log "AT port unavailable after SIM selection"; return 1; }
 	if [ "$1" = require_ready ]; then
 		sim_ready_at_port || { log "Selected SIM is not ready"; return 1; }
 	fi
 	apply_apn_at_ready || return 1
-	ifup lte >/dev/null 2>&1 || { log "LTE interface start failed"; return 1; }
+	lte_netifd_call up || { log "LTE interface start failed; preserving LAN"; return 1; }
 }
 
 apply_apn() {
@@ -407,6 +409,7 @@ sim_absent() {
 
 soft_reconnect() {
  local p rc
+ network_manager_safe || { log "CFUN reconnect held: network manager conflict"; return 3; }
  log "Escalated LTE radio reconnect: exclusive AT lock"
  wait_at || return 1
  apply_apn || true
@@ -426,7 +429,7 @@ soft_reconnect() {
  }
  sleep 4
  usb_repair
- ifup lte >/dev/null 2>&1 || true
+ lte_netifd_call up || true
 }
 
 data_ok() {
@@ -561,6 +564,41 @@ radio_or_link_lost() {
  esac
 }
 
+# Prevent another accidental netifd launch from triggering competing ubus
+# ownership and endless LTE DHCP recovery. Read-only; never kill processes.
+network_manager_safe() {
+ local owner name parent exe pid count
+ owner="$(ubus -S -t 3 call service list '{"name":"network","verbose":true}' 2>/dev/null |
+   jsonfilter -e '@.network.instances[*].pid' 2>/dev/null)" || return 1
+ case "$owner" in ''|*[!0-9]*) return 1 ;; esac
+ [ -r "/proc/$owner/status" ] || return 1
+ name="$(awk '$1=="Name:" {print $2}' "/proc/$owner/status" 2>/dev/null || :)"
+ parent="$(awk '$1=="PPid:" {print $2}' "/proc/$owner/status" 2>/dev/null || :)"
+ exe="$(readlink "/proc/$owner/exe" 2>/dev/null || :)"
+ [ "$name" = netifd ] && [ "$parent" = 1 ] &&
+   [ "$exe" = /sbin/netifd ] || return 1
+ count=0
+ for pid in $(pidof netifd 2>/dev/null || :); do
+   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+   [ "$pid" = "$owner" ] || return 1
+   count=$((count+1))
+ done
+ [ "$count" -eq 1 ]
+}
+lan_bridge_present() { [ -d /sys/class/net/br-lan ]; }
+
+lte_netifd_call() {
+ local method
+ method="$1"
+ case "$method" in up|down) ;; *) return 2 ;; esac
+ if ! network_manager_safe; then
+   log "LTE-only action refused: netifd is not uniquely procd-owned"
+   return 3
+ fi
+ # Generic /sbin/ifup may cause an entire network reload: never use it.
+ ubus -S -t 8 call network.interface.lte "$method" '{}' >/dev/null 2>&1
+}
+
 renew_lte() {
  local n now previous
  # Restrict automatic renew retries to once every two minutes.
@@ -608,10 +646,20 @@ repair_lte_interface() {
  fi
  last_repair_attempt="$now"
  log "LTE interface recovery: netifd LTE only, preserve Wi-Fi and modem"
- ifdown lte >/dev/null 2>&1 || true
- sleep 1
- ifup lte >/dev/null 2>&1 || true
- sleep 3
+ lte_netifd_call down || {
+   log "LTE-only down rejected; avoid modem escalation"
+   return 3
+ }
+ sleep 5
+ lan_bridge_present || {
+   log "LAN bridge unavailable after LTE-only down"
+   return 3
+ }
+ lte_netifd_call up || {
+   log "LTE-only up rejected; avoid modem escalation"
+   return 3
+ }
+ sleep 6
  gateway_ok
 }
 
@@ -622,6 +670,7 @@ manual_reconnect() {
    log "LTE datapath is present; manual reconnect suppressed to avoid downtime"
    return 0
  fi
+ network_manager_safe || { log "Manual reconnect held: netifd owner not unique"; return 3; }
  renew_lte && return 0
  gateway_ok && return 0
  repair_lte_interface && return 0
@@ -1043,13 +1092,13 @@ daemon() {
    # This read-only probe does not disturb IPv4, SMS, Wi-Fi or the modem.
    radio_phase="$(modem_readiness_phase)"
    log "LTE RNDIS gateway present but Internet unavailable; modem_phase=$radio_phase; holding DHCP and radio"
- else
+ elif network_manager_safe; then
    power_on || true
    # Only restore GPIO selection during actual cold-start/recovery.
    set_sim "$sim" >/dev/null 2>&1 || true
    usb_repair
    # Start RNDIS DHCP independently of the serial control port.
-   gateway_ok || ifup lte >/dev/null 2>&1 || true
+   gateway_ok || lte_netifd_call up || true
    if wait_at; then
      if [ "$(cfg auto_failover)" = 1 ] && sim_absent; then
        if [ "$sim" = 1 ]; then next=2; else next=1; fi
@@ -1062,6 +1111,9 @@ daemon() {
    fi
    radio_phase="$(modem_readiness_phase)"
    log "LTE cold-start readiness: modem_phase=$radio_phase"
+ else
+   log "LTE cold-start suppressed: duplicate/unowned netifd; preserve modem and LAN"
+   radio_phase=network_manager_anomaly
  fi
 
  threshold="$(clamped_number "$(cfg fail_threshold)" 3 2 20)"
@@ -1069,8 +1121,23 @@ daemon() {
  hard_after="$(clamped_number "$(cfg hard_reset_after)" 3 2 20)"
  sim_after="$(clamped_number "$(cfg sim_failover_after)" 3 2 20)"
  log "LTE performance-first monitor started; checks every $interval sec; threshold $threshold"
-
+ last_network_anomaly=0
  while enabled; do
+   if ! network_manager_safe; then
+     stage=network_manager_anomaly
+     radio_phase=not_verified
+     if [ "$last_network_anomaly" = 0 ]; then
+       log "Duplicate/unowned netifd detected: holding all LTE recovery (no network reload, modem reset, or SIM switch)"
+     fi
+     last_network_anomaly=1
+     performance_state
+     sleep "$interval"
+     continue
+   fi
+   if [ "$last_network_anomaly" = 1 ]; then
+     log "Single procd netifd restored; resuming normal network monitoring"
+     last_network_anomaly=0
+   fi
    if data_ok; then
      if [ "$failures" -gt 0 ] || [ "$recoveries" -gt 0 ]; then
        log "LTE connectivity restored"
@@ -1215,7 +1282,7 @@ case "$1" in
 		;;
 	usb-repair)
 		usb_repair
-		ifup lte >/dev/null 2>&1 || true
+		lte_netifd_call up || true
 		;;
 	restart)
 		/etc/init.d/we5927-lte restart

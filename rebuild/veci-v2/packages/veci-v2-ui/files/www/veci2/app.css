@@ -203,3 +203,134 @@ footer { font-size:12px; }
   .grid { grid-template-columns:1fr }
   .tabs { grid-template-columns:repeat(2,minmax(0,1fr)) }
 }
+
+
+/* VeCI Control Center v2.1: native offline GUI, four primary sections, no vendor assets. */
+:root{--bg:#f2f5f9;--surface:#fff;--ink:#152741;--muted:#65758c;--line:#e2e9f1;--accent:#0b6baa;--good:#167e63;--warn:#a96519;--bad:#bd4145;--shadow:0 12px 35px rgba(18,43,72,.045)}
+body{background:var(--bg);line-height:1.5}
+.header{min-height:80px;background:#fff;color:var(--ink);border-bottom:1px solid var(--line);box-shadow:0 2px 12px rgba(16,40,69,.025)}
+.header .brand strong{color:#11273d;font-size:23px}
+.header .brand strong span{color:#2583b5}
+.header .brand small{color:#7489a0}
+.header .mark{background:linear-gradient(145deg,#146fa6,#123655);border:0}
+.header button.quiet{color:#254762;border-color:#cad6e2;background:#f7f9fc}
+main{max-width:1620px;padding:30px 26px 45px}
+#workspace{display:grid;grid-template-columns:236px minmax(0,1fr);grid-template-rows:auto 1fr;column-gap:26px;align-items:start}
+#workspace>.intro{grid-column:2;grid-row:1;min-width:0;margin-bottom:12px;padding:4px 2px 10px}
+#workspace>.tabs{grid-column:1;grid-row:1/span 2;align-self:start;position:sticky;top:18px;display:flex;flex-direction:column;align-items:stretch;gap:6px;width:236px;min-height:min(670px,calc(100vh - 135px));padding:23px 13px 18px;margin:0;background:linear-gradient(170deg,#13283f,#102238 76%,#1a3952);border:1px solid #23445e;box-shadow:0 20px 48px rgba(17,38,64,.14);border-radius:20px;color:#f2f7ff}
+#workspace>.page{grid-column:2;grid-row:2;min-width:0}
+.menu-caption{display:block;padding:1px 14px 11px;font-size:10px;font-weight:800;letter-spacing:.17em;color:#8facbe}
+#workspace .tabs .tab{display:flex;align-items:center;gap:13px;flex:0 0 auto;min-height:53px;width:100%;text-align:left;padding:12px 14px;color:#b7c8d7;border:1px solid transparent;border-radius:11px;font-size:14px;font-weight:680;box-shadow:none;background:transparent}
+#workspace .tabs .tab::before{font-size:20px;line-height:1;flex:0 0 24px;text-align:center;font-weight:500}
+#workspace .tabs .tab[data-page="overview"]::before{content:"▦"}
+#workspace .tabs .tab[data-page="network"]::before{content:"◎"}
+#workspace .tabs .tab[data-page="sms"]::before{content:"✉"}
+#workspace .tabs .tab[data-page="settings"]::before{content:"⚙"}
+#workspace .tabs .tab:hover{background:#223b54;color:#fff}
+#workspace .tabs .tab.active{color:#fff;border-color:#32618a;background:linear-gradient(95deg,#176a9b,#19517e);box-shadow:0 7px 14px rgba(0,0,0,.11)}
+.sidebar-info{margin-top:auto;border-top:1px solid #385069;padding:22px 12px 2px;display:grid;gap:9px}
+.sidebar-device{display:block;color:#d9e9f4;font-size:12px;font-weight:700}
+.sidebar-prompt{display:block;color:#98aec2;font-size:11px;line-height:1.7}
+.session-disclosure{margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.09);font-size:11px}
+.session-disclosure summary{color:#c8d9e8;cursor:pointer;padding:8px 0;font-weight:650}
+.session-disclosure p{color:#b4cada;font-size:11px;overflow-wrap:anywhere}
+.session-disclosure strong{color:#fff}
+.intro{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.intro h1{font-size:clamp(24px,2.4vw,32px);letter-spacing:-.035em;margin-top:4px}
+.intro .eyebrow{color:#367caa}
+.intro-actions{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.live-label{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:650;color:#648098}
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#2aa17b;box-shadow:0 0 0 4px rgba(37,168,127,.13)}
+.intro-actions button{font-size:12px;padding:11px 15px;white-space:nowrap}
+.page>.subnav{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 19px;padding:6px;border:1px solid var(--line);background:white;border-radius:13px;box-shadow:var(--shadow)}
+.subtab{padding:11px 16px;color:#556b7d;border-radius:9px}
+.subtab.active{background:#e7f3fc;color:#0c609a;box-shadow:inset 0 0 0 1px #badbf2}
+.subtab:hover:not(.active){background:#f3f7fb}
+.page>.panel,.traffic-panel{box-shadow:var(--shadow)}
+.dashboard-home{min-width:0}
+.connection-hero{background:linear-gradient(115deg,#142d49 0%,#164f70 66%,#146f94 100%);box-shadow:0 13px 30px rgba(14,62,93,.13);padding:31px;border-radius:17px}
+.connection-hero h2{font-size:23px;max-width:620px;line-height:1.3}
+.connection-hero p{max-width:520px}
+.connection-hero .eyebrow{color:#9edcfa}
+.indicator{display:inline-flex;align-items:center;gap:8px;white-space:normal}
+.topology-strip{display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr;gap:9px;align-items:center;margin:16px 0;padding:18px 19px;border-radius:15px;border:1px solid var(--line);background:#fff;box-shadow:var(--shadow)}
+.topology-node{display:flex;align-items:center;gap:13px;min-width:0}
+.topology-icon{height:39px;width:39px;border-radius:12px;flex-shrink:0;display:grid;place-items:center;background:#e8f4fa;color:#146693;font-size:22px}
+.topology-node strong{display:block;font-size:12px;color:#213e55}
+.topology-node small{display:block;font-size:11px;color:#688099;margin-top:3px;overflow-wrap:anywhere}
+.topology-link{text-align:center;color:#97b3c4;font-size:21px}
+.metric{box-shadow:var(--shadow);border-radius:13px;padding:21px 19px;min-height:112px}
+.metric h3{font-size:11px;letter-spacing:.015em;margin:1px 0 12px}
+.metric strong{font-size:15px;line-height:1.4}
+.panel h2{font-size:18px}
+.panel form{max-width:620px}
+.panel p{max-width:780px}
+.panel details{border:1px solid #e6edf4;border-radius:11px;padding:11px 14px;margin:12px 0;background:#fcfdff}
+.panel details[open]{background:#fff}
+.panel details summary{padding:4px 0 7px}
+.panel button{font-size:12px;line-height:1.35}
+.panel input,.panel select,.panel textarea{min-height:41px}
+.panel fieldset{border:1px solid #e3eaf1;border-radius:10px;padding:13px;margin:12px 0}
+.panel h3{margin:17px 0 7px}
+.traffic-panel{margin-top:16px;padding:23px 25px}
+.traffic-head h2{font-size:19px}
+#traffic-chart,#health-chart{max-width:100%;background:#fcfdff;border-radius:10px;border:1px solid #f0f3f7}
+.health-panel{padding:24px 26px}
+.section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:15px}
+.section-heading h2{font-size:20px;margin-top:7px}
+.section-heading h3{font-size:16px;margin:0 0 6px}
+.section-heading p{margin:0 0 8px}
+.health-banner{background:#f4f8fc;border:1px solid #dae7f3;border-radius:10px;padding:13px 15px;color:#4c647b;font-size:13px;margin-bottom:15px;line-height:1.6}
+.health-banner.good{background:#f0faf6;border-color:#bbe7d2;color:#17664e}
+.health-banner.bad{background:#fff3f1;border-color:#f0c8c8;color:#a53e46}
+.health-banner.warn{background:#fffaf0;border-color:#ead8ab;color:#885915}
+.system-chart{border:1px solid var(--line);border-radius:14px;padding:20px 19px;margin-top:16px}
+.system-chart .section-heading{margin:0}
+.system-chart .section-heading h3{font-size:15px;margin:0}
+.system-chart canvas{display:block;width:100%;height:188px;margin:10px 0 0}
+.chart-unit{font-size:11px;color:#667d91;font-weight:700;white-space:nowrap}
+.health-panel .metric{min-height:103px}
+#health-note{margin:5px 0 0;font-size:11px}
+@media(max-width:1180px){
+#workspace{grid-template-columns:215px minmax(0,1fr);gap:0 18px}
+#workspace>.tabs{width:215px}
+.grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:860px){
+#workspace{display:flex;flex-direction:column;gap:0}
+#workspace>.intro{order:0;width:100%;margin:0 0 8px}
+#workspace>.tabs{order:1;position:static;display:flex;flex-direction:row;flex-wrap:wrap;width:100%;min-height:0;margin:0 0 15px;padding:7px;border-radius:13px;background:#fff;border-color:var(--line);gap:5px;box-shadow:var(--shadow)}
+#workspace .tabs .menu-caption{display:none}
+#workspace .tabs .tab{width:auto;flex:1 1 auto;justify-content:center;min-height:48px;padding:10px 12px;font-size:12px;color:#536f88;gap:6px}
+#workspace .tabs .tab::before{flex:0 0 19px;font-size:17px}
+#workspace .tabs .tab.active{color:#075b90;background:#e7f3fc;box-shadow:inset 0 0 0 1px #c7e1f3;border-color:transparent}
+#workspace .tabs .tab:hover{color:#075b90;background:#f0f8fc}
+.sidebar-info{display:none}
+#workspace>.page:not([hidden]){order:2;width:100%}
+main{padding:20px 15px 35px}
+}
+@media(max-width:610px){
+.header{padding:14px 15px;min-height:68px}
+.header .brand strong{font-size:19px}
+.header .brand small{font-size:10px}
+#workspace .tabs .tab{min-width:0;min-height:44px;gap:3px;font-size:11px;padding:8px 5px}
+#workspace .tabs .tab::before{font-size:17px;flex:0 0 17px}
+.intro-actions{margin-top:11px;width:100%;justify-content:space-between}
+.connection-hero{padding:22px 20px}
+.topology-strip{grid-template-columns:1fr;gap:7px;padding:15px}
+.topology-node{gap:9px}
+.topology-link{transform:rotate(90deg);height:16px;font-size:19px;line-height:1}
+.topology-icon{width:34px;height:34px;font-size:19px;border-radius:9px}
+.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.metric{min-height:111px;padding:17px 14px}
+.metric strong{font-size:13px}
+.page>.subnav{flex-wrap:nowrap;overflow:auto;scroll-snap-type:x proximity}
+.subtab{flex-shrink:0;font-size:12px;padding:10px}
+.section-heading{flex-direction:column;gap:8px}
+.section-heading button{align-self:flex-start}
+.health-panel{padding:18px 15px}
+.traffic-panel{padding:17px 15px}
+.traffic-values{display:flex;justify-content:flex-start;gap:9px}
+}
+@media(max-width:360px){#workspace .tabs .tab::before{display:none}.grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}

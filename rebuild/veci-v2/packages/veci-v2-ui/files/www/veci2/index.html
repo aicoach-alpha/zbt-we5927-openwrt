@@ -48,22 +48,39 @@
         </form>
       </section>
       <section id="workspace" hidden>
-        <details><summary>Sesi dan izin akun</summary>
-          <p>Akun <strong id="session-account"></strong></p>
-          <p id="session-permissions"></p>
-        </details>
-        <div class="intro"><div><h1>Dashboard router</h1><p>Pantau jaringan, Wi-Fi, dan perangkat Anda dalam satu tempat.</p></div><button id="refresh" type="button">Perbarui</button></div>
+        <div class="intro"><div><span class="eyebrow">VECI CONTROL CENTER / WE5927</span><h1 id="page-title">Beranda</h1><p id="page-summary">Status internet, router, Wi-Fi, dan trafik langsung.</p></div><div class="intro-actions"><span class="live-label"><span class="live-dot"></span> Data langsung dari router</span><button id="refresh" type="button">Perbarui status</button></div></div>
         <nav class="tabs" aria-label="Menu utama VeCI">
+          <span class="menu-caption">MENU UTAMA</span>
           <button class="tab active" type="button" data-page="overview">Beranda</button>
           <button class="tab" type="button" data-page="network">Koneksi</button>
           <button class="tab" type="button" data-page="sms">SMS Center</button>
           <button class="tab" type="button" data-page="settings">Pengaturan</button>
+          <div class="sidebar-info">
+            <span class="sidebar-device">ZBT-WE5927 · Dual SIM</span>
+            <span class="sidebar-prompt">Kelola router dengan aman. Data hanya diambil dari perangkat Anda.</span>
+            <details class="session-disclosure"><summary>Sesi dan izin akun</summary>
+              <p>Akun <strong id="session-account"></strong></p>
+              <p id="session-permissions"></p>
+            </details>
+          </div>
         </nav>
         <section id="overview" class="page" aria-label="Status koneksi">
+          <nav class="subnav" aria-label="Submenu beranda" data-scope="overview">
+            <button type="button" class="subtab active" data-group="dashboard">Dashboard &amp; trafik</button>
+            <button type="button" class="subtab" data-group="health">Kesehatan jaringan</button>
+          </nav>
+          <article class="dashboard-home" data-group="dashboard">
           <div class="connection-hero">
             <div><span class="eyebrow">JARINGAN SELULER</span><h2>Koneksi internet dan perangkat</h2>
               <p>Memisahkan status modem, koneksi router, dan akses internet klien.</p></div>
             <div class="verification-status"><span id="internet-indicator" class="indicator">Belum diperiksa</span><small id="internet-detail">Pengujian HTTPS aktual melalui usb0</small></div>
+          </div>
+          <div class="topology-strip" aria-label="Alur koneksi internet">
+            <div class="topology-node"><span class="topology-icon" aria-hidden="true">◈</span><div><strong>Modem LTE</strong><small id="path-modem">Memeriksa perangkat…</small></div></div>
+            <span class="topology-link" aria-hidden="true">→</span>
+            <div class="topology-node"><span class="topology-icon" aria-hidden="true">▤</span><div><strong>Router VeCI</strong><small id="path-router">Memeriksa jaringan…</small></div></div>
+            <span class="topology-link" aria-hidden="true">→</span>
+            <div class="topology-node"><span class="topology-icon" aria-hidden="true">▣</span><div><strong>Wi-Fi &amp; LAN</strong><small id="path-clients">Memeriksa koneksi lokal…</small></div></div>
           </div>
           <div id="status-grid" class="grid"></div>
           <section class="traffic-panel" aria-label="Grafik trafik jaringan">
@@ -72,7 +89,19 @@
             <div class="traffic-values"><span id="traffic-rx">Unduh: belum ada sampel</span><span id="traffic-tx">Unggah: belum ada sampel</span></div>
             <p id="traffic-note" class="notice">Nilai awal membutuhkan dua sampel; grafik tidak mengarang kecepatan operator.</p>
           </section>
-          <p class="notice">Status internet yang belum diuji ditampilkan sebagai belum terverifikasi, bukan dipaksa menjadi offline. Beacon Wi-Fi tidak dianggap hidup hanya karena radio up.</p>
+          <p class="notice">Internet baru dinyatakan aktif setelah HTTPS dan DNS berhasil. Alamat IP modem saja bukan bukti internet. Grafik trafik memakai pengukuran asli kernel, bukan data simulasi.</p>
+          </article>
+          <article class="panel health-panel" data-group="health" hidden>
+            <div class="section-heading"><div><span class="eyebrow">OBSERVABILITAS ROUTER</span><h2>Kesehatan sistem dan koneksi</h2><p>Periksa pengelola jaringan resmi, DHCP, memori, dan status LTE tanpa merestart perangkat.</p></div><button type="button" id="health-refresh" class="quiet">Perbarui data</button></div>
+            <div id="health-banner" class="health-banner" role="status">Belum ada pemeriksaan kesehatan.</div>
+            <div id="health-grid" class="grid" aria-live="polite"></div>
+            <section class="system-chart" aria-label="Grafik penggunaan memori router">
+              <div class="section-heading"><div><h3>Riwayat RAM tersedia</h3><p>Grafik hanya muncul setelah menerima sampel dari sistem router.</p></div><span class="chart-unit">MiB tersedia</span></div>
+              <canvas id="health-chart" width="980" height="188" role="img" aria-label="Grafik RAM tersedia, sampel nyata dari kernel"></canvas>
+              <p id="health-note" class="notice">Belum ada data.</p>
+            </section>
+            <p class="notice">Proses netifd tambahan hanya ditandai sebagai masalah; panel ini tidak menghentikan daemon, mengubah modem, atau memutus koneksi.</p>
+          </article>
         </section>
         <section id="network" class="page" aria-label="Koneksi dan perangkat" hidden>
           <nav class="subnav" aria-label="Submenu koneksi" data-scope="network">
@@ -362,11 +391,14 @@
           </article>
         </section>
         <section id="sms" class="page" aria-label="SMS Center" hidden>
-          <article class="panel">
+          <nav class="subnav" data-scope="sms" aria-label="Submenu SMS Center">
+            <button type="button" class="subtab active" data-group="messages">Kotak pesan</button>
+            <button type="button" class="subtab" data-group="diagnostics">Status &amp; diagnostik</button>
+          </nav>
+          <article class="panel" data-group="messages">
             <span class="eyebrow">KOMUNIKASI</span><h2>SMS Center</h2>
             <p>Transport SMS menggunakan layanan modem yang ada dan satu kunci akses AT, bukan koneksi paralel yang berisiko membuat modem macet.</p>
             <div id="sms-status" class="result" aria-live="polite">Belum ada hasil pemeriksaan layanan SMS.</div>
-            <div class="diagnostics"><button type="button" id="sms-retry">Periksa layanan</button><button type="button" id="sms-diagnostics" class="quiet">Diagnostik SMS</button><p id="sms-diagnostics-status" role="status">Belum diuji pada perangkat.</p></div>
             <div class="sms-actions">
               <button id="sms-enable" type="button" hidden>Aktifkan SMS</button>
               <button id="sms-inbox-open" type="button" disabled>Buka Inbox</button>
@@ -392,6 +424,12 @@
             <div id="sms-results" class="sms-results" aria-live="polite"></div>
             <p class="notice">Pesan hanya dibaca saat diminta. Buka Inbox dapat menandai SMS belum dibaca sebagai dibaca. Hasil “diterima modem” belum berarti diterima penerima; pengiriman gagal/tidak pasti tidak dicoba ulang otomatis.</p>
           </article>
+          <article class="panel" data-group="diagnostics" hidden>
+            <span class="eyebrow">KONEKSI MODEM</span><h2>Status dan diagnostik SMS</h2>
+            <p>Periksa registrasi layanan SMS dan ketersediaan port AT. Pemeriksaan ini tidak mengirim pesan dan tidak merestart modem.</p>
+            <div class="diagnostics"><button type="button" id="sms-retry">Periksa layanan</button><button type="button" id="sms-diagnostics" class="quiet">Diagnostik SMS</button><p id="sms-diagnostics-status" role="status">Belum diuji pada perangkat.</p></div>
+            <p class="notice">Ketersediaan layanan bukan bukti SMS terkirim atau diterima. Pengujian fisik membutuhkan konfirmasi terpisah.</p>
+          </article>
         </section>
         <section id="apps" class="page" aria-label="Pengelola addon" hidden>
           <article class="panel">
@@ -412,7 +450,7 @@
       </section>
       <div id="message" class="message" role="status" aria-live="polite"></div>
     </main>
-    <footer>VeCI v2 · ZBT-WE5927 · Data berasal dari router · Pengaturan berisiko memerlukan konfirmasi</footer>
+    <footer>VeCI Control Center · ZBT-WE5927 · Pengukuran langsung · Perubahan jaringan memerlukan konfirmasi</footer>
   </div>
 </body>
 </html>
