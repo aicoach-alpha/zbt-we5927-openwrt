@@ -1,60 +1,13 @@
-
-test_cli_reports_usb_registration_binding_and_link (test_lte_rndis_identity.RndisIdentity.test_cli_reports_usb_registration_binding_and_link) ... ok
 test_configured_network_must_belong_to_selected_modem (test_lte_rndis_identity.RndisIdentity.test_configured_network_must_belong_to_selected_modem) ... ok
-
-----------------------------------------------------------------------
-Ran 2 tests in 0.207s
-
-OK
-
-
-test_attached_sim_and_registered_operator (test_lte_coldboot_phase.TestColdbootReadiness.test_attached_sim_and_registered_operator) ... ok
-test_busy_at_port_yields_unknown_not_radio_reset (test_lte_coldboot_phase.TestColdbootReadiness.test_busy_at_port_yields_unknown_not_radio_reset) ... ok
-test_diagnostics_stay_in_tmpfs (test_lte_coldboot_phase.TestColdbootReadiness.test_diagnostics_stay_in_tmpfs) ... ok
-test_hotplug_cannot_flap_network_or_radio (test_lte_coldboot_phase.TestColdbootReadiness.test_hotplug_cannot_flap_network_or_radio) ... ok
-test_invalid_lte_protocol_fails_closed (test_lte_coldboot_phase.TestColdbootReadiness.test_invalid_lte_protocol_fails_closed) ... ok
-test_lte_daemon_reload_trigger_is_narrow (test_lte_coldboot_phase.TestColdbootReadiness.test_lte_daemon_reload_trigger_is_narrow) ... ok
-test_missing_at_port (test_lte_coldboot_phase.TestColdbootReadiness.test_missing_at_port) ... ok
-test_missing_lte_section_is_reported_not_created (test_lte_coldboot_phase.TestColdbootReadiness.test_missing_lte_section_is_reported_not_created) ... ok
-test_missing_usb_interface (test_lte_coldboot_phase.TestColdbootReadiness.test_missing_usb_interface) ... ok
-test_operator_denied (test_lte_coldboot_phase.TestColdbootReadiness.test_operator_denied) ... ok
-test_operator_not_registered (test_lte_coldboot_phase.TestColdbootReadiness.test_operator_not_registered) ... ok
-test_operator_searching (test_lte_coldboot_phase.TestColdbootReadiness.test_operator_searching) ... ok
-test_packet_session_detached (test_lte_coldboot_phase.TestColdbootReadiness.test_packet_session_detached) ... ok
-test_probe_is_read_only (test_lte_coldboot_phase.TestColdbootReadiness.test_probe_is_read_only) ... ok
+test_cli_reports_usb_registration_binding_and_link (test_lte_rndis_identity.RndisIdentity.test_cli_reports_usb_registration_binding_and_link) ... ok
 test_rndis_local_link_not_claimed_as_public_internet (test_lte_coldboot_phase.TestColdbootReadiness.test_rndis_local_link_not_claimed_as_public_internet) ... ok
-test_roaming_is_registered (test_lte_coldboot_phase.TestColdbootReadiness.test_roaming_is_registered) ... ok
-test_sim_not_ready (test_lte_coldboot_phase.TestColdbootReadiness.test_sim_not_ready) ... ok
-test_sim_replies_distinguish_ready_absent_and_unknown (test_lte_coldboot_phase.TestColdbootReadiness.test_sim_replies_distinguish_ready_absent_and_unknown) ... ok
-test_sim_requires_pin_no_auto_unlock (test_lte_coldboot_phase.TestColdbootReadiness.test_sim_requires_pin_no_auto_unlock) ... ok
-test_sim_requires_puk_no_auto_unlock (test_lte_coldboot_phase.TestColdbootReadiness.test_sim_requires_puk_no_auto_unlock) ... ok
-test_single_configured_ping_failure_is_not_success (test_lte_coldboot_phase.TestColdbootReadiness.test_single_configured_ping_failure_is_not_success) ... ok
-test_startup_config_validation_never_mutates_network_or_firewall (test_lte_coldboot_phase.TestColdbootReadiness.test_startup_config_validation_never_mutates_network_or_firewall) ... ok
-test_valid_lte_network_does_not_restart_anything (test_lte_coldboot_phase.TestColdbootReadiness.test_valid_lte_network_does_not_restart_anything) ... ok
-
-----------------------------------------------------------------------
-Ran 23 tests in 0.159s
-
-OK
-
-
-test_carrier_is_physically_down (test_lte_recovery_guard.TestLowDowntimeReconnect.test_carrier_is_physically_down) ... ok
-test_detached_modem_allows_reset (test_lte_recovery_guard.TestLowDowntimeReconnect.test_detached_modem_allows_reset) ... ok
-test_manual_reconnect_cfun_only_with_detached_modem (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_cfun_only_with_detached_modem) ... ok
-test_manual_reconnect_does_not_cfun_attached_modem (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_does_not_cfun_attached_modem) ... ok
-test_manual_reconnect_renews_missing_local_gateway_first (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_renews_missing_local_gateway_first) ... ok
-test_manual_reconnect_repair_can_recover_without_modem_reset (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_repair_can_recover_without_modem_reset) ... ok
-test_manual_reconnect_skips_healthy_gateway_even_if_public_ping_fails (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_skips_healthy_gateway_even_if_public_ping_fails) ... ok
+test_invalid_lte_protocol_fails_closed (test_lte_coldboot_phase.TestColdbootReadiness.test_invalid_lte_protocol_fails_closed) ... ok
+test_missing_usb_interface (test_lte_coldboot_phase.TestColdbootReadiness.test_missing_usb_interface) ... ok
 test_manual_reconnect_skips_healthy_internet (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_skips_healthy_internet) ... ok
-test_missing_dhcp_ip_with_attached_modem_does_not_trigger_radio_reset (test_lte_recovery_guard.TestLowDowntimeReconnect.test_missing_dhcp_ip_with_attached_modem_does_not_trigger_radio_reset) ... ok
-test_modem_attached_but_at_busy_fails_closed (test_lte_recovery_guard.TestLowDowntimeReconnect.test_modem_attached_but_at_busy_fails_closed) ... ok
-test_failed_renew_must_not_call_ifup (test_lte_recovery_guard.TestRecovery.test_failed_renew_must_not_call_ifup) ... ok
-test_renew_timeout_does_not_flap_interface (test_lte_recovery_guard.TestRecovery.test_renew_timeout_does_not_flap_interface) ... ok
-test_renew_waits_for_local_gateway (test_lte_recovery_guard.TestRecovery.test_renew_waits_for_local_gateway) ... ok
-test_repair_only_for_persistent_local_failure (test_lte_recovery_guard.TestRecovery.test_repair_only_for_persistent_local_failure) ... ok
-test_repair_skips_ifdown_when_link_returns (test_lte_recovery_guard.TestRecovery.test_repair_skips_ifdown_when_link_returns) ... ok
+test_manual_reconnect_renews_missing_local_gateway_first (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_renews_missing_local_gateway_first) ... ok
+test_detached_modem_allows_reset (test_lte_recovery_guard.TestLowDowntimeReconnect.test_detached_modem_allows_reset) ... ok
 
 ----------------------------------------------------------------------
-Ran 15 tests in 0.059s
+Ran 8 tests in 0.356s
 
 OK

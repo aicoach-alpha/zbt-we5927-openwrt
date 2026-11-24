@@ -1,12 +1,7 @@
-
 test_codec_exactly_tracks_reviewed_v1_parser_function_block (test_veci_v2_sms_ui.SmsCenterV2.test_codec_exactly_tracks_reviewed_v1_parser_function_block) ... ok
 test_gsm_ucs2_and_three_part_pdu_vector (test_veci_v2_sms_ui.SmsCenterV2.test_gsm_ucs2_and_three_part_pdu_vector) ... ok
-test_html_dom_and_package_includes_all_sms_modules (test_veci_v2_sms_ui.SmsCenterV2.test_html_dom_and_package_includes_all_sms_modules) ... ok
-test_inbox_sent_and_draft_rpc_contract (test_veci_v2_sms_ui.SmsCenterV2.test_inbox_sent_and_draft_rpc_contract) ... ok
-test_sms_private_data_cleared_on_logout (test_veci_v2_sms_ui.SmsCenterV2.test_sms_private_data_cleared_on_logout) ... ok
-test_sms_requires_user_action_and_never_retries_unknown_outcome (test_veci_v2_sms_ui.SmsCenterV2.test_sms_requires_user_action_and_never_retries_unknown_outcome) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 0.411s
+Ran 2 tests in 0.629s
 
 OK

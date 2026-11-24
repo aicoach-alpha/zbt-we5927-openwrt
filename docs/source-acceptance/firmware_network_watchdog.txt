@@ -1,69 +1,12 @@
-
-test_daemon_cooldown_renew_does_not_reenter_ifdown_or_reset (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_daemon_cooldown_renew_does_not_reenter_ifdown_or_reset) ... ok
-test_daemon_cooldown_teardown_does_not_escalate (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_daemon_cooldown_teardown_does_not_escalate) ... ok
-test_daemon_has_explicit_cooldown_branch_before_escalating_radio (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_daemon_has_explicit_cooldown_branch_before_escalating_radio) ... ok
-test_interface_teardown_at_most_once_in_five_minutes (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_interface_teardown_at_most_once_in_five_minutes) ... ok
 test_renew_only_once_in_two_minutes (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_renew_only_once_in_two_minutes) ... ok
-test_same_script_staged_into_both_lte_sources (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_same_script_staged_into_both_lte_sources) ... ok
-
-----------------------------------------------------------------------
-Ran 6 tests in 0.051s
-
-OK
-
-
-test_carrier_is_physically_down (test_lte_recovery_guard.TestLowDowntimeReconnect.test_carrier_is_physically_down) ... ok
-test_detached_modem_allows_reset (test_lte_recovery_guard.TestLowDowntimeReconnect.test_detached_modem_allows_reset) ... ok
-test_manual_reconnect_cfun_only_with_detached_modem (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_cfun_only_with_detached_modem) ... ok
-test_manual_reconnect_does_not_cfun_attached_modem (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_does_not_cfun_attached_modem) ... ok
-test_manual_reconnect_renews_missing_local_gateway_first (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_renews_missing_local_gateway_first) ... ok
-test_manual_reconnect_repair_can_recover_without_modem_reset (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_repair_can_recover_without_modem_reset) ... ok
+test_interface_teardown_at_most_once_in_five_minutes (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_interface_teardown_at_most_once_in_five_minutes) ... ok
+test_daemon_cooldown_teardown_does_not_escalate (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_daemon_cooldown_teardown_does_not_escalate) ... ok
 test_manual_reconnect_skips_healthy_gateway_even_if_public_ping_fails (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_skips_healthy_gateway_even_if_public_ping_fails) ... ok
-test_manual_reconnect_skips_healthy_internet (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_skips_healthy_internet) ... ok
-test_missing_dhcp_ip_with_attached_modem_does_not_trigger_radio_reset (test_lte_recovery_guard.TestLowDowntimeReconnect.test_missing_dhcp_ip_with_attached_modem_does_not_trigger_radio_reset) ... ok
-test_modem_attached_but_at_busy_fails_closed (test_lte_recovery_guard.TestLowDowntimeReconnect.test_modem_attached_but_at_busy_fails_closed) ... ok
-test_failed_renew_must_not_call_ifup (test_lte_recovery_guard.TestRecovery.test_failed_renew_must_not_call_ifup) ... ok
-test_renew_timeout_does_not_flap_interface (test_lte_recovery_guard.TestRecovery.test_renew_timeout_does_not_flap_interface) ... ok
-test_renew_waits_for_local_gateway (test_lte_recovery_guard.TestRecovery.test_renew_waits_for_local_gateway) ... ok
-test_repair_only_for_persistent_local_failure (test_lte_recovery_guard.TestRecovery.test_repair_only_for_persistent_local_failure) ... ok
-test_repair_skips_ifdown_when_link_returns (test_lte_recovery_guard.TestRecovery.test_repair_skips_ifdown_when_link_returns) ... ok
-
-----------------------------------------------------------------------
-Ran 15 tests in 0.095s
-
-OK
-
-
 test_monitor_reuses_existing_modem_and_validates (test_owner_network_monitor_settings.NetworkMonitor.test_monitor_reuses_existing_modem_and_validates) ... ok
-test_rpc_and_panel_wired (test_owner_network_monitor_settings.NetworkMonitor.test_rpc_and_panel_wired) ... ok
-
-----------------------------------------------------------------------
-Ran 2 tests in 0.388s
-
-OK
-
-
 test_bad_telemetry_cannot_inflate_72h_coverage (test_veci_link_monitor.Tests.test_bad_telemetry_cannot_inflate_72h_coverage) ... ok
-test_bad_timestamp_does_not_crash_or_expand_coverage (test_veci_link_monitor.Tests.test_bad_timestamp_does_not_crash_or_expand_coverage) ... ok
-test_dhcp_release_is_suspected_only (test_veci_link_monitor.Tests.test_dhcp_release_is_suspected_only) ... ok
-test_disconnected_monitor_gap_is_not_a_proven_wan_down_edge (test_veci_link_monitor.Tests.test_disconnected_monitor_gap_is_not_a_proven_wan_down_edge) ... ok
-test_duplicates_cannot_fake_99_percent_coverage (test_veci_link_monitor.Tests.test_duplicates_cannot_fake_99_percent_coverage) ... ok
-test_first_failed_poll_anchors_window_even_if_ssh_recovers_late (test_veci_link_monitor.Tests.test_first_failed_poll_anchors_window_even_if_ssh_recovers_late) ... ok
-test_gap_recovery_must_not_invent_outage_edge (test_veci_link_monitor.Tests.test_gap_recovery_must_not_invent_outage_edge) ... ok
-test_invalid_or_failed_scan_never_claims_router_visible (test_veci_link_monitor.Tests.test_invalid_or_failed_scan_never_claims_router_visible) ... ok
-test_long_window_monitor_ignores_same_ssid_from_other_ap (test_veci_link_monitor.Tests.test_long_window_monitor_ignores_same_ssid_from_other_ap) ... ok
-test_missing_usb_interface_is_a_valid_observation_not_missing_data (test_veci_link_monitor.Tests.test_missing_usb_interface_is_a_valid_observation_not_missing_data) ... ok
 test_no_false_root_cause_from_ping (test_veci_link_monitor.Tests.test_no_false_root_cause_from_ping) ... ok
-test_outside_requested_window_cannot_repair_missing_coverage (test_veci_link_monitor.Tests.test_outside_requested_window_cannot_repair_missing_coverage) ... ok
-test_period_requires_multiple_cycles (test_veci_link_monitor.Tests.test_period_requires_multiple_cycles) ... ok
-test_single_gap_not_evidence (test_veci_link_monitor.Tests.test_single_gap_not_evidence) ... ok
-test_snapshot_filters_private_fields (test_veci_link_monitor.Tests.test_snapshot_filters_private_fields) ... ok
-test_successful_ssh_with_unparsed_metrics_is_not_valid_telemetry (test_veci_link_monitor.Tests.test_successful_ssh_with_unparsed_metrics_is_not_valid_telemetry) ... ok
-test_uat_coverage_uses_full_requested_72h_not_only_success_span (test_veci_link_monitor.Tests.test_uat_coverage_uses_full_requested_72h_not_only_success_span) ... ok
-test_unordered_logs_are_sorted_before_outage_classification (test_veci_link_monitor.Tests.test_unordered_logs_are_sorted_before_outage_classification) ... ok
-test_wifi_visibility_must_be_observed_externally (test_veci_link_monitor.Tests.test_wifi_visibility_must_be_observed_externally) ... ok
 
 ----------------------------------------------------------------------
-Ran 19 tests in 0.012s
+Ran 7 tests in 0.027s
 
 OK

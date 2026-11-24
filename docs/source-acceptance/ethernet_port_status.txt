@@ -1,23 +1,8 @@
-
-test_ap_status_uses_present_radio_interfaces (test_veci_v2_rebuild.V2BuildTests.test_ap_status_uses_present_radio_interfaces) ... ok
-test_channel_only_from_enabled_primary_bss (test_veci_v2_rebuild.V2BuildTests.test_channel_only_from_enabled_primary_bss) ... ok
 test_ethernet_reads_only_external_switch_ports (test_veci_v2_rebuild.V2BuildTests.test_ethernet_reads_only_external_switch_ports) ... ok
 test_ethernet_unavailable_for_wrong_board_or_switch_error (test_veci_v2_rebuild.V2BuildTests.test_ethernet_unavailable_for_wrong_board_or_switch_error) ... ok
-test_install_needs_explicit_confirmation_before_apk (test_veci_v2_rebuild.V2BuildTests.test_install_needs_explicit_confirmation_before_apk) ... ok
-test_lte_default_device_route_and_failed_queries (test_veci_v2_rebuild.V2BuildTests.test_lte_default_device_route_and_failed_queries) ... ok
-test_lte_link_checks_only_the_active_managed_device (test_veci_v2_rebuild.V2BuildTests.test_lte_link_checks_only_the_active_managed_device) ... ok
-test_lte_monitor_only_reports_recent_known_stages (test_veci_v2_rebuild.V2BuildTests.test_lte_monitor_only_reports_recent_known_stages) ... ok
-test_oem_inventory_only_allows_non_sensitive_config_fields (test_veci_v2_rebuild.V2BuildTests.test_oem_inventory_only_allows_non_sensitive_config_fields) ... ok
-test_oem_is_exact_dualsim_original_binary_evidence (test_veci_v2_rebuild.V2BuildTests.test_oem_is_exact_dualsim_original_binary_evidence) ... ok
-test_package_rejects_core_luci_and_kernel_mutations (test_veci_v2_rebuild.V2BuildTests.test_package_rejects_core_luci_and_kernel_mutations) ... ok
-test_primary_ap_configuration_and_runtime_are_independent (test_veci_v2_rebuild.V2BuildTests.test_primary_ap_configuration_and_runtime_are_independent) ... ok
-test_signed_repository_allowlist_and_resource_guards (test_veci_v2_rebuild.V2BuildTests.test_signed_repository_allowlist_and_resource_guards) ... ok
-test_single_source_package_ownership_no_duplicate_backend (test_veci_v2_rebuild.V2BuildTests.test_single_source_package_ownership_no_duplicate_backend) ... ok
-test_sms_contract_uses_existing_serialized_transport_not_double_AT (test_veci_v2_rebuild.V2BuildTests.test_sms_contract_uses_existing_serialized_transport_not_double_AT) ... ok
-test_status_contract_detects_missing_bss_and_never_infers_internet (test_veci_v2_rebuild.V2BuildTests.test_status_contract_detects_missing_bss_and_never_infers_internet) ... ok
 test_status_never_runs_mutating_network_commands (test_veci_v2_rebuild.V2BuildTests.test_status_never_runs_mutating_network_commands) ... ok
 
 ----------------------------------------------------------------------
-Ran 17 tests in 2.784s
+Ran 3 tests in 0.029s
 
 OK
