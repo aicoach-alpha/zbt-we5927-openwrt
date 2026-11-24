@@ -1,4 +1,4 @@
-"""Fail-closed source-to-SquashFS image mapping for all 40 core features."""
+"""Fail-closed source-to-SquashFS image mapping for all 39 active core features."""
 import importlib.util
 import hashlib
 import pathlib
@@ -17,7 +17,7 @@ spec.loader.exec_module(module)
 
 class CompleteRomSourceMap(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(prefix="veci-40-rom-test-")
+        self.temp=tempfile.TemporaryDirectory(prefix="veci-39-rom-test-")
         self.addCleanup(self.temp.cleanup)
         self.rom=pathlib.Path(self.temp.name)
         for pairs in module.FEATURES.values():
@@ -25,8 +25,9 @@ class CompleteRomSourceMap(unittest.TestCase):
                 destination=self.rom/inside
                 destination.parent.mkdir(parents=True,exist_ok=True)
                 shutil.copyfile(ROOT/original,destination)
-    def test_40_sources_have_exact_compiled_image_path_and_bytes(self):
-        self.assertEqual(len(module.FEATURES),40)
+    def test_39_sources_have_exact_compiled_image_path_and_bytes(self):
+        self.assertEqual(len(module.FEATURES),39)
+        self.assertNotIn("lte_ussd",module.FEATURES)
         self.assertEqual(module.check(self.rom),[])
     def test_any_missing_runtime_sends_fail_closed(self):
         target=self.rom/"usr/libexec/rpcd/veci.v2.observability"

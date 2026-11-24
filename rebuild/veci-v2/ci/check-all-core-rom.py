@@ -44,7 +44,6 @@ FEATURES={
  "lte_dual_sim_manual":[(RTL+"veci2-sim-manual","usr/libexec/rpcd/veci.v2.sim")],
  "lte_apn_pin_puk":[(RTL+"veci2-lte-policy","usr/libexec/rpcd/veci.v2.lte"),
                     (RTL+"veci2-sim-lock","usr/libexec/rpcd/veci.v2.simlock")],
- "lte_ussd":[(RTL+"veci2-ussd","usr/libexec/rpcd/veci.v2.ussd")],
  "sms_inbox":[(SMS+"rpcd/veci.sms","usr/libexec/rpcd/veci.sms")],
  "sms_sent_and_drafts":[(SMS+"veci-sms-sent-history","usr/libexec/veci-sms-sent-history"),
                         (SMS+"veci-sms-drafts","usr/libexec/veci-sms-drafts")],
@@ -114,8 +113,8 @@ def _squashfs_digest(path: Path) -> str:
 def check(rom:Path)->list[str]:
     errors=[]
     ids=[x["id"] for x in json.loads(CONTRACT.read_text())["required_core"]]
-    if len(ids)!=40 or set(ids)!=set(FEATURES):
-        return ["FEATURE_MAP_NOT_EXACTLY_40"]
+    if len(ids)!=39 or set(ids)!=set(FEATURES):
+        return ["FEATURE_MAP_NOT_EXACTLY_39"]
     if not rom.is_dir() or rom.is_symlink():
         return ["INVALID_IMAGE_ROOT"]
     checked=0
@@ -147,7 +146,7 @@ def check(rom:Path)->list[str]:
         if (rom/forbidden).exists():
             errors.append("LUCI_PRESENT:"+forbidden)
     if not errors:
-        print(f"EXACT_40_CORE_ROM_PAYLOADS=PASS checked_files={checked}")
+        print(f"EXACT_39_CORE_ROM_PAYLOADS=PASS checked_files={checked}")
         print("NOT_A_HARDWARE_UAT_NOT_SIGNED_NOT_FLASH_APPROVED")
     return errors
 
