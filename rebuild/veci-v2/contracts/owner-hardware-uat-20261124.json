@@ -210,6 +210,16 @@
       "safe_next_step": "read only SHA-pinned triage script via SSH stdin, no inline quoted grep pipes",
       "triage_source": "scripts/router/veci-live-wifi-readonly-triage.sh",
       "triage_hw_executed": false
+    },
+    "sixth_owner_download_and_ssh_timeout": {
+      "download_bytes": 4533,
+      "sha256": "e202255199c00ebe5b2d85a8be21c113ff5a86a5c08a281a5327a81e3f518a8a",
+      "status": "TRIAGE_NOT_EXECUTED",
+      "ssh_target": "192.168.1.1:22",
+      "ssh_error": "Connection timed out",
+      "post_rollback_router_state": "UNKNOWN",
+      "wifi_change_from_attempt": false,
+      "next": "Windows Ethernet link IP route gateway ping and TCP 443/22 diagnostics"
     }
   }
 }
