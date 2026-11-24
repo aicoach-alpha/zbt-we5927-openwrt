@@ -664,6 +664,21 @@
       "fix_success": "NOT_YET_VERIFIED",
       "device_access": "only owner Windows PowerShell to physical router over LAN; NAS on different network",
       "firmware_release": "NOT_PASSED"
+    },
+    "twentysecond_owner_scoped_lte_restart_rejected": {
+      "source": "owner actual PowerShell->SSH physical router execution",
+      "precheck": "passed and printed ACTION=RESTART_LTE_ONLY",
+      "restart_command": "ubus -S -t 8 call network.interface.lte restart '{}'",
+      "restart_result": "REJECTED",
+      "repair_ssh_exit": 4,
+      "ubus_stdout_stderr": "SUPPRESSED_BY_PREVIOUS_SCRIPT",
+      "root_cause": "UNKNOWN; interface down/teardown maps to error in upstream netifd, or timeout",
+      "physical_lte_data_egress": "STILL_NOT_VERIFIED_WORKING",
+      "lan_status": "COMMAND_RAN_VIA_SSH; no post-restart probe",
+      "new_staged_repair": "scripts/router/veci-lte-scoped-down-up-recovery-20261124.sh",
+      "new_repair_physical_execution": false,
+      "new_repair_contract": "one lte-only down/up, 5s teardown grace, no global network reload or netifd kill, report raw ubus errors",
+      "firmware_acceptance": "FAIL_LTE"
     }
   }
 }
