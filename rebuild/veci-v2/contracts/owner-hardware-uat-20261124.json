@@ -185,6 +185,31 @@
       "next": "READ_ONLY per-radio ubus, hostapd and netifd/mt76 log diagnostics, no repeated radio mutation",
       "wifi_hardware_uat": "FAIL",
       "no_flash": true
+    },
+    "fifth_owner_readonly_run_20261124_approx_105500_wib": {
+      "source": "owner PowerShell inline SSH output",
+      "network_wireless_radio0_up": true,
+      "hostapd_ubus_objects": [
+        "hostapd",
+        "hostapd-auth"
+      ],
+      "primary_bss_hostapd_object": "NOT_REGISTERED",
+      "kernel_network_interfaces": [
+        "br-lan",
+        "eth0",
+        "eth0.1",
+        "eth0.2",
+        "lo",
+        "usb0"
+      ],
+      "wlan_netdev": "ABSENT",
+      "error_output": "shell quoting corrupted grep alternation; ash tried executing netifd/mt76/timeout/etc as commands",
+      "ubus_publish_errors": "POSSIBLE_EXTRA_NETIFD_COLLISION_FROM_MANGLED_COMMAND_NOT_PROOF_ROUTER_SERVICE_DOWN",
+      "post_rollback_lte_https": "NOT_RELIABLY_CHECKED",
+      "wifi_root_cause": "MISSING_BSS_CONFIRMED; DRIVER_ROOT_CAUSE_UNRESOLVED",
+      "safe_next_step": "read only SHA-pinned triage script via SSH stdin, no inline quoted grep pipes",
+      "triage_source": "scripts/router/veci-live-wifi-readonly-triage.sh",
+      "triage_hw_executed": false
     }
   }
 }
