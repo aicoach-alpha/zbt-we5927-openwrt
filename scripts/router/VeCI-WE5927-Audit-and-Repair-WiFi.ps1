@@ -14,7 +14,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Router = '192.168.1.1'
 $ExpectedHostKey = 'SHA256:vTuQFuvd+br7jrfmqqNDN2FZxLtNNRYvOo3bDQ2Zlic'
-$GitHubRaw = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/35e158aee4979dc7c70d6d9d683d227a8858075e/scripts/router'
+$GitHubRaw = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/27976b9c799c065800aac44a9b1ee3e75680cbb4/scripts/router'
 $Scripts = @(
     @{
       Name='veci-live-router-audit.sh';
@@ -22,7 +22,7 @@ $Scripts = @(
     },
     @{
       Name='veci-live-wifi-guarded-repair.sh';
-      Sha256='b24c4b5cc5485f66da4f4e48e535c3aaefb271171c6f08a3a1076ee30054e82b'
+      Sha256='d6d1f48e755c704e51a5bfeac0451ef24ae521ca66fd4f9054d1273d8be4df12'
     }
 )
 $TimeTag = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -67,7 +67,13 @@ function Invoke-OnRouter {
   $RemoteLines = @()
   try {
     $ErrorActionPreference = 'Continue'
-    $RemoteLines = @($Text | & ssh.exe -o 'HostKeyAlgorithms=+ssh-rsa' -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout=8' -T "root@$Router" '/bin/sh -s' 2>&1)
+    # Windows PowerShell 5.1 adds a final CRLF record when a string is piped
+    # to a native executable. OpenWrt ash may interpret the trailing CR as
+    # a separate command, yielding exit 127 after AUDIT_END=OK.
+    # A literal exit statement BEFORE that terminal CR preserves the true
+    # previous command status and prevents execution of the stray CR.
+    $SafePayload = $Text.TrimEnd([char[]]@([char]10,[char]13)) + [char]10 + 'exit $?' + [char]10
+    $RemoteLines = @($SafePayload | & ssh.exe -o 'HostKeyAlgorithms=+ssh-rsa' -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout=8' -T "root@$Router" '/bin/sh -s' 2>&1)
     $ExitCode = $LASTEXITCODE
   } finally {
     $ErrorActionPreference = $SavedPreference

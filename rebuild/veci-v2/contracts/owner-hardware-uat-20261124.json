@@ -107,6 +107,37 @@
       "reason": "Standalone timeout command previously missing on OpenWrt; BusyBox binary includes timeout applet string",
       "correction": "Test busybox --list before invoking BusyBox timeout and fail closed otherwise",
       "source_commit": "35e158aee4979dc7c70d6d9d683d227a8858075e"
+    },
+    "second_hardware_audit_20261124_034029_utc": {
+      "device_board": "zbtlink,zbt-we5927",
+      "root_password_configured": true,
+      "overlay_kib_free": 1804,
+      "ram_kib_available": 15004,
+      "lte_bound_https": "PASS_HTTP_200",
+      "wireless_primary_ap_disabled": true,
+      "wireless_security": "NONE",
+      "wifi_key_present": false,
+      "phy0": "PRESENT",
+      "mt7603e": "LOADED",
+      "radio_up": true,
+      "wlan_interface_count": 0,
+      "sms_ubus_registered": true,
+      "sms_configuration_enabled": false,
+      "audit_end": "AUDIT_END_OK",
+      "ssh_exit": 127,
+      "wifi_repair_attempted": false,
+      "error": "PowerShell appended carriage-return-only line to remote stdin, shell exit 127"
+    },
+    "corrected_later_source": {
+      "transport": "literal POSIX exit $? before native input trailing CR, preserves error status",
+      "device_wifi_operation": "ubus -S -t 12 call network.wireless up targeting radio0, NOT /sbin/wifi up",
+      "unsafe_old_op": "signed firmware /sbin/wifi up invokes ubus call network reload",
+      "broad_network_reload": "FORBIDDEN",
+      "timeout_dependency": "REMOVED",
+      "rollback": "WIRELESS_UCI_ONLY; kernel deadlock cannot be auto-recovered",
+      "hardware_executed": false,
+      "source_commit": "27976b9c799c065800aac44a9b1ee3e75680cbb4",
+      "new_wrapper_sha256": "a295e8399a9d9b437a449af34fd278abf177b993606c5b756267f67e29774eae"
     }
   }
 }
