@@ -327,6 +327,66 @@
       "similar_upstream_action1": "https://github.com/openwrt/openwrt/issues/18105",
       "next_action": "co-temporal Windows-only Ethernet ICMP TCP22 TCP443 samples; no repeats of SSH when TCP22 unavailable",
       "safety": "do not kill/restart network management, WAN, modem, wifi, or flash"
+    },
+    "twelfth_owner_windows_8_probe_20261124_135631_135657_wib": {
+      "windows_ipv4": "192.168.1.223",
+      "router_ipv4": "192.168.1.1",
+      "timestamps_local": [
+        "13:56:31",
+        "13:56:34",
+        "13:56:38",
+        "13:56:42",
+        "13:56:46",
+        "13:56:49",
+        "13:56:53",
+        "13:56:57"
+      ],
+      "ping": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "tcp_22": [
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "tcp_443": [
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "https_status": [
+        "200",
+        "200",
+        "200",
+        "200",
+        "200",
+        "200",
+        "200",
+        "200"
+      ],
+      "local_lan_web_http": "8_OF_8_PASS",
+      "ssh_authenticated": "NOT_VERIFIED",
+      "lte_cellular_egress": "NOT_TESTED_BY_THIS_RUN",
+      "netifd_process_conflict": "NOT_RESOLVED",
+      "router_mutation": false,
+      "next": "one timed ssh banner check plus verbose client trace in same time window; no radio or modem actions"
     }
   }
 }
