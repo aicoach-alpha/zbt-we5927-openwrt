@@ -1,0 +1,10 @@
+test_exact_board_ordinary_archive_passes_without_writing_router (test_owner_backup_restore_native.RestoreSourceAcceptance.test_exact_board_ordinary_archive_passes_without_writing_router) ... ok
+test_rejects_wrong_board_traversal_symlinks_and_unknown_entries (test_owner_backup_restore_native.RestoreSourceAcceptance.test_rejects_wrong_board_traversal_symlinks_and_unknown_entries) ... ok
+test_https_admin_digest_and_two_phase_receipt (test_owner_backup_restore_native.RestoreSourceAcceptance.test_https_admin_digest_and_two_phase_receipt) ... ok
+test_ui_acl_install_and_shell_syntax (test_owner_backup_restore_native.RestoreSourceAcceptance.test_ui_acl_install_and_shell_syntax) ... ok
+test_export_requires_live_grant_and_intact_archive (test_veci_backup_export.BackupExport.test_export_requires_live_grant_and_intact_archive) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 3.679s
+
+OK

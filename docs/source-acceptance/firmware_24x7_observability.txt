@@ -1,0 +1,12 @@
+test_native_healthy_degraded_three_samples_unknown_and_no_internet_claim (test_owner_24x7_observability_native.Native24x7Observability.test_native_healthy_degraded_three_samples_unknown_and_no_internet_claim) ... ok
+test_privacy_bounded_tmpfs_and_root_only_permissions (test_owner_24x7_observability_native.Native24x7Observability.test_privacy_bounded_tmpfs_and_root_only_permissions) ... ok
+test_failclosed_other_board_symlink_and_no_router_controls (test_owner_24x7_observability_native.Native24x7Observability.test_failclosed_other_board_symlink_and_no_router_controls) ... ok
+test_procd_startup_bounded_rpc_acl_and_installed_files (test_owner_24x7_observability_native.Native24x7Observability.test_procd_startup_bounded_rpc_acl_and_installed_files) ... ok
+test_bad_telemetry_cannot_inflate_72h_coverage (test_veci_link_monitor.Tests.test_bad_telemetry_cannot_inflate_72h_coverage) ... ok
+test_no_false_root_cause_from_ping (test_veci_link_monitor.Tests.test_no_false_root_cause_from_ping) ... ok
+test_uat_coverage_uses_full_requested_72h_not_only_success_span (test_veci_link_monitor.Tests.test_uat_coverage_uses_full_requested_72h_not_only_success_span) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.909s
+
+OK

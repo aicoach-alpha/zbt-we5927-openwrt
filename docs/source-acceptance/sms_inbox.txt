@@ -1,0 +1,8 @@
+test_inbox_sent_and_draft_rpc_contract (test_veci_v2_sms_ui.SmsCenterV2.test_inbox_sent_and_draft_rpc_contract) ... ok
+test_html_dom_and_package_includes_all_sms_modules (test_veci_v2_sms_ui.SmsCenterV2.test_html_dom_and_package_includes_all_sms_modules) ... ok
+test_sms_v2_package_does_not_depend_on_v1_ui (test_veci_v2_contract.FeatureContract.test_sms_v2_package_does_not_depend_on_v1_ui) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.002s
+
+OK

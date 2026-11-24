@@ -1,25 +1,7 @@
-PASS RA/DHCPv6 profiles, master-off refusal, stale revision, invalid relay, explicit confirmation, profile roundtrip across master off/on
-PASS native UCI: initialization, retry, boot, confirmation, pending edits, rollback, enable/disable, IPv4 preservation
-
 test_native_ipv6_provision_toggle_rollback_and_ra_profiles (test_owner_ipv6_native_acceptance.NativeIpv6Acceptance.test_native_ipv6_provision_toggle_rollback_and_ra_profiles) ... ok
-
-----------------------------------------------------------------------
-Ran 1 test in 4.983s
-
-OK
-
-
-test_acl_never_exposes_default_write_to_guest (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_acl_never_exposes_default_write_to_guest) ... ok
-test_boot_ipv6_mode_is_before_network_only (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_boot_ipv6_mode_is_before_network_only) ... ok
-test_default_is_ipv6_off_with_one_time_initializer (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_default_is_ipv6_off_with_one_time_initializer) ... ok
-test_only_four_primary_navigation_items (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_only_four_primary_navigation_items) ... ok
 test_read_api_reports_configuration_and_runtime_separately (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_read_api_reports_configuration_and_runtime_separately) ... ok
-test_release_contract_preserves_release_gates (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_release_contract_preserves_release_gates) ... ok
-test_save_rejects_unconfirmed_injected_request_without_mutation (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_save_rejects_unconfirmed_injected_request_without_mutation) ... ok
-test_ui_shows_apply_only_on_reboot_and_trusts_live_status (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_ui_shows_apply_only_on_reboot_and_trusts_live_status) ... ok
-test_v2_source_staging_and_ui_dependency_include_ipv6 (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_v2_source_staging_and_ui_dependency_include_ipv6) ... ok
 
 ----------------------------------------------------------------------
-Ran 9 tests in 0.007s
+Ran 2 tests in 7.992s
 
 OK

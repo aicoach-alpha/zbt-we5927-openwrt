@@ -1,19 +1,9 @@
-$ python3 -m unittest discover -s /home/andre/projects/zbt-we2825-veci-openwrt/worktrees/owner-uat-20261124-usdd-ui/scripts/tests -p test_owner_apn_acceptance.py -v
-
 test_actual_oem_apn_validator (test_owner_apn_acceptance.ApnIntegration.test_actual_oem_apn_validator) ... ok
-test_private_sim_and_apn_acl_and_board_safety (test_owner_apn_acceptance.ApnIntegration.test_private_sim_and_apn_acl_and_board_safety) ... ok
 test_real_rpc_provider_uci_staging_and_no_modem_restart (test_owner_apn_acceptance.ApnIntegration.test_real_rpc_provider_uci_staging_and_no_modem_restart) ... ok
-
-----------------------------------------------------------------------
-Ran 3 tests in 8.612s
-
-OK
-
-$ python3 -m unittest discover -s /home/andre/projects/zbt-we2825-veci-openwrt/worktrees/owner-uat-20261124-usdd-ui/scripts/tests -p test_sim_unlock.py -v
-
+test_private_sim_and_apn_acl_and_board_safety (test_owner_apn_acceptance.ApnIntegration.test_private_sim_and_apn_acl_and_board_safety) ... ok
 test_guarded_transport (test_sim_unlock.SimUnlock.test_guarded_transport) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 10.443s
+Ran 4 tests in 5.715s
 
 OK

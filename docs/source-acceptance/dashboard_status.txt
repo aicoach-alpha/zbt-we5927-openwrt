@@ -1,0 +1,12 @@
+test_status_contract_detects_missing_bss_and_never_infers_internet (test_veci_v2_rebuild.V2BuildTests.test_status_contract_detects_missing_bss_and_never_infers_internet) ... ok
+test_primary_ap_configuration_and_runtime_are_independent (test_veci_v2_rebuild.V2BuildTests.test_primary_ap_configuration_and_runtime_are_independent) ... ok
+test_lte_link_checks_only_the_active_managed_device (test_veci_v2_rebuild.V2BuildTests.test_lte_link_checks_only_the_active_managed_device) ... ok
+test_lte_default_device_route_and_failed_queries (test_veci_v2_rebuild.V2BuildTests.test_lte_default_device_route_and_failed_queries) ... ok
+test_lte_monitor_only_reports_recent_known_stages (test_veci_v2_rebuild.V2BuildTests.test_lte_monitor_only_reports_recent_known_stages) ... ok
+test_provider_exposes_independent_link_and_verification (test_cellular_link_status_truth.LinkVsInternet.test_provider_exposes_independent_link_and_verification) ... ok
+test_ui_requires_explicit_auth_no_persistent_session (test_veci_v2_contract.FeatureContract.test_ui_requires_explicit_auth_no_persistent_session) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.979s
+
+OK

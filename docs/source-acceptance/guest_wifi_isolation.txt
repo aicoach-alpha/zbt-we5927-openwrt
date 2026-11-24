@@ -1,0 +1,11 @@
+test_real_guest_provisioning_is_disabled_and_no_lan_forward (test_owner_guest_native_acceptance.GuestNativeProvisioning.test_real_guest_provisioning_is_disabled_and_no_lan_forward) ... ok
+test_source_has_fail_closed_guest_rollback_and_packet_scope (test_owner_guest_native_acceptance.GuestNativeProvisioning.test_source_has_fail_closed_guest_rollback_and_packet_scope) ... ok
+test_configuration_states_using_fake_uci (test_guest_isolation_readonly.GuestIsolationReadonly.test_configuration_states_using_fake_uci) ... ok
+test_provision_does_not_restart_wifi_network (test_guest_startup_guard.GuestSafety.test_provision_does_not_restart_wifi_network) ... ok
+test_failed_provision_rolls_back_without_wifi_reload (test_guest_startup_guard.GuestSafety.test_failed_provision_rolls_back_without_wifi_reload) ... ok
+test_inactive_guest_cleanup_does_not_restart_network (test_guest_startup_guard.GuestSafety.test_inactive_guest_cleanup_does_not_restart_network) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 1.071s
+
+OK

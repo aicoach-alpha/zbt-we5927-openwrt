@@ -1,0 +1,12 @@
+test_send_once_and_restore_sms_mode (test_sms_port_transaction.SmsPortTransaction.test_send_once_and_restore_sms_mode) ... ok
+test_delete_matching_message (test_sms_port_transaction.SmsPortTransaction.test_delete_matching_message) ... ok
+test_port_change_before_delete (test_sms_port_transaction.SmsPortTransaction.test_port_change_before_delete) ... ok
+test_port_change_before_submit (test_sms_port_transaction.SmsPortTransaction.test_port_change_before_submit) ... ok
+test_sms_requires_user_action_and_never_retries_unknown_outcome (test_veci_v2_sms_ui.SmsCenterV2.test_sms_requires_user_action_and_never_retries_unknown_outcome) ... ok
+test_nonzero_transport_exit_does_not_claim_acceptance (test_veci_sms_cmgs_result.CMGSResultTests.test_nonzero_transport_exit_does_not_claim_acceptance) ... ok
+test_unknown_or_broken_receipt_is_uncertain_not_send_unavailable (test_veci_sms_cmgs_result.CMGSResultTests.test_unknown_or_broken_receipt_is_uncertain_not_send_unavailable) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 2.375s
+
+OK

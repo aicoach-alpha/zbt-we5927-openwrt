@@ -1,0 +1,12 @@
+test_renew_only_once_in_two_minutes (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_renew_only_once_in_two_minutes) ... ok
+test_interface_teardown_at_most_once_in_five_minutes (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_interface_teardown_at_most_once_in_five_minutes) ... ok
+test_daemon_cooldown_teardown_does_not_escalate (test_lte_dhcp_recovery_cooldown.LteCooldownTests.test_daemon_cooldown_teardown_does_not_escalate) ... ok
+test_manual_reconnect_skips_healthy_gateway_even_if_public_ping_fails (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_skips_healthy_gateway_even_if_public_ping_fails) ... ok
+test_monitor_reuses_existing_modem_and_validates (test_owner_network_monitor_settings.NetworkMonitor.test_monitor_reuses_existing_modem_and_validates) ... ok
+test_bad_telemetry_cannot_inflate_72h_coverage (test_veci_link_monitor.Tests.test_bad_telemetry_cannot_inflate_72h_coverage) ... ok
+test_no_false_root_cause_from_ping (test_veci_link_monitor.Tests.test_no_false_root_cause_from_ping) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.027s
+
+OK

@@ -1,0 +1,8 @@
+test_ethernet_reads_only_external_switch_ports (test_veci_v2_rebuild.V2BuildTests.test_ethernet_reads_only_external_switch_ports) ... ok
+test_ethernet_unavailable_for_wrong_board_or_switch_error (test_veci_v2_rebuild.V2BuildTests.test_ethernet_unavailable_for_wrong_board_or_switch_error) ... ok
+test_status_never_runs_mutating_network_commands (test_veci_v2_rebuild.V2BuildTests.test_status_never_runs_mutating_network_commands) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.029s
+
+OK

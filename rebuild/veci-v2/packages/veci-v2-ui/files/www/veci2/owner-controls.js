@@ -72,7 +72,7 @@
       call('veci.v2.system','ntp'),
       call('veci.v2.system','observability'),
       call('veci.v2.system','leds'),
-      ...(loadLogs ? [call('veci.v2.system','logs')] : [])
+      ...(loadLogs ? [call('veci.v2.system','logs'), call('veci.v2.system','diagnostics')] : [])
     ]);
     if (seq !== epoch || !authenticated()) return;
     if (results[0].status === 'fulfilled') {
@@ -100,8 +100,17 @@
       'Observabilitas belum terverifikasi.');
     if (loadLogs) {
       const report = results[4];
-      set('owner-system-log', report.status === 'fulfilled' ? String(report.value.logs || 'Tidak ada log.') :
-        'Log tidak tersedia: ' + report.reason.message);
+      const diag = results[5];
+      const health = diag.status === 'fulfilled' ? diag.value : null;
+      const summary = health
+        ? 'Diagnostik (observasi): LAN ' + (health.lan_ipv4 || '?') +
+          ', LTE carrier ' + (health.lte_carrier || '?') +
+          ', DNS ' + (health.first_dns || '?') +
+          ', rute ' + (health.default_route || '?')
+        : 'Diagnostik tidak tersedia / belum terverifikasi.';
+      set('owner-system-log', summary + '\n' +
+        (report.status === 'fulfilled' ? String(report.value.logs || 'Tidak ada log.') :
+        'Log tidak tersedia: ' + report.reason.message));
     }
   }
   async function invoke(button, output, object, method, args, timeout = 15000, refresh = null) {

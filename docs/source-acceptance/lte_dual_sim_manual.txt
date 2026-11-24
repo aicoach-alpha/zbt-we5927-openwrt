@@ -1,0 +1,12 @@
+test_native_manual_sim_switch_confirmation_and_uci_consistency (test_owner_manual_sim_native_acceptance.ManualSimNativeAcceptance.test_native_manual_sim_switch_confirmation_and_uci_consistency) ... ok
+test_rollback_pending_and_wrong_board_fail_closed (test_owner_manual_sim_native_acceptance.ManualSimNativeAcceptance.test_rollback_pending_and_wrong_board_fail_closed) ... ok
+test_acl_scoping_and_derived_modem_config_guards (test_owner_manual_sim_native_acceptance.ManualSimNativeAcceptance.test_acl_scoping_and_derived_modem_config_guards) ... ok
+test_failed_new_apn_restores_old_slot_once (test_lte_sim_switch_failure.SimSwitchFailureTests.test_failed_new_apn_restores_old_slot_once) ... ok
+test_gpio_failure_stops_before_sim_reconnect (test_lte_sim_switch_failure.SimSwitchFailureTests.test_gpio_failure_stops_before_sim_reconnect) ... ok
+test_manual_success_runs_expected_reconnect_steps (test_lte_sim_switch_failure.SimSwitchFailureTests.test_manual_success_runs_expected_reconnect_steps) ... ok
+test_selector_readback_handles_polarity_and_missing_line (test_lte_sim_switch_failure.SimSwitchFailureTests.test_selector_readback_handles_polarity_and_missing_line) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 2.511s
+
+OK

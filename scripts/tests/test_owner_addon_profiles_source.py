@@ -9,7 +9,7 @@ class AddonProfiles(unittest.TestCase):
         acl=json.loads((R/'veci2-addon-acl.json').read_text())
         group=acl['veci-v2-addon-admin']
         self.assertEqual(group['read']['ubus']['veci.v2.addon'], ['status'])
-        self.assertEqual(group['write']['ubus']['veci.v2.addon'], ['setVpnStartup'])
+        self.assertEqual(group['write']['ubus']['veci.v2.addon'], ['setVpnStartup','setPortalStartup'])
         helper=(R/'veci2-addon-profiles').read_text()
         self.assertIn('stale_selection',helper)
         self.assertIn('ENABLE_WIREGUARD_NEXT_BOOT',helper)

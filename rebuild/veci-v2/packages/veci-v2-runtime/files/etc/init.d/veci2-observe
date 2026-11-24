@@ -1,0 +1,15 @@
+#!/bin/sh /etc/rc.common
+# 24x7 read-only sampling supervised by OpenWrt procd.
+START=85
+STOP=20
+USE_PROCD=1
+start_service() {
+  [ -x /usr/libexec/veci2-observe ] || return 1
+  [ "$(cat /tmp/sysinfo/board_name 2>/dev/null)" = zbtlink,zbt-we5927 ] || return 1
+  procd_open_instance
+  procd_set_param command /usr/libexec/veci2-observe daemon
+  procd_set_param respawn 3600 5 5
+  procd_set_param stdout 0
+  procd_set_param stderr 0
+  procd_close_instance
+}

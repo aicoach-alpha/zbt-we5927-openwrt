@@ -1,4 +1,6 @@
 """Run the shipped cron UI and BusyBox record parser on deterministic inputs."""
+import os
+import sys
 import json
 from pathlib import Path
 import subprocess
@@ -11,6 +13,13 @@ UI = PACKAGE / "veci-v2-ui/files/www/veci2"
 
 
 class CronAcceptance(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get("VECI_LIBUBOX_PREFIX"), "native libubox required")
+    def test_cron_rpc_native_transactions_preserve_external_changes(self):
+        result = subprocess.run([sys.executable, str(ROOT / "scripts/uat/test-cron-host.py"),
+                                 os.environ["VECI_LIBUBOX_PREFIX"]], cwd=ROOT,
+                                capture_output=True, text=True, timeout=90)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
     def test_parser_add_remove_preserves_oem_and_rejects_invalid_ranges(self):
         def parse(mode, rows, **values):
             args = ["busybox", "awk", "-v", f"mode={mode}"]
