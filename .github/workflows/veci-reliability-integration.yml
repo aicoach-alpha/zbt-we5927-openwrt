@@ -23,6 +23,8 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Offline modem, guardian, guest, Wi-Fi, monitoring regression suites
         run: |
           set -eu

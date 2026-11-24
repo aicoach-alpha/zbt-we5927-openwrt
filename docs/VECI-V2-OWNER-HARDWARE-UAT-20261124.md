@@ -31,3 +31,8 @@
 
 ## Build accounting
 The earlier contract contained 40 required core modules including USSD. Owner explicitly removed USSD: new active count 39, one intentionally retired. A future report must state '39 active + 1 retired', never '40/40 PASS' with the retired feature.
+
+## Follow-up CI failure investigation after draft PR #29
+- A shallow actions checkout left historical source commits unreachable, so exact-hash regression tests failed despite correct working source bytes. CI source validation workflows now require full git history (fetch-depth 0) rather than disabling checks.
+- The native UCI host integration regression relied on a private executable and libubox prefix on andre-nas, absent in generic GitHub-hosted runners. With no explicitly provided toolchain, the integration test records a SKIP, not a PASS; with explicitly configured missing toolchain, it still fails. Source security tests remain mandatory.
+- The lab image has a fail-closed 39-module source acceptance gate and is EXPECTED to block compilation until all active modules have real source proof. Do not disable to produce a false green build or flash candidate.

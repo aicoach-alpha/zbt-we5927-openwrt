@@ -24,6 +24,8 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Validate source and regressions
         shell: bash
         run: |
@@ -67,6 +69,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Pin official OpenWrt 25.12.6 and custom dual SIM device tree
         shell: bash
         run: |

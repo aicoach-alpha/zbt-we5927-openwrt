@@ -25,9 +25,15 @@ class NativeRoutingAcceptance(unittest.TestCase):
         prefix = Path(env.get("VECI_LIBUBOX_PREFIX", "/home/andre/projects/veci/signing-tools/prefix"))
         uci = Path(env.get("VECI_HOST_UCI", "/tmp/veci-host-uci.cr9ZfQ/build/uci"))
         jshn = prefix / "share/libubox/jshn.sh"
-        self.assertTrue(shutil.which("busybox"), "busybox with ash is required")
+        if not shutil.which("busybox"):
+            if "VECI_HOST_UCI" in env or "VECI_LIBUBOX_PREFIX" in env:
+                self.fail("Explicit native UCI test toolchain requires BusyBox ash")
+            self.skipTest("Native OpenWrt host integration unavailable: BusyBox ash missing; not hardware UAT")
         for tool in (uci, prefix / "bin/jshn", jshn):
-            self.assertTrue(tool.is_file(), f"Missing {tool}. See test module docstring.")
+            if not tool.is_file():
+                if "VECI_HOST_UCI" in env or "VECI_LIBUBOX_PREFIX" in env:
+                    self.fail(f"Native UCI toolchain explicitly configured but missing {tool}")
+                self.skipTest(f"Native UCI fixture unavailable ({tool.name}); not hardware UAT")
         env["PATH"] = str(prefix / "bin") + os.pathsep + env["PATH"]
         env["LD_LIBRARY_PATH"] = os.pathsep.join(filter(None, [str(prefix / "lib"), env.get("LD_LIBRARY_PATH")]))
         result = subprocess.run(
