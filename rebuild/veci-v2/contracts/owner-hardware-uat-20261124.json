@@ -312,6 +312,21 @@
       "lte_usb0_egress": "NOT_PROVEN_BY_PORT_PROBES",
       "next": "single harmless authenticated SSH echo, then already SHA-pinned read-only netifd LTE script",
       "router_changes": false
+    },
+    "eleventh_owner_ssh_preflight_timeout_again": {
+      "source": "owner PowerShell verification+SSH output",
+      "local_file_sha256_verified": true,
+      "ssh_login_preflight": "TCP_CONNECTION_TIMEOUT",
+      "ssh_script_reevaluation": "TCP_CONNECTION_TIMEOUT",
+      "ssh_audit_exit": 255,
+      "audit_physically_executed": false,
+      "router_mutation": false,
+      "observed_current_port_443": "UNKNOWN_DURING_TIMEOUT",
+      "causal_hypothesis": "assistant-generated prior malformed shell grep caused accidental netifd executable launch, potentially resulting in extra daemons and ubus publish collisions",
+      "confidence": "NOT_PROVEN: process identities and procd ownership not observed yet",
+      "similar_upstream_action1": "https://github.com/openwrt/openwrt/issues/18105",
+      "next_action": "co-temporal Windows-only Ethernet ICMP TCP22 TCP443 samples; no repeats of SSH when TCP22 unavailable",
+      "safety": "do not kill/restart network management, WAN, modem, wifi, or flash"
     }
   }
 }
