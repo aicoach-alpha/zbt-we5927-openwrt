@@ -44,3 +44,8 @@ Sebelum pengembangan ini, source-completion-gate melaporkan 7/39 source verified
 ## 6. Bug tambahan gerbang build ditemukan dan diperbaiki
 
 Gerbang source lama secara keliru mengecek 40 modul padahal kontrak aktif berisi 39 setelah USSD dipensiunkan. Perhitungan sekarang konsisten: ACTIVE_CORE_COUNT=39 dan retired_module_reintroduced diperlakukan sebagai penolakan. Ini hanya memperbaiki satu kesalahan jumlah; 70 blocker nyata lainnya masih ada, yaitu 32 modul belum source_verified, 32 belum memiliki bukti implementation/test, satu kesenjangan manifest bukti, serta lima SHA source yang berubah/stale. Data ini bukan izin bypass untuk menghasilkan firmware.
+
+
+## 7. Koreksi penting: progres 7/39 bukan regresi 40/40 hardware
+
+Audit Git historis membuktikan source-completion gate **40/40 PASS** pada commit 2bb593a tanggal 23 November 2026. Cabang firmware perbaikan LTE+GUI saat ini berasal dari baseline berbeda yang tidak menggabungkan commit tersebut. Penurunan 40/40 menjadi 7/39 terutama disebabkan oleh divergensi branch dan kehilangan manifest/source acceptance; bukan bukti 32 modul rusak. Perbandingan file juga menunjukkan 21 file historis hilang dan 31 file berubah hash sehingga sebagian fungsi perlu rekonsiliasi nyata. Referensi rincian: docs/WE5927-40-TO-39-GIT-BRANCH-DIVERGENCE-20261124.md. Pensiunnya USSD menjadikan target aktif 39, bukan rollback terhadap fitur lainnya.

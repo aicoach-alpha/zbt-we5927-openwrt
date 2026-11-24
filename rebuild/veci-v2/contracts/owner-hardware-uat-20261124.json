@@ -806,7 +806,22 @@
       "physical_router_flash_performed": false,
       "physical_new_firmware_test_performed": false,
       "next": "legitimately resolve remaining 39-core source evidence, then signed candidate image, sysupgrade -T and hardware UAT",
-      "do_not": "bypass gate or claim release PASS without proof"
+      "do_not": "bypass gate or claim release PASS without proof",
+      "historical_branch_divergence_audit": {
+        "baseline_commit": "2bb593a133261de0fc2cd5e78e61f574ea1137d4",
+        "historic_source_completion_gate": "40_of_40_pass_blockers_0_verified_by_replay",
+        "baseline_branch": "development/we2825-all13-integration-20261123",
+        "current_branch": "feat/veci-v2-owner-uat-retire-ussd-pro-ui-20261124",
+        "is_baseline_ancestor_of_current": false,
+        "all_active_39_names_present_in_baseline": true,
+        "retired_feature": "lte_ussd",
+        "baseline_files_missing_in_current": 21,
+        "baseline_files_changed_hash": 31,
+        "actual_current_module_failures_from_this_count": "NOT_ESTABLISHED",
+        "reconciliation_done": false,
+        "root_issue": "divergent_branch_not_merged_and_prior_source_evidence_discarded",
+        "doc": "docs/WE5927-40-TO-39-GIT-BRANCH-DIVERGENCE-20261124.md"
+      }
     }
   }
 }
