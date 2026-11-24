@@ -45,9 +45,17 @@ def verify():
                 raise ValueError("PROVENANCE_SOURCE_DIGEST_MISMATCH:" + item["path"])
             if not (ROOT / item["path"]).is_file():
                 raise ValueError("CURRENT_SOURCE_MISSING:" + item["path"])
+    # USSD was permanently retired by the owner. Its historical Git object
+    # remains pinned for provenance, but it must NOT be shipped or verified as
+    # an active runtime asset.
+    for forbidden in (
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-ussd",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/ussd.js",
+    ):
+        if (ROOT / forbidden).exists():
+            raise ValueError("RETIRED_USSD_REINTRODUCED:" + forbidden)
     for short, names in (
         ("aa1b0b8", ("veci2-sim-lock", "sim-lock.js")),
-        ("331ebf7", ("veci2-ussd", "ussd.js")),
     ):
         for name in names:
             if name.endswith(".js"):
