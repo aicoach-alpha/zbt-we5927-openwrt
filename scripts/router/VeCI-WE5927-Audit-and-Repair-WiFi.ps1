@@ -14,15 +14,15 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Router = '192.168.1.1'
 $ExpectedHostKey = 'SHA256:vTuQFuvd+br7jrfmqqNDN2FZxLtNNRYvOo3bDQ2Zlic'
-$GitHubRaw = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/d123dc4b30b4650f07e79ced40d888fd55d8aa35/scripts/router'
+$GitHubRaw = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/35e158aee4979dc7c70d6d9d683d227a8858075e/scripts/router'
 $Scripts = @(
     @{
       Name='veci-live-router-audit.sh';
-      Sha256='98fcb277fc59ca6cc7376499c4b6d19924930e841f8dade48d177f380f54c540'
+      Sha256='b2ea348a9f2ef4517a06aeeafc3a1e277cc0a9a5b5a7b631b3dd22198c1daa02'
     },
     @{
       Name='veci-live-wifi-guarded-repair.sh';
-      Sha256='9d51c6de7569d18ed9113306f6bbcdb9599de7aeb0d8feb540a8ecc1efc7ca34'
+      Sha256='b24c4b5cc5485f66da4f4e48e535c3aaefb271171c6f08a3a1076ee30054e82b'
     }
 )
 $TimeTag = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -30,7 +30,7 @@ $WorkDir = Join-Path $env:TEMP "VeCI-router-WiFi-$TimeTag"
 $ReportDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'VeCI-Router-Audits'
 New-Item -Path $WorkDir,$ReportDir -ItemType Directory -Force | Out-Null
 $Report = Join-Path $ReportDir "WE5927-physical-audit-$TimeTag.txt"
-Write-Host 'VeCI WE5927 — audit total router, Wi-Fi guard, no flash/reboot'
+Write-Host 'VeCI WE5927 - audit total router, Wi-Fi guard, no flash/reboot'
 Write-Host "File hasil: $Report"
 Write-Host 'Memastikan koneksi SSH melalui kabel Ethernet dan identitas host...'
 $Link = Test-NetConnection $Router -Port 22 -WarningAction SilentlyContinue
@@ -59,8 +59,29 @@ function Invoke-OnRouter {
   Write-Host "===== $Label ====="
   Add-Content -LiteralPath $Report -Value "===== $Label =====" -Encoding UTF8
   $Text = [System.IO.File]::ReadAllText($Source, [System.Text.Encoding]::UTF8)
-  $Text | & ssh.exe -o 'HostKeyAlgorithms=+ssh-rsa' -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout=8' -T "root@$Router" '/bin/sh -s' 2>&1 | ForEach-Object {
-    $Line = [string]$_
+  # Windows PowerShell 5.1 turns OpenSSH native stderr into ErrorRecord
+  # objects. With ErrorActionPreference=Stop it aborts at the first warning
+  # even when the remote script has already completed (AUDIT_END=OK).
+  # Capture BOTH output streams, then evaluate the actual ssh.exe exit code.
+  $SavedPreference = $ErrorActionPreference
+  $RemoteLines = @()
+  try {
+    $ErrorActionPreference = 'Continue'
+    $RemoteLines = @($Text | & ssh.exe -o 'HostKeyAlgorithms=+ssh-rsa' -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout=8' -T "root@$Router" '/bin/sh -s' 2>&1)
+    $ExitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $SavedPreference
+  }
+  $AuditCompleted = $false
+  $RepairCompleted = $false
+  foreach ($Record in $RemoteLines) {
+    if ($Record -is [System.Management.Automation.ErrorRecord]) {
+      $Line = [string]$Record.Exception.Message
+    } else {
+      $Line = [string]$Record
+    }
+    if ($Line -match '^AUDIT_END=OK\s*$') { $AuditCompleted = $true }
+    if ($Line -match '^WIFI_REPAIR_STATUS=AP_STARTED_CONFIGURATION_SAVED\s*$') { $RepairCompleted = $true }
     if ($Line.StartsWith('NEW_WIFI_PASSWORD_PRIVATE_DO_NOT_SHARE=')) {
       Write-Host $Line -ForegroundColor Yellow
       Add-Content -LiteralPath $Report -Value 'NEW_WIFI_PASSWORD_PRIVATE_DO_NOT_SHARE=[REDACTED]' -Encoding UTF8
@@ -69,9 +90,14 @@ function Invoke-OnRouter {
       Add-Content -LiteralPath $Report -Value $Line -Encoding UTF8
     }
   }
-  $ExitCode = $LASTEXITCODE
   if ($ExitCode -ne 0) {
-    throw "$Label gagal (exit $ExitCode). Router tidak dinyatakan PASS. Buka laporan: $Report"
+    throw "$Label gagal (SSH exit $ExitCode). Laporan menunjukkan pesan error lengkap: $Report"
+  }
+  if ($Label.StartsWith('AUDIT') -and -not $AuditCompleted) {
+    throw "$Label tidak menghasilkan tanda selesai AUDIT_END=OK. Tidak akan lanjut: $Report"
+  }
+  if ($Label -eq 'WIFI GUARDED REPAIR' -and -not $RepairCompleted) {
+    throw "Perbaikan Wi-Fi tidak berhasil terverifikasi. Lihat alasan penolakan/rollback: $Report"
   }
 }
 $AuditPath = Join-Path $WorkDir 'veci-live-router-audit.sh'
