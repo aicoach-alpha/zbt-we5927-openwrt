@@ -712,6 +712,40 @@
       "staged_rescue_physically_executed": false,
       "recovery_plan": "single exact PID16862 non-procd SIGTERM conditional on identity and no LTE IP, then if needed LTE-only down/up, preserve LAN",
       "firmware_release_status": "FAIL_NO_LTE_EGRESS"
+    },
+    "twentyfourth_owner_physically_successful_orphan_cleanup_and_lte_recovery": {
+      "evidence_source": "owner original PowerShell pasted full transcript, one authenticated router SSH invocation; one command repeatedly echoed while typing",
+      "precheck": "PRECHECK=VERIFYING",
+      "action": "TERM_ONLY_EXTRA_NETIFD_16862",
+      "orphan_process": "ORPHAN_TERM=ENDED",
+      "lan_preservation": "LAN=STILL_PRESENT",
+      "lte_only_cycle": {
+        "down_exit": 0,
+        "up_exit": 0
+      },
+      "usb0_ipv4": "assigned",
+      "lte_default_route": "present",
+      "direct_ip_https": {
+        "destination": "https://1.1.1.1/ bound to if!usb0",
+        "http_code": 301,
+        "curl_exit": 0
+      },
+      "dns_https": {
+        "destination": "https://www.cloudflare.com/cdn-cgi/trace bound to if!usb0",
+        "http_code": 200,
+        "curl_exit": 0
+      },
+      "rescue_end": "OK",
+      "rescue_ssh_exit": 0,
+      "lte_public_internet": "PASS_AT_SINGLE_PHYSICAL_SNAPSHOT",
+      "single_cause_hypothesis": "extra non-procd netifd interfered; plausible from observed recovery, not conclusive unique root cause",
+      "independent_reboot_recovery": "NOT_VERIFIED",
+      "72h_stability": "NOT_VERIFIED",
+      "physical_wifi_ap": "NOT_VERIFIED_AND_PREVIOUSLY_DISABLED",
+      "production_release": "NOT_APPROVED",
+      "repetition": "DO_NOT_REPEAT_PROCESS_TERMINATION_OR_LTE_RESTART_WHILE_LINK_WORKS",
+      "source_reference_commit": "0ceddadfd5ec6519490e8e704f194b10998922a9",
+      "exact_source_equality": "NOT_ASSERTED_OWNER_PASTED_SHORTER_VARIANT"
     }
   }
 }

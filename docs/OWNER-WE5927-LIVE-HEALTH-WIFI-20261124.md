@@ -206,3 +206,23 @@ Earlier hardware source showed procd canonical netifd PID1366 (PPID1) and non-pr
 Source remediation STAGED, NOT EXECUTED on router: scripts/router/veci-netifd-orphan-lte-targeted-rescue-20261124.sh. Requires explicit --apply and verifies exact ZBT-WE5927, root, wired LAN 192.168.1.1, usb0, procd netifd PID1366/PPID1/executable/state S, MemAvailable>=12 MiB, lte ubus object, exactly two netifd PIDs (1366,16862), unmanaged PID16862 exact parent ash PID16854 PPID1, and no current usb0 IPv4/default route. Captures PID starttime and repeats all identities/memory/LAN/IP checks immediately before a SINGLE SIGTERM only to PID16862, never canonical netifd or parent ash. If target has changed, abort before signal; if still running after five seconds, stop without escalation. After the process ends, rechecks canonical netifd/ubus/LAN, checks whether LTE external IP and DNS have spontaneously recovered; if so, skip LTE cycle. Else executes one narrowly scoped lte down/up with five-second teardown pause and eighteen-second DHCP wait, then tests USB0 IPv4/default route/DHCP client count, public IP HTTPS and DNS HTTPS. Never uses killall, modem reset, UCI edits, WiFi, global reload, reboot or flash. Tests 3 new targeted and existing regressions PASS on NAS; NOT hardware tested. A guarded SIGTERM still has some risk on the user's only router.
 
 Physical router is reachable only from user's Windows PowerShell. Desktop Commander Windows device is online but connector reports monthly usage exhausted; NAS andre-nas has no routed SSH connection to sole physical router. Transport via offline checksum-verifiable PowerShell script piped to authenticated SSH to avoid GitHub download dependence.
+
+## Owner sole physical WE5927: targeted rescue REAL SUCCESS 2026-11-24 ~15:40 WIB
+
+Authoritative complete owner Windows PowerShell transcript was uploaded as a pasted-text file and examined through its final output. The same long command was repeatedly echoed as progressively completed Windows input; these are NOT multiple rescue invocations. There is ONE authenticated SSH session, and its captured output:
+- PRECHECK=VERIFYING
+- ACTION=TERM_ONLY_EXTRA_NETIFD_16862
+- ORPHAN_TERM=ENDED
+- LAN=STILL_PRESENT
+- ACTION=LTE_ONLY_DOWN_UP
+- LTE_DOWN_EXIT=0
+- LTE_UP_EXIT=0
+- USB0_IPV4=assigned
+- LTE_ROUTE=present
+- PUBLIC_IP_CODE=301 ; PUBLIC_IP_HTTPS_EXIT=0 for direct IP 1.1.1.1 over usb0
+- PUBLIC_DNS_CODE=200 ; PUBLIC_DNS_HTTPS_EXIT=0 for www.cloudflare.com HTTPS over usb0
+- RESCUE_END=OK ; RESCUE_SSH_EXIT=0
+
+This is the FIRST confirmed physical public LTE egress success in the most recent failed series: both direct-IP and DNS-using HTTPS connected and responded. DNS resolution, assigned IPv4, default route, and LAN were present during the one-shot post-remediation test. Non-procd netifd PID16862 was terminated; procd-managed netifd PID1366 was not a target. The owner used a shorter visible direct PowerShell shell-array variant of staged fix 0ceddad; do not imply its exact bytes were the checked-in SHA-pinned script. STOP issuing repeat rescue/kill/reboot/flash commands. Source cause is strongly consistent with orphan netifd interference but causal attribution not proven just by before/after; LTE-only down/up without orphan removal had previously failed. No long-term stability, restart recovery, WiFi AP, SMS/GUI, 72h soak, or modem-only upstream data integrity test is proven by this single post-fix snapshot. Production firmware must remain guarded, without broad PASS.
+
+Next: keep router stable and internet running; perform only non-disruptive monitoring if the user requests. Investigate source-level prevention of second netifd launch and ensure explicit UAT acceptance controls include single procd-owned netifd, live LTE IP/default route and two egress checks. Do not risk reintroducing duplicate netifd by command injection/inline quoting.
