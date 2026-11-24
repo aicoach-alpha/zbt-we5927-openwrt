@@ -588,6 +588,30 @@
       "mitigation": "DO_NOT_RUN_WHILE_LTE_IPV4_OR_ROUTE_PRESENT",
       "source_extra_safety": "recheck IPv4 and default route immediately before any exact PID TERM to avoid race",
       "next": "one-off read-only bound HTTP/HTTPS over existing LTE usb0, do not download Github or change router"
+    },
+    "nineteenth_owner_lte_ipv4_present_but_external_egress_fails": {
+      "source": "owner no-download read-only authenticated SSH LTE egress test",
+      "triage": "TRIAGE_END=OK,AUDIT_SSH_EXIT=0",
+      "usb0_link": "UP_LOWER_UP",
+      "usb0_ipv4": "192.168.7.120/24",
+      "default_route": "via 192.168.7.1 dev usb0 src 192.168.7.120 metric 5",
+      "http_direct_ip": {
+        "destination": "1.1.1.1:80",
+        "exit_code": 28,
+        "http_code": "000",
+        "failure": "8 second timeout"
+      },
+      "https_hostname": {
+        "destination": "www.cloudflare.com:443",
+        "exit_code": 28,
+        "http_code": "000",
+        "failure": "DNS lookup timed out"
+      },
+      "actual_public_internet": "FAILED_PROBES; modem gateway and numeric-IP TLS not yet tested",
+      "router_changes": false,
+      "netifd_kill": false,
+      "new_risk": "Do not equate assigned modem-side IP and route with LTE internet",
+      "next": "read-only local modem gateway vs public numeric IP TLS, no DNS needed; check resolver without secrets"
     }
   }
 }
