@@ -46,5 +46,24 @@
     ],
     "never_restore_ussd": true
   },
-  "sensitive_identifiers_retained": false
+  "sensitive_identifiers_retained": false,
+  "wifi_repair_20261124": {
+    "signed_rootfs_firstboot_wifi_disabled_confirmed": true,
+    "signed_rootfs_boot_source": "etc/uci-defaults/98-we5927-websafe",
+    "owner_gui_wifi_ap": "DISABLED_CONFIG",
+    "root_cause": "SECURE_FRESH_INSTALL_WITHOUT_ADMIN_WIFI_ACTIVATION_WIZARD",
+    "historical_hardware_risk": "mt76 MCU timeout after wifi up in earlier build",
+    "hardware_phy_status": "UNKNOWN",
+    "current_wifi_repair_execution": "NOT_RUN_DEVICE_NOT_DIRECTLY_ACCESSIBLE",
+    "toolchain": "scripts/router/VeCI-WE5927-Audit-and-Repair-WiFi.ps1",
+    "guarded_backup_rollback_seconds": 75,
+    "test_source": "scripts/tests/test_owner_wifi_router_repair_20261124.py",
+    "next_build_required": [
+      "secure_wifi_onboarding_wizard",
+      "fail_closed_phy_driver_and_hostapd_checks",
+      "no_full_network_reset",
+      "live_beacon_client_DHCP_DNS_TCP_UAT"
+    ],
+    "wifi_owner_physical_acceptance": "PENDING"
+  }
 }
