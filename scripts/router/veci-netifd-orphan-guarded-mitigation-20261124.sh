@@ -76,6 +76,14 @@ case "$mem_before_signal" in ''|*[!0-9]*) stop memory_state_unknown_before_signa
 lte_status="$(ubus -S -t 3 call network.interface.lte status '{}' 2>/dev/null)" || stop lte_query_failed_before_signal
 [ "$(printf '%s' "$lte_status" | jsonfilter -e '@.pending' 2>/dev/null || :)" = false ] || stop lte_pending_before_signal
 [ "$(pidof udhcpc 2>/dev/null | wc -w | tr -d ' ')" -ge 1 ] || stop dhcp_clients_disappeared_before_signal
+# LTE may recover between initial preflight and process-identity rechecks.
+# Fail closed if the data plane has come back at the LAST safe moment.
+if ip -4 addr show dev usb0 2>/dev/null | grep -q ' inet '; then
+  stop lte_ipv4_reappeared_before_signal
+fi
+if ip -4 route show default 2>/dev/null | grep -q ' dev usb0 '; then
+  stop lte_route_reappeared_before_signal
+fi
 # Explicitly NEVER send a signal to procd-owned PID 1366 or parent ash 16854.
 kill -TERM "$orphan" || stop orphan_term_failed
 echo 'ORPHAN_TERM=REQUESTED'

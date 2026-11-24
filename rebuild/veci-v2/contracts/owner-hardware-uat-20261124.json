@@ -554,6 +554,40 @@
       "workaround_source_validation": "sh -n PASS; wrong board abort exit3 PASS on NAS",
       "physical_workaround_executed": false,
       "safety": "NO_KILL_NO_RELOAD_NO_WIFI_NO_MODEM_RESET_NO_FLASH"
+    },
+    "eighteenth_owner_lte_ip_route_recovered_20261124_approx_1434_wib": {
+      "source": "owner no-download direct read-only POSIX diagnostic over SSH",
+      "audit": "TRIAGE_END=OK, AUDIT_SSH_EXIT=0",
+      "canonical_netifd": {
+        "pid": 1366,
+        "ppid": 1,
+        "state": "S",
+        "vmrss_kib": 1728
+      },
+      "nonprocd_netifd": {
+        "pid": 16862,
+        "ppid": 16854,
+        "state": "S",
+        "vmrss_kib": 1624
+      },
+      "netifd_kernel_wchan": "NOT_RETURNED",
+      "mem_free_kib": 26056,
+      "mem_available_kib": 18044,
+      "swap_free_kib": 0,
+      "usb0_link": "UP_LOWER_UP",
+      "usb0_ipv4": "192.168.7.120/24",
+      "lte_default_route": "via 192.168.7.1 dev usb0 src 192.168.7.120 metric 5",
+      "udhcpc_pids": [
+        25820,
+        25724
+      ],
+      "lte_bound_http": "NOT_TESTED_IN_THIS_SNAPSHOT",
+      "lte_bound_https": "NOT_TESTED_IN_THIS_SNAPSHOT",
+      "external_internet": "NOT_VERIFIED",
+      "router_mutation": false,
+      "mitigation": "DO_NOT_RUN_WHILE_LTE_IPV4_OR_ROUTE_PRESENT",
+      "source_extra_safety": "recheck IPv4 and default route immediately before any exact PID TERM to avoid race",
+      "next": "one-off read-only bound HTTP/HTTPS over existing LTE usb0, do not download Github or change router"
     }
   }
 }

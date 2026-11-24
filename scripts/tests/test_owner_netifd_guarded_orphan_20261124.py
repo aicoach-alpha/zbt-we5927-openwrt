@@ -22,6 +22,8 @@ class OrphanNetifdGuard(unittest.TestCase):
                      "canonical_state_changed_before_signal",
                      "memory_pressure_before_signal",
                      "lte_pending_before_signal",
+                     "lte_ipv4_reappeared_before_signal",
+                     "lte_route_reappeared_before_signal",
                      "dhcp_clients_disappeared_before_signal",
                      "lte_ipv4_already_assigned_do_not_touch",
                      "lte_route_already_present_do_not_touch",
@@ -50,6 +52,10 @@ class OrphanNetifdGuard(unittest.TestCase):
         self.assertLess(s.index("canonical_netifd_not_sleeping_safely"),
                         s.index('kill -TERM "$orphan"'))
         self.assertLess(s.index("lte_pending_before_signal"),
+                        s.index('kill -TERM "$orphan"'))
+        self.assertLess(s.index("lte_ipv4_reappeared_before_signal"),
+                        s.index('kill -TERM "$orphan"'))
+        self.assertLess(s.index("lte_route_reappeared_before_signal"),
                         s.index('kill -TERM "$orphan"'))
 
     def test_wrong_device_no_process_mutation(self):
