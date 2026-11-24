@@ -69,36 +69,25 @@ port_responds() {
 }
 
 at_port() {
-	local t p preferred devpath
-	preferred="$(cfg at_port)"
-
-	# CX07E verified AT function is USB interface 1.4.
-	# Resolve the current ttyUSB name from sysfs instead of probing ports,
-	# because probing the non-AT 1.5 function can enter uninterruptible I/O.
-	for t in /sys/class/tty/ttyUSB*; do
-		[ -e "$t/device" ] || continue
-		devpath="$(readlink -f "$t/device" 2>/dev/null || true)"
-		case "$devpath" in
-			*/1-1:1.4/*)
-				p="/dev/$(basename "$t")"
-				[ -c "$p" ] && {
-					echo "$p"
-					return 0
-				}
-				;;
+	local entry name path modem
+	# CX07E uses USB interface 1.4. On the original enumeration ttyUSB3 is function 1.5.
+	# A tty number alone does not identify the function after USB re-enumeration.
+	for entry in /sys/class/tty/ttyUSB*; do
+		[ -e "$entry/device" ] || continue
+		name=${entry##*/}
+		path="$(readlink -f "$entry/device" 2>/dev/null)" || continue
+		case "$path" in
+			*/1-1/1-1:1.4/"$name") ;;
+			*) continue ;;
 		esac
+		modem=${path%/*}
+		modem=${modem%/*}
+		[ "$(cat "$modem/idVendor" 2>/dev/null)" = 05c6 ] || continue
+		[ "$(cat "$modem/idProduct" 2>/dev/null)" = 902e ] || continue
+		[ -c "/dev/$name" ] || continue
+		printf '%s\n' "/dev/$name"
+		return 0
 	done
-
-	# Safe fallbacks only. Never auto-probe ttyUSB3 (USB interface 1.5).
-	for p in "$preferred" /dev/ttyUSB2 /dev/ttyUSB1 /dev/ttyUSB0; do
-		[ -n "$p" ] || continue
-		[ -c "$p" ] && {
-			echo "$p"
-			return 0
-		}
-	done
-
-	echo "$preferred"
 	return 1
 }
 
@@ -146,6 +135,31 @@ driver_name() {
 	basename "$x"
 }
 
+rndis_state() {
+	local net modem interface carrier
+	net="$(cfg data_if)"
+	[ -n "$net" ] || net=usb0
+	case "$net" in .|..|-*|*[!A-Za-z0-9_.-]*) echo invalid_configuration; return ;; esac
+	modem="$(usb_device_dir)" && modem="$(readlink -f "$modem")" || { echo modem_missing; return; }
+	[ -e "/sys/class/net/$net/device" ] || { echo interface_missing; return; }
+	interface="$(readlink -f "/sys/class/net/$net/device")" || { echo interface_missing; return; }
+	[ "${interface%/*}" = "$modem" ] || { echo other_device; return; }
+	[ "$(driver_name "$interface")" = rndis_host ] || { echo driver_mismatch; return; }
+	carrier="$(cat "/sys/class/net/$net/carrier" 2>/dev/null)" || carrier=
+	case "$carrier" in
+		1) echo "carrier_up $net" ;;
+		0) echo "carrier_down $net" ;;
+		*) echo "carrier_unknown $net" ;;
+	esac
+}
+
+rndis_data_ready() {
+	case "$(rndis_state)" in
+		carrier_up\ *|carrier_down\ *|carrier_unknown\ *) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
 repair_rndis() {
 	local dev base i cls sub proto drv ctrl=""
 
@@ -177,7 +191,7 @@ repair_rndis() {
 
 	local n=0
 	while [ "$n" -lt 10 ]; do
-		ip link show usb0 >/dev/null 2>&1 && return 0
+		rndis_data_ready && return 0
 		n=$((n + 1))
 		sleep 1
 	done
@@ -185,6 +199,13 @@ repair_rndis() {
 }
 
 usb_repair() {
+	# Do not unbind/rebind an already healthy RNDIS+AT pair.
+	# Re-enumeration can interrupt active LTE traffic or SMS transactions.
+	if rndis_data_ready; then
+		local live_port
+		live_port="$(at_port)"
+		[ -c "$live_port" ] && return 0
+	fi
 	modprobe usbserial >/dev/null 2>&1 || true
 	modprobe usb_wwan >/dev/null 2>&1 || true
 	modprobe option >/dev/null 2>&1 || true
@@ -229,53 +250,69 @@ wait_at() {
 }
 
 ensure_network() {
-	local dev metric z
+ # Inspect only. UCI defaults own one-time network provisioning.
+ # Runtime uci commit/firewall reload can restart the MT7628 Ethernet
+ # switch, delay LAN availability, or restart the LTE interface.
+ local dev configured_device proto
+ dev="$(cfg data_if)"
+ [ -n "$dev" ] || dev=usb0
+ if [ "$(uci -q get network.lte 2>/dev/null)" != interface ]; then
+   log "LTE network section missing; refusing auto-provision while router runs"
+   return 1
+ fi
+ configured_device="$(uci -q get network.lte.device 2>/dev/null)"
+ proto="$(uci -q get network.lte.proto 2>/dev/null)"
+ if [ "$configured_device" != "$dev" ] || [ "$proto" != dhcp ]; then
+   log "LTE network device/protocol mismatch; preserve user config and LAN"
+   return 1
+ fi
+ return 0
+}
 
-	dev="$(cfg data_if)"
-	metric="$(cfg metric)"
-	[ -n "$dev" ] || dev=usb0
-	[ -n "$metric" ] || metric=5
+sim1_level() {
+	local first second
+	first="$(cfg sim1_value)"
+	second="$(cfg sim2_value)"
+	case "${first:-1}:${second:-0}" in
+		1:0) echo 1 ;;
+		0:1) echo 0 ;;
+		*) return 1 ;;
+	esac
+}
 
-	[ "$(uci -q get network.lte)" = "interface" ] || uci set network.lte=interface
-	uci set network.lte.device="$dev"
-	uci set network.lte.proto=dhcp
-	uci set network.lte.metric="$metric"
-	uci set network.lte.peerdns=1
-	uci commit network
-
-	z="$(uci -q show firewall | sed -n "s/^\(firewall\.@zone\[[0-9]\+\]\)\.name='wan'$/\1/p" | head -n1)"
-	if [ -n "$z" ] && ! uci -q get "$z.network" | grep -qw lte; then
-		uci add_list "$z.network=lte"
-		uci commit firewall
-		/etc/init.d/firewall reload >/dev/null 2>&1 || true
-	fi
+selector_slot() {
+	local n first level
+	n="$(cfg sim_gpio)"
+	[ "${n:-46}" = 46 ] || return 1
+	first="$(sim1_level)" || return 1
+	# Only observe the named line exported by the board. gpio_path may change direction.
+	level="$(cat /sys/class/gpio/sim_select/value 2>/dev/null)" || return 1
+	case "$level" in 0|1) ;; *) return 1 ;; esac
+	if [ "$level" = "$first" ]; then echo 1; else echo 2; fi
 }
 
 set_sim() {
-	local slot n v
-
+	local slot n v first previous changes
 	slot="$1"
+	case "$slot" in 1|2) ;; *) return 2 ;; esac
+	changes="$(uci -q changes we5927_lte)" || return 1
+	[ -z "$changes" ] || { log "LTE configuration has pending edits"; return 1; }
 	n="$(cfg sim_gpio)"
 	[ -n "$n" ] || n=46
-
-	case "$slot" in
-		1)
-			v="$(cfg sim1_value)"
-			[ -n "$v" ] || v=1
-			;;
-		2)
-			v="$(cfg sim2_value)"
-			[ -n "$v" ] || v=0
-			;;
-		*)
-			echo "usage: $0 sim 1|2" >&2
-			return 2
-			;;
-	esac
-
+	first="$(sim1_level)" || { log "Invalid SIM selector levels"; return 1; }
+	if [ "$slot" = 1 ]; then v="$first"; else v=$((1 - first)); fi
+	previous="$(cfg sim)"
 	gpio_set "$n" "$v" || return 1
-	uci set "$CFG.sim=$slot"
-	uci commit we5927_lte
+	if [ "$previous" != "$slot" ]; then
+		(
+			umask 077
+			tmp="$(mktemp -d /tmp/we5927-sim.XXXXXX)" || exit 1
+			trap 'rm -rf "$tmp"' EXIT
+			trap 'exit 1' HUP INT TERM
+			uci -q -t "$tmp" set "$CFG.sim=$slot" &&
+				uci -q -t "$tmp" commit we5927_lte
+		) || { log "SIM selector moved but configuration save failed"; return 1; }
+	fi
 	echo "sim=$slot" > "$STATE"
 	log "SIM selector changed to SIM$slot (GPIO$n value=$v)"
 }
@@ -289,7 +326,7 @@ power_on() {
 	gpio_set "$n" "$active"
 }
 
-power_cycle() {
+cycle_modem_power() {
 	local n active off
 
 	n="$(cfg modem_gpio)"
@@ -304,60 +341,361 @@ power_cycle() {
 	fi
 
 	log "Hard power-cycle modem on GPIO$n"
-	gpio_set "$n" "$off" || true
+	gpio_set "$n" "$off" || { log "Modem power-off GPIO write failed"; return 1; }
 	sleep 3
-	gpio_set "$n" "$active" || true
+	gpio_set "$n" "$active" || { log "Modem power-on GPIO write failed"; return 1; }
 	sleep 10
+}
 
-	usb_repair
-	wait_at || true
-	ifup lte >/dev/null 2>&1 || true
+power_cycle() {
+ local ready=0
+ network_manager_safe || { log "Modem power cycle held: network manager conflict"; return 3; }
+	cycle_modem_power || return 1
+	wait_at && ready=1
+	# Independent RNDIS DHCP can proceed even while serial control is unavailable.
+	lte_netifd_call up || { log "LTE interface start failed; preserving LAN"; return 1; }
+	[ "$ready" = 1 ]
+}
+
+start_selected_sim() {
+ network_manager_safe || { log "SIM reconnect held: network manager conflict"; return 3; }
+ cycle_modem_power || return 1
+	wait_at || { log "AT port unavailable after SIM selection"; return 1; }
+	if [ "$1" = require_ready ]; then
+		sim_ready_at_port || { log "Selected SIM is not ready"; return 1; }
+	fi
+	apply_apn_at_ready || return 1
+	lte_netifd_call up || { log "LTE interface start failed; preserving LAN"; return 1; }
 }
 
 apply_apn() {
+	wait_at || return 1
+	apply_apn_at_ready
+}
+
+valid_apn() {
+	local LC_ALL=C
+	case "$1" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
+	[ "${#1}" -le 100 ]
+}
+
+apply_apn_at_ready() {
 	local apn
 
 	apn="$(cfg apn)"
 	[ -n "$apn" ] || apn=internet
-
-	wait_at || return 1
+	valid_apn "$apn" || { log "Invalid configured APN"; return 1; }
 
 	at "AT+CGDCONT=1,\"IPV4V6\",\"$apn\"" 3000 >/dev/null 2>&1 || \
-	at "AT+CGDCONT=1,\"IP\",\"$apn\"" 3000 >/dev/null 2>&1 || true
+	at "AT+CGDCONT=1,\"IP\",\"$apn\"" 3000 >/dev/null 2>&1 || { log "Modem APN configuration failed"; return 1; }
 }
 
 sim_ready() {
 	wait_at || return 1
-	at 'AT+CPIN?' 2000 2>/dev/null | grep -q 'READY'
+	sim_ready_at_port
+}
+
+sim_ready_at_port() {
+	local response
+	response="$(at 'AT+CPIN?' 2000 2>/dev/null)" || return 1
+	printf '%s\n' "$response" | grep -Eq '^[[:space:]]*\+CPIN:[[:space:]]*READY[[:space:]]*$'
+}
+
+sim_absent() {
+	local response
+	response="$(at 'AT+CPIN?' 2000 2>/dev/null)" || :
+	printf '%s\n' "$response" | grep -Eiq '^[[:space:]]*\+CME ERROR:[[:space:]]*(10|SIM not inserted)[[:space:]]*$'
 }
 
 soft_reconnect() {
-	log "Soft reconnect modem (CFUN)"
-	wait_at || return 1
-	apply_apn || true
-
-	at "AT+CFUN=0" 3000 >/dev/null 2>&1 || true
-	sleep 3
-	at "AT+CFUN=1" 8000 >/dev/null 2>&1 || true
-	sleep 6
-
-	usb_repair
-	ifup lte >/dev/null 2>&1 || true
+ local p rc
+ network_manager_safe || { log "CFUN reconnect held: network manager conflict"; return 3; }
+ log "Escalated LTE radio reconnect: exclusive AT lock"
+ wait_at || return 1
+ apply_apn || true
+ p="$(at_port)"
+ [ -c "$p" ] || return 1
+ (
+   # Shared lock prevents collision with active SMS send/read/delete.
+   flock -n -x 9 || exit 75
+   /usr/sbin/we5927-at "$p" "AT+CFUN=0" 3000 >/dev/null 2>&1 || exit 1
+   sleep 2
+   /usr/sbin/we5927-at "$p" "AT+CFUN=1" 8000 >/dev/null 2>&1 || exit 1
+ ) 9>/var/lock/we5927-at.lock
+ rc=$?
+ [ "$rc" -eq 0 ] || {
+   log "CFUN reconnect failed or SMS AT channel busy; no forced override"
+   return 1
+ }
+ sleep 4
+ usb_repair
+ lte_netifd_call up || true
 }
 
 data_ok() {
-	local dev host
+ local dev host
+ dev="$(cfg data_if)"
+ host="$(cfg ping_host)"
+ [ -n "$dev" ] || dev=usb0
+ [ -n "$host" ] || host=1.1.1.1
+ ip link show "$dev" >/dev/null 2>&1 || return 1
+ ip -4 addr show dev "$dev" | grep -q "inet " || return 1
+ # Two independent remote targets; never reset for one failed ping.
+ ping -I "$dev" -c 1 -W 1 "$host" >/dev/null 2>&1 && return 0
+ [ "$host" != "8.8.8.8" ] || return 1
+ ping -I "$dev" -c 1 -W 1 8.8.8.8 >/dev/null 2>&1
+}
 
-	dev="$(cfg data_if)"
-	host="$(cfg ping_host)"
-	[ -n "$dev" ] || dev=usb0
-	[ -n "$host" ] || host=1.1.1.1
+# HTTPS is diagnostic only when both public ICMP targets fail.
+# Bounded five-second IPv4 request with normal CA validation.
+https_ok() {
+ local dev code
+ dev="$(cfg data_if)"
+ [ -n "$dev" ] || dev=usb0
+ # An HTTPS response over Ethernet must never qualify the LTE path.
+ code=$(curl --disable --ipv4 --silent --noproxy '*' --interface "if!$dev" \
+    --max-time 5 --output /dev/null --write-out '%{http_code}' \
+    'https://1.1.1.1/cdn-cgi/trace') || return 1
+ [ "$code" = 200 ]
+}
 
-	ip link show "$dev" >/dev/null 2>&1 || return 1
-	ip -4 addr show dev "$dev" | grep -q "inet " || return 1
+# VeCI PDP diagnostic on real degraded WAN events only.
+# Read-only AT, shared lock, no SIM identity, no modem control.
+wan_pdp_diag() {
+  [ "$2" = icmp_and_https_failed ] || return 0
+  local att pdp a c file
+  att="$(at 'AT+CGATT?' 1500 2>/dev/null || true)"
+  pdp="$(at 'AT+CGACT?' 1500 2>/dev/null || true)"
+  case "$att" in *'+CGATT: 1'*) a=1;; *'+CGATT: 0'*) a=0;; *) a=unknown;; esac
+  case "$pdp" in *'+CGACT: 1,1'*) c=1;; *'+CGACT: 1,0'*) c=0;; *) c=unknown;; esac
+  file="/overlay/veci-reliability/wan-pdp-$(date +%Y%m%d).csv"
+  [ -s "$file" ] || printf 'epoch,attached,cid1_active\n' >> "$file"
+  printf '%s,%s,%s\n' "$1" "$a" "$c" >> "$file"
+}
 
-	ping -I "$dev" -c 1 -W 2 "$host" >/dev/null 2>&1 && return 0
-	[ "$host" = "8.8.8.8" ] || ping -I "$dev" -c 1 -W 2 8.8.8.8 >/dev/null 2>&1
+wan_diag_event() {
+ # Write on degraded events, never on healthy ten-second polls.
+ # No IP, SIM, MAC, location, APN, or SMS identifiers.
+ local directory file free now
+ directory=/overlay/veci-reliability
+ [ -d "$directory" ] || return 0
+ free="$(df -k /overlay 2>/dev/null | awk 'NR==2{print $4}')"
+ case "$free" in ''|*[!0-9]*) return 0;; esac
+ [ "$free" -ge 300 ] || return 0
+ now="$(date +%s)"
+ file="$directory/wan-health-$(date +%Y%m%d).csv"
+ if [ ! -s "$file" ]; then
+   printf 'epoch,classification,action\n' >> "$file"
+ fi
+ printf '%s,%s,%s\n' "$now" "$1" "$2" >> "$file"
+  wan_pdp_diag "$now" "$1"
+}
+
+gateway_ok() {
+ local dev gw
+ dev="$(cfg data_if)"
+ [ -n "$dev" ] || dev=usb0
+ ip link show "$dev" >/dev/null 2>&1 || return 1
+ ip -4 addr show dev "$dev" | grep -q "inet " || return 1
+ gw="$(ip -4 route show default dev "$dev" 2>/dev/null | awk '/^default via /{print $3;exit}')"
+ case "$gw" in ''|*[!0-9.]*) return 1 ;; esac
+  ping -I "$dev" -c 1 -W 1 "$gw" >/dev/null 2>&1 && return 0
+  # A missed gateway ICMP response is not proof that RNDIS/IPv4 is down.
+  # Do not flap a configured modem datapath on a transient ICMP failure.
+  [ "$(cat "/sys/class/net/$dev/carrier" 2>/dev/null)" = 1 ]
+}
+
+# Conservative last-resort guard. If RNDIS+IP remain present and the
+# cellular packet service says "attached", do not toggle modem power for
+# ICMP-only failures. An AT channel busy with SMS is not proof of radio loss.
+# Read-only and privacy-preserving. RNDIS IP alone does not prove
+# SIM/operator/PDP readiness. No IMSI, no CFUN, no SIM GPIO, no DHCP.
+modem_readiness_phase() {
+ local dev p response reg
+ dev="$(cfg data_if)"
+ [ -n "$dev" ] || dev=usb0
+ ip link show "$dev" >/dev/null 2>&1 || { echo usb_missing; return 0; }
+ p="$(at_port 2>/dev/null)" || { echo at_unavailable; return 0; }
+ [ -c "$p" ] || { echo at_unavailable; return 0; }
+ response="$(at 'AT+CPIN?' 1500 2>/dev/null)" ||
+   { echo at_busy_or_unavailable; return 0; }
+ case "$response" in
+   *'+CPIN: READY'*) ;;
+   *'+CPIN: SIM PIN'*) echo sim_pin_required; return 0 ;;
+   *'+CPIN: SIM PUK'*) echo sim_puk_required; return 0 ;;
+   *'+CPIN:'*) echo sim_not_ready; return 0 ;;
+   *) echo sim_unknown; return 0 ;;
+ esac
+ response="$(at 'AT+CEREG?' 1500 2>/dev/null)" ||
+   { echo registration_unavailable; return 0; }
+ reg="$(printf '%s\n' "$response" |
+   sed -n 's/.*+CEREG:[[:space:]]*[0-9]*,[[:space:]]*\([0-9]\).*/\1/p' | head -n 1)"
+ case "$reg" in
+   1|5) ;;
+   3) echo registration_denied; return 0 ;;
+   0|2|4) echo searching_for_operator; return 0 ;;
+   *) echo registration_unknown; return 0 ;;
+ esac
+ response="$(at 'AT+CGATT?' 1500 2>/dev/null)" ||
+   { echo packet_attach_unavailable; return 0; }
+ case "$response" in
+   *'+CGATT: 1'*) echo packet_attached; return 0 ;;
+   *'+CGATT: 0'*) echo packet_detached; return 0 ;;
+   *) echo packet_attach_unknown; return 0 ;;
+ esac
+}
+
+radio_or_link_lost() {
+ local dev p state carrier
+ dev="$(cfg data_if)"
+ [ -n "$dev" ] || dev=usb0
+ # A disappearing USB/RNDIS interface is physical evidence of link loss.
+ ip link show "$dev" >/dev/null 2>&1 || return 0
+ carrier="$(cat "/sys/class/net/$dev/carrier" 2>/dev/null || true)"
+ [ "$carrier" = 0 ] && return 0
+ # Missing DHCP IPv4 alone is NOT proof that a healthy PDP session is down.
+ # If modem AT is busy (for example SMS), fail closed: no radio reset.
+ p="$(at_port)" || return 1
+ [ -c "$p" ] || return 1
+ state="$(at 'AT+CGATT?' 1500 2>/dev/null)" || return 1
+ case "$state" in
+   *'+CGATT: 0'*) return 0 ;;
+   *) return 1 ;;
+ esac
+}
+
+# Prevent another accidental netifd launch from triggering competing ubus
+# ownership and endless LTE DHCP recovery. Read-only; never kill processes.
+network_manager_safe() {
+ local owner name parent exe pid count
+ owner="$(ubus -S -t 3 call service list '{"name":"network","verbose":true}' 2>/dev/null |
+   jsonfilter -e '@.network.instances[*].pid' 2>/dev/null)" || return 1
+ case "$owner" in ''|*[!0-9]*) return 1 ;; esac
+ [ -r "/proc/$owner/status" ] || return 1
+ name="$(awk '$1=="Name:" {print $2}' "/proc/$owner/status" 2>/dev/null || :)"
+ parent="$(awk '$1=="PPid:" {print $2}' "/proc/$owner/status" 2>/dev/null || :)"
+ exe="$(readlink "/proc/$owner/exe" 2>/dev/null || :)"
+ [ "$name" = netifd ] && [ "$parent" = 1 ] &&
+   [ "$exe" = /sbin/netifd ] || return 1
+ count=0
+ for pid in $(pidof netifd 2>/dev/null || :); do
+   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+   [ "$pid" = "$owner" ] || return 1
+   count=$((count+1))
+ done
+ [ "$count" -eq 1 ]
+}
+lan_bridge_present() { [ -d /sys/class/net/br-lan ]; }
+
+lte_netifd_call() {
+ local method
+ method="$1"
+ case "$method" in up|down) ;; *) return 2 ;; esac
+ if ! network_manager_safe; then
+   log "LTE-only action refused: netifd is not uniquely procd-owned"
+   return 3
+ fi
+ # Generic /sbin/ifup may cause an entire network reload: never use it.
+ ubus -S -t 8 call network.interface.lte "$method" '{}' >/dev/null 2>&1
+}
+
+renew_lte() {
+ local n now previous
+ # Restrict automatic renew retries to once every two minutes.
+ # Manual reconnect runs in a separate process with fresh counters.
+ now="$(date +%s)"
+ case "$now" in ''|*[!0-9]*) return 1 ;; esac
+ previous="$last_renew_attempt"
+ if [ "$previous" -gt 0 ] 2>/dev/null &&
+    [ "$now" -ge "$previous" ] && [ $((now-previous)) -lt 120 ]; then
+   log "LTE DHCP renew cooldown: keeping netifd lease/route untouched"
+   return 3
+ fi
+ last_renew_attempt="$now"
+ log "LTE fast recovery: renew existing DHCP lease"
+ # Failed renew must not grant permission to tear down a valid route.
+ if ! ubus call network.interface.lte renew '{}' >/dev/null 2>&1; then
+   log "LTE DHCP renew request failed; keeping interface unchanged"
+   return 1
+ fi
+ n=0
+ while [ "$n" -lt 5 ]; do
+   sleep 2
+   gateway_ok && return 0
+   n=$((n + 1))
+ done
+ return 1
+}
+
+repair_lte_interface() {
+ local now previous
+ # A flapping modem must not lose its LTE route every 30-60 seconds.
+ # Maximum one netifd LTE teardown every five minutes.
+ sleep 3
+ if gateway_ok; then
+   log "LTE local gateway recovered; skipping interface teardown"
+   return 0
+ fi
+ now="$(date +%s)"
+ case "$now" in ''|*[!0-9]*) return 1 ;; esac
+ previous="$last_repair_attempt"
+ if [ "$previous" -gt 0 ] 2>/dev/null &&
+    [ "$now" -ge "$previous" ] && [ $((now-previous)) -lt 300 ]; then
+   log "LTE interface teardown cooldown: preserving network and USB state"
+   return 3
+ fi
+ last_repair_attempt="$now"
+ log "LTE interface recovery: netifd LTE only, preserve Wi-Fi and modem"
+ lte_netifd_call down || {
+   log "LTE-only down rejected; avoid modem escalation"
+   return 3
+ }
+ sleep 5
+ lan_bridge_present || {
+   log "LAN bridge unavailable after LTE-only down"
+   return 3
+ }
+ lte_netifd_call up || {
+   log "LTE-only up rejected; avoid modem escalation"
+   return 3
+ }
+ sleep 6
+ gateway_ok
+}
+
+manual_reconnect() {
+ # User-initiated recovery should never release a healthy DHCP lease or
+ # reset LTE merely because a remote probe is filtered.
+ if data_ok || gateway_ok; then
+   log "LTE datapath is present; manual reconnect suppressed to avoid downtime"
+   return 0
+ fi
+ network_manager_safe || { log "Manual reconnect held: netifd owner not unique"; return 3; }
+ renew_lte && return 0
+ gateway_ok && return 0
+ repair_lte_interface && return 0
+ gateway_ok && return 0
+ # CFUN changes the cellular registration and can interrupt active SMS.
+ # Only permit it after independent evidence that the modem is detached.
+ if radio_or_link_lost; then
+   soft_reconnect
+ else
+   log "LTE reconnect held: RNDIS/PDP state does not prove radio loss"
+   return 1
+ fi
+}
+
+clamped_number() {
+ case ${1:-} in ''|*[!0-9]*) echo "$2"; return ;; esac
+ if [ "$1" -lt "$3" ]; then echo "$3"
+ elif [ "$1" -gt "$4" ]; then echo "$4"
+ else echo "$1"; fi
+}
+
+performance_state() {
+ # tmpfs only; bounded metadata without APN, IMSI, SMS, IP or credentials.
+ printf 'failures=%s recoveries=%s stage=%s modem_phase=%s timestamp=%s
+' "$failures" "$recoveries" "$stage" "$radio_phase" "$(date +%s)" > /tmp/veci-lte-performance.state
 }
 
 clean_line() {
@@ -411,10 +749,38 @@ maybe_refresh_status_cache() {
 	fi
 }
 
+
+# Deliberately read-only and on demand; never used by the poller.
+# This issues AT+CGSN only through the serialized, bounded AT transport.
+imei_read_json() {
+	local response number
+	response="$(at 'AT+CGSN' 1500 2>/dev/null)" || {
+		printf '{ "ok": false, "error": "modem_at_busy_or_unavailable" }\n'
+		return
+	}
+	number="$(printf '%s\n' "$response" | tr -d '\r' | grep -E '^[[:space:]]*[0-9]{15}[[:space:]]*$' | head -n 1 | tr -dc '0-9')"
+	case "$number" in
+		???????????????) ;;
+		*) number='' ;;
+	esac
+	case "$number" in
+		''|*[!0-9]*)
+			printf '{ "ok": false, "error": "modem_imei_not_returned" }\n'
+			return
+			;;
+	esac
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_boolean ok 1
+	json_add_string imei "$number"
+	json_add_string source 'at_cgsn_live'
+	json_dump
+}
+
 status_fast_json() {
 	. /usr/share/libubox/jshn.sh
 
-	local dev sim p ip4 gateway online
+	local dev sim p ip4 gateway online data_link runtime_stage modem_phase sample_time now
 	local manufacturer model revision imei iccid sim_status operator access_tech
 	local registration eps_registration circuit_registration registration_status
 	local packet_attach packet_status extended_error csq signal_percent signal_dbm registration_denied
@@ -466,12 +832,26 @@ status_fast_json() {
 	p="$(at_port)"
 	[ -n "$dev" ] || dev=usb0
 	[ -n "$sim" ] || sim=1
-	[ -n "$p" ] || p=/dev/ttyUSB2
 
 	ip4="$(ip -4 -o addr show dev "$dev" 2>/dev/null | awk '{print $4}' | head -1)"
 	gateway="$(ip route show default dev "$dev" 2>/dev/null | awk '/default via/ {print $3; exit}')"
+	# DHCP gateway means local USB connectivity only. A valid Internet
+	# status requires a recent daemon reachability/HTTPS confirmation.
+	data_link=0
 	online=0
-	[ -n "$ip4" ] && [ -n "$gateway" ] && online=1
+	[ -n "$ip4" ] && [ -n "$gateway" ] && data_link=1
+	runtime_stage="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /^stage=/) {sub(/^stage=/,"",$i);print $i;exit}}' /tmp/veci-lte-performance.state 2>/dev/null)"
+	modem_phase="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /^modem_phase=/) {sub(/^modem_phase=/,"",$i);print $i;exit}}' /tmp/veci-lte-performance.state 2>/dev/null)"
+	sample_time="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /^timestamp=/) {sub(/^timestamp=/,"",$i);print $i;exit}}' /tmp/veci-lte-performance.state 2>/dev/null)"
+	now="$(date +%s 2>/dev/null)"
+	case "$sample_time:$now" in *[!0-9:]*|:*) sample_time=0; now=0;; esac
+	if [ "$data_link" = 1 ] && [ "$sample_time" -gt 0 ] &&
+	   [ "$now" -ge "$sample_time" ] && [ $((now-sample_time)) -le 180 ]; then
+		case "$runtime_stage" in
+			healthy|icmp_degraded_https_ok) online=1;;
+		esac
+	fi
+	[ -n "$modem_phase" ] || modem_phase=unknown
 
 	json_init
 	json_add_boolean enabled "$(enabled && echo 1 || echo 0)"
@@ -511,7 +891,10 @@ status_fast_json() {
 		1|true) json_add_boolean registration_denied 1 ;;
 		*) json_add_boolean registration_denied 0 ;;
 	esac
+	json_add_boolean data_link_up "$data_link"
+	json_add_boolean internet_verified "$online"
 	json_add_boolean online "$online"
+	json_add_string modem_phase "$modem_phase"
 	json_add_string status_source "cached-safe"
 	json_dump
 
@@ -665,129 +1048,213 @@ auto_switch_sim() {
 
 	log "automatic dual-SIM failover trial: SIM$old -> SIM$new"
 	set_sim "$new" || return 1
-	power_cycle
-
-	if ! sim_ready; then
-		log "SIM$new not detected; reverting to SIM$old"
-		set_sim "$old" || true
-		power_cycle
-		apply_apn || true
-		ifup lte >/dev/null 2>&1 || true
-		return 1
+	if start_selected_sim require_ready; then
+		i=0
+		while [ "$i" -lt 12 ]; do
+			if data_ok; then
+				log "automatic dual-SIM failover succeeded on SIM$new"
+				return 0
+			fi
+			i=$((i + 1))
+			sleep 2
+		done
 	fi
 
-	apply_apn || true
-	ifup lte >/dev/null 2>&1 || true
-
-	i=0
-	while [ "$i" -lt 12 ]; do
-		data_ok && {
-			log "automatic dual-SIM failover succeeded on SIM$new"
-			return 0
-		}
-		i=$((i + 1))
-		sleep 2
-	done
-
-	log "SIM$new has no working data; reverting to SIM$old"
-	set_sim "$old" || true
-	power_cycle
-	apply_apn || true
-	ifup lte >/dev/null 2>&1 || true
+	log "SIM$new trial failed; reverting to SIM$old"
+	set_sim "$old" || { log "SIM selector restore failed; stopping failover recovery"; return 1; }
+	start_selected_sim restore || log "Previous SIM selected but reconnect failed"
 	return 1
 }
 
 daemon() {
-	local failures recoveries threshold interval hard_after auto sim_after sim next
+ local failures recoveries threshold interval hard_after sim_after sim next
+ local last_hard last_sim last_upstream_check now gap stage classification radio_phase
+ local last_renew_attempt last_repair_attempt renew_rc repair_rc
+ radio_phase=unknown
+ last_upstream_check=0
+ last_renew_attempt=0
+ last_repair_attempt=0
+ failures=0
+ recoveries=0
+ last_hard=0
+ last_sim=0
+ stage=starting
+ enabled || exit 0
 
-	failures=0
-	recoveries=0
-	enabled || exit 0
+ ensure_network
+ sim="$(cfg sim)"
+ [ "$sim" = 2 ] || sim=1
+ if data_ok; then
+   radio_phase=internet_verified
+   log "LTE already healthy; preserving GPIOs, RNDIS, APN and DHCP session"
+ elif gateway_ok; then
+   # RNDIS IP/gateway does not prove carrier registration or packet attach.
+   # This read-only probe does not disturb IPv4, SMS, Wi-Fi or the modem.
+   radio_phase="$(modem_readiness_phase)"
+   log "LTE RNDIS gateway present but Internet unavailable; modem_phase=$radio_phase; holding DHCP and radio"
+ elif network_manager_safe; then
+   power_on || true
+   # Only restore GPIO selection during actual cold-start/recovery.
+   set_sim "$sim" >/dev/null 2>&1 || true
+   usb_repair
+   # Start RNDIS DHCP independently of the serial control port.
+   gateway_ok || lte_netifd_call up || true
+   if wait_at; then
+     if [ "$(cfg auto_failover)" = 1 ] && sim_absent; then
+       if [ "$sim" = 1 ]; then next=2; else next=1; fi
+       auto_switch_sim "$sim" "$next" && sim="$next"
+     else
+       apply_apn_at_ready || true
+     fi
+   else
+     log "AT port not ready; netifd continues RNDIS DHCP"
+   fi
+   radio_phase="$(modem_readiness_phase)"
+   log "LTE cold-start readiness: modem_phase=$radio_phase"
+ else
+   log "LTE cold-start suppressed: duplicate/unowned netifd; preserve modem and LAN"
+   radio_phase=network_manager_anomaly
+ fi
 
-	ensure_network
-	power_on || true
-
-	sim="$(cfg sim)"
-	[ "$sim" = "2" ] || sim=1
-	set_sim "$sim" >/dev/null 2>&1 || true
-
-	usb_repair
-	wait_at || log "AT port not ready yet"
-
-	if ! sim_ready && [ "$(cfg auto_failover)" != "0" ]; then
-		if [ "$sim" = "1" ]; then next=2; else next=1; fi
-		auto_switch_sim "$sim" "$next" && sim="$next"
-	fi
-
-	apply_apn || true
-	ifup lte >/dev/null 2>&1 || true
-
-	threshold="$(cfg fail_threshold)"
-	interval="$(cfg ping_interval)"
-	hard_after="$(cfg hard_reset_after)"
-	auto="$(cfg auto_failover)"
-	sim_after="$(cfg sim_failover_after)"
-
-	[ -n "$threshold" ] || threshold=6
-	[ -n "$interval" ] || interval=10
-	[ -n "$hard_after" ] || hard_after=2
-	[ -n "$auto" ] || auto=1
-	[ -n "$sim_after" ] || sim_after=3
-
-	log "service started: RNDIS $(cfg data_if), APN=$(cfg apn), SIM$sim"
-
-	while enabled; do
-		if data_ok; then
-			failures=0
-			recoveries=0
-		else
-			failures=$((failures + 1))
-			log "connectivity failure $failures/$threshold"
-
-			if [ "$failures" -ge "$threshold" ]; then
-				failures=0
-				recoveries=$((recoveries + 1))
-
-				log "Interface-first LTE recovery: ifdown/ifup"
-				ifdown lte >/dev/null 2>&1 || true
-				sleep 2
-				ifup lte >/dev/null 2>&1 || true
-				sleep 8
-
-				if data_ok; then
-					log "LTE interface recovery succeeded"
-					recoveries=0
-					continue
-				fi
-
-				soft_reconnect || true
-				sleep 8
-
-				if ! data_ok && [ $((recoveries % hard_after)) -eq 0 ]; then
-					power_cycle
-				fi
-
-				if ! data_ok && [ "$auto" = "1" ] && [ $((recoveries % sim_after)) -eq 0 ]; then
-					sim="$(cfg sim)"
-					if [ "$sim" = "1" ]; then
-						next=2
-					else
-						next=1
-					fi
-
-					auto_switch_sim "$sim" "$next" || true
-				fi
-			fi
-		fi
-
-		sleep "$interval"
-	done
+ threshold="$(clamped_number "$(cfg fail_threshold)" 3 2 20)"
+ interval="$(clamped_number "$(cfg ping_interval)" 10 5 120)"
+ hard_after="$(clamped_number "$(cfg hard_reset_after)" 3 2 20)"
+ sim_after="$(clamped_number "$(cfg sim_failover_after)" 3 2 20)"
+ log "LTE performance-first monitor started; checks every $interval sec; threshold $threshold"
+ last_network_anomaly=0
+ while enabled; do
+   if ! network_manager_safe; then
+     stage=network_manager_anomaly
+     radio_phase=not_verified
+     if [ "$last_network_anomaly" = 0 ]; then
+       log "Duplicate/unowned netifd detected: holding all LTE recovery (no network reload, modem reset, or SIM switch)"
+     fi
+     last_network_anomaly=1
+     performance_state
+     sleep "$interval"
+     continue
+   fi
+   if [ "$last_network_anomaly" = 1 ]; then
+     log "Single procd netifd restored; resuming normal network monitoring"
+     last_network_anomaly=0
+   fi
+   if data_ok; then
+     if [ "$failures" -gt 0 ] || [ "$recoveries" -gt 0 ]; then
+       log "LTE connectivity restored"
+     fi
+     failures=0
+     recoveries=0
+     stage=healthy
+     radio_phase=internet_verified
+   else
+     failures=$((failures + 1))
+     stage=checking
+     if [ "$failures" -ge "$threshold" ]; then
+       failures=0
+       # A responding IPv4 gateway is not a broken DHCP interface.
+       # Do not renew DHCP or flap modem on public ICMP-only loss.
+       if gateway_ok; then
+         stage=upstream_degraded
+         recoveries=0
+         now="$(date +%s)"
+         case "$now" in ''|*[!0-9]*) now=0;; esac
+         gap=$((now-last_upstream_check))
+         if [ "$last_upstream_check" -eq 0 ] || [ "$gap" -ge 90 ]; then
+           last_upstream_check="$now"
+           if https_ok; then
+             classification=icmp_failed_https_ok
+             stage=icmp_degraded_https_ok
+             radio_phase=internet_verified_https
+           else
+             classification=icmp_and_https_failed
+             radio_phase="$(modem_readiness_phase)"
+           fi
+           log "LTE RNDIS link/IP/route present; $classification; modem_phase=$radio_phase; no DHCP renew or radio reset"
+           wan_diag_event "$classification" "hold_gateway_healthy"
+         fi
+       else
+         recoveries=$((recoveries + 1))
+         stage=dhcp_renew
+         # Only missing gateway/local LTE IP justifies DHCP renew.
+         if renew_lte; then
+           stage=recovered_dhcp
+           recoveries=0
+           wan_diag_event "local_gateway_failure" "dhcp_renew_recovered"
+         else
+           renew_rc=$?
+           if [ "$renew_rc" -eq 3 ]; then
+             stage=dhcp_cooldown
+             recoveries=0
+           elif gateway_ok; then
+             stage=upstream_degraded
+             recoveries=0
+             wan_diag_event "gateway_recovered" "hold"
+           else
+             stage=interface_recovery
+             if repair_lte_interface; then
+               stage=recovered_interface
+               recoveries=0
+             else
+               repair_rc=$?
+               if [ "$repair_rc" -eq 3 ]; then
+                 stage=interface_cooldown
+                 recoveries=0
+               else
+           if [ "$recoveries" -ge 2 ] && radio_or_link_lost; then
+             stage=modem_soft_reconnect
+             soft_reconnect || true
+             if data_ok; then
+               stage=recovered_soft
+               recoveries=0
+             fi
+           fi
+           # Hard resets have a strict 15-min cooldown and require missing
+           # both public reachability and RNDIS gateway.
+           if [ "$recoveries" -ge "$hard_after" ] && ! data_ok && ! gateway_ok && radio_or_link_lost; then
+             now="$(date +%s)"
+             case "$now" in ''|*[!0-9]*) now=0 ;; esac
+             gap=$((now - last_hard))
+             if [ "$last_hard" -eq 0 ] || [ "$gap" -ge 900 ]; then
+               last_hard="$now"
+               stage=last_resort_power_cycle
+               power_cycle || stage=power_cycle_failed
+             else
+               stage=power_cycle_cooldown
+               log "Suppressing modem power-cycle during 900-second cooldown"
+             fi
+           fi
+           if [ "$recoveries" -ge "$sim_after" ] && [ "$(cfg auto_failover)" = 1 ] && ! data_ok && ! gateway_ok; then
+             now="$(date +%s)"
+             case "$now" in ''|*[!0-9]*) now=0 ;; esac
+             gap=$((now - last_sim))
+             if [ "$last_sim" -eq 0 ] || [ "$gap" -ge 1800 ]; then
+               last_sim="$now"
+               sim="$(cfg sim)"
+               if [ "$sim" = 1 ]; then next=2; else next=1; fi
+               stage=opt_in_sim_failover
+               auto_switch_sim "$sim" "$next" || stage=sim_failover_failed
+             fi
+           fi
+               fi
+             fi
+           fi
+         fi
+       fi
+     fi
+   fi
+   performance_state
+   sleep "$interval"
+ done
 }
 
 case "$1" in
 	daemon)
 		daemon
 		;;
+	at-port) at_port ;;
+	rndis-state) rndis_state ;;
+	selector-slot) selector_slot ;;
+	validate-apn) valid_apn "$2" ;;
 	status-fast)
 		status_fast_json
 		;;
@@ -797,24 +1264,25 @@ case "$1" in
 	status-full)
 		status_json
 		;;
+	imei-read)
+		imei_read_json
+		;;
 	refresh-cache)
 		refresh_status_cache
 		;;
 	reconnect)
-		soft_reconnect
+		manual_reconnect
 		;;
 	power-cycle)
 		power_cycle
 		;;
 	sim)
-		set_sim "$2"
-		power_cycle
-		apply_apn
-		ifup lte >/dev/null 2>&1 || true
+		set_sim "$2" || exit $?
+		start_selected_sim manual
 		;;
 	usb-repair)
 		usb_repair
-		ifup lte >/dev/null 2>&1 || true
+		lte_netifd_call up || true
 		;;
 	restart)
 		/etc/init.d/we5927-lte restart

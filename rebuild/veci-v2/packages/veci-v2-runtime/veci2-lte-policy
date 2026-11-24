@@ -1,0 +1,68 @@
+#!/bin/sh
+set -eu
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "${1:-}:${2:-}" in
+  list:*) echo '{"status":{},"setFailover":{"action":"String"},"setApn":{"apn":"String"},"setMonitor":{"interval":"String","expected":"String"}}'; exit 0 ;;
+  call:status|call:setFailover|call:setApn|call:setMonitor) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+if [ "$2" != status ]; then
+  request=$(head -c 257)
+  [ "${#request}" -le 256 ] || fail invalid_request
+  if [ "$2" = setMonitor ]; then
+    option=ping_interval
+    desired=$(jsonfilter -s "$request" -e '@.interval') || fail invalid_interval
+    expected=$(jsonfilter -s "$request" -e '@.expected') || fail invalid_interval
+    case "$desired" in [5-9]|[1-9][0-9]|1[01][0-9]|120) ;; *) fail invalid_interval ;; esac
+  elif [ "$2" = setApn ]; then
+    option=apn
+    desired=$(jsonfilter -s "$request" -e '@.apn') || fail invalid_request
+    /usr/sbin/we5927-lte validate-apn "$desired" || fail invalid_apn
+  else
+    option=auto_failover
+    action=$(jsonfilter -s "$request" -e '@.action') || fail invalid_request
+    case "$action" in ENABLE_FAILOVER) desired=1 ;; DISABLE_FAILOVER) desired=0 ;; *) fail invalid_action ;; esac
+  fi
+  exec 9<"$0"
+  flock -n 9 || fail busy
+fi
+cfg=we5927_lte.main
+[ "$(uci -q get "$cfg")" = modem ] || fail no_modem_configuration
+pending=$(uci -q changes we5927_lte) || fail config_unavailable
+[ -z "$pending" ] || fail pending_lte_changes
+stored=$(uci -q get "$cfg.ping_interval" || :)
+case "$stored" in
+  '') interval=10 ;;
+  [5-9]|[1-9][0-9]|1[01][0-9]|120) interval=$stored ;;
+  *) interval=null ;;
+esac
+if [ "$2" = setMonitor ]; then
+  [ "$interval" != null ] && [ "$expected" = "$interval" ] || fail stale_interval
+fi
+value=$(uci -q get "$cfg.auto_failover" || :)
+case "$value" in ''|0) value=0 ;; 1) ;; *) fail invalid_policy ;; esac
+if [ "$2" != status ] && [ "$(uci -q get "$cfg.$option" || :)" != "$desired" ]; then
+  tmp=$(mktemp -d /tmp/veci2-lte-policy.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 1' HUP INT TERM
+  uci -q -t "$tmp" set "$cfg.$option=$desired" &&
+    uci -q -t "$tmp" commit we5927_lte || fail save_failed
+  [ "$(uci -q get "$cfg.$option")" = "$desired" ] || fail save_failed
+  [ "$option" != ping_interval ] || interval=$desired
+  [ "$option" != auto_failover ] || value=$desired
+fi
+slot=$(uci -q get "$cfg.sim" || :)
+case "$slot" in 1|2) ;; *) slot=null ;; esac
+selected=$(/usr/sbin/we5927-lte selector-slot 2>/dev/null) || selected=
+case "$selected" in 1|2) ;; *) selected=null ;; esac
+case "$value" in 1) enabled=true ;; *) enabled=false ;; esac
+apn=$(uci -q get "$cfg.apn" || :)
+[ -n "$apn" ] || apn=internet
+if /usr/sbin/we5927-lte validate-apn "$apn"; then
+  apn_json=$(printf '"%s"' "$apn")
+else
+  apn_json=null
+fi
+printf '{"ok":true,"monitor_interval":%s,"auto_failover":%s,"configured_slot":%s,"selector_slot":%s,"configured_apn":%s}\n' "$interval" "$enabled" "$slot" "$selected" "$apn_json"

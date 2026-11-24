@@ -1,0 +1,7 @@
+{
+  "veci-v2-services": {
+    "description": "Read boot services and select scheduled tasks or NTP for startup",
+    "read": {"ubus": {"veci.v2.services": ["status"]}},
+    "write": {"ubus": {"veci.v2.services": ["save"]}}
+  }
+}

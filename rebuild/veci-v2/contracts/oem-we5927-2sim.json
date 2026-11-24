@@ -1,0 +1,67 @@
+{
+  "evidence": "EXTRACTED_OEM_REFERENCE_NOT_ROUTER_FLASH_APPROVAL",
+  "menu_flags": {
+    "adv": {
+      "adv_ddns": false,
+      "adv_dmz": true,
+      "adv_firewall_general": true,
+      "adv_netwatchdog": true,
+      "adv_router_nat": false
+    },
+    "config": {
+      "online_user_num": true
+    },
+    "mgnt": {
+      "mgnt_auth": false,
+      "mgnt_backup_restore": true,
+      "mgnt_system": true,
+      "mgnt_sysupgrade": true
+    },
+    "net": {
+      "net_accelerate": true,
+      "net_cellular1": true,
+      "net_cellular2": false,
+      "net_clients": true,
+      "net_dhcp": true,
+      "net_lan": true,
+      "net_qos": false,
+      "net_static_router": false,
+      "net_wan": true
+    },
+    "srv": {
+      "srv_client_l2tp": false,
+      "srv_client_pptp": false,
+      "srv_cloud_control": true,
+      "srv_cloud_login": true,
+      "srv_samba": false,
+      "srv_storage": false
+    },
+    "tool": {
+      "tool_diagnose": true,
+      "tool_site_survey": true
+    },
+    "wifi": {
+      "wifi_2": true,
+      "wifi_5": false,
+      "wifi_60": false,
+      "wifi_acl": false,
+      "wifi_guest": true,
+      "wifi_signal": true
+    }
+  },
+  "migration_note": "menu true means visible in OEM, not proof of live feature function; menu false means disabled, not guaranteed hardware support",
+  "schema": "veci.oem-inventory.v1",
+  "source_image_bytes": 7471108,
+  "source_sha256": "80529b8e9c31d686eb7f63a1517d6dbcf781f26cb4aceb7b8b1ff27c2d51d1f9",
+  "source_url": "https://cdn.shopify.com/s/files/1/0760/0416/3873/files/WE2825-2SIM_V26.03.04_V26.08.09.bin?v=1786953217",
+  "vendor_bundled_driver_filenames": [
+    "mt7628.ko",
+    "mt76x2e.ko"
+  ],
+  "vendor_display_model": "WE2825-2SIM",
+  "vendor_model": "ZBT-WE5927-DSIM",
+  "vendor_os": "LEDE ramips/mt7628 Linux 4.4.61",
+  "vendor_release": "26.08.09",
+  "vendor_watchdog_gpio_source": 37,
+  "vendor_watchdog_type_source": 1
+}

@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+# After S11 sysctl and before S20 network. No runtime network reload.
+START=16
+STOP=89
+start() {
+	[ "$(cat /tmp/sysinfo/board_name 2>/dev/null)" = zbtlink,zbt-we5927 ] ||
+		return 1
+	configured="$(uci -q get veci2_ipv6.main.enabled 2>/dev/null)"
+	case "$configured" in 1) value=0 ;; 0) value=1 ;; *) return 1 ;; esac
+	for name in all default; do
+		[ -w "/proc/sys/net/ipv6/conf/$name/disable_ipv6" ] || return 1
+	done
+	printf '%s\n' "$value" >/proc/sys/net/ipv6/conf/default/disable_ipv6 || return 1
+	printf '%s\n' "$value" >/proc/sys/net/ipv6/conf/all/disable_ipv6 || return 1
+	logger -t veci-v2-ipv6 "IPv6 boot preference applied (no network reload)"
+}

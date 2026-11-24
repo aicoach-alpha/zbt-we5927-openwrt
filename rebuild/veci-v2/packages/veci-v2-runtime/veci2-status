@@ -1,0 +1,254 @@
+#!/bin/sh
+# VeCI v2 read-only runtime contract; NO Wi-Fi reload, modem reset, or AT.
+# Do not expose AP keys, SMS, IMEI, ICCID, MACs, passwords, or user IPs.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+LC_ALL=C
+export LC_ALL
+numeric() {
+  case "$1" in ''|*[!0-9]*) printf 0 ;; *) printf %s "$1" ;; esac
+}
+primary_ap_configured() {
+  /usr/sbin/veci-wifi-guardian configured 2>/dev/null
+}
+ubus_radio_up() {
+  ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
+    jsonfilter -e '@.radio0.up' 2>/dev/null
+}
+ubus_hostapd_ap() {
+  local interface status snapshot channel
+  for interface in $(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null |
+      jsonfilter -e '@.radio0.interfaces[@.section="default_radio0"].ifname' 2>/dev/null); do
+    case "$interface" in ''|*[!a-zA-Z0-9_.-]*) continue ;; esac
+    [ -e "/sys/class/net/$interface/phy80211" ] || continue
+    snapshot="$(ubus -S -t 2 call "hostapd.$interface" get_status '{}' 2>/dev/null)" || continue
+    status="$(printf '%s' "$snapshot" | jsonfilter -e '@.status' 2>/dev/null)" || continue
+    [ "$status" = ENABLED ] || continue
+    channel="$(printf '%s' "$snapshot" | jsonfilter -e '@.channel' 2>/dev/null)" || channel=
+    case "$channel" in
+      [1-9]|1[0-4]) printf 'ENABLED %s\n' "$channel" ;;
+      *) echo ENABLED ;;
+    esac
+    return 0
+  done
+  return 1
+}
+lte_usb_path() { /usr/sbin/we5927-lte rndis-state 2>/dev/null; }
+lte_data_device() {
+  local configured active
+  configured=$(uci -q get we5927_lte.main.data_if 2>/dev/null) || configured=usb0
+  [ -n "$configured" ] || configured=usb0
+  active=$(ubus -S -t 3 call network.interface.lte status '{}' 2>/dev/null |
+    jsonfilter -e '@.l3_device' 2>/dev/null) || return 1
+  case "$active" in ''|-*|*[!a-zA-Z0-9_.-]*) return 1 ;; esac
+  [ "$active" = "$configured" ] || return 1
+  printf '%s\n' "$active"
+}
+lte_monitor_stage() {
+  local now
+  now=$(date +%s) || return 1
+  awk -v now="$now" '
+    NF == 5 && $3 ~ /^stage=/ && $5 ~ /^timestamp=[0-9]+$/ {
+      stage = substr($3,7)
+      age = now - substr($5,11)
+      if (age >= 0 && age <= 180 &&
+          stage ~ /^(healthy|network_manager_anomaly|checking|upstream_degraded|icmp_degraded_https_ok|dhcp_renew|recovered_dhcp|dhcp_cooldown|interface_recovery|recovered_interface|interface_cooldown|modem_soft_reconnect|recovered_soft|last_resort_power_cycle|power_cycle_failed|power_cycle_cooldown|opt_in_sim_failover|sim_failover_failed)$/)
+        print stage
+    }' /tmp/veci-lte-performance.state 2>/dev/null
+}
+live_board() { cat /tmp/sysinfo/board_name 2>/dev/null || :; }
+openwrt_version() {
+  sed -n "s/^DISTRIB_RELEASE='\([^']*\)'$/\1/p" /etc/openwrt_release 2>/dev/null | head -1
+}
+ethernet_ports() {
+  local snapshot
+  if [ "$(live_board)" != 'zbtlink,zbt-we5927' ]; then
+    printf '{"available":false,"ports":[]}\n'
+    return
+  fi
+  snapshot="$(timeout 3 swconfig dev switch0 show 2>/dev/null)" || {
+    printf '{"available":false,"ports":[]}\n'
+    return
+  }
+  printf '%s\n' "$snapshot" | awk '
+    $1 == "link:" && $2 ~ /^port:[0-4]$/ && $3 ~ /^link:(up|down)$/ {
+      port = substr($2, 6) + 0
+      state[port] = substr($3, 6)
+      count++
+    }
+    END {
+      printf "{\"available\":%s,\"ports\":[", count ? "true" : "false"
+      for (port = 0; port <= 4 && count; port++) {
+        printf "%s{\"port\":%d,\"link\":\"%s\"}", port ? "," : "", port, state[port] ? state[port] : "unknown"
+      }
+      print "]}"
+    }'
+}
+main() {
+  case "${1:-}:${2:-}" in
+    list:*)
+      printf '{ "status": {}, "capabilities": {}, "smsProvider": {}, "ethernetPorts": {}, "traffic": {}, "internetCheck": {}, "smsDiagnostics": {}, "networkHealth": {} }\n'
+      ;;
+    call:status)
+      board_ok=false; version_ok=false
+      [ "$(live_board)" = 'zbtlink,zbt-we5927' ] && board_ok=true
+      [ "$(openwrt_version)" = '25.12.6' ] && version_ok=true
+      lte_address=null; lte_route=null; radio=null; ap=false
+      usb_snapshot=$(lte_usb_path) || usb_snapshot=
+      usb_state=$(printf '%s
+' "$usb_snapshot" | cut -d' ' -f1)
+      case "$usb_state" in
+        carrier_up|carrier_down|carrier_unknown|modem_missing|interface_missing|other_device|driver_mismatch|invalid_configuration) ;;
+        *) usb_state=unknown ;;
+      esac
+      case "$usb_state" in carrier_*) bound_device=$(printf '%s
+' "$usb_snapshot" | cut -d' ' -f2) ;; *) bound_device= ;; esac
+      if device=$(lte_data_device); then
+        if addresses=$(ip -4 -o addr show dev "$device" 2>/dev/null); then
+          lte_address=false
+          if printf '%s\n' "$addresses" | grep -q ' inet '; then lte_address=true; fi
+        fi
+        if routes=$(ip -4 route show default dev "$device" 2>/dev/null); then
+          lte_route=false
+          if printf '%s\n' "$routes" | grep -Eq '^default (via|dev) '; then lte_route=true; fi
+        fi
+      fi
+      radio_result="$(ubus_radio_up || true)"
+      case "$radio_result" in true|false) radio=$radio_result ;; esac
+      ap_result="$(ubus_hostapd_ap || true)"
+      ap_channel=null
+      case "$ap_result" in
+        ENABLED) ap=true ;;
+        'ENABLED '[1-9]|'ENABLED '1[0-4]) ap=true; ap_channel="${ap_result#ENABLED }" ;;
+      esac
+      wanted_rc=0
+      primary_ap_configured || wanted_rc=$?
+      case "$wanted_rc" in 0) expected=true ;; 1) expected=false ;; *) expected=null ;; esac
+      ap_missing=null
+      if [ "$ap" = true ] || [ "$expected" = false ] || [ "$radio" = false ]; then
+        ap_missing=false
+      elif [ "$radio" = true ] && [ "$expected" = true ]; then
+        ap_missing=true
+      fi
+      stage=$(lte_monitor_stage) || stage=
+      case "$stage" in ''|*[!a-z_]*) stage_json=null ;; *) stage_json=$(printf '"%s"' "$stage") ;; esac
+      n=0
+      pids="$(pidof netifd 2>/dev/null || true)"
+      for pid in $pids; do
+        case "$pid" in *[!0-9]*|'') ;; *) n=$((n + 1)) ;; esac
+      done
+      overlay_kb="$(df -Pk /overlay 2>/dev/null | awk 'NR==2 {print $4}' || true)"
+      mem_kb="$(awk '/^MemAvailable:/ {print $2;exit}' /proc/meminfo 2>/dev/null || true)"
+      overlay_kb="$(numeric "$overlay_kb")"
+      mem_kb="$(numeric "$mem_kb")"
+      # Internet is UNKNOWN here, not inferred from a modem lease.
+      printf '{"schema":2,"board_supported":%s,"openwrt_supported":%s,"lte_usb_state":"%s","lte_monitor_stage":%s,"lte_ipv4":%s,"lte_default_route":%s,"internet_verified":null,"wifi_ap_configured":%s,"wifi_radio_config_up":%s,"wifi_ap_enabled":%s,"wifi_ap_missing":%s,"wifi_ap_channel":%s,"wifi_beacon_verified":null,"netifd_count":%s,"overlay_free_kb":%s,"memory_available_kb":%s}\n' \
+        "$board_ok" "$version_ok" "$usb_state" "$stage_json" "$lte_address" "$lte_route" "$expected" "$radio" "$ap" "$ap_missing" "$ap_channel" "$n" "$overlay_kb" "$mem_kb"
+      ;;
+    call:networkHealth)
+      # Read-only hardware truth. Never spawn a network manager or leak
+      # interface addresses, SIM identifiers, client devices or secrets.
+      n=0; owner_present=false; extra=null; owner=null; owner_state=null
+      all_pids="$(pidof netifd 2>/dev/null || true)"
+      for pid in $all_pids; do
+        case "$pid" in ''|*[!0-9]*) continue ;; esac
+        n=$((n + 1))
+      done
+      procd_owner="$(ubus -S -t 3 call service list '{"name":"network","verbose":true}' 2>/dev/null |
+        jsonfilter -e '@.network.instances[*].pid' 2>/dev/null || true)"
+      case "$procd_owner" in ''|*[!0-9]*) procd_owner= ;; esac
+      if [ -n "$procd_owner" ] && [ -r "/proc/$procd_owner/status" ]; then
+        status_name="$(awk '$1=="Name:" {print $2}' "/proc/$procd_owner/status" 2>/dev/null || true)"
+        executable="$(readlink "/proc/$procd_owner/exe" 2>/dev/null || true)"
+        state="$(awk '$1=="State:" {print $2}' "/proc/$procd_owner/status" 2>/dev/null || true)"
+        if [ "$status_name" = netifd ] && [ "$executable" = /sbin/netifd ]; then
+          for pid in $all_pids; do
+            if [ "$pid" = "$procd_owner" ]; then
+              owner_present=true
+            fi
+          done
+          if [ "$owner_present" = true ]; then
+            owner="$procd_owner"
+            extra=$((n-1))
+            case "$state" in S|R|D|T|Z) owner_state="\"$state\"" ;; esac
+          fi
+        fi
+      fi
+      owner_confirmed=false
+      if [ "$owner_present" = true ]; then owner_confirmed=true; fi
+      dhcp=0
+      for pid in $(pidof udhcpc 2>/dev/null || true); do
+        case "$pid" in ''|*[!0-9]*) continue ;; esac
+        dhcp=$((dhcp + 1))
+      done
+      mem_free="$(numeric "$(awk '$1=="MemAvailable:" {print $2}' /proc/meminfo 2>/dev/null || true)")"
+      uptime="$(awk '{printf "%.0f", $1}' /proc/uptime 2>/dev/null || echo 0)"
+      uptime="$(numeric "$uptime")"
+      load_1m="$(awk 'NR==1 && $1 ~ /^[0-9]+[.][0-9]+$/ {print $1}' /proc/loadavg 2>/dev/null || true)"
+      case "$load_1m" in ''|*[!0-9.]*) load_1m=null ;; esac
+      address=false
+      route=false
+      if [ -d /sys/class/net/usb0 ]; then
+        if ip -4 addr show dev usb0 2>/dev/null | grep -q ' inet '; then address=true; fi
+        if ip -4 route show default dev usb0 2>/dev/null | grep -q '^default '; then route=true; fi
+      fi
+      printf '{"schema":1,"source":"live_procfs_procd_kernel","netifd_count":%s,"procd_netifd_owner_confirmed":%s,"procd_netifd_pid":%s,"procd_netifd_state":%s,"unmanaged_netifd_count":%s,"udhcpc_process_count":%s,"memory_available_kb":%s,"uptime_seconds":%s,"load1":%s,"lte_ipv4":%s,"lte_default_route":%s}\n' \
+        "$n" "$owner_confirmed" "$owner" "$owner_state" "$extra" "$dhcp" "$mem_free" "$uptime" "$load_1m" "$address" "$route"
+      ;;
+    call:traffic)
+      # Only kernel counters; never estimate throughput from link speed or cache.
+      counter() {
+        local val
+        val="$(cat "/sys/class/net/$1/statistics/$2" 2>/dev/null)" || val=
+        case "$val" in ''|*[!0-9]*) echo null;; *) echo "$val";; esac
+      }
+      rx="$(counter usb0 rx_bytes)"
+      tx="$(counter usb0 tx_bytes)"
+      lan_rx="$(counter br-lan rx_bytes)"
+      lan_tx="$(counter br-lan tx_bytes)"
+      printf '{"source":"kernel_interface_counters","interface":"usb0","rx_bytes":%s,"tx_bytes":%s,"lan_rx_bytes":%s,"lan_tx_bytes":%s}\n' "$rx" "$tx" "$lan_rx" "$lan_tx"
+      ;;
+    call:internetCheck)
+      # Explicit on-demand probe of USB0 HTTPS + DNS. A DHCP lease alone is not Internet.
+      if [ ! -d /sys/class/net/usb0 ]; then
+        printf '{"verified":false,"source":"usb0_https","reason":"lte_interface_unavailable"}\n'
+      else
+        http="$(curl --disable --ipv4 --noproxy '*' --interface 'if!usb0' --connect-timeout 3 --max-time 7 --silent --output /dev/null --write-out '%{http_code}' 'https://www.cloudflare.com/cdn-cgi/trace' 2>/dev/null)" && code=0 || code=$?
+        if [ "$code" -eq 0 ] && [ "$http" = 200 ]; then
+          printf '{"verified":true,"source":"usb0_https","https_code":200,"dns_verified":true}\n'
+        else
+          case "$http" in ''|*[!0-9]*) http=0;; esac
+          printf '{"verified":false,"source":"usb0_https","https_code":%s,"reason":"https_or_dns_not_verified"}\n' "$http"
+        fi
+      fi
+      ;;
+    call:smsDiagnostics)
+      # Read-only and privacy-preserving; never AT-probe, send SMS, or claim service works.
+      registered=false
+      transport=false
+      config=false
+      if ubus -S -t 3 list veci.sms 2>/dev/null | grep -Fxq 'veci.sms'; then registered=true; fi
+      port="$(/usr/sbin/we5927-lte at-port 2>/dev/null)" || port=
+      [ -n "$port" ] && [ -c "$port" ] && transport=true
+      [ -r /etc/config/veci_sms ] && config=true
+      printf '{"provider_registered":%s,"modem_at_port_present":%s,"config_present":%s,"hardware_sms_verified":false,"source":"live_read_only"}\n' "$registered" "$transport" "$config"
+      ;;
+    call:ethernetPorts) ethernet_ports ;;
+    call:capabilities)
+      printf '{"schema":2,"model":"ZBT-WE5927-DSIM","dual_sim_hardware_source":true,"lte_rndis":true,"wifi_2g":true,"wifi_5g":false,"sms_center_contract":"veci.sms","package_manager":"apk","firmware_auto_install_default":false,"wifi_auto_radio_reload":false}\n'
+      ;;
+    call:smsProvider)
+      available=false
+      if ubus -S -t 3 list veci.sms 2>/dev/null | grep -Fxq 'veci.sms'; then
+        available=true
+      fi
+      printf '{"available":%s,"provider":"veci.sms","send_requires_confirmation":true,"at_probe_performed":false}\n' "$available"
+      ;;
+    *)
+      printf '{"error":"unsupported_method"}\n'
+      exit 2
+      ;;
+  esac
+}
+main "$@"

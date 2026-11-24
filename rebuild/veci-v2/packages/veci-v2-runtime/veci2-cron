@@ -1,0 +1,87 @@
+#!/bin/sh
+set -e
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "$1:${2:-}" in
+  list:*) echo '{"status":{},"save":{"row":"String","schedule":"String","enabled":"String","revision":"String"},"add":{"task":"String","schedule":"String","enabled":"String","revision":"String"},"remove":{"row":"String","revision":"String"}}'; exit 0 ;;
+  call:status|call:save|call:add|call:remove) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+tab=/etc/crontabs/root
+parser=/usr/libexec/veci2-cron.awk
+exec 9<"$0"; flock -n 9 || fail busy
+[ ! -L "$tab" ] || fail unsupported_layout
+if [ -e "$tab" ]; then
+  [ -f "$tab" ] && [ "$(wc -c < "$tab")" -le 32768 ] || fail unsupported_layout
+fi
+tmp=$(mktemp -d /tmp/veci2-cron.XXXXXX) || fail temporary_storage
+trap 'rm -rf "$tmp"' EXIT
+hash() { sha256sum "$1" | cut -d' ' -f1; }
+live_revision() {
+  [ ! -L "$tab" ] || return 1
+  if [ -e "$tab" ]; then
+    [ -f "$tab" ] && [ -r "$tab" ] || return 1
+    hash "$tab"
+  fi
+}
+revision=$(live_revision) || fail unreadable
+if [ -n "$revision" ]; then
+  cp "$tab" "$tmp/current" && [ "$(hash "$tmp/current")" = "$revision" ] || fail stale_configuration
+else
+  : > "$tmp/current"
+fi
+. /usr/share/libubox/jshn.sh
+if [ "$2" != status ]; then
+  request=$(head -c 513)
+  [ "${#request}" -le 512 ] || fail invalid_request
+  json_load "$request" || fail invalid_request
+  json_get_type kind revision || fail invalid_request
+  [ "$kind" = string ] || fail invalid_request
+  json_get_var expected revision
+  [ "$revision" = "$expected" ] || fail stale_configuration
+  mode=$2
+  row= schedule= active= command=
+  if [ "$mode" != add ]; then
+    json_get_var row row || fail invalid_row
+    case "$row" in ''|0*|*[!0-9]*) fail invalid_row ;; esac
+  fi
+  if [ "$mode" != remove ]; then
+    json_get_var schedule schedule || fail invalid_schedule
+    json_get_var active enabled || fail invalid_mode
+    case "$active" in 0|1) ;; *) fail invalid_mode ;; esac
+    case "$schedule" in ''|*[!0-9\ \*/,-]*) fail invalid_schedule ;; esac
+  fi
+  if [ "$mode" = add ]; then
+    json_get_var task task || fail invalid_task
+    case "$task" in
+      uptime) command='/bin/busybox uptime | /bin/busybox logger -t veci-cron-uptime' ;;
+      memory) command='/bin/busybox free | /bin/busybox logger -t veci-cron-memory' ;;
+      *) fail invalid_task ;;
+    esac
+  fi
+  [ ! -s "$tmp/current" ] || [ "$(tail -c 1 "$tmp/current" | wc -l)" -eq 1 ] || fail unsupported_layout
+  awk -v mode="$mode" -v active="$active" -v row="$row" -v schedule="$schedule" -v cmd="$command" -f "$parser" "$tmp/current" > "$tmp/next" || fail invalid_schedule_or_row
+  [ "$(wc -c < "$tmp/next")" -le 32768 ] || fail unsupported_layout
+  wanted=$(hash "$tmp/next")
+  observed=$(live_revision) && [ "$observed" = "$revision" ] || fail stale_configuration
+  if ! /usr/bin/crontab "$tmp/next"; then
+    observed=$(live_revision) || fail rollback_failed
+    if [ "$observed" != "$revision" ]; then
+      [ "$observed" = "$wanted" ] || fail concurrent_update
+      if [ -n "$revision" ]; then /usr/bin/crontab "$tmp/current" || :; else /usr/bin/crontab -r || :; fi
+      observed=$(live_revision) && [ "$observed" = "$revision" ] || fail rollback_failed
+    fi
+    fail install_failed
+  fi
+  observed=$(live_revision) && [ "$observed" = "$wanted" ] || fail concurrent_update
+  revision=$wanted
+  mv "$tmp/next" "$tmp/current"
+fi
+awk -v mode=list -f "$parser" "$tmp/current" > "$tmp/jobs" || fail unreadable
+json_init; json_add_boolean ok 1; json_add_string revision "$revision"; json_add_array jobs
+while IFS="$(printf '\t')" read -r row active schedule label; do
+  json_add_object ''; json_add_string row "$row"; json_add_boolean enabled "$active"
+  json_add_string schedule "$schedule"; json_add_string label "$label"; json_close_object
+done < "$tmp/jobs"
+json_close_array; json_dump

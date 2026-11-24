@@ -1,0 +1,339 @@
+{
+  "board_display": "WE2825-2SIM",
+  "board_id": "ZBT-WE5927-DSIM",
+  "firmware_slots": 1,
+  "flash_authorized": false,
+  "flash_mtd_bytes": 7995392,
+  "ipv6_policy": {
+    "apply": "separately approved manual reboot; never background network reload",
+    "first_boot": "off",
+    "hardware_uat": "not_run",
+    "lan_ra_dhcpv6_default": "disabled",
+    "settings_toggle": "authenticated explicit confirmation; saves UCI only",
+    "sysctl": "disable_ipv6=1 on all/default",
+    "upstream_ipv6": "not guaranteed; depends on modem/carrier",
+    "wan6_default": "disabled"
+  },
+  "kernel_version": "6.12.112",
+  "luci_revision": "53312862521a4b02d7e45ae483537132dbcf63ad",
+  "mandatory_gates": [
+    "exact_board_revision_reverified",
+    "all_core_modules_source_pass",
+    "all_core_modules_hardware_pass",
+    "wifi_beacon_and_client_join",
+    "lan_all_ports_ethernet_and_nat",
+    "lte_2sim_safe_switch_sms",
+    "signed_ota_and_offline_rollback",
+    "package_feed_verified",
+    "fuzz_and_security_review",
+    "image_size_and_flash_headroom",
+    "reboot_recovery_on_identical_test_unit"
+  ],
+  "navigation": [
+    {
+      "id": "overview",
+      "label": "Beranda",
+      "scope": "status kesehatan dan akses cepat"
+    },
+    {
+      "id": "network",
+      "label": "Koneksi",
+      "scope": "LTE 2SIM, Wi-Fi, WAN/LAN, DHCP, devices"
+    },
+    {
+      "id": "sms",
+      "label": "SMS Center",
+      "scope": "inbox, kirim, sent, draft, delete"
+    },
+    {
+      "id": "settings",
+      "label": "Pengaturan",
+      "scope": "IPv6, addons, updates, backup, firewall dan advanced"
+    }
+  ],
+  "oem_sha256": "80529b8e9c31d686eb7f63a1517d6dbcf781f26cb4aceb7b8b1ff27c2d51d1f9",
+  "openwrt_pin": "64900e756efa667774214f9c6b17c113222e01f7",
+  "openwrt_version": "25.12.6",
+  "optional_apps_source": "luci-25.12-feature-index.json",
+  "optional_luci_app_count": 107,
+  "post_flash_gates": [
+    "continuous_72h_on_owner_router"
+  ],
+  "release_state": "DEVELOPMENT_NOT_FLASHABLE",
+  "required_core": [
+    {
+      "id": "dashboard_status",
+      "origin": "LuCI Status + OEM system",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_tested"
+    },
+    {
+      "id": "router_login_and_permissions",
+      "origin": "LuCI Administration",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "interface_wan_lan",
+      "origin": "LuCI Network Interfaces",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "dhcp_dns_static_leases",
+      "origin": "LuCI DHCP and DNS",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "ipv6_ra_dhcpv6",
+      "origin": "LuCI IPv6",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_verified"
+    },
+    {
+      "id": "firewall_zones_nat",
+      "origin": "LuCI Firewall",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "port_forward_dmz",
+      "origin": "LuCI Firewall + OEM DMZ",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "static_routes_policy",
+      "origin": "LuCI Routing",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_verified"
+    },
+    {
+      "id": "wifi_ap_2g",
+      "origin": "LuCI Wireless + OEM Wi-Fi 2.4",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "wifi_survey_channel",
+      "origin": "LuCI Wireless Site Survey",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "wifi_clients_access_control",
+      "origin": "LuCI Wireless Access Control",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "ethernet_port_status",
+      "origin": "LuCI Devices + OEM LAN",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_tested"
+    },
+    {
+      "id": "lte_rndis_data",
+      "origin": "OEM cellular RNDIS",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "lte_dual_sim_manual",
+      "origin": "OEM WE5927 dual-SIM",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "lte_apn_pin_puk",
+      "origin": "OEM cellular configuration",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_verified"
+    },
+    {
+      "id": "sms_inbox",
+      "origin": "SMS Center",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_tested"
+    },
+    {
+      "id": "sms_sent_and_drafts",
+      "origin": "SMS Center",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_tested"
+    },
+    {
+      "id": "sms_send_and_delete",
+      "origin": "SMS Center",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_tested"
+    },
+    {
+      "id": "sms_multipart_pdu",
+      "origin": "SMS Center",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_tested"
+    },
+    {
+      "id": "sms_security_and_storage",
+      "origin": "SMS Center",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_tested"
+    },
+    {
+      "id": "system_services_startup",
+      "origin": "LuCI Startup",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_verified"
+    },
+    {
+      "id": "system_cron_scheduler",
+      "origin": "LuCI Scheduled Tasks",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "system_logs_diagnostics",
+      "origin": "LuCI System + OEM Diagnose",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "system_time_ntp",
+      "origin": "LuCI System",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_verified"
+    },
+    {
+      "id": "system_leds_buttons",
+      "origin": "LuCI LED Configuration",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "system_access_ssh_https",
+      "origin": "LuCI Administration",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "system_backup_restore",
+      "origin": "LuCI Flash/Backup",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "system_manual_sysupgrade",
+      "origin": "LuCI Flash/Upgrade",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_tested"
+    },
+    {
+      "id": "system_signed_github_ota",
+      "origin": "VeCI OTA",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_tested"
+    },
+    {
+      "id": "system_update_policy",
+      "origin": "VeCI OTA",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "addon_signed_package_manager",
+      "origin": "LuCI Software + OpenWrt APK",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_tested"
+    },
+    {
+      "id": "addon_enable_disable",
+      "origin": "LuCI Services",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "firmware_network_watchdog",
+      "origin": "OEM Net Watchdog",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "firmware_gpio_hardware_watchdog",
+      "origin": "OEM GPIO37 Watchdog",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "firmware_24x7_observability",
+      "origin": "VeCI 24/7 reliability",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "guest_wifi_isolation",
+      "origin": "OEM Guest Wi-Fi",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "not_ported_to_v2"
+    },
+    {
+      "id": "system_ipv6_off_by_default",
+      "origin": "User requirement 2026-11-17",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_verified"
+    },
+    {
+      "id": "system_ipv6_guarded_settings_toggle",
+      "origin": "User requirement 2026-11-17",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_verified"
+    },
+    {
+      "id": "ui_four_group_navigation",
+      "origin": "User requirement 2026-11-17",
+      "physical_uat": "not_run",
+      "required": true,
+      "v2_state": "source_implemented_not_hardware_verified"
+    }
+  ],
+  "schema": "veci.v2.rebuild-contract.v1"
+}

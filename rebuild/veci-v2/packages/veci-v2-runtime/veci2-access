@@ -1,0 +1,61 @@
+#!/bin/sh
+set -e
+set -f
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "${1:-}:${2:-}" in
+  list:*) echo '{"status":{},"setIdle":{"seconds":"String","revision":"String"},"requireHttps":{"revision":"String"}}'; exit 0 ;;
+  call:status|call:setIdle|call:requireHttps) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+. /usr/share/libubox/jshn.sh
+exec 9<"$0"
+flock -n 9 || fail busy
+[ "$(uci -q get uhttpd.main)" = uhttpd ] || fail missing_uhttpd
+[ "$(uci -q get 'dropbear.@dropbear[0]')" = dropbear ] || fail missing_dropbear
+if uci -q get 'dropbear.@dropbear[1]' >/dev/null; then fail multiple_ssh_instances; fi
+for config in dropbear uhttpd; do
+  changes=$(uci -q changes "$config") || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+done
+revision() {
+  hashes=$(sha256sum /etc/config/dropbear /etc/config/uhttpd) || return 1
+  digest=$(printf '%s' "$hashes" | sha256sum) || return 1
+  printf '%s\n' "${digest%% *}"
+}
+version=$(revision) || fail config_unavailable
+if [ "$2" != status ]; then
+  request=$(head -c 513); [ "${#request}" -le 512 ] && json_load "$request" || fail invalid_request
+  json_get_var supplied revision
+  [ "$supplied" = "$version" ] || fail stale_configuration
+  case "$2" in
+    setIdle)
+      json_get_var seconds seconds
+      case "$seconds" in ''|*[!0-9]*|0?*|??????*) fail invalid_timeout ;; esac
+      [ "$seconds" -eq 0 ] || { [ "$seconds" -ge 60 ] && [ "$seconds" -le 86400 ]; } || fail invalid_timeout
+      config=dropbear; assignment="dropbear.@dropbear[0].IdleTimeout=$seconds" ;;
+    requireHttps)
+      [ -n "$(uci -q get uhttpd.main.listen_https)" ] || fail https_unconfigured
+      cert=$(uci -q get uhttpd.main.cert || :)
+      key=$(uci -q get uhttpd.main.key || :)
+      [ -s "${cert:-/etc/uhttpd.crt}" ] && [ -s "${key:-/etc/uhttpd.key}" ] || fail missing_certificate
+      config=uhttpd; assignment=uhttpd.main.redirect_https=1 ;;
+  esac
+  tmp=$(mktemp -d /tmp/veci2-access.XXXXXX) || fail save_failed
+  trap 'rm -rf "$tmp"' EXIT
+  uci -q -t "$tmp" set "$assignment" && uci -q -t "$tmp" commit "$config" || fail save_failed
+  version=$(revision) || fail config_unavailable
+fi
+ssh_opt() { uci -q get "dropbear.@dropbear[0].$1" || :; }
+json_init
+json_add_boolean ok 1
+json_add_string revision "$version"
+json_add_string ssh_port "$(ssh_opt Port)"
+json_add_string ssh_interface "$(ssh_opt Interface)"
+json_add_string ssh_password "$(ssh_opt PasswordAuth)"
+json_add_string root_password "$(ssh_opt RootPasswordAuth)"
+json_add_string idle "$(ssh_opt IdleTimeout)"
+json_add_string listen_https "$(uci -q get uhttpd.main.listen_https || :)"
+json_add_string redirect_https "$(uci -q get uhttpd.main.redirect_https || :)"
+json_dump

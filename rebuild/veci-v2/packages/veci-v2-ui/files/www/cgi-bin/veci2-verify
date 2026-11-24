@@ -1,0 +1,120 @@
+#!/bin/sh
+# Body: 32 hex session characters, 64 hex digest characters, then raw image.
+set -eu
+umask 077
+reply() {
+  printf 'Status: %s\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n\r\n%s\n' "$1" "$2"
+  exit 0
+}
+bad() { reply '400 Bad Request' '{"error":"invalid_request"}'; }
+deny() { reply '403 Forbidden' '{"error":"access_denied"}'; }
+[ "${HTTPS:-}" = on ] || deny
+[ "${REQUEST_METHOD:-}" = POST ] && [ "${CONTENT_TYPE:-}" = application/octet-stream ] || bad
+length=${CONTENT_LENGTH:-}
+case "$length" in ''|*[!0-9]*|0*) bad ;; esac
+operation=verify
+header=96
+case "${QUERY_STRING:-}" in
+  "") ota=false ;;
+  stable) ota=true ;;
+  apply) ota=false; operation=apply; header=160 ;;
+  stable-apply) ota=true; operation=apply; header=160 ;;
+  *) bad ;;
+esac
+[ "${#length}" -le 7 ] && [ "$length" -gt "$header" ] && [ "$length" -le $((7995392 + header)) ] || bad
+[ "$ota" = false ] || [ "$length" -le 576 ] || bad
+session=$(head -c 32)
+case "$session" in ''|*[!0-9a-f]*|00000000000000000000000000000000) deny ;; esac
+[ "${#session}" -eq 32 ] || deny
+authorize() {
+  permitted=$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"ubus\",\"object\":\"veci.v2.firmware\",\"function\":\"$operation\"}" | jsonfilter -e '@.access') || deny
+  [ "$permitted" = true ] || deny
+}
+authorize
+digest=$(head -c 64)
+case "$digest" in ''|*[!0-9a-f]*) bad ;; esac
+[ "${#digest}" -eq 64 ] || bad
+if [ "$operation" = apply ]; then
+  ticket=$(head -c 64)
+  case "$ticket" in ''|*[!0-9a-f]*) bad ;; esac
+  [ "${#ticket}" -eq 64 ] || bad
+fi
+if [ "$ota" = true ]; then
+  IFS= read -r size || bad
+  IFS= read -r tag || bad
+  IFS= read -r asset || bad
+  [ "$length" -eq $((header + 3 + ${#size} + ${#tag} + ${#asset})) ] || bad
+  case "$size" in ''|0*|*[!0-9]*) bad ;; esac
+  [ "${#size}" -le 7 ] && [ "$size" -le 7995392 ] || bad
+  for part in "$tag" "$asset"; do
+    case "$part" in ''|.*|*[!A-Za-z0-9._-]*) bad ;; esac
+  done
+else
+  size=$((length - header))
+fi
+verify=/usr/libexec/veci2-verify-image
+exec 9<"$verify"
+flock -n 9 || reply '409 Conflict' '{"error":"verification_busy"}'
+mode=$(cat /etc/veci2-update-policy 2>/dev/null) || mode=
+allow_install=false
+[ "$mode" != manual ] || allow_install=true
+if [ "$operation" = apply ] && [ "$allow_install" != true ]; then
+  reply '403 Forbidden' '{"error":"installation_locked"}'
+fi
+receipt=/var/run/veci2-upgrade.receipt
+uptime_seconds() { cut -d. -f1 /proc/uptime; }
+ticket_hash() { printf '%s' "$session:$digest:$ota:$1" | sha256sum | cut -d' ' -f1; }
+if [ "$operation" = apply ]; then
+  conflict() { reply '409 Conflict' '{"error":"verification_expired_or_replaced"}'; }
+  [ -f "$receipt" ] && read -r bound issued < "$receipt" || conflict
+  now=$(uptime_seconds)
+  [ "$bound" = "$(ticket_hash "$ticket")" ] && [ "$now" -ge "$issued" ] && [ $((now - issued)) -lt 600 ] || conflict
+  rm -f "$receipt"
+fi
+free=$(df -Pk /tmp | awk 'NR==2 {print $4}')
+[ "$free" -ge $(((size + 1023) / 1024 + 1024)) ] || reply '507 Insufficient Storage' '{"error":"insufficient_tmp_space"}'
+work=$(mktemp -d /tmp/veci2-upload.XXXXXX)
+trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
+if [ "$ota" = true ]; then
+  mkfifo "$work/download"
+  timeout 40 uclient-fetch -q -O - "https://github.com/aicoach-alpha/zbt-we5927-openwrt/releases/download/$tag/$asset" > "$work/download" 2>/dev/null &
+  downloader=$!
+  head -c "$((size + 1))" < "$work/download" > "$work/image"
+  wait "$downloader" || reply '502 Bad Gateway' '{"error":"release_download_failed"}'
+else
+  # A stalled upload must release the verification/policy lock.
+  timeout 90 head -c "$size" > "$work/image" || {
+    case "$?" in
+      124|143) reply '408 Request Timeout' '{"error":"upload_timeout"}' ;;
+      *) reply '500 Internal Server Error' '{"error":"upload_read_failed"}' ;;
+    esac
+  }
+fi
+[ "$(wc -c < "$work/image")" -eq "$size" ] || bad
+if ! "$verify" "$work/image" "$digest" > "$work/result" 2>&1; then
+  reason=$(tail -n 1 "$work/result")
+  case "$reason" in
+    unsupported_board|incompatible_flash_layout|incompatible_target|incompatible_device) reason=incompatible_image ;;
+    missing_anchor|anchor_mismatch) reason=trust_anchor_failed ;;
+    signature_unreadable|invalid_signature) reason=signature_failed ;;
+    checksum_mismatch|image_changed) reason=digest_failed ;;
+    sysupgrade_test_failed) reason=sysupgrade_test_failed ;;
+    *) reason=image_verification_failed ;;
+  esac
+  reply '422 Unprocessable Entity' "{\"error\":\"$reason\"}"
+fi
+if [ "$operation" = apply ]; then
+  authorize
+  now=$(uptime_seconds)
+  [ "$now" -ge "$issued" ] && [ $((now - issued)) -lt 600 ] || conflict
+  # The worker inherits the lock and owns the private image until sysupgrade exits.
+  (sleep 2; /sbin/sysupgrade "$work/image" || logger -t veci2-upgrade 'sysupgrade failed'; rm -rf "$work") </dev/null >/dev/null 2>&1 &
+  trap - EXIT
+  reply '202 Accepted' "{\"accepted\":true,\"sha256\":\"$digest\"}"
+fi
+head -c 32 /dev/urandom > "$work/nonce"
+[ "$(wc -c < "$work/nonce")" -eq 32 ] || reply '503 Service Unavailable' '{"error":"ticket_unavailable"}'
+ticket=$(sha256sum "$work/nonce" | cut -d' ' -f1)
+printf '%s %s\n' "$(ticket_hash "$ticket")" "$(uptime_seconds)" > "$receipt"
+reply '200 OK' "{\"verified\":true,\"install_allowed\":$allow_install,\"sha256\":\"$digest\",\"ticket\":\"$ticket\"}"

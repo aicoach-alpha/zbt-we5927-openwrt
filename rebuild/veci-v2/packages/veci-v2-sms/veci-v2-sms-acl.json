@@ -1,0 +1,18 @@
+{
+  "veci-v2-sms-admin": {
+    "description": "Administrator SMS Center access; messages contain private data",
+    "read": {
+      "ubus": {
+        "veci.sms": ["getConfig", "listMessages", "getSent", "getDrafts"]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.sms": [
+          "setEnabled", "sendMessage", "deleteMessage",
+          "saveDraft", "deleteDraft"
+        ]
+      }
+    }
+  }
+}

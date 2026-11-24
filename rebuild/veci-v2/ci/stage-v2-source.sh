@@ -1,0 +1,113 @@
+#!/bin/sh
+# Stage only source packages in a verified, isolated OpenWrt build tree.
+# No router SSH, no firmware flash, no package installation.
+set -eu
+if [ "$#" -ne 1 ]; then
+  echo 'usage: stage-v2-source.sh <pinned-openwrt-source>' >&2
+  exit 2
+fi
+root="$(CDPATH= cd -- "$1" && pwd -P)"
+here="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)"
+case "$root" in /|/etc|/root|/tmp|/home|/overlay|/rom)
+  echo unsafe_build_root >&2; exit 2 ;; esac
+[ -f "$root/include/toplevel.mk" ] &&
+[ -f "$root/target/linux/ramips/dts/mt7628an_zbtlink_zbt-we5927.dts" ] &&
+[ -f "$root/package/we5927-lte/Makefile" ] &&
+[ -d "$root/.git" ] || {
+  echo missing_custom_board_or_not_build_tree >&2; exit 3
+}
+pin='64900e756efa667774214f9c6b17c113222e01f7'
+[ "$(git -C "$root" rev-parse HEAD)" = "$pin" ] || {
+  echo wrong_openwrt_source_commit >&2; exit 3
+}
+for name in veci-v2-runtime veci-v2-package-manager veci-v2-ui veci-v2-sms veci-v2-ipv6; do
+  src="$here/packages/$name"
+  dst="$root/package/$name"
+  [ -f "$src/Makefile" ] && [ ! -L "$src" ] &&
+    [ ! -L "$dst" ] || { echo "invalid_package:$name" >&2; exit 3; }
+  if [ -e "$dst" ]; then
+    if [ "$name" = veci-v2-sms ]; then
+      cmp -s "$src/Makefile" "$dst/Makefile" &&
+      cmp -s "$src/veci-v2-sms-acl.json" "$dst/veci-v2-sms-acl.json" || {
+        echo "different_existing_sms_package:$name" >&2; exit 3
+      }
+    else
+      diff -qr "$src" "$dst" >/dev/null || {
+        echo "different_existing_package:$name" >&2; exit 3
+      }
+    fi
+  fi
+done
+# The SMS transport source is canonical and reviewed in the old module.
+# Never duplicate its code inside the repository or execute vendor binaries.
+sms_origin="$here/../../source/veci-cellular-we5927/files"
+sms_files='etc/config/veci_sms etc/uci-defaults/97-veci-sms-userdata
+usr/libexec/rpcd/veci.sms usr/libexec/veci-sms-parse
+usr/libexec/veci-sms-delete-one usr/libexec/veci-sms-send-one
+usr/libexec/veci-sms-sent-history usr/libexec/veci-sms-drafts'
+sms_dst="$root/package/veci-v2-sms/files"
+for rel in $sms_files; do
+  [ -f "$sms_origin/$rel" ] && [ ! -L "$sms_origin/$rel" ] &&
+  [ ! -L "$sms_dst/$rel" ] || { echo "invalid_sms_source:$rel" >&2; exit 3; }
+  if [ -e "$sms_dst/$rel" ]; then
+    cmp -s "$sms_origin/$rel" "$sms_dst/$rel" || {
+      echo "different_sms_runtime:$rel" >&2; exit 3
+    }
+  fi
+done
+# Validation succeeded before any modifications.
+for name in veci-v2-runtime veci-v2-package-manager veci-v2-ui veci-v2-sms veci-v2-ipv6; do
+  src="$here/packages/$name"
+  dst="$root/package/$name"
+  if [ ! -d "$dst" ]; then
+    mkdir "$dst"
+    cp -a "$src/." "$dst/"
+  fi
+  if [ "$name" != veci-v2-sms ]; then
+    diff -qr "$src" "$dst" >/dev/null || {
+      echo "staging_corrupt:$name" >&2; exit 4
+    }
+  fi
+done
+mkdir -p "$sms_dst"
+for rel in $sms_files; do
+  if [ ! -e "$sms_dst/$rel" ]; then
+    mkdir -p "$(dirname "$sms_dst/$rel")"
+    cp -p "$sms_origin/$rel" "$sms_dst/$rel"
+  fi
+  cmp -s "$sms_origin/$rel" "$sms_dst/$rel" ||
+    { echo "sms_transport_mismatch:$rel" >&2; exit 4; }
+done
+# The legacy reliability stager owns a /veci/ landing used by previous builds.
+# This exact-board v2 image must ship the v2 landing (/veci2/) instead.
+# Reject unfamiliar overlay content rather than silently replacing it.
+legacy_landing="$here/../../source/veci-default-ui/files/www/index.html"
+v2_landing="$here/packages/veci-v2-ui/files/www/index.html"
+overlay_landing="$root/files/www/index.html"
+[ -f "$legacy_landing" ] && [ -f "$v2_landing" ] &&
+grep -Fq '/veci2/' "$v2_landing" || {
+  echo 'invalid_v2_landing_source' >&2
+  exit 4
+}
+# A standalone v2 stage starts without a root landing; a full firmware stage
+# starts with the reviewed /veci/ landing. A second stage is idempotent.
+[ ! -L "$overlay_landing" ] || {
+  echo 'symlink_landing_overlay_refused' >&2
+  exit 4
+}
+if [ -e "$overlay_landing" ] &&
+   ! cmp -s "$legacy_landing" "$overlay_landing" &&
+   ! cmp -s "$v2_landing" "$overlay_landing"; then
+  echo 'unexpected_landing_overlay_refuse_to_replace' >&2
+  exit 4
+fi
+mkdir -p "$(dirname "$overlay_landing")"
+cp "$v2_landing" "$overlay_landing"
+cmp -s "$v2_landing" "$overlay_landing" || {
+  echo 'v2_landing_overlay_mismatch' >&2
+  exit 4
+}
+echo VECI_V2_ROOT_LANDING=PASS
+echo VECI_V2_SMS_TRANSPORT_SINGLE_SOURCE=PASS
+echo VECI_V2_EXACT_BOARD_PACKAGES_STAGED=PASS
+echo NOT_A_FINISHED_IMAGE_NOT_SIGNED_NOT_FLASHABLE

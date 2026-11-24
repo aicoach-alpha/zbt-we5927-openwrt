@@ -1,0 +1,67 @@
+{
+  "track": "system",
+  "reused_byte_identical_sources": [
+    {
+      "commit": "a66f7ec",
+      "path": "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron",
+      "sha256": "bd2e9f00c06d5f4d70fb5f1046d5d5a722b4191b689b6027a04cdf55f7435659",
+      "reviewed_successor_sha256": "d1706d00734f6da8c8e4027714534959eb84a3d5767fcbe939b4a3ac61457f75",
+      "reviewed_successor_commit": "04e8058",
+      "reviewed_successor_evidence": "Owner cron source acceptance: test_owner_cron_acceptance.py, 2 tests PASS on 2026-11-24. No hardware UAT claim."
+    },
+    {
+      "commit": "a66f7ec",
+      "path": "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron-acl.json",
+      "sha256": "aa76e84bb22b1d9e4077cb18670a67e1ff6a096380826ac74bc1b4005aa1aecc",
+      "reviewed_successor_sha256": "d4e060792c436f88a3c87a6d489fcf710c41eb7b3118e3af6993a8edc7aebbfc",
+      "reviewed_successor_commit": "04e8058",
+      "reviewed_successor_evidence": "Owner cron source acceptance: test_owner_cron_acceptance.py, 2 tests PASS on 2026-11-24. No hardware UAT claim."
+    },
+    {
+      "commit": "a66f7ec",
+      "path": "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron.awk",
+      "sha256": "1ceae7f2f0ef4d4dfeba243bc7a291400a7649a39114676a33da81f41fc04159",
+      "reviewed_successor_sha256": "be4c2710980e11d33dff11a166a8ee7d45a37a712dc746badcc8166a6991b595",
+      "reviewed_successor_commit": "04e8058",
+      "reviewed_successor_evidence": "Owner cron source acceptance: test_owner_cron_acceptance.py, 2 tests PASS on 2026-11-24. No hardware UAT claim."
+    },
+    {
+      "commit": "a66f7ec",
+      "path": "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/cron.js",
+      "sha256": "7bfa1fdb4d0724a7b7d0e3bf653a743b8aca81b81bdbf2469f54ed19610c1838",
+      "reviewed_successor_sha256": "0b6ddc90070bd7ef54e85b84712403b4ab49270dc5ffe5ba99e6cccea25dd074",
+      "reviewed_successor_commit": "04e8058",
+      "reviewed_successor_evidence": "Owner cron source acceptance: test_owner_cron_acceptance.py, 2 tests PASS on 2026-11-24. No hardware UAT claim."
+    },
+    {
+      "commit": "a66f7ec",
+      "path": "scripts/uat/test-cron-host.py",
+      "sha256": "a6e0c7298d5ea6010c62ba3400bfa1b8c9add372dc8423ad5594ec3e046fb356",
+      "reviewed_successor_sha256": "70de1a8fbba7feba835bea4fd346800a75a50bfdb1d68d108d2abc51fcf7db55",
+      "reviewed_successor_commit": "04e8058",
+      "reviewed_successor_evidence": "Owner cron source acceptance: test_owner_cron_acceptance.py, 2 tests PASS on 2026-11-24. No hardware UAT claim."
+    },
+    {
+      "commit": "f438b7d",
+      "path": "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services",
+      "sha256": "39b99178cd07efdc5759b4189765b69b7d3e11fed21ee9394aaee833a0f90db0"
+    },
+    {
+      "commit": "f438b7d",
+      "path": "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services-acl.json",
+      "sha256": "f7152b5a56e12ba5fa6f2ac6cde0c2a3484d5fdf1edb20b3cd1a96cf848af42b"
+    },
+    {
+      "commit": "f438b7d",
+      "path": "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js",
+      "sha256": "c3342292033bd096954e36d38ec11e6ceb1e4be7f1ce10d302e562355887ed2c"
+    },
+    {
+      "commit": "f438b7d",
+      "path": "scripts/uat/test-services-host.py",
+      "sha256": "82520fac1408ca44f028e164a4b2c84034e03ae4987dabae7a08fdfa13263efb"
+    }
+  ],
+  "hardware_uat": "not_run",
+  "full_module_verified": false
+}

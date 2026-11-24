@@ -1,13 +1,12 @@
 #!/bin/sh
+# CX07E RNDIS hotplug is informational. netifd handles DHCP when usb0
+# appears; the procd LTE service is responsible for bounded AT readiness.
+# Do not start competing background jobs / ifup lte on USB enumeration.
+# Some modems emit USB add before serial endpoints are available.
 [ "$ACTION" = add ] || exit 0
 case "$PRODUCT" in
-	5c6/902e/*|05c6/902e/*) ;;
-	*) exit 0 ;;
+    5c6/902e/*|05c6/902e/*) ;;
+    *) exit 0 ;;
 esac
-
-logger -t we5927-lte "CX07E USB modem added ($PRODUCT)"
-(
-	sleep 2
-	/usr/sbin/we5927-lte usb-repair >/dev/null 2>&1 || true
-	ifup lte >/dev/null 2>&1 || true
-) &
+logger -t we5927-lte "CX07E USB add: no automatic DHCP flap; netifd/procd own startup"
+exit 0

@@ -1,0 +1,827 @@
+{
+  "board": "zbtlink,zbt-we5927",
+  "date": "2026-11-24",
+  "owner_decisions": {
+    "ussd": {
+      "status": "FAIL_OWNER_HARDWARE_UAT",
+      "decision": "PERMANENTLY_RETIRED",
+      "must_never_return": true
+    },
+    "sms": {
+      "status": "FAIL_OWNER_GUI_UAT",
+      "required_for_release": true,
+      "hardware_verified": false
+    },
+    "ui": {
+      "status": "REJECTED_OWNER_UAT",
+      "top_level_menus": [
+        "Beranda",
+        "Koneksi",
+        "SMS Center",
+        "Pengaturan"
+      ],
+      "subnavigation": true,
+      "real_traffic_charts": true
+    },
+    "lte_uplink": {
+      "router_http": "PASS",
+      "router_https": "PASS",
+      "router_dns": "PASS",
+      "wired_client_tcp": "PASS"
+    },
+    "wifi_ap": {
+      "status": "NOT_TESTED"
+    },
+    "sim_gpio_mapping": {
+      "status": "UNRESOLVED"
+    },
+    "soak72h": {
+      "status": "NOT_TESTED"
+    }
+  },
+  "ship_gate": {
+    "active_core_modules": 39,
+    "retired_modules": [
+      "lte_ussd"
+    ],
+    "never_restore_ussd": true
+  },
+  "sensitive_identifiers_retained": false,
+  "wifi_repair_20261124": {
+    "signed_rootfs_firstboot_wifi_disabled_confirmed": true,
+    "signed_rootfs_boot_source": "etc/uci-defaults/98-we5927-websafe",
+    "owner_gui_wifi_ap": "DISABLED_CONFIG",
+    "root_cause": "SECURE_FRESH_INSTALL_WITHOUT_ADMIN_WIFI_ACTIVATION_WIZARD",
+    "historical_hardware_risk": "mt76 MCU timeout after wifi up in earlier build",
+    "hardware_phy_status": "UNKNOWN",
+    "current_wifi_repair_execution": "NOT_RUN_DEVICE_NOT_DIRECTLY_ACCESSIBLE",
+    "toolchain": "scripts/router/VeCI-WE5927-Audit-and-Repair-WiFi.ps1",
+    "guarded_backup_rollback_seconds": 75,
+    "test_source": "scripts/tests/test_owner_wifi_router_repair_20261124.py",
+    "next_build_required": [
+      "secure_wifi_onboarding_wizard",
+      "fail_closed_phy_driver_and_hostapd_checks",
+      "no_full_network_reset",
+      "live_beacon_client_DHCP_DNS_TCP_UAT"
+    ],
+    "wifi_owner_physical_acceptance": "PENDING",
+    "owner_readonly_device_snapshot_20261124_033345_utc": {
+      "status": "AUDIT_COMPLETED_THEN_WINDOWS_NATIVE_STDERR_ABORT",
+      "hardware_wifi_repair_applied": false,
+      "board": "zbtlink,zbt-we5927",
+      "kernel": "6.12.112",
+      "uptime_s": 4040,
+      "memory_available_kib": 15164,
+      "overlay_available_kib": 1804,
+      "radio_band": "2g",
+      "radio_disabled_option": "UNSET",
+      "primary_ap_disabled": true,
+      "encryption": "none",
+      "psk_configured": false,
+      "phy0": "PRESENT",
+      "mt7603e": "LOADED",
+      "wireless_ubus_radio_up": true,
+      "wlan_netdev": "NO_INTERFACE_OBSERVED",
+      "hostapd_process": "PRESENT",
+      "mt76_mcu_timeout_current_boot": "NOT_OBSERVED",
+      "lte_public_https_via_usb0": "PASS_HTTP_200",
+      "lan_dhcp": "RUNNING",
+      "firewall_wan_masquerade": "ENABLED",
+      "sms_ubus_object": "REGISTERED",
+      "sms_uci_enabled": false,
+      "root_password_audit": "UNKNOWN_EMPTY_OUTPUT_FROM_OLD_PARSER",
+      "ntp_process": "STOPPED_OR_UNKNOWN",
+      "sim_selector_old_script": "WRONG_UCI_KEY_EMPTY_OUTPUT",
+      "wifi_ap_client_association": "NOT_TESTED",
+      "wifi_repair_status": "NOT_STARTED"
+    },
+    "windows_native_stderr_fix": {
+      "status": "SOURCE_COMMITTED_NOT_HARDWARE_EXECUTED",
+      "cause": "Windows PowerShell 5.1 ErrorActionPreference Stop terminates on native SSH stderr regardless of preceding valid stdout",
+      "correction": "Scoped Continue for native process; capture both streams and ssh exit, require success sentinel, restore preference",
+      "script_sha256": "da29864a84c8d748cab40c48d693cbf09747403e703a626541a5a400e5e5bb0a",
+      "source_commit": "729e6fa1cbaba9b6973a689a77d3a5ad10781442"
+    },
+    "busybox_timeout_fix": {
+      "status": "SOURCE_COMMITTED_NOT_HARDWARE_EXECUTED",
+      "reason": "Standalone timeout command previously missing on OpenWrt; BusyBox binary includes timeout applet string",
+      "correction": "Test busybox --list before invoking BusyBox timeout and fail closed otherwise",
+      "source_commit": "35e158aee4979dc7c70d6d9d683d227a8858075e"
+    },
+    "second_hardware_audit_20261124_034029_utc": {
+      "device_board": "zbtlink,zbt-we5927",
+      "root_password_configured": true,
+      "overlay_kib_free": 1804,
+      "ram_kib_available": 15004,
+      "lte_bound_https": "PASS_HTTP_200",
+      "wireless_primary_ap_disabled": true,
+      "wireless_security": "NONE",
+      "wifi_key_present": false,
+      "phy0": "PRESENT",
+      "mt7603e": "LOADED",
+      "radio_up": true,
+      "wlan_interface_count": 0,
+      "sms_ubus_registered": true,
+      "sms_configuration_enabled": false,
+      "audit_end": "AUDIT_END_OK",
+      "ssh_exit": 127,
+      "wifi_repair_attempted": false,
+      "error": "PowerShell appended carriage-return-only line to remote stdin, shell exit 127"
+    },
+    "corrected_later_source": {
+      "transport": "literal POSIX exit $? before native input trailing CR, preserves error status",
+      "device_wifi_operation": "ubus -S -t 12 call network.wireless up targeting radio0, NOT /sbin/wifi up",
+      "unsafe_old_op": "signed firmware /sbin/wifi up invokes ubus call network reload",
+      "broad_network_reload": "FORBIDDEN",
+      "timeout_dependency": "REMOVED",
+      "rollback": "WIRELESS_UCI_ONLY; kernel deadlock cannot be auto-recovered",
+      "hardware_executed": false,
+      "source_commit": "27976b9c799c065800aac44a9b1ee3e75680cbb4",
+      "new_wrapper_sha256": "a295e8399a9d9b437a449af34fd278abf177b993606c5b756267f67e29774eae"
+    },
+    "third_physical_attempt_20261124_035008_utc": {
+      "source": "owner PowerShell SSH output",
+      "board": "zbtlink,zbt-we5927",
+      "kernel": "6.12.112",
+      "ram_available_kib": 15340,
+      "overlay_available_kib": 1804,
+      "lte_bound_https": "PASS_HTTP_200",
+      "wireless_disabled": true,
+      "wireless_psk_present": false,
+      "backup": "/root/veci-router-uat/wireless-before-20261124T035014Z.uci",
+      "failure": "WIFI_REPAIR_STOP=key_generation_failed; /bin/sh: od: not found",
+      "rollback": "WIFI_UCI_ROLLBACK=PASS",
+      "driver_activation_attempted": false,
+      "wifi_hardware_pass": false,
+      "route_and_modem_intentionally_untouched": true,
+      "correction": "kernel CSPRNG UUIDv4 122bit entropy, 32-char lowercase hex WPA2 secret; tr already confirmed on device",
+      "new_regression": "exact shell keygen branch runs without od/base64/openssl and does not emit secrets"
+    },
+    "fourth_physical_attempt_20261124_035500_utc": {
+      "source": "owner PowerShell SSH output",
+      "firmware": "OpenWrt 25.12.6 kernel 6.12.112",
+      "uptime_seconds": 5315,
+      "ram_available_kib": 15148,
+      "overlay_available_kib": 1824,
+      "lte_https_preflight": "PASS_HTTP_200",
+      "radio0_runtime_up": true,
+      "wlan_kernel_netdev_count": 0,
+      "ap_disabled_before": true,
+      "wpa2_key_generation": "BEYOND_PREVIOUS_ERROR",
+      "wifi_backup": "/root/veci-router-uat/wireless-before-20261124T035505Z.uci",
+      "operation": "ubus -S -t 12 call network.wireless up radio0",
+      "operation_did_not_trigger_broad_network_reload": true,
+      "error": "WIFI_REPAIR_STOP=hostapd_ap_not_enabled_rollback",
+      "uci_rollback": "WIFI_UCI_ROLLBACK=PASS",
+      "ap_bss_verified": false,
+      "post_attempt_live_status": "NOT_OBSERVED",
+      "hypotheses": [
+        "radio0 already up, no UCI reload; ubus up may no-op",
+        "missing primary WLAN netdev",
+        "hostapd startup error",
+        "known MT76 driver instability",
+        "selector parser might not find interface"
+      ],
+      "next": "READ_ONLY per-radio ubus, hostapd and netifd/mt76 log diagnostics, no repeated radio mutation",
+      "wifi_hardware_uat": "FAIL",
+      "no_flash": true
+    },
+    "fifth_owner_readonly_run_20261124_approx_105500_wib": {
+      "source": "owner PowerShell inline SSH output",
+      "network_wireless_radio0_up": true,
+      "hostapd_ubus_objects": [
+        "hostapd",
+        "hostapd-auth"
+      ],
+      "primary_bss_hostapd_object": "NOT_REGISTERED",
+      "kernel_network_interfaces": [
+        "br-lan",
+        "eth0",
+        "eth0.1",
+        "eth0.2",
+        "lo",
+        "usb0"
+      ],
+      "wlan_netdev": "ABSENT",
+      "error_output": "shell quoting corrupted grep alternation; ash tried executing netifd/mt76/timeout/etc as commands",
+      "ubus_publish_errors": "POSSIBLE_EXTRA_NETIFD_COLLISION_FROM_MANGLED_COMMAND_NOT_PROOF_ROUTER_SERVICE_DOWN",
+      "post_rollback_lte_https": "NOT_RELIABLY_CHECKED",
+      "wifi_root_cause": "MISSING_BSS_CONFIRMED; DRIVER_ROOT_CAUSE_UNRESOLVED",
+      "safe_next_step": "read only SHA-pinned triage script via SSH stdin, no inline quoted grep pipes",
+      "triage_source": "scripts/router/veci-live-wifi-readonly-triage.sh",
+      "triage_hw_executed": false
+    },
+    "sixth_owner_download_and_ssh_timeout": {
+      "download_bytes": 4533,
+      "sha256": "e202255199c00ebe5b2d85a8be21c113ff5a86a5c08a281a5327a81e3f518a8a",
+      "status": "TRIAGE_NOT_EXECUTED",
+      "ssh_target": "192.168.1.1:22",
+      "ssh_error": "Connection timed out",
+      "post_rollback_router_state": "UNKNOWN",
+      "wifi_change_from_attempt": false,
+      "next": "Windows Ethernet link IP route gateway ping and TCP 443/22 diagnostics"
+    },
+    "seventh_user_windows_lan_reachability_20261124_1215_wib": {
+      "ethernet": "Up 100 Mbps",
+      "source_address": "192.168.1.223",
+      "destination_router": "192.168.1.1",
+      "route": "onlink 192.168.1.0/24",
+      "ping": "3/3 replies 0 percent loss latency <1 to 1ms",
+      "arp_state": "Probe (transient)",
+      "tcp_443": "PASS",
+      "tcp_22": "PASS",
+      "prior_ssh_timeout": "TRANSIENT_OR_UNRESOLVED_NO_CURRENT_PORT_REACHABILITY_FAILURE",
+      "authenticated_ssh": "NOT_TESTED_IN_THIS_SNAPSHOT",
+      "wifi_radio": "NOT_RETESTED",
+      "next": "run already downloaded SHA256-validated read-only triage via SSH; no WiFi activation"
+    },
+    "eighth_physical_triage_20261124_052248_utc": {
+      "source": "owner authenticated SSH read-only triage output",
+      "status": "TRIAGE_END_OK_AND_SSH_EXIT_0",
+      "uptime_seconds": 10583,
+      "netifd_pid_count": 3,
+      "hostapd_pid_count": 1,
+      "ap_disabled_uci": true,
+      "ap_encryption": "none",
+      "ap_key_present": false,
+      "radio0_up": true,
+      "radio0_pending": false,
+      "radio0_primary_ifname": "none",
+      "radio0_autostart": true,
+      "wifi_kernel_netdev": false,
+      "hostapd_bss_rpc": "missing",
+      "mt7603_firmware_init": "DONE",
+      "mcu_timeout": "NOT_OBSERVED_IN_FILTER",
+      "lte_default_route_usb0": true,
+      "lan_bridge": true,
+      "lte_bound_https": "NOT_VERIFIED",
+      "lte_status": "UNKNOWN_DO_NOT_ASSUME_OFFLINE",
+      "repeated_dhcp_notify_proto_denied": true,
+      "affected_interfaces": [
+        "lte usb0",
+        "wan eth0.2"
+      ],
+      "upstream_possible_related_bugs": [
+        "https://github.com/openwrt/openwrt/issues/18807",
+        "https://github.com/openwrt/openwrt/issues/23266"
+      ],
+      "upstream_disclaimer": "upstream mostly action=0 teardown; owner action=1 DHCP launch; not established same cause",
+      "do_not": "kill or restart netifd, reboot, reload networking, modem reset, wifi reenable, or flash",
+      "next_readonly_diagnostic": "scripts/router/veci-netifd-lte-readonly-20261124.sh",
+      "current_firmware_repaired": false
+    },
+    "ninth_owner_repeat_ssh_timeout_after_verified_download": {
+      "source": "user Windows PowerShell",
+      "file_bytes": 4037,
+      "source_sha256": "0eb716c46f91b446bfecbda357db612c19c390e80b22458d9c14ada7319a2e2f",
+      "target": "192.168.1.1 TCP22",
+      "ssh_error": "Connection timed out",
+      "ssh_exit": 255,
+      "router_diagnostic_executed": false,
+      "router_state_changed": false,
+      "intermittent_history": "prior TCP22/443 reachable, later SSH login succeeded, now timed out again",
+      "next": "Windows-side timed LAN/ICMP/TCP22/TCP443 check, do not retry radio or kill netifd"
+    },
+    "tenth_owner_windows_three_probe_20261124_134526_134536_wib": {
+      "source": "owner PowerShell TCP/ping result",
+      "ethernet": "UP 100 Mbps",
+      "windows_ipv4": "192.168.1.223",
+      "router": "192.168.1.1",
+      "times_local": [
+        "13:45:26",
+        "13:45:31",
+        "13:45:36"
+      ],
+      "ping": [
+        true,
+        true,
+        true
+      ],
+      "tcp_22": [
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "tcp_443": [
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "tcp_reachability": "3/3 snapshots passed",
+      "authenticated_ssh": "NOT_PROVEN_BY_PORT_PROBES",
+      "lte_usb0_egress": "NOT_PROVEN_BY_PORT_PROBES",
+      "next": "single harmless authenticated SSH echo, then already SHA-pinned read-only netifd LTE script",
+      "router_changes": false
+    },
+    "eleventh_owner_ssh_preflight_timeout_again": {
+      "source": "owner PowerShell verification+SSH output",
+      "local_file_sha256_verified": true,
+      "ssh_login_preflight": "TCP_CONNECTION_TIMEOUT",
+      "ssh_script_reevaluation": "TCP_CONNECTION_TIMEOUT",
+      "ssh_audit_exit": 255,
+      "audit_physically_executed": false,
+      "router_mutation": false,
+      "observed_current_port_443": "UNKNOWN_DURING_TIMEOUT",
+      "causal_hypothesis": "assistant-generated prior malformed shell grep caused accidental netifd executable launch, potentially resulting in extra daemons and ubus publish collisions",
+      "confidence": "NOT_PROVEN: process identities and procd ownership not observed yet",
+      "similar_upstream_action1": "https://github.com/openwrt/openwrt/issues/18105",
+      "next_action": "co-temporal Windows-only Ethernet ICMP TCP22 TCP443 samples; no repeats of SSH when TCP22 unavailable",
+      "safety": "do not kill/restart network management, WAN, modem, wifi, or flash"
+    },
+    "twelfth_owner_windows_8_probe_20261124_135631_135657_wib": {
+      "windows_ipv4": "192.168.1.223",
+      "router_ipv4": "192.168.1.1",
+      "timestamps_local": [
+        "13:56:31",
+        "13:56:34",
+        "13:56:38",
+        "13:56:42",
+        "13:56:46",
+        "13:56:49",
+        "13:56:53",
+        "13:56:57"
+      ],
+      "ping": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "tcp_22": [
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "tcp_443": [
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "https_status": [
+        "200",
+        "200",
+        "200",
+        "200",
+        "200",
+        "200",
+        "200",
+        "200"
+      ],
+      "local_lan_web_http": "8_OF_8_PASS",
+      "ssh_authenticated": "NOT_VERIFIED",
+      "lte_cellular_egress": "NOT_TESTED_BY_THIS_RUN",
+      "netifd_process_conflict": "NOT_RESOLVED",
+      "router_mutation": false,
+      "next": "one timed ssh banner check plus verbose client trace in same time window; no radio or modem actions"
+    },
+    "thirteenth_owner_netifd_lte_hw_20261124_070115_utc": {
+      "source": "owner authenticated read-only SSH console",
+      "audit": "TRIAGE_END_OK and AUDIT_SSH_EXIT_0",
+      "uptime_seconds": 16490,
+      "netifd_processes": [
+        {
+          "pid": 1366,
+          "ppid": 1,
+          "state": "S",
+          "exe": "/sbin/netifd",
+          "procd_canonical": "UNVERIFIED"
+        },
+        {
+          "pid": 16862,
+          "ppid": 16854,
+          "state": "S",
+          "exe": "/sbin/netifd",
+          "procd_canonical": "UNVERIFIED"
+        }
+      ],
+      "network_ubus_objects": "PRESENT",
+      "lte_ubus_up": true,
+      "lte_pending": false,
+      "lte_available": true,
+      "lte_proto": "dhcp",
+      "lte_device": "usb0",
+      "usb0_present": true,
+      "usb0_carrier": "1",
+      "usb0_ipv4_assigned": false,
+      "lte_default_route": false,
+      "lan_bridge": true,
+      "udhcpc_count": 1,
+      "notify_proto_permission_denied_count": 12,
+      "http_ipv4_usb0": {
+        "curl_exit": 28,
+        "http_code": "000"
+      },
+      "https_usb0": {
+        "curl_exit": 28,
+        "http_code": "000"
+      },
+      "lte_data_plane": "FAILED_AT_OBSERVATION",
+      "radio_registration": "NOT_TESTED",
+      "root_cause": "UNPROVEN: possible extra netifd, possible protocol setup/teardown race",
+      "openwrt_source_inference": "action 1 proto_shell_run_command denies if protocol state teardown/setup_abort",
+      "next_script": "scripts/router/veci-netifd-ownership-readonly-20261124.sh",
+      "recovery_safety": "NO_KILL_NO_RELOAD_NO_REBOOT_NO_MODEM_RESET_NO_FLASH",
+      "physical_changes": false
+    },
+    "fourteenth_owner_netifd_procd_verified_20261124_070705_utc": {
+      "source": "owner authenticated SHA-pinned read-only procd/ownership audit",
+      "audit": "TRIAGE_END_OK_AND_SSH_EXIT_0",
+      "procd_network_pid": 1366,
+      "canonical": {
+        "pid": 1366,
+        "ppid": 1,
+        "state": "S",
+        "exe": "/sbin/netifd"
+      },
+      "orphan_candidate": {
+        "pid": 16862,
+        "ppid": 16854,
+        "state": "S",
+        "exe": "/sbin/netifd"
+      },
+      "orphan_parent": {
+        "pid": 16854,
+        "name": "ash",
+        "ppid": 1,
+        "state": "S",
+        "exe": "/bin/busybox"
+      },
+      "duplicate_process_confirmed": true,
+      "cause_of_lte_data_failure": "NOT_PROVEN",
+      "current_usb0_ipv4": "ABSENT",
+      "current_usb0_default_route": "ABSENT",
+      "udhcpc_count": 2,
+      "lan_bridge": "PRESENT",
+      "safe_next_plan": "guarded exact-PID SIGTERM targeting only non-procd PID 16862, conditional on revalidation, explicit user --apply",
+      "mitigation_source": "scripts/router/veci-netifd-orphan-guarded-mitigation-20261124.sh",
+      "mitigation_physically_executed": false,
+      "avoid": "killall, kill parent ash, restart canonical netifd, ifup/ifdown LTE, modem reset, network reload, flash"
+    },
+    "fifteenth_owner_guarded_orphan_mitigation_safe_stop": {
+      "source": "owner real physical router SSH output",
+      "script": "scripts/router/veci-netifd-orphan-guarded-mitigation-20261124.sh",
+      "source_commit": "2fb533bd1e0b0bc4c614c9f446935b5959dca176",
+      "source_sha256": "2ee85d917482a8d7b338ad173374be0951279c5bca548424895e994c8e6a2233",
+      "procd_network_pid": 1366,
+      "mitigation_stop": "lte_ipv4_already_assigned_do_not_touch",
+      "ssh_exit": 3,
+      "lte_usb0_ipv4": "ASSIGNED_AT_PRECHECK",
+      "lte_default_route": "UNKNOWN",
+      "lte_egress": "NOT_VERIFIED",
+      "orphan_process_stopped": false,
+      "router_mutation": false,
+      "safety_precheck": "WORKED",
+      "next": "read-only repeat LTE route+direct HTTP+HTTPS and netifd processes from cached sha-pinned script",
+      "do_not": "rerun SIGTERM mitigation, reboot, reload network or flash while IPv4 has returned"
+    },
+    "sixteenth_owner_lte_recurrence_canonical_D_20261124_071729_utc": {
+      "source": "owner completed SHA256-pinned read-only netifd/LTE audit",
+      "audit": "TRIAGE_END_OK_AND_AUDIT_SSH_EXIT_0",
+      "uptime_seconds": 17464,
+      "mem_available_kib": 6780,
+      "mem_available_previous_kib": 19332,
+      "netifd_process_count": 2,
+      "procd_managed_netifd": {
+        "pid": 1366,
+        "ppid": 1,
+        "state": "D",
+        "exe": "/sbin/netifd"
+      },
+      "non_procd_netifd": {
+        "pid": 16862,
+        "ppid": 16854,
+        "state": "S",
+        "exe": "/sbin/netifd"
+      },
+      "lte_ubus": {
+        "up": false,
+        "pending": true,
+        "available": true,
+        "autostart": true,
+        "proto": "dhcp",
+        "device": "usb0"
+      },
+      "usb0": {
+        "present": true,
+        "operstate": "unknown",
+        "carrier": "1",
+        "ipv4": false,
+        "default_route": false
+      },
+      "udhcpc_count": 0,
+      "notify_proto_permission_denied_count": 15,
+      "lte_http": {
+        "curl_exit": 28,
+        "code": "000"
+      },
+      "lte_https": {
+        "curl_exit": 28,
+        "code": "000"
+      },
+      "lan_bridge": "PRESENT",
+      "authenticated_ssh": "PASS",
+      "previous_lte_ipv4_reappearance": "TRANSIENT_NOT_DURABLE",
+      "physical_router_mutation": false,
+      "mitigation_status": "DO_NOT_RUN_PREVIOUS_IMMUTABLE_TERM_SCRIPT_WHILE_CANONICAL_D_LOW_RAM_LTE_PENDING_UDHCPC_ZERO",
+      "guarded_mitigation_source_hardened": "scripts/router/veci-netifd-orphan-guarded-mitigation-20261124.sh",
+      "low_overhead_next_readonly": "scripts/router/veci-netifd-wchan-memory-readonly-20261124.sh",
+      "uart_or_live_wchan_result": "NOT_OBSERVED",
+      "next": "bounded read-only wchan/memory snapshot only, preserve wired LAN; no kill/restart/reload/reboot/flash",
+      "hardware_uat": "FAIL_LTE_WAN_AND_WIFI_AP_NOT_VERIFIED"
+    },
+    "seventeenth_owner_download_timeout_of_wchan_script": {
+      "source": "owner Windows PowerShell",
+      "download_target": "raw.githubusercontent.com for wchan memory diagnostic",
+      "curl_error": "(28) Connection timed out after 5013 milliseconds",
+      "executed_on_router": false,
+      "router_state_changed": false,
+      "diagnosis": "WINDOWS_TO_GITHUB_CONNECTIVITY_FAILURE; do not infer router SSH or modem status",
+      "workaround": "direct Windows-generated, SHA-independent, read-only POSIX script sent through authenticated SSH stdin, exact-board guarded; no Github download",
+      "workaround_source_validation": "sh -n PASS; wrong board abort exit3 PASS on NAS",
+      "physical_workaround_executed": false,
+      "safety": "NO_KILL_NO_RELOAD_NO_WIFI_NO_MODEM_RESET_NO_FLASH"
+    },
+    "eighteenth_owner_lte_ip_route_recovered_20261124_approx_1434_wib": {
+      "source": "owner no-download direct read-only POSIX diagnostic over SSH",
+      "audit": "TRIAGE_END=OK, AUDIT_SSH_EXIT=0",
+      "canonical_netifd": {
+        "pid": 1366,
+        "ppid": 1,
+        "state": "S",
+        "vmrss_kib": 1728
+      },
+      "nonprocd_netifd": {
+        "pid": 16862,
+        "ppid": 16854,
+        "state": "S",
+        "vmrss_kib": 1624
+      },
+      "netifd_kernel_wchan": "NOT_RETURNED",
+      "mem_free_kib": 26056,
+      "mem_available_kib": 18044,
+      "swap_free_kib": 0,
+      "usb0_link": "UP_LOWER_UP",
+      "usb0_ipv4": "192.168.7.120/24",
+      "lte_default_route": "via 192.168.7.1 dev usb0 src 192.168.7.120 metric 5",
+      "udhcpc_pids": [
+        25820,
+        25724
+      ],
+      "lte_bound_http": "NOT_TESTED_IN_THIS_SNAPSHOT",
+      "lte_bound_https": "NOT_TESTED_IN_THIS_SNAPSHOT",
+      "external_internet": "NOT_VERIFIED",
+      "router_mutation": false,
+      "mitigation": "DO_NOT_RUN_WHILE_LTE_IPV4_OR_ROUTE_PRESENT",
+      "source_extra_safety": "recheck IPv4 and default route immediately before any exact PID TERM to avoid race",
+      "next": "one-off read-only bound HTTP/HTTPS over existing LTE usb0, do not download Github or change router"
+    },
+    "nineteenth_owner_lte_ipv4_present_but_external_egress_fails": {
+      "source": "owner no-download read-only authenticated SSH LTE egress test",
+      "triage": "TRIAGE_END=OK,AUDIT_SSH_EXIT=0",
+      "usb0_link": "UP_LOWER_UP",
+      "usb0_ipv4": "192.168.7.120/24",
+      "default_route": "via 192.168.7.1 dev usb0 src 192.168.7.120 metric 5",
+      "http_direct_ip": {
+        "destination": "1.1.1.1:80",
+        "exit_code": 28,
+        "http_code": "000",
+        "failure": "8 second timeout"
+      },
+      "https_hostname": {
+        "destination": "www.cloudflare.com:443",
+        "exit_code": 28,
+        "http_code": "000",
+        "failure": "DNS lookup timed out"
+      },
+      "actual_public_internet": "FAILED_PROBES; modem gateway and numeric-IP TLS not yet tested",
+      "router_changes": false,
+      "netifd_kill": false,
+      "new_risk": "Do not equate assigned modem-side IP and route with LTE internet",
+      "next": "read-only local modem gateway vs public numeric IP TLS, no DNS needed; check resolver without secrets"
+    },
+    "twentieth_owner_gateway_timeout_no_ipv4_output": {
+      "source": "owner no-download physically authenticated router SSH one-off check",
+      "triage": "TRIAGE_END_OK_SSH_EXIT_0",
+      "usb0_ipv4_lines": "NONE_PRINTED",
+      "ip_default_route_lines": "NONE_PRINTED",
+      "usb0_physical_netdev": "UNVERIFIED",
+      "qualcomm_usb_05c6_902e": "UNVERIFIED",
+      "gateway_neighbor_output": "NONE",
+      "gateway_ping_exit": 1,
+      "gateway_http_code": "000",
+      "gateway_http_exit": 28,
+      "public_tls_ip_code": "000",
+      "public_tls_ip_exit": 28,
+      "resolv_conf_nameserver": "NO_NAMESERVER_LINES",
+      "diagnosis": "LTE route/gateway unavailable at snapshot, whether USB modem disappeared or DHCP/IP failed still unknown",
+      "router_mutation": false,
+      "release_gate": "LTE_FAIL_WIFI_NOT_PASSED",
+      "next_readonly_probe": "scripts/router/veci-lte-usb-link-readonly-20261124.sh",
+      "next_probe_physically_executed": false,
+      "safety": "NO_MODEM_RESET_NETWORK_RELOAD_KILL_REBOOT_FLASH"
+    },
+    "twentyfirst_owner_modem_present_public_egress_still_down_scope_recovery_staged": {
+      "source": "owner real physical no-download USB modem/usb0 local read-only check",
+      "triage": "TRIAGE_END=OK,AUDIT_SSH_EXIT=0",
+      "usb0_netdev": "present",
+      "usb0_operstate": "unknown",
+      "usb0_carrier": "1",
+      "qualcomm_vidpid_05c6_902e": "present",
+      "usb0_ipv4": "assigned",
+      "usb0_default_route": "present",
+      "lte_ubus_status": "UNPARSEABLE_EMPTY_OR_TIMEOUT; not proof of up/down",
+      "canonical_netifd": {
+        "pid": 1366,
+        "state": "S"
+      },
+      "extra_netifd": {
+        "pid": 16862,
+        "state": "S"
+      },
+      "udhcpc_pids": [
+        17485,
+        17483
+      ],
+      "mem_available_kib": 15152,
+      "public_internet": "PREVIOUS_HTTP_HTTPS_AND_GATEWAY_TESTS_FAILED; NO_NEW_SUCCESS_PROOF",
+      "proposed_fix_source": "scripts/router/veci-lte-interface-scoped-recovery-20261124.sh",
+      "fix": "ONE per-interface network.interface.lte restart only, no global reload, guarded by procd+LAN+mem",
+      "physical_fix_executed": false,
+      "fix_success": "NOT_YET_VERIFIED",
+      "device_access": "only owner Windows PowerShell to physical router over LAN; NAS on different network",
+      "firmware_release": "NOT_PASSED"
+    },
+    "twentysecond_owner_scoped_lte_restart_rejected": {
+      "source": "owner actual PowerShell->SSH physical router execution",
+      "precheck": "passed and printed ACTION=RESTART_LTE_ONLY",
+      "restart_command": "ubus -S -t 8 call network.interface.lte restart '{}'",
+      "restart_result": "REJECTED",
+      "repair_ssh_exit": 4,
+      "ubus_stdout_stderr": "SUPPRESSED_BY_PREVIOUS_SCRIPT",
+      "root_cause": "UNKNOWN; interface down/teardown maps to error in upstream netifd, or timeout",
+      "physical_lte_data_egress": "STILL_NOT_VERIFIED_WORKING",
+      "lan_status": "COMMAND_RAN_VIA_SSH; no post-restart probe",
+      "new_staged_repair": "scripts/router/veci-lte-scoped-down-up-recovery-20261124.sh",
+      "new_repair_physical_execution": false,
+      "new_repair_contract": "one lte-only down/up, 5s teardown grace, no global network reload or netifd kill, report raw ubus errors",
+      "firmware_acceptance": "FAIL_LTE"
+    },
+    "twentythird_owner_lte_down_up_accepted_no_wan": {
+      "source": "owner physical authenticated SSH console output",
+      "lte_status_before": {
+        "up": false,
+        "pending": true,
+        "available": true,
+        "autostart": true,
+        "proto": "dhcp",
+        "device": "usb0"
+      },
+      "lte_down_exit": 0,
+      "lte_up_exit": 0,
+      "wait_seconds_after_up": 12,
+      "br_lan_ipv4": "192.168.1.1/24",
+      "usb0_addr_command": "NO_OUTPUT_LINES",
+      "default_route_command": "NO_OUTPUT_LINES",
+      "direct_ip_https": {
+        "http_code": "000",
+        "exit": 28
+      },
+      "dns_https": {
+        "http_code": "000",
+        "exit": 28
+      },
+      "repair_end": "OK_ONLY_COMMAND_EXIT_NOT_INTERNET",
+      "repair_ssh_exit": 0,
+      "lte_internet_recovered": false,
+      "root_cause": "NOT_PROVEN; nonprocd extra netifd plausible DHCP state conflict",
+      "staged_exact_pid_rescue": "scripts/router/veci-netifd-orphan-lte-targeted-rescue-20261124.sh",
+      "staged_rescue_physically_executed": false,
+      "recovery_plan": "single exact PID16862 non-procd SIGTERM conditional on identity and no LTE IP, then if needed LTE-only down/up, preserve LAN",
+      "firmware_release_status": "FAIL_NO_LTE_EGRESS"
+    },
+    "twentyfourth_owner_physically_successful_orphan_cleanup_and_lte_recovery": {
+      "evidence_source": "owner original PowerShell pasted full transcript, one authenticated router SSH invocation; one command repeatedly echoed while typing",
+      "precheck": "PRECHECK=VERIFYING",
+      "action": "TERM_ONLY_EXTRA_NETIFD_16862",
+      "orphan_process": "ORPHAN_TERM=ENDED",
+      "lan_preservation": "LAN=STILL_PRESENT",
+      "lte_only_cycle": {
+        "down_exit": 0,
+        "up_exit": 0
+      },
+      "usb0_ipv4": "assigned",
+      "lte_default_route": "present",
+      "direct_ip_https": {
+        "destination": "https://1.1.1.1/ bound to if!usb0",
+        "http_code": 301,
+        "curl_exit": 0
+      },
+      "dns_https": {
+        "destination": "https://www.cloudflare.com/cdn-cgi/trace bound to if!usb0",
+        "http_code": 200,
+        "curl_exit": 0
+      },
+      "rescue_end": "OK",
+      "rescue_ssh_exit": 0,
+      "lte_public_internet": "PASS_AT_SINGLE_PHYSICAL_SNAPSHOT",
+      "single_cause_hypothesis": "extra non-procd netifd interfered; plausible from observed recovery, not conclusive unique root cause",
+      "independent_reboot_recovery": "NOT_VERIFIED",
+      "72h_stability": "NOT_VERIFIED",
+      "physical_wifi_ap": "NOT_VERIFIED_AND_PREVIOUSLY_DISABLED",
+      "production_release": "NOT_APPROVED",
+      "repetition": "DO_NOT_REPEAT_PROCESS_TERMINATION_OR_LTE_RESTART_WHILE_LINK_WORKS",
+      "source_reference_commit": "0ceddadfd5ec6519490e8e704f194b10998922a9",
+      "exact_source_equality": "NOT_ASSERTED_OWNER_PASTED_SHORTER_VARIANT"
+    },
+    "twentyfifth_source_lte_permanent_fix_and_professional_gui_20261124": {
+      "scope": "SOURCE DEVELOPMENT ONLY NOT RUN ON PHYSICAL ROUTER",
+      "hardware_field_basis": "confirmed owner 2026-11-24 one-shot orphan netifd SIGTERM+LTE down/up with 301 and 200 public HTTPS exit 0",
+      "source_file": "source/we5927-lte/files/usr/sbin/we5927-lte",
+      "source_mirror": "files/usr/sbin/we5927-lte",
+      "fixes": [
+        "validate one procd-owned netifd before LTE recovery",
+        "reject duplicate/unowned netifd and report network_manager_anomaly",
+        "suppress automatic modem radio reset/CFUN/SIM switches when manager invalid",
+        "replace generic ifup and ifdown with ubus network.interface.lte up/down only",
+        "keep physical LAN unchanged; no auto kill or arbitrary PID termination",
+        "record root cause and actual hardware recovery evidence for future regressions"
+      ],
+      "gui": {
+        "four_main_menus": [
+          "Beranda",
+          "Koneksi",
+          "SMS Center",
+          "Pengaturan"
+        ],
+        "nested_navigation": true,
+        "desktop_sidebar_and_mobile_responsive": true,
+        "real_lte_rx_tx_chart": true,
+        "real_kernel_memory_chart": true,
+        "live_procd_netifd_owner_rpc": true,
+        "no_vendor_copied_assets_or_external_cdn": true,
+        "on_device_visual_uat": "NOT_TESTED",
+        "hardware_sms_and_wifi_uat": "NOT_TESTED"
+      },
+      "packages": {
+        "we5927-lte_release": 12,
+        "veci-v2-runtime_release": 21,
+        "veci-v2-ui_release": 2
+      },
+      "tests": {
+        "scripts_tests": 419,
+        "scripts_skipped": 5,
+        "scripts_failures": 0,
+        "tests_repo": 38,
+        "tests_repo_failures": 0
+      },
+      "source_completion_gate": {
+        "build_permitted": false,
+        "core_total": 39,
+        "source_verified": 7,
+        "blockers": 70,
+        "blocker_categories": {
+          "missing_implementation_or_test_evidence": 32,
+          "not_source_verified": 32,
+          "source_evidence_missing_or_extra_modules": 1,
+          "source_hash_mismatch": 5
+        },
+        "active_core_contract_corrected": 39,
+        "retired_ussd_protection": "ADDED_RETIRED_CORE_REINTRODUCTION_HARD_FAIL"
+      },
+      "signed_image_available": false,
+      "physical_router_flash_performed": false,
+      "physical_new_firmware_test_performed": false,
+      "next": "legitimately resolve remaining 39-core source evidence, then signed candidate image, sysupgrade -T and hardware UAT",
+      "do_not": "bypass gate or claim release PASS without proof",
+      "historical_branch_divergence_audit": {
+        "baseline_commit": "2bb593a133261de0fc2cd5e78e61f574ea1137d4",
+        "historic_source_completion_gate": "40_of_40_pass_blockers_0_verified_by_replay",
+        "baseline_branch": "development/we2825-all13-integration-20261123",
+        "current_branch": "feat/veci-v2-owner-uat-retire-ussd-pro-ui-20261124",
+        "is_baseline_ancestor_of_current": false,
+        "all_active_39_names_present_in_baseline": true,
+        "retired_feature": "lte_ussd",
+        "baseline_files_missing_in_current": 21,
+        "baseline_files_changed_hash": 31,
+        "actual_current_module_failures_from_this_count": "NOT_ESTABLISHED",
+        "reconciliation_done": false,
+        "root_issue": "divergent_branch_not_merged_and_prior_source_evidence_discarded",
+        "doc": "docs/WE5927-40-TO-39-GIT-BRANCH-DIVERGENCE-20261124.md"
+      }
+    }
+  }
+}

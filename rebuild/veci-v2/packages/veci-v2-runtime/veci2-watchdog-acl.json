@@ -1,0 +1,7 @@
+{
+  "veci-v2-watchdog-observe": {
+    "description": "Read kernel GPIO watchdog status only, no control permissions",
+    "read": {"ubus": {"veci.v2.watchdog": ["status"]}},
+    "write": {"ubus": {}}
+  }
+}

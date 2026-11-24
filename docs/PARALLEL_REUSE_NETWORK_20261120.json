@@ -1,0 +1,22 @@
+{
+  "track": "network",
+  "reused_byte_identical_sources": [
+    {
+      "commit": "2d32ed4",
+      "path": "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra",
+      "sha256": "0c1797aabfd2c7e343e42afe5d96dae74e418bc2d3a637e1b010be264369c273"
+    },
+    {
+      "commit": "2d32ed4",
+      "path": "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/ipv6-ra.js",
+      "sha256": "0b0a010ed70e4f5b430c81b981f1cac8cd9a5865adc3d75f39a3fc8b3a032ac6"
+    },
+    {
+      "commit": "2d32ed4",
+      "path": "scripts/uat/test-ipv6-host.py",
+      "sha256": "843c519daec13a118c42d42a3b284b358897c726d9dbc70433c26f45b584b235"
+    }
+  ],
+  "hardware_uat": "not_run",
+  "full_module_verified": false
+}

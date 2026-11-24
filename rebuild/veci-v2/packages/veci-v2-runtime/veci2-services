@@ -1,0 +1,61 @@
+#!/bin/sh
+# Manage the boot selection independently of a daemon's current runtime state.
+set -e
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+case "${1:-}:${2:-}" in
+  list:*) echo '{"status":{},"save":{"name":"String","expected":"String","enabled":"String"}}'; exit 0 ;;
+  call:status|call:save) ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+. /usr/share/libubox/jshn.sh
+init=/etc/init.d
+rc=/etc/rc.d
+[ -d "$init" ] && [ -d "$rc" ] || fail init_unavailable
+manageable() { case "$1" in cron|sysntpd) return 0 ;; *) return 1 ;; esac; }
+boot_enabled() {
+  local link
+  for link in "$rc"/S[0-9][0-9]"$1"; do
+    [ -L "$link" ] && [ "$(readlink -f "$link")" = "$init/$1" ] && return 0
+  done
+  return 1
+}
+if [ "$2" = save ]; then
+  exec 9<"$0"
+  flock -n 9 || fail busy
+  request=$(head -c 513)
+  [ "${#request}" -le 512 ] || fail invalid_request
+  json_load "$request" || fail invalid_request
+  json_get_var name name
+  json_get_var expected expected
+  json_get_var enabled enabled
+  manageable "$name" || fail protected_service
+  [ -x "$init/$name" ] && [ ! -L "$init/$name" ] || fail init_unavailable
+  case "$expected:$enabled" in 0:0|0:1|1:0|1:1) ;; *) fail invalid_mode ;; esac
+  before=0; if boot_enabled "$name"; then before=1; fi
+  [ "$before" = "$expected" ] || fail stale_selection
+  if [ "$before" != "$enabled" ]; then
+    if [ "$enabled" = 1 ]; then action=enable; else action=disable; fi
+    "$init/$name" "$action" 9<&- >/dev/null 2>&1 || fail change_failed
+    after=0; if boot_enabled "$name"; then after=1; fi
+    [ "$after" = "$enabled" ] || fail change_failed
+  fi
+fi
+json_init
+json_add_boolean ok 1
+json_add_array services
+for script in "$init"/*; do
+  [ -f "$script" ] && [ -x "$script" ] || continue
+  name=${script##*/}
+  case "$name" in *[!a-zA-Z0-9_.-]*) continue ;; esac
+  enabled=0; if boot_enabled "$name"; then enabled=1; fi
+  mutable=0; if manageable "$name" && [ ! -L "$script" ]; then mutable=1; fi
+  json_add_object ''
+  json_add_string name "$name"
+  json_add_boolean enabled "$enabled"
+  json_add_boolean mutable "$mutable"
+  json_close_object
+done
+json_close_array
+json_dump

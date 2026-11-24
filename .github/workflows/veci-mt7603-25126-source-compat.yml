@@ -1,0 +1,57 @@
+name: WE5927 MT7603 OpenWrt 25.12.6 source compatibility
+on:
+  pull_request:
+    paths:
+      - 'source/mt76-patches/**'
+      - 'source/openwrt-zbt-we5927-current.patch'
+      - 'scripts/stage-mt7603-deadlock-fix.sh'
+      - '.github/workflows/veci-mt7603-25126-source-compat.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-compatibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm pinned source tag and driver revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/openwrt-25126"
+          git clone -q --depth=1 --branch v25.12.6 https://github.com/openwrt/openwrt.git "$src"
+          test "$(git -C "$src" rev-parse HEAD)" = "64900e756efa667774214f9c6b17c113222e01f7"
+          grep -Fxq 'PKG_SOURCE_VERSION:=39c960c3ada558b4c2e7915772483d3731573d09' "$src/package/kernel/mt76/Makefile"
+          grep -Fxq 'PKG_RELEASE:=3' "$src/package/kernel/mt76/Makefile"
+          echo 'OPENWRT_25126_MT76_PIN_MATCH=PASS'
+      - name: Verify historical WE5927 board patch on newer stable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/openwrt-25126"
+          git -C "$src" apply --check "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          git -C "$src" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          sh scripts/stage-mt7603-deadlock-fix.sh "$src"
+          test "$(find "$src/package/kernel/mt76/patches" -maxdepth 1 -name '95?-mt7603-*' | wc -l)" -eq 2
+          echo 'BOARD_PATCH_AND_MT7603_STAGE_25126=PASS'
+      - name: Independently verify both patches against pinned mt76
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/mt76"
+          mkdir -p "$src"
+          git -C "$src" init -q
+          git -C "$src" fetch -q --depth=1 https://github.com/openwrt/mt76.git 39c960c3ada558b4c2e7915772483d3731573d09
+          git -C "$src" checkout -q --detach FETCH_HEAD
+          git -C "$src" apply --check "$GITHUB_WORKSPACE/source/mt76-patches/950-mt7603-defer-watchdog-on-channel-failure.patch"
+          git -C "$src" apply "$GITHUB_WORKSPACE/source/mt76-patches/950-mt7603-defer-watchdog-on-channel-failure.patch"
+          git -C "$src" apply --check "$GITHUB_WORKSPACE/source/mt76-patches/951-mt7603-free-beacon-skb-on-error.patch"
+          git -C "$src" apply "$GITHUB_WORKSPACE/source/mt76-patches/951-mt7603-free-beacon-skb-on-error.patch"
+          echo 'MT7603_PATCHES_25126_SOURCE_COMPATIBLE=PASS'
+      - name: Safety notice
+        if: always()
+        run: |
+          echo 'Source compatibility only, NOT a 25.12.6 compile, signed firmware image, hardware UAT or flash permission.'

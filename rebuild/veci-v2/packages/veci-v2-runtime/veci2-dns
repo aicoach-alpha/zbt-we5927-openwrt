@@ -1,0 +1,98 @@
+#!/bin/sh
+# Exact-board DNS upstream preferences, reusing existing dnsmasq.
+# No modem, interface, firewall or radio restarts.
+set -eu
+umask 077
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+valid_ipv4() {
+  case "$1" in ''|*[!0-9.]*|.*|*..*|*.) return 1 ;; esac
+  old_ifs=$IFS
+  IFS=.
+  set -- $1
+  IFS=$old_ifs
+  [ "$#" -eq 4 ] || return 1
+  for x in "$@"; do
+    case "$x" in 0|[1-9]|[1-9][0-9]|[1-9][0-9][0-9]) ;; *) return 1 ;; esac
+    [ "$x" -le 255 ] 2>/dev/null || return 1
+  done
+  [ "$1" -gt 0 ] && [ "$1" -ne 127 ] && [ "$1" -lt 224 ] || return 1
+  return 0
+}
+[ "$#" -ge 1 ] || fail unsupported_method
+case "$1" in
+  list) echo '{"status":{},"set":{"mode":"String","primary":"String","secondary":"String"}}'; exit 0 ;;
+  call) [ "$#" -ge 2 ] || fail unsupported_method; case "$2" in status|set) ;; *) fail unsupported_method ;; esac ;;
+  *) fail unsupported_method ;;
+esac
+[ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+D='dhcp.@dnsmasq[0]'
+[ "$(uci -q get "$D")" = dnsmasq ] || fail no_dnsmasq_configuration
+if [ "$2" = set ]; then
+  data=$(head -c 257)
+  [ "$(printf '%s' "$data" | wc -c)" -le 256 ] || fail invalid_request
+  mode=$(jsonfilter -s "$data" -e '@.mode') || fail invalid_request
+  case "$mode" in AUTO|CUSTOM) ;; *) fail invalid_mode ;; esac
+  primary=$(jsonfilter -s "$data" -e '@.primary' 2>/dev/null || :)
+  secondary=$(jsonfilter -s "$data" -e '@.secondary' 2>/dev/null || :)
+  if [ "$mode" = CUSTOM ]; then
+    valid_ipv4 "$primary" || fail invalid_primary_dns
+    [ -z "$secondary" ] || valid_ipv4 "$secondary" || fail invalid_secondary_dns
+    [ "$primary" != "$secondary" ] || fail duplicate_dns
+  else
+    primary=; secondary=
+  fi
+  exec 9>>/var/lock/veci2-dhcp.lock
+  flock -n 9 || fail busy
+fi
+pending=$(uci -q changes dhcp) || fail config_unavailable
+[ -z "$pending" ] || fail pending_dhcp_changes
+if [ "$2" = set ]; then
+  existing=$(uci -q get "$D.server" || :)
+  policy=$(uci -q get "$D.noresolv" || :)
+  # Preserve conditional forwarding, mixed upstream policies and custom ports.
+  case "$policy" in
+    1) set -- $existing; [ "$#" -ge 1 ] && [ "$#" -le 2 ] || fail unsupported_dns_config
+       for value in "$@"; do valid_ipv4 "$value" || fail unsupported_dns_config; done ;;
+    0|'') [ -z "$existing" ] || fail unsupported_dns_config ;;
+    *) fail unsupported_dns_config ;;
+  esac
+  tmp=$(mktemp -d /tmp/veci2-dns.XXXXXX) || fail save_failed
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 1' HUP INT TERM
+  cp /etc/config/dhcp "$tmp/original" || fail backup_failed
+  # AUTO follows the interface/operator DNS in generated resolv.conf.
+  uci -q -t "$tmp" delete "$D.server" 2>/dev/null || :
+  uci -q -t "$tmp" delete "$D.noresolv" 2>/dev/null || :
+  if [ "$mode" = CUSTOM ]; then
+    uci -q -t "$tmp" set "$D.noresolv=1" || fail save_failed
+    uci -q -t "$tmp" add_list "$D.server=$primary" || fail save_failed
+    if [ -n "$secondary" ]; then
+      uci -q -t "$tmp" add_list "$D.server=$secondary" || fail save_failed
+    fi
+  fi
+  if ! uci -q -t "$tmp" commit dhcp || ! /etc/init.d/dnsmasq restart >/dev/null 2>&1 || ! pidof dnsmasq >/dev/null 2>&1; then
+    cp "$tmp/original" /etc/config/dhcp || fail rollback_failed
+    /etc/init.d/dnsmasq restart >/dev/null 2>&1 || fail rollback_failed
+    pidof dnsmasq >/dev/null || fail rollback_failed
+    fail apply_failed_restored
+  fi
+fi
+noresolv=$(uci -q get "$D.noresolv" || :)
+servers=$(uci -q get "$D.server" || :)
+mode=AUTO
+primary=
+secondary=
+case "$noresolv" in
+  1)
+    count=0
+    for value in $servers; do
+      valid_ipv4 "$value" || fail unsupported_dns_config
+      count=$((count+1))
+      case "$count" in 1) primary=$value ;; 2) secondary=$value ;; *) fail unsupported_dns_config ;; esac
+    done
+    [ "$count" -gt 0 ] || fail unsupported_dns_config
+    mode=CUSTOM ;;
+  ''|0) ;;
+  *) fail unsupported_dns_config ;;
+esac
+printf '{"ok":true,"mode":"%s","primary":"%s","secondary":"%s"}\n' "$mode" "$primary" "$secondary"

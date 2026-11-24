@@ -1,0 +1,19 @@
+{
+  "veci-v2-routes": {
+    "description": "IPv4 routing preferences",
+    "read": {
+      "ubus": {
+        "veci.v2.routes": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.routes": [
+          "save", "remove"
+        ]
+      }
+    }
+  }
+}

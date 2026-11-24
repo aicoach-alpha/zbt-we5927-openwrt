@@ -1,0 +1,10 @@
+$ python3 -m unittest discover -s /home/andre/projects/zbt-we2825-veci-openwrt/worktrees/build-zbt-we2825-oem-veci-20261119/scripts/tests -p test_owner_ussd_acceptance.py -v
+
+test_at_helper_rejects_input_injection_without_opening_modem (test_owner_ussd_acceptance.UssdAcceptance.test_at_helper_rejects_input_injection_without_opening_modem) ... ok
+test_pty_fake_modem_one_shot_timeout_cancel_and_rejects (test_owner_ussd_acceptance.UssdAcceptance.test_pty_fake_modem_one_shot_timeout_cancel_and_rejects) ... ok
+test_rpc_is_scoped_and_fails_closed (test_owner_ussd_acceptance.UssdAcceptance.test_rpc_is_scoped_and_fails_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 2.430s
+
+OK

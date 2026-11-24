@@ -1,0 +1,12 @@
+#!/bin/sh
+# Initialize private SMS storage if absent, never overwrite existing user data.
+set -eu
+umask 077
+for data in /etc/veci-sms-drafts /etc/veci-sms-sent-history; do
+  [ -L "$data" ] && exit 1
+  if [ ! -e "$data" ]; then
+    : > "$data"
+    chmod 600 "$data"
+  fi
+done
+exit 0

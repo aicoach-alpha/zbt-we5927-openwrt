@@ -1,0 +1,99 @@
+#!/bin/sh
+# Stages UCI preferences. NEVER reloads IPv4, modem, radio, firewall or kernel.
+set -eu
+CFG=veci2_ipv6.main
+fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; }
+board_ok() { [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || true)" = zbtlink,zbt-we5927 ]; }
+current() { uci -q get "$CFG.enabled" 2>/dev/null || true; }
+status() {
+	case "$(current)" in 1) desired=true ;; 0) desired=false ;; *) fail configuration_unavailable; return ;; esac
+	runtime=null
+	if [ -r /proc/sys/net/ipv6/conf/all/disable_ipv6 ]; then
+		case "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6)" in
+			0) runtime=true ;; 1) runtime=false ;;
+		esac
+	fi
+	reboot=true
+	[ "$desired" = "$runtime" ] && reboot=false
+	printf '{"ok":true,"enabled":%s,"runtime_enabled":%s,"reboot_required":%s,"ipv6_internet_verified":null,"apply_mode":"manual_reboot_only"}\n' \
+		"$desired" "$runtime" "$reboot"
+}
+save() {
+	[ "$(id -u)" = 0 ] || { fail admin_required; return; }
+	board_ok || { fail board_mismatch; return; }
+	request="$(head -c 257)"
+	[ "$(printf '%s' "$request" | wc -c)" -le 256 ] || { fail invalid_request; return; }
+	want="$(jsonfilter -s "$request" -e '@.enabled' 2>/dev/null || true)"
+	confirm="$(jsonfilter -s "$request" -e '@.confirm' 2>/dev/null || true)"
+	case "$want:$confirm" in
+		true:IPV6_ENABLE) value=1 ;;
+		false:IPV6_DISABLE) value=0 ;;
+		*) fail explicit_confirmation_required; return ;;
+	esac
+	[ "$(uci -q get network.lan 2>/dev/null)" = interface ] &&
+	[ "$(uci -q get dhcp.lan 2>/dev/null)" = dhcp ] ||
+		{ fail network_sections_unavailable; return; }
+	(
+		flock -n -x 9 || { fail change_busy; exit 0; }
+		for cfg in network dhcp veci2_ipv6; do
+			changes="$(uci -q changes "$cfg")" || { fail configuration_unavailable; exit 0; }
+			[ -z "$changes" ] || { fail pending_configuration_changes; exit 0; }
+		done
+		[ "$(current)" != "$value" ] || { status; exit 0; }
+		umask 077
+		tmp="$(mktemp -d /tmp/veci2-ipv6.XXXXXX)" || { fail backup_failed; exit 0; }
+		trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+		mkdir "$tmp/delta" || { fail backup_failed; exit 0; }
+		for cfg in network dhcp veci2_ipv6; do
+			[ -f "/etc/config/$cfg" ] && [ ! -L "/etc/config/$cfg" ] &&
+			cp -p "/etc/config/$cfg" "$tmp/$cfg" ||
+				{ fail backup_failed; exit 0; }
+		done
+		rollback() {
+			for cfg in network dhcp veci2_ipv6; do
+				cp -p "$tmp/$cfg" "/etc/config/$cfg" || :
+			done
+		}
+		# Only persistent UCI changes. New state starts at next user reboot.
+		if [ "$value" = 1 ]; then
+			lanassign=60; delegated=1; ra=server; dhcpv6=server
+			case "$(uci -q get dhcp.lan.veci2_ipv6_profile || :)" in
+				disabled) ra=disabled; dhcpv6=disabled ;;
+				slaac) dhcpv6=disabled ;;
+				mixed|'') ;;
+				*) fail invalid_lan_profile; exit 0 ;;
+			esac
+			uplink_mode=auto; wan6_disabled=0
+		else
+			lanassign=0; delegated=0; ra=disabled; dhcpv6=disabled
+			uplink_mode=0; wan6_disabled=1
+		fi
+		uci -q -t "$tmp/delta" set "network.lan.ip6assign=$lanassign" &&
+		uci -q -t "$tmp/delta" set "network.lan.delegate=$delegated" &&
+		uci -q -t "$tmp/delta" set "dhcp.lan.ra=$ra" &&
+		uci -q -t "$tmp/delta" set "dhcp.lan.dhcpv6=$dhcpv6" &&
+		uci -q -t "$tmp/delta" set dhcp.lan.ndp=disabled || { rollback; fail stage_failed; exit 0; }
+		for uplink in wan lte; do
+			[ "$(uci -q get network.$uplink 2>/dev/null)" = interface ] || continue
+			uci -q -t "$tmp/delta" set "network.$uplink.ipv6=$uplink_mode" ||
+				{ rollback; fail stage_failed; exit 0; }
+		done
+		if [ "$(uci -q get network.wan6 2>/dev/null)" = interface ]; then
+			uci -q -t "$tmp/delta" set "network.wan6.disabled=$wan6_disabled" ||
+				{ rollback; fail stage_failed; exit 0; }
+		fi
+		uci -q -t "$tmp/delta" set "$CFG.enabled=$value" ||
+			{ rollback; fail stage_failed; exit 0; }
+		if ! uci -q -t "$tmp/delta" commit network ||
+		   ! uci -q -t "$tmp/delta" commit dhcp ||
+		   ! uci -q -t "$tmp/delta" commit veci2_ipv6; then
+			rollback; fail commit_failed; exit 0
+		fi
+		printf '{"ok":true,"saved":true,"reboot_required":true,"reboot_started":false,"network_reloaded":false}\n'
+	) 9>/var/lock/veci2-ipv6.lock
+}
+case "$1" in
+	list) printf '{"status":{},"save":{"enabled":"bool","confirm":"str"}}\n' ;;
+	call) case "$2" in status) status ;; save) save ;; *) fail unsupported_method ;; esac ;;
+	*) fail unsupported_request ;;
+esac

@@ -1,0 +1,26 @@
+name: VeCI RNDIS MT7603 evidence monitor safety
+on:
+  pull_request:
+    paths:
+      - 'scripts/veci-link-*.py'
+      - 'scripts/veci_wifi_scan.py'
+      - 'scripts/veci-link-readonly-snapshot.sh'
+      - 'scripts/tests/test_veci_link_monitor.py'
+      - '.github/workflows/veci-link-evidence.yml'
+  workflow_dispatch:
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s scripts/tests -p test_veci_link_monitor.py -v
+      - run: python -m py_compile scripts/veci-link-wired-monitor.py scripts/veci-link-analyze.py scripts/veci_wifi_scan.py
+      - run: sh -n scripts/veci-link-readonly-snapshot.sh
+      - name: Reject disruptive commands in readonly collector
+        run: |
+          ! sed '/^[[:space:]]*#/d' scripts/veci-link-readonly-snapshot.sh | grep -En '(^|[[:space:]])(ifup|ifdown|wifi[[:space:]]+(reload|up|down)|sysupgrade|reboot|uci[[:space:]]+(set|commit)|AT\+CFUN|power-cycle)([[:space:]]|$)'

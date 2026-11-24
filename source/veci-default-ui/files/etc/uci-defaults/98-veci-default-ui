@@ -1,0 +1,5 @@
+#!/bin/sh
+[ -x /usr/sbin/veci-default-ui ] || exit 0
+[ -f /www/veci/index.html ] || exit 0
+/usr/sbin/veci-default-ui enable >/dev/null 2>&1 || true
+exit 0

@@ -1,0 +1,71 @@
+/* VeCI SMS inbox: offline CSS, compatible with style-src 'self'. */
+.sms-message-card {
+	border: 1px solid #dce6ef;
+	border-radius: 12px;
+	padding: 14px 16px;
+	margin: 12px 0;
+	background: #fff;
+	overflow-wrap: anywhere;
+	color: #182638;
+}
+.sms-message-card strong {
+	display: block;
+	font-size: 14px;
+	margin-bottom: 6px;
+}
+.sms-message-card small {
+	display: block;
+	opacity: 0.8;
+	margin-bottom: 10px;
+}
+.sms-message-card p {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	line-height: 1.55;
+}
+.sms-compose-field {
+	display: block;
+	margin: 14px 0;
+	font-weight: 600;
+}
+.sms-compose-field input,
+.sms-compose-field textarea {
+	display: block;
+	width: 100%;
+	margin-top: 6px;
+	padding: 10px;
+	border: 1px solid #aec0d4;
+	border-radius: 8px;
+	font: inherit;
+}
+.sms-compose-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+	flex-wrap: wrap;
+}
+.sms-compose-subtitle {
+	opacity: 0.85;
+}
+#cellular-sms-state {
+	margin: 10px 0;
+	font-weight: 500;
+}
+/* Buttons use display:inline-flex in app.css. Override with author [hidden]. */
+#cellular-sms-compose-open[hidden],
+#cellular-sms-sent-open[hidden],
+#cellular-sms-drafts-open[hidden],
+#cellular-sms-inbox-controls[hidden],
+#cellular-sms-compose[hidden],
+#cellular-sms-drafts-panel[hidden],
+#cellular-sms-sent-panel[hidden] {
+	display: none !important;
+}
+@media (max-width: 640px) {
+	.sms-message-card {
+		padding: 12px;
+	}
+	.sms-compose-actions > * {
+		flex: 1 1 auto;
+	}
+}

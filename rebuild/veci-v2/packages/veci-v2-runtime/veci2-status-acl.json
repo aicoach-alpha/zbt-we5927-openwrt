@@ -1,0 +1,203 @@
+{
+  "veci-v2-backup": {
+    "description": "Export private OpenWrt configuration",
+    "write": {
+      "ubus": {
+        "veci.v2.backup": [
+          "export"
+        ]
+      }
+    }
+  },
+  "veci-v2-dhcp": {
+    "description": "Exact-board user-authorized native VeCI administration",
+    "read": {
+      "ubus": {
+        "veci.v2.dhcp": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.dhcp": [
+          "add",
+          "delete"
+        ]
+      }
+    }
+  },
+  "veci-v2-dns": {
+    "description": "Manage upstream DNS via authenticated local dnsmasq",
+    "read": {
+      "ubus": {
+        "veci.v2.dns": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.dns": [
+          "set"
+        ]
+      }
+    }
+  },
+  "veci-v2-firewall": {
+    "description": "Exact-board user-authorized native VeCI administration",
+    "read": {
+      "ubus": {
+        "veci.v2.firewall": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.firewall": [
+          "addForward",
+          "deleteForward",
+          "setDmz"
+        ]
+      }
+    }
+  },
+  "veci-v2-firmware": {
+    "description": "Verify a firmware upload in RAM",
+    "write": {
+      "ubus": {
+        "veci.v2.firmware": [
+          "verify",
+          "apply"
+        ]
+      }
+    }
+  },
+  "veci-v2-firmware-policy": {
+    "description": "Guard manual firmware installation, fail-closed by default",
+    "read": {
+      "ubus": {
+        "veci.v2.updatepolicy": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.updatepolicy": [
+          "save"
+        ]
+      }
+    }
+  },
+  "veci-v2-lte": {
+    "description": "Read cellular preferences and change automatic SIM failover",
+    "read": {
+      "ubus": {
+        "veci.v2.lte": [
+          "status"
+        ],
+        "veci.v2.simlock": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.lte": [
+          "setFailover",
+          "setApn",
+          "setMonitor"
+        ],
+        "veci.v2.simlock": [
+          "unlock"
+        ]
+      }
+    }
+  },
+  "veci-v2-runtime": {
+    "description": "VeCI v2 read-only exact-board diagnostics",
+    "read": {
+      "ubus": {
+        "session": [
+          "destroy"
+        ],
+        "veci.v2": [
+          "status",
+          "capabilities",
+          "smsProvider",
+          "ethernetPorts",
+          "traffic",
+          "internetCheck",
+          "smsDiagnostics",
+          "networkHealth"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {}
+    }
+  },
+  "veci-v2-sim": {
+    "description": "Exact-board user-authorized native VeCI administration",
+    "read": {
+      "ubus": {
+        "veci.v2.sim": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.sim": [
+          "switchSim"
+        ]
+      }
+    }
+  },
+  "veci-v2-system": {
+    "description": "Exact-board user-authorized native VeCI administration",
+    "read": {
+      "ubus": {
+        "veci.v2.system": [
+          "ntp",
+          "logs",
+          "leds",
+          "observability"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.system": [
+          "setNtp"
+        ]
+      }
+    }
+  },
+  "veci-v2-wifi": {
+    "description": "Primary AP name and visibility",
+    "read": {
+      "ubus": {
+        "veci.v2.wifi": [
+          "status",
+          "info"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.wifi": [
+          "setVisibility",
+          "setSsid",
+          "setAutoChannel",
+          "survey",
+          "setChannel",
+          "setAccess",
+          "setAuth"
+        ]
+      }
+    }
+  }
+}

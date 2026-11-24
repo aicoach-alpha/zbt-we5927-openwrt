@@ -1,0 +1,3 @@
+config ipv6 'main'
+	option enabled '0'
+	option initialized '0'

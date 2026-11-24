@@ -1,0 +1,13 @@
+{
+	"id": "wireguard",
+	"name": "WireGuard",
+	"description": "WireGuard VPN capability",
+	"tier": "S",
+	"packages": [
+		"veci-app-wireguard"
+	],
+	"remove_packages": [
+		"veci-app-wireguard"
+	],
+	"module": "/veci-apps/wireguard.js"
+}

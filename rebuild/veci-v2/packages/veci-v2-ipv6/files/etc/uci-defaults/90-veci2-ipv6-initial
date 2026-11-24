@@ -1,0 +1,26 @@
+#!/bin/sh
+# First-boot provisioning only; preserve an already saved preference.
+set -eu
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null)" = zbtlink,zbt-we5927 ] || exit 1
+[ "$(uci -q get veci2_ipv6.main.initialized 2>/dev/null)" = 1 ] && exit 0
+[ "$(uci -q get veci2_ipv6.main.enabled 2>/dev/null)" = 0 ] || exit 1
+[ "$(uci -q get network.lan 2>/dev/null)" = interface ] || exit 1
+[ "$(uci -q get dhcp.lan 2>/dev/null)" = dhcp ] || exit 1
+uci -q set network.lan.ip6assign=0
+uci -q set network.lan.delegate=0
+for uplink in wan lte; do
+	[ "$(uci -q get network.$uplink 2>/dev/null)" = interface ] ||
+		continue
+	uci -q set "network.$uplink.ipv6=0"
+done
+if [ "$(uci -q get network.wan6 2>/dev/null)" = interface ]; then
+	uci -q set network.wan6.disabled=1
+fi
+uci -q set dhcp.lan.ra=disabled
+uci -q set dhcp.lan.dhcpv6=disabled
+uci -q set dhcp.lan.ndp=disabled
+uci -q commit network
+uci -q commit dhcp
+uci -q set veci2_ipv6.main.initialized=1
+uci -q commit veci2_ipv6
+exit 0

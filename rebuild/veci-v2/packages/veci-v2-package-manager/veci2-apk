@@ -1,0 +1,157 @@
+#!/bin/sh
+# VeCI v2 optional APK package backend. No arbitrary URL, untrusted APK,
+# kernel/driver mutation, or automatic package install.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+LC_ALL=C
+export LC_ALL
+RELEASE=25.12.6
+BOARD=zbtlink,zbt-we5927
+LOCK=/tmp/veci-v2-apk-action.lock
+reject() { printf '{"ok":false,"error":"%s"}\n' "$1"; }
+digits() { case "$1" in ''|*[!0-9]*) printf 0;; *) printf %s "$1";; esac; }
+board_ready() {
+  [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || true)" = "$BOARD" ] &&
+  grep -Fxq "DISTRIB_RELEASE='$RELEASE'" /etc/openwrt_release 2>/dev/null &&
+  command -v apk >/dev/null 2>&1
+}
+read_field() {
+  head -c 256 | jsonfilter -e "@.$1" 2>/dev/null || true
+}
+package_valid() {
+  name="$1"
+  case "$name" in
+    ''|[!A-Za-z0-9]*|*[!A-Za-z0-9+_.-]*|*..*|*/*)
+      return 1 ;;
+    # Hardware-critical, core, LuCI UI and kernel packages need firmware rebuild,
+    # not an unreviewed live update on 8 MB NOR.
+    kernel|kernel-*|kmod-*|base-files|busybox|libc|procd|procd-*|netifd|netifd-*|rpcd|rpcd-*|uhttpd|uhttpd-*|apk-tools|fstools|firewall4|dnsmasq|wpad*|hostapd*|luci|luci-*|veci|veci-*runtime|we5927-lte)
+      return 1 ;;
+  esac
+  [ "$(printf %s "$name" | wc -c | tr -d ' ')" -le 64 ]
+}
+build_id() {
+  id="$(jsonfilter -i /etc/veci-release.json -e '@.build_id' 2>/dev/null || true)"
+  case "$id" in ''|*[!0-9a-f]*) return 1;; esac
+  [ "$(printf %s "$id" | wc -c | tr -d ' ')" -eq 40 ] || return 1
+  printf %s "$id"
+}
+trust_repositories() {
+  [ -d /etc/apk/keys ] || return 1
+  [ -n "$(find /etc/apk/keys -maxdepth 1 -type f -size +0c -print -quit 2>/dev/null)" ] || return 1
+  found=0
+  # Reject ALL unexpected repos; allow only pinned official release and an
+  # independently verified exact-build GitHub VeCI feed.
+  for file in /etc/apk/repositories /etc/apk/repositories.d/*.list; do
+    [ -f "$file" ] || continue
+    [ ! -L "$file" ] || return 1
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in ''|'#'*) continue;; esac
+      case "$line" in
+        https://downloads.openwrt.org/releases/25.12.6/*/packages.adb)
+          found=$((found + 1)) ;;
+        https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/*)
+          id="$(build_id)" || return 1
+          [ "$(uci -q get veci.main.app_feed_verified_build_id 2>/dev/null || true)" = "$id" ] || return 1
+          case "$line" in
+            "https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/feeds/$id/"*/packages.adb)
+              found=$((found + 1)) ;;
+            *) return 1 ;;
+          esac
+          ;;
+        *) return 1 ;;
+      esac
+    done < "$file"
+  done
+  [ "$found" -gt 0 ]
+}
+resources_ok() {
+  overlay="$(df -Pk /overlay 2>/dev/null | awk 'NR==2 {print $4}' || true)"
+  mem="$(awk '/^MemAvailable:/ {print $2;exit}' /proc/meminfo 2>/dev/null || true)"
+  overlay="$(digits "$overlay")"
+  mem="$(digits "$mem")"
+  # 4 MiB minimum free before install; do not exhaust writable overlay.
+  [ "$overlay" -ge 4096 ] && [ "$mem" -ge 16384 ]
+}
+search_packages() {
+  name="$1"
+  package_valid "$name" || { reject invalid_package; return; }
+  board_ready || { reject wrong_board_or_release; return; }
+  trust_repositories || { reject repository_not_trusted; return; }
+  printf '{"ok":true,"matches":['
+  first=1
+  # Output ONLY syntactically valid package name tokens.
+  apk search "$name" 2>/dev/null | head -30 |
+    sed -n 's/^\([A-Za-z0-9][A-Za-z0-9+_.-]*\).*$/\1/p' |
+    while IFS= read -r pkg; do
+      [ "$(printf %s "$pkg" | wc -c | tr -d ' ')" -le 64 ] || continue
+      [ "$first" -eq 1 ] || printf ','
+      printf '"%s"' "$pkg"
+      first=0
+    done
+  printf ']}\n'
+}
+preflight() {
+  name="$1"
+  package_valid "$name" || { reject protected_or_invalid_package; return 1; }
+  board_ready || { reject wrong_board_or_release; return 1; }
+  trust_repositories || { reject repository_not_trusted; return 1; }
+  resources_ok || { reject insufficient_storage_or_ram; return 1; }
+  tmp="$(mktemp /tmp/veci2-apk-preflight.XXXXXX)" || {
+    reject temp_unavailable; return 1
+  }
+  if ! apk --simulate add "$name" > "$tmp" 2>&1; then
+    rm -f "$tmp"
+    reject dependency_or_package_unavailable
+    return 1
+  fi
+  # Never allow replacing/upgrading/removing base packages as an install
+  # side-effect; a full-image upgrade must handle that atomically.
+  if grep -Eiq '(^|[[:space:]])(Upgrading|Replacing|Removing|Purging)[[:space:]]|kmod-' "$tmp"; then
+    rm -f "$tmp"
+    reject live_upgrade_or_removal_forbidden
+    return 1
+  fi
+  rm -f "$tmp"
+  printf '{"ok":true,"package":"%s","manual_confirmation_required":true}\n' "$name"
+}
+install() {
+  name="$1"
+  confirm="$2"
+  package_valid "$name" || { reject protected_or_invalid_package; return; }
+  [ "$confirm" = "INSTALL:$name" ] || { reject confirmation_required; return; }
+  mkdir "$LOCK" 2>/dev/null || { reject package_manager_busy; return; }
+  trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT HUP INT TERM
+  # Re-evaluate board, available space and feed integrity under the lock.
+  preflight "$name" >/dev/null || { reject preflight_failed; return; }
+  if apk -U add "$name" >/tmp/veci2-apk-action.log 2>&1; then
+    printf '{"ok":true,"package":"%s","action":"installed"}\n' "$name"
+  else
+    reject installation_failed
+  fi
+}
+main() {
+  case "${1:-}:${2:-}" in
+    list:*) printf '{"status":{},"search":{"name":"str"},"preflight":{"name":"str"},"install":{"name":"str","confirm":"str"}}\n' ;;
+    call:status)
+      ready=false; trust=false; resources=false
+      board_ready && ready=true
+      trust_repositories && trust=true
+      resources_ok && resources=true
+      printf '{"board_ready":%s,"repositories_trusted":%s,"resources_sufficient":%s,"manager":"apk","automatic_install":false,"minimum_overlay_free_kb":4096}\n' "$ready" "$trust" "$resources"
+      ;;
+    call:search|call:preflight)
+      name="$(read_field name)"
+      case "$2" in search) search_packages "$name";; preflight) preflight "$name";; esac
+      ;;
+    call:install)
+      input="$(head -c 256)"
+      name="$(printf %s "$input" | jsonfilter -e '@.name' 2>/dev/null || true)"
+      confirm="$(printf %s "$input" | jsonfilter -e '@.confirm' 2>/dev/null || true)"
+      install "$name" "$confirm"
+      ;;
+    *) reject unsupported_method; exit 2 ;;
+  esac
+}
+main "$@"

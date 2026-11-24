@@ -1,0 +1,22 @@
+{
+  "track": "security",
+  "reused_byte_identical_sources": [
+    {
+      "commit": "636710d",
+      "path": "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-backup",
+      "sha256": "81834abeaa6f1b872ad8145d03071ffbc29dba03dea0eb96b067dc9e2f9d3cdd"
+    },
+    {
+      "commit": "636710d",
+      "path": "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/backup.js",
+      "sha256": "30edab6432b10c594ebfe8526ca9fc189b239b5e28f33a1883a7a438652f6371"
+    },
+    {
+      "commit": "636710d",
+      "path": "scripts/tests/test_veci_backup_export.py",
+      "sha256": "9fc829da8ab7281ad0a33a48ba0330b88986d736c01933f0f4d17cee99500482"
+    }
+  ],
+  "hardware_uat": "not_run",
+  "full_module_verified": false
+}

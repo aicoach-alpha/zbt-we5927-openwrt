@@ -1,0 +1,37 @@
+{
+  "veci-cellular-we5927": {
+    "description": "VeCI cellular access for the WE5927 LTE manager",
+    "read": {
+      "ubus": {
+        "veci.cellular": [
+          "status",
+          "identity",
+          "identityLive",
+          "messagingCapabilities",
+          "performanceStatus"
+        ],
+        "veci.sms": [
+          "getConfig",
+          "listMessages",
+          "getSent",
+          "getDrafts"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.cellular": [
+          "reconnect",
+          "switchSim"
+        ],
+        "veci.sms": [
+          "setEnabled",
+          "sendMessage",
+          "deleteMessage",
+          "saveDraft",
+          "deleteDraft"
+        ]
+      }
+    }
+  }
+}

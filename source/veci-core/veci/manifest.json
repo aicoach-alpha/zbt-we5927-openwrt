@@ -1,0 +1,17 @@
+{
+	"name": "VeCI",
+	"short_name": "VeCI",
+	"description": "Vendor-style Easy Configuration Interface for OpenWrt",
+	"start_url": "/veci/",
+	"display": "standalone",
+	"background_color": "#f2f7fb",
+	"theme_color": "#071421",
+	"icons": [
+		{
+			"src": "icons/veci.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any maskable"
+		}
+	]
+}

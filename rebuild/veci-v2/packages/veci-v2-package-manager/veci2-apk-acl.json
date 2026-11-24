@@ -1,0 +1,11 @@
+{
+  "veci-v2-packages": {
+    "description": "VeCI v2 signed APK addon provider; explicit install",
+    "read": {
+      "ubus": { "veci.v2.pkg": ["status", "search", "preflight"] }
+    },
+    "write": {
+      "ubus": { "veci.v2.pkg": ["install"] }
+    }
+  }
+}
