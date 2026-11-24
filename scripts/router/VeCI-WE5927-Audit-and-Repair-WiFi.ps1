@@ -14,7 +14,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Router = '192.168.1.1'
 $ExpectedHostKey = 'SHA256:vTuQFuvd+br7jrfmqqNDN2FZxLtNNRYvOo3bDQ2Zlic'
-$GitHubRaw = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/27976b9c799c065800aac44a9b1ee3e75680cbb4/scripts/router'
+$GitHubRaw = 'https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/41d14321e6bb1573f3d10ae376c1b3b05da0292f/scripts/router'
 $Scripts = @(
     @{
       Name='veci-live-router-audit.sh';
@@ -22,7 +22,7 @@ $Scripts = @(
     },
     @{
       Name='veci-live-wifi-guarded-repair.sh';
-      Sha256='d6d1f48e755c704e51a5bfeac0451ef24ae521ca66fd4f9054d1273d8be4df12'
+      Sha256='b6d7b8d302693766b3cc1c983951fe0e0f3fa0303a7ea4446641b8ea238ffb45'
     }
 )
 $TimeTag = Get-Date -Format 'yyyyMMdd-HHmmss'
