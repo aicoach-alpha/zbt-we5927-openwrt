@@ -269,6 +269,18 @@
       "do_not": "kill or restart netifd, reboot, reload networking, modem reset, wifi reenable, or flash",
       "next_readonly_diagnostic": "scripts/router/veci-netifd-lte-readonly-20261124.sh",
       "current_firmware_repaired": false
+    },
+    "ninth_owner_repeat_ssh_timeout_after_verified_download": {
+      "source": "user Windows PowerShell",
+      "file_bytes": 4037,
+      "source_sha256": "0eb716c46f91b446bfecbda357db612c19c390e80b22458d9c14ada7319a2e2f",
+      "target": "192.168.1.1 TCP22",
+      "ssh_error": "Connection timed out",
+      "ssh_exit": 255,
+      "router_diagnostic_executed": false,
+      "router_state_changed": false,
+      "intermittent_history": "prior TCP22/443 reachable, later SSH login succeeded, now timed out again",
+      "next": "Windows-side timed LAN/ICMP/TCP22/TCP443 check, do not retry radio or kill netifd"
     }
   }
 }
