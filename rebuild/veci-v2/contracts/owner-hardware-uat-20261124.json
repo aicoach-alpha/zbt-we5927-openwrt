@@ -542,6 +542,18 @@
       "uart_or_live_wchan_result": "NOT_OBSERVED",
       "next": "bounded read-only wchan/memory snapshot only, preserve wired LAN; no kill/restart/reload/reboot/flash",
       "hardware_uat": "FAIL_LTE_WAN_AND_WIFI_AP_NOT_VERIFIED"
+    },
+    "seventeenth_owner_download_timeout_of_wchan_script": {
+      "source": "owner Windows PowerShell",
+      "download_target": "raw.githubusercontent.com for wchan memory diagnostic",
+      "curl_error": "(28) Connection timed out after 5013 milliseconds",
+      "executed_on_router": false,
+      "router_state_changed": false,
+      "diagnosis": "WINDOWS_TO_GITHUB_CONNECTIVITY_FAILURE; do not infer router SSH or modem status",
+      "workaround": "direct Windows-generated, SHA-independent, read-only POSIX script sent through authenticated SSH stdin, exact-board guarded; no Github download",
+      "workaround_source_validation": "sh -n PASS; wrong board abort exit3 PASS on NAS",
+      "physical_workaround_executed": false,
+      "safety": "NO_KILL_NO_RELOAD_NO_WIFI_NO_MODEM_RESET_NO_FLASH"
     }
   }
 }
