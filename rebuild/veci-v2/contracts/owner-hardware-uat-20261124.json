@@ -64,6 +64,49 @@
       "no_full_network_reset",
       "live_beacon_client_DHCP_DNS_TCP_UAT"
     ],
-    "wifi_owner_physical_acceptance": "PENDING"
+    "wifi_owner_physical_acceptance": "PENDING",
+    "owner_readonly_device_snapshot_20261124_033345_utc": {
+      "status": "AUDIT_COMPLETED_THEN_WINDOWS_NATIVE_STDERR_ABORT",
+      "hardware_wifi_repair_applied": false,
+      "board": "zbtlink,zbt-we5927",
+      "kernel": "6.12.112",
+      "uptime_s": 4040,
+      "memory_available_kib": 15164,
+      "overlay_available_kib": 1804,
+      "radio_band": "2g",
+      "radio_disabled_option": "UNSET",
+      "primary_ap_disabled": true,
+      "encryption": "none",
+      "psk_configured": false,
+      "phy0": "PRESENT",
+      "mt7603e": "LOADED",
+      "wireless_ubus_radio_up": true,
+      "wlan_netdev": "NO_INTERFACE_OBSERVED",
+      "hostapd_process": "PRESENT",
+      "mt76_mcu_timeout_current_boot": "NOT_OBSERVED",
+      "lte_public_https_via_usb0": "PASS_HTTP_200",
+      "lan_dhcp": "RUNNING",
+      "firewall_wan_masquerade": "ENABLED",
+      "sms_ubus_object": "REGISTERED",
+      "sms_uci_enabled": false,
+      "root_password_audit": "UNKNOWN_EMPTY_OUTPUT_FROM_OLD_PARSER",
+      "ntp_process": "STOPPED_OR_UNKNOWN",
+      "sim_selector_old_script": "WRONG_UCI_KEY_EMPTY_OUTPUT",
+      "wifi_ap_client_association": "NOT_TESTED",
+      "wifi_repair_status": "NOT_STARTED"
+    },
+    "windows_native_stderr_fix": {
+      "status": "SOURCE_COMMITTED_NOT_HARDWARE_EXECUTED",
+      "cause": "Windows PowerShell 5.1 ErrorActionPreference Stop terminates on native SSH stderr regardless of preceding valid stdout",
+      "correction": "Scoped Continue for native process; capture both streams and ssh exit, require success sentinel, restore preference",
+      "script_sha256": "da29864a84c8d748cab40c48d693cbf09747403e703a626541a5a400e5e5bb0a",
+      "source_commit": "729e6fa1cbaba9b6973a689a77d3a5ad10781442"
+    },
+    "busybox_timeout_fix": {
+      "status": "SOURCE_COMMITTED_NOT_HARDWARE_EXECUTED",
+      "reason": "Standalone timeout command previously missing on OpenWrt; BusyBox binary includes timeout applet string",
+      "correction": "Test busybox --list before invoking BusyBox timeout and fail closed otherwise",
+      "source_commit": "35e158aee4979dc7c70d6d9d683d227a8858075e"
+    }
   }
 }
