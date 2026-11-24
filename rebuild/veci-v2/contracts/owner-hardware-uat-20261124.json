@@ -679,6 +679,39 @@
       "new_repair_physical_execution": false,
       "new_repair_contract": "one lte-only down/up, 5s teardown grace, no global network reload or netifd kill, report raw ubus errors",
       "firmware_acceptance": "FAIL_LTE"
+    },
+    "twentythird_owner_lte_down_up_accepted_no_wan": {
+      "source": "owner physical authenticated SSH console output",
+      "lte_status_before": {
+        "up": false,
+        "pending": true,
+        "available": true,
+        "autostart": true,
+        "proto": "dhcp",
+        "device": "usb0"
+      },
+      "lte_down_exit": 0,
+      "lte_up_exit": 0,
+      "wait_seconds_after_up": 12,
+      "br_lan_ipv4": "192.168.1.1/24",
+      "usb0_addr_command": "NO_OUTPUT_LINES",
+      "default_route_command": "NO_OUTPUT_LINES",
+      "direct_ip_https": {
+        "http_code": "000",
+        "exit": 28
+      },
+      "dns_https": {
+        "http_code": "000",
+        "exit": 28
+      },
+      "repair_end": "OK_ONLY_COMMAND_EXIT_NOT_INTERNET",
+      "repair_ssh_exit": 0,
+      "lte_internet_recovered": false,
+      "root_cause": "NOT_PROVEN; nonprocd extra netifd plausible DHCP state conflict",
+      "staged_exact_pid_rescue": "scripts/router/veci-netifd-orphan-lte-targeted-rescue-20261124.sh",
+      "staged_rescue_physically_executed": false,
+      "recovery_plan": "single exact PID16862 non-procd SIGTERM conditional on identity and no LTE IP, then if needed LTE-only down/up, preserve LAN",
+      "firmware_release_status": "FAIL_NO_LTE_EGRESS"
     }
   }
 }
