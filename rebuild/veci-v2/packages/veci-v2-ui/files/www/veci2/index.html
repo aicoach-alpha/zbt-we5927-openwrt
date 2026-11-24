@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json https://speed.cloudflare.com; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'">
-  <title>VeCI v2 — WE5927-DSIM Engineering Preview</title>
+  <title>VeCI v2 — Pusat Kendali Router</title>
   <link rel="stylesheet" href="/veci2/app.css">
   <script src="/veci2/sms-codec.js" defer></script>
   <script src="/veci2/sms-center.js" defer></script>
@@ -14,7 +14,6 @@
   <script src="/veci2/dns-settings.js" defer></script>
   <script src="/veci2/owner-controls.js" defer></script>
   <script src="/veci2/app.js" defer></script>
-  <script src="/veci2/ussd.js" defer></script>
   <script src="/veci2/sim-lock.js" defer></script>
   <script src="/veci2/monitor-settings.js" defer></script>
   <script src="/veci2/addon-profiles.js" defer></script>
@@ -33,7 +32,7 @@
 <body>
   <div class="layout">
     <header class="header">
-      <div class="brand"><span class="mark">V</span><div><strong>VeCI <span>v2</span></strong><small>WE5927-DSIM · engineering preview</small></div></div>
+      <div class="brand"><span class="mark">V</span><div><strong>VeCI <span>v2</span></strong><small>WE5927-DSIM · Router Management</small></div></div>
       <button id="logout" class="quiet" type="button" hidden>Keluar</button>
     </header>
     <main>
@@ -53,7 +52,7 @@
           <p>Akun <strong id="session-account"></strong></p>
           <p id="session-permissions"></p>
         </details>
-        <div class="intro"><div><h1>Router health</h1><p>Berbasis kondisi sistem yang terbaca, bukan perkiraan atau indikator cache.</p></div><button id="refresh" type="button">Perbarui</button></div>
+        <div class="intro"><div><h1>Dashboard router</h1><p>Pantau jaringan, Wi-Fi, dan perangkat Anda dalam satu tempat.</p></div><button id="refresh" type="button">Perbarui</button></div>
         <nav class="tabs" aria-label="Menu utama VeCI">
           <button class="tab active" type="button" data-page="overview">Beranda</button>
           <button class="tab" type="button" data-page="network">Koneksi</button>
@@ -61,19 +60,29 @@
           <button class="tab" type="button" data-page="settings">Pengaturan</button>
         </nav>
         <section id="overview" class="page" aria-label="Status koneksi">
+          <div class="connection-hero">
+            <div><span class="eyebrow">JARINGAN SELULER</span><h2>Koneksi internet dan perangkat</h2>
+              <p>Memisahkan status modem, koneksi router, dan akses internet klien.</p></div>
+            <div class="verification-status"><span id="internet-indicator" class="indicator">Belum diperiksa</span><small id="internet-detail">Pengujian HTTPS aktual melalui usb0</small></div>
+          </div>
           <div id="status-grid" class="grid"></div>
+          <section class="traffic-panel" aria-label="Grafik trafik jaringan">
+            <div class="traffic-head"><div><span class="eyebrow">STATISTIK LANGSUNG</span><h2>Trafik LTE</h2><p>Grafik berdasarkan byte RX/TX yang benar-benar dihitung oleh kernel OpenWrt.</p></div><div class="traffic-legend"><span>● Unduh</span><span>● Unggah</span></div></div>
+            <canvas id="traffic-chart" height="200" width="980" role="img" aria-label="Grafik lalu lintas download dan upload LTE"></canvas>
+            <div class="traffic-values"><span id="traffic-rx">Unduh: belum ada sampel</span><span id="traffic-tx">Unggah: belum ada sampel</span></div>
+            <p id="traffic-note" class="notice">Nilai awal membutuhkan dua sampel; grafik tidak mengarang kecepatan operator.</p>
+          </section>
           <p class="notice">Status internet yang belum diuji ditampilkan sebagai belum terverifikasi, bukan dipaksa menjadi offline. Beacon Wi-Fi tidak dianggap hidup hanya karena radio up.</p>
         </section>
         <section id="network" class="page" aria-label="Koneksi dan perangkat" hidden>
-          <article class="panel">
-            <details><summary>USSD operator</summary>
-              <button id="ussd-check" type="button">Periksa dukungan modem</button>
-              <form id="ussd-form" hidden autocomplete="off"><label>Kode operator <input id="ussd-code" maxlength="32" required autocomplete="off"></label><button>Kirim sekali</button></form>
-              <button type="button" id="ussd-cancel" hidden>Akhiri sesi USSD</button>
-              <p id="ussd-status" role="status"></p>
-            </details>
-          </article>
-          <article class="panel">
+          <nav class="subnav" aria-label="Submenu koneksi" data-scope="network">
+            <button type="button" class="subtab active" data-group="overview">Ringkasan koneksi</button>
+            <button type="button" class="subtab" data-group="sim">LTE &amp; SIM</button>
+            <button type="button" class="subtab" data-group="wifi">Wi-Fi</button>
+            <button type="button" class="subtab" data-group="lan">LAN &amp; DHCP</button>
+            <button type="button" class="subtab" data-group="lte">Pemantauan LTE</button>
+          </nav>
+<article class="panel" data-group="sim">
             <details><summary>PIN dan PUK SIM</summary>
               <button type="button" id="sim-lock-read">Baca status kunci</button>
               <p id="sim-lock-status" role="status"></p>
@@ -85,7 +94,7 @@
               </form>
             </details>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="lte">
             <h2>Monitor LTE</h2>
             <p>Interval pemeriksaan koneksi modem yang sudah ada; tidak menjalankan ulang daemon.</p>
             <button type="button" id="monitor-read">Baca interval</button>
@@ -94,13 +103,13 @@
             <button id="monitor-save" type="button" disabled>Simpan interval</button>
             <p id="monitor-result" role="status"></p>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="wifi">
             <h2>Guest Wi-Fi — Isolasi</h2>
             <button id="guest-status-read" type="button">Periksa konfigurasi guest</button>
             <p id="guest-status-result" role="status"></p>
             <p class="notice">Audit konfigurasi saja; belum menjadi bukti isolasi runtime.</p>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="wifi">
             <details id="wifi-extra"><summary>Klien, keamanan dan kanal Wi-Fi</summary>
               <fieldset id="wifi-controls" disabled>
                 <button type="button" id="stations-refresh">Perbarui klien</button><p id="station-list"></p>
@@ -114,7 +123,7 @@
               <p id="wifi-extra-status" role="status"></p>
             </details>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="sim">
             <details>
               <summary><strong>Dual-SIM — Ganti kartu secara manual</strong></summary>
               <p>Perpindahan SIM merestart modem LTE dan dapat memutus internet beberapa menit. Nonaktifkan auto-failover terlebih dahulu. Tidak berjalan otomatis.</p>
@@ -125,7 +134,7 @@
               </form>
             </details>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="lan">
             <details>
               <summary><strong>DHCP — Reservasi IP statis</strong></summary>
               <p>Pasangkan alamat MAC perangkat dengan IP lokal. DNS/DHCP direstart sebentar; LTE dan Wi-Fi tidak direstart.</p>
@@ -140,7 +149,7 @@
               <p id="owner-lease-status" class="result" role="status"></p>
             </details>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="overview">
             <h2>Koneksi</h2>
             <p>Satu tempat untuk LTE dua SIM, Wi-Fi, LAN/WAN, DHCP dan perangkat. Fitur detail mengikuti modul yang benar-benar tersedia.</p>
             <div id="network-status" class="grid" aria-live="polite"></div>
@@ -192,14 +201,20 @@
           </article>
         </section>
         <section id="settings" class="page" aria-label="Pengaturan router" hidden>
-          <article class="panel">
+          <nav class="subnav" aria-label="Submenu pengaturan" data-scope="settings">
+            <button type="button" class="subtab active" data-group="system">Sistem &amp; cadangan</button>
+            <button type="button" class="subtab" data-group="network">DNS &amp; jaringan</button>
+            <button type="button" class="subtab" data-group="security">Akses &amp; keamanan</button>
+            <button type="button" class="subtab" data-group="firmware">Firmware &amp; addon</button>
+          </nav>
+          <article class="panel" data-group="firmware">
             <h2>Addon yang terpasang</h2>
             <button type="button" id="addon-profiles-read">Periksa profil addon</button>
             <ul id="addon-profiles-list"></ul>
             <p class="notice">Pilihan WireGuard hanya mengatur startup berikutnya, tidak menghubungkan VPN saat ini.</p>
             <p id="addon-profiles-status" role="status"></p>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="firmware">
             <h2>Kebijakan instalasi firmware</h2>
             <button id="update-policy-read" type="button">Baca kebijakan</button>
             <select id="update-policy-mode" disabled>
@@ -209,29 +224,29 @@
             <button id="update-policy-save" type="button" disabled>Simpan kebijakan</button>
             <p id="update-policy-status" role="status"></p>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="system">
             <h2>Hardware Watchdog GPIO37</h2>
             <button type="button" id="watchdog-read">Baca watchdog kernel</button>
             <p id="watchdog-result" role="status"></p>
             <p class="notice">Hanya memeriksa registrasi driver; tidak memicu watchdog atau restart router.</p>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="system">
             <button type="button" id="backup-export">Unduh cadangan konfigurasi</button>
             <p>Arsip dapat memuat kata sandi dan kunci privat. Simpan di tempat aman.</p><p id="backup-message" role="status"></p>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="system">
             <h2>Layanan saat startup</h2>
             <button id="startup-read" type="button">Baca layanan</button>
             <p id="startup-status" role="status"></p>
             <ul id="startup-services"></ul>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="system">
             <h3>Jadwal cron</h3>
             <button type="button" id="cron-read">Baca jadwal</button>
             <form id="cron-form"><fieldset id="cron-fields" disabled><label>Tugas<select id="cron-job"></select></label><label>Menit, jam, tanggal, bulan, hari<input id="cron-schedule" required maxlength="100"></label><label><input type="checkbox" id="cron-enabled"> Aktif</label><button id="cron-save">Simpan perubahan</button><button type="button" id="cron-remove">Hapus tugas terpilih</button><label>Tugas baru<select id="cron-task"><option value="uptime">Catat uptime</option><option value="memory">Catat penggunaan memori</option></select></label><button type="button" id="cron-add">Tambah dengan jadwal di atas</button></fieldset></form>
             <p role="status" id="cron-status"></p>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="network">
             <details><summary>Router Advertisement dan DHCPv6 LAN</summary>
               <button type="button" id="ra-read">Baca profil LAN</button>
               <label>Profil layanan IPv6 LAN <select id="ra-profile" disabled>
@@ -242,7 +257,7 @@
               <p id="ra-message" role="status"></p>
             </details>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="security">
             <h2>Akses SSH dan HTTPS</h2>
             <button id="access-read" type="button">Baca konfigurasi akses</button>
             <p id="access-status" role="status"></p>
@@ -253,7 +268,7 @@
               <button id="access-https" type="button">Aktifkan pengalihan HTTPS</button>
             </fieldset>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="security">
             <details>
               <summary><strong>Firewall — Port Forward &amp; DMZ</strong></summary>
               <p>Aturan port forwarding ke perangkat LAN. Router tetap menolak koneksi masuk WAN secara default; DMZ mengekspos banyak port dan dinonaktifkan jika tidak diperlukan.</p>
@@ -275,7 +290,7 @@
               <p id="owner-firewall-status" class="result" role="status" aria-live="polite"></p>
             </details>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="system">
             <details>
               <summary><strong>Sistem — NTP, LED &amp; Logs</strong></summary>
               <p>Sinkronisasi waktu dan kondisi perangkat. Perubahan NTP tidak me-restart Wi-Fi atau LTE.</p>
@@ -290,7 +305,7 @@
               <details><summary>Log terakhir (admin)</summary><pre id="owner-system-log" class="owner-log"></pre></details>
             </details>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="network">
             <h2>DNS Settings</h2>
             <p>Atur DNS upstream yang digunakan dnsmasq untuk perangkat LAN. Mode otomatis mengikuti DNS operator; mode manual memakai DNS IPv4 pilihan. Tidak mengubah modem atau APN.</p>
             <form id="dns-form">
@@ -307,7 +322,7 @@
             <p class="notice">Penerapan me-restart dnsmasq sebentar; tidak me-restart modem, Wi-Fi, atau firewall. Jika restart gagal, konfigurasi DHCP sebelumnya dipulihkan.</p>
             <p id="dns-status" class="result" role="status" aria-live="polite">Memuat pengaturan DNS…</p>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="network">
             <h2>Speed Test Lite</h2>
             <p>Ukur kecepatan koneksi melalui browser ke server Cloudflare. Ini mengukur jalur perangkat penguji, bukan kemampuan maksimum CPU router. Hanya gunakan saat browser benar-benar tersambung melalui router LTE ini.</p>
             <button id="speedtest-run" type="button">Jalankan Speed Test</button>
@@ -316,7 +331,7 @@
             <div id="speedtest-result" class="result" aria-live="polite">Belum diuji.</div>
             <div id="speedtest-history" class="result" aria-live="polite"></div>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="network">
             <h2>IPv6</h2>
             <p>Default <strong>Off</strong> untuk WE5927-DSIM. IPv4, LTE dan koneksi LAN tetap dipertahankan. Aktifkan IPv6 hanya jika diperlukan.</p>
             <div id="ipv6-status" class="result" role="status" aria-live="polite">Memuat status IPv6...</div>
@@ -327,7 +342,7 @@
             <button id="ipv6-save" type="button" disabled>Simpan pilihan</button>
             <p class="notice">Perubahan disimpan tanpa memutus jaringan. IPv6 baru berubah setelah Anda melakukan reboot secara sadar. Mengaktifkan IPv6 tidak menjamin modem/operator memberikan koneksi IPv6 internet.</p>
           </article>
-          <article class="panel">
+          <article class="panel" data-group="firmware">
             <h2>Aplikasi &amp; firmware</h2>
             <p>Addon, pembaruan, backup dan pengaturan lanjutan dikelompokkan di sini—tidak memenuhi menu utama.</p>
             <button id="open-addons" type="button">Kelola Addon</button>
@@ -348,9 +363,10 @@
         </section>
         <section id="sms" class="page" aria-label="SMS Center" hidden>
           <article class="panel">
-            <h2>SMS Center — kesiapan modem</h2>
+            <span class="eyebrow">KOMUNIKASI</span><h2>SMS Center</h2>
             <p>Transport SMS menggunakan layanan modem yang ada dan satu kunci akses AT, bukan koneksi paralel yang berisiko membuat modem macet.</p>
-            <div id="sms-status" class="result" aria-live="polite"></div>
+            <div id="sms-status" class="result" aria-live="polite">Belum ada hasil pemeriksaan layanan SMS.</div>
+            <div class="diagnostics"><button type="button" id="sms-retry">Periksa layanan</button><button type="button" id="sms-diagnostics" class="quiet">Diagnostik SMS</button><p id="sms-diagnostics-status" role="status">Belum diuji pada perangkat.</p></div>
             <div class="sms-actions">
               <button id="sms-enable" type="button" hidden>Aktifkan SMS</button>
               <button id="sms-inbox-open" type="button" disabled>Buka Inbox</button>
@@ -396,7 +412,7 @@
       </section>
       <div id="message" class="message" role="status" aria-live="polite"></div>
     </main>
-    <footer>VeCI v2 · board-locked development · no automatic resets · no production flash</footer>
+    <footer>VeCI v2 · ZBT-WE5927 · Data berasal dari router · Pengaturan berisiko memerlukan konfirmasi</footer>
   </div>
 </body>
 </html>

@@ -40,6 +40,6 @@ class ScopeIntegration(unittest.TestCase):
     def test_explicit_source_only_status(self):
         contract=json.loads((ROOT/"rebuild/veci-v2/contracts/veci-v2-rebuild-contract.json").read_text())
         self.assertFalse(contract["flash_authorized"])
-        self.assertEqual(len(contract["required_core"]),40)
+        self.assertEqual(len(contract["required_core"]),39)
 
 if __name__=="__main__": unittest.main()

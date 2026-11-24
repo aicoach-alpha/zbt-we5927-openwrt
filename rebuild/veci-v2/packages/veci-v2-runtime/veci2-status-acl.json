@@ -100,9 +100,6 @@
         ],
         "veci.v2.simlock": [
           "status"
-        ],
-        "veci.v2.ussd": [
-          "status"
         ]
       }
     },
@@ -115,10 +112,6 @@
         ],
         "veci.v2.simlock": [
           "unlock"
-        ],
-        "veci.v2.ussd": [
-          "send",
-          "cancel"
         ]
       }
     }
@@ -134,7 +127,10 @@
           "status",
           "capabilities",
           "smsProvider",
-          "ethernetPorts"
+          "ethernetPorts",
+          "traffic",
+          "internetCheck",
+          "smsDiagnostics"
         ]
       }
     },

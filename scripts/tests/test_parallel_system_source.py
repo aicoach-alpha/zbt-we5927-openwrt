@@ -21,7 +21,18 @@ class ScopeIntegration(unittest.TestCase):
         self.assertEqual(RECORD["hardware_uat"],"not_run")
         for item in RECORD["reused_byte_identical_sources"]:
             with self.subTest(path=item["path"]):
-                self.assertEqual(hashlib.sha256((ROOT/item["path"]).read_bytes()).hexdigest(),item["sha256"])
+                digest=hashlib.sha256((ROOT/item["path"]).read_bytes()).hexdigest()
+                if digest != item["sha256"]:
+                    # Historical a66f7ec receipt remains immutable; any newer
+                    # revision must match its exact reviewed git commit.
+                    self.assertEqual(digest,item.get("reviewed_successor_sha256"))
+                    commit=item.get("reviewed_successor_commit")
+                    self.assertEqual(commit,"04e8058")
+                    committed=subprocess.check_output(
+                        ["git","-C",str(ROOT),"show",commit+":"+item["path"]])
+                    self.assertEqual(hashlib.sha256(committed).hexdigest(),digest)
+                else:
+                    self.assertEqual(digest,item["sha256"])
     def test_no_duplicate_ui_ids_and_scripts_load_after_main(self):
         import re
         ids=re.findall(r'\bid="([^"]+)"',HTML)
@@ -40,6 +51,6 @@ class ScopeIntegration(unittest.TestCase):
     def test_explicit_source_only_status(self):
         contract=json.loads((ROOT/"rebuild/veci-v2/contracts/veci-v2-rebuild-contract.json").read_text())
         self.assertFalse(contract["flash_authorized"])
-        self.assertEqual(len(contract["required_core"]),40)
+        self.assertEqual(len(contract["required_core"]),39)
 
 if __name__=="__main__": unittest.main()

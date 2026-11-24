@@ -27,9 +27,9 @@ class ExistingModuleIntegration(unittest.TestCase):
   at=(ROOT/"source/we5927-lte/src/we5927-at.c").read_text()
   self.assertIn("--sim-pin-stdin",at)
   self.assertIn("--sim-puk-stdin",at)
-  self.assertIn("--ussd-stdin",at)
+  self.assertNotIn("--ussd-stdin",at)
   self.assertIn("private_cmd",at)
-  self.assertIn("ussd",at)
+  self.assertNotIn("AT+CUSD=1",at)
  def test_not_hardware_pass(self):
   contract=json.loads((ROOT/"rebuild/veci-v2/contracts/veci-v2-rebuild-contract.json").read_text())
   self.assertFalse(contract["flash_authorized"])

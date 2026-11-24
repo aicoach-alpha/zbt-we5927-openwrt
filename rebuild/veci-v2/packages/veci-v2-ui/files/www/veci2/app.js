@@ -271,7 +271,7 @@ function showLogin() {
   globalThis.VeciAddonProfiles?.reset?.();
   globalThis.VeciUpdatePolicy?.reset?.();
   globalThis.VeciSimLock?.reset?.();
-  globalThis.VeciUssd?.reset?.();
+  trafficLast=null; trafficSeries=[]; trafficBusy=false;
   globalThis.VeciSmsCenter.logout();
   globalThis.VeciDnsSettings?.logout?.();
   globalThis.VeciOwnerControls?.logout?.();
@@ -282,6 +282,17 @@ function showLogin() {
   el('workspace').hidden = true;
   el('password').value = '';
 }
+function setSubgroup(scope, group) {
+  const page = el(scope);
+  if (!page) return;
+  for (const button of page.querySelectorAll('.subnav .subtab')) {
+    const selected = button.dataset.group === group;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  }
+  for (const panel of page.querySelectorAll(':scope > article[data-group]'))
+    panel.hidden = panel.dataset.group !== group;
+}
 function showPage(id) {
   for (const page of document.querySelectorAll('.page'))
     page.hidden = page.id !== id;
@@ -290,6 +301,10 @@ function showPage(id) {
     tab.classList.toggle('active', selected);
     tab.setAttribute('aria-current', selected ? 'page' : 'false');
   }
+  if (id === 'network') setSubgroup('network',
+    document.querySelector('#network .subtab.active')?.dataset.group || 'overview');
+  if (id === 'settings') setSubgroup('settings',
+    document.querySelector('#settings .subtab.active')?.dataset.group || 'system');
   if (id === 'network') {
     globalThis.VeciOwnerControls?.refreshNetwork?.();
     refreshNetwork();
@@ -319,7 +334,7 @@ async function refreshOverview() {
     ? data.lte_ipv4 && data.lte_default_route : null;
   state = binaryStatus(lteLink, 'IP dan gateway tersedia', 'Belum lengkap');
   cards.push(metric('LTE RNDIS', state[0], state[1]));
-  cards.push(metric('Internet end-to-end', 'Belum terverifikasi', 'warn'));
+  cards.push(metric('Internet LTE (router)', 'Memeriksa HTTPS...', 'warn'));
   cards.push(metric('Wi-Fi AP', ...primaryApStatus(data)));
   if (data.wifi_ap_missing === true)
     cards.push(metric('Wi-Fi radio/AP mismatch', 'Radio UP, AP hilang', 'bad'));
@@ -332,7 +347,120 @@ async function refreshOverview() {
     Number.isFinite(data.memory_available_kb) ?
       Math.round(data.memory_available_kb / 1024) + ' MiB' : 'Unknown'));
   el('status-grid').replaceChildren(...cards);
+  void verifyInternetLive();
+  void sampleTraffic();
 }
+
+// The live Internet probe confirms the exact USB0 HTTPS and DNS path rather
+// than treating any modem DHCP lease as evidence of Internet connectivity.
+async function verifyInternetLive() {
+  const session = sid;
+  const badge = el('internet-indicator');
+  const detail = el('internet-detail');
+  const grid = el('status-grid');
+  const card = grid && grid.children ? [...grid.children].find(node =>
+    node.querySelector('h3')?.textContent === 'Internet LTE (router)') : null;
+  if (!session || !card) return;
+  badge.className = 'indicator';
+  badge.textContent = 'Memeriksa koneksi...';
+  detail.textContent = 'Memeriksa HTTPS dan DNS melalui LTE';
+  try {
+    const result = await rpc('veci.v2','internetCheck',{},session,10000);
+    if (sid !== session) return;
+    const verified = result.verified === true && result.https_code === 200 &&
+      result.dns_verified === true && result.source === 'usb0_https';
+    badge.className = verified ? 'indicator good' : 'indicator';
+    badge.textContent = verified ? 'Internet LTE aktif' : 'Belum terverifikasi';
+    detail.textContent = verified ? 'HTTPS 200 · DNS berhasil · via USB0' :
+      'Tidak ada keberhasilan HTTPS yang terkonfirmasi';
+    const text = card.querySelector('strong');
+    text.className = verified ? 'good' : 'warn';
+    text.textContent = verified ? 'HTTPS & DNS berhasil' : 'Belum terverifikasi';
+  } catch (error) {
+    if (sid !== session) return;
+    badge.textContent = 'Belum terverifikasi';
+    detail.textContent = 'Pemeriksaan gagal: ' + String(error.message || 'Unknown');
+    const text = card.querySelector('strong');
+    text.className = 'warn';
+    text.textContent = 'Pemeriksaan tidak berhasil';
+  }
+}
+
+// Lightweight real-time kernel counter visualization; strictly NO fake samples.
+let trafficLast = null;
+let trafficSeries = [];
+let trafficBusy = false;
+function drawTraffic() {
+  const canvas = el('traffic-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const width = canvas.width, height = canvas.height;
+  ctx.clearRect(0,0,width,height);
+  const left=57, right=20, top=18, bottom=31;
+  const plotW=width-left-right, plotH=height-top-bottom;
+  const high = Math.max(8,...trafficSeries.flatMap(s => [s.down,s.up]));
+  ctx.font='12px system-ui, sans-serif';
+  ctx.textAlign='right';
+  for (let n=0;n<=4;n++) {
+    const y=top+n*plotH/4;
+    ctx.strokeStyle='#e6edf5'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(width-right,y); ctx.stroke();
+    ctx.fillStyle='#7891a6'; ctx.fillText((high*(4-n)/4).toFixed(0),left-10,y+4);
+  }
+  ctx.textAlign='left';ctx.fillText('KiB/s',7,12);
+  if (trafficSeries.length < 2) {
+    ctx.fillStyle='#7b90a4';ctx.font='14px system-ui, sans-serif';
+    ctx.textAlign='center';ctx.fillText('Mengumpulkan sampel trafik jaringan...',width/2,height/2);
+    return;
+  }
+  const draw=(key,color) => {
+    ctx.beginPath();ctx.lineWidth=3;ctx.lineJoin='round';
+    ctx.strokeStyle=color;
+    trafficSeries.forEach((point,i) => {
+      const x=left+plotW*i/Math.max(trafficSeries.length-1,1);
+      const y=top+plotH-(point[key]/high)*plotH;
+      if (i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  };
+  draw('down','#2785ca');draw('up','#26b99d');
+}
+async function sampleTraffic() {
+  if (!sid || trafficBusy || el('overview').hidden ||
+      typeof el('traffic-chart')?.getContext !== 'function') return;
+  trafficBusy=true;
+  const session=sid;
+  try {
+    const counter=await rpc('veci.v2','traffic',{},session,7500);
+    if (session!==sid || counter.source!=='kernel_interface_counters' ||
+        counter.interface!=='usb0' ||
+        !Number.isSafeInteger(counter.rx_bytes) ||
+        !Number.isSafeInteger(counter.tx_bytes)) throw Error('Counter belum tersedia');
+    const now=performance.now();
+    if (trafficLast && now>trafficLast.when &&
+        counter.rx_bytes>=trafficLast.rx && counter.tx_bytes>=trafficLast.tx) {
+      const seconds=(now-trafficLast.when)/1000;
+      const down=(counter.rx_bytes-trafficLast.rx)/seconds/1024;
+      const up=(counter.tx_bytes-trafficLast.tx)/seconds/1024;
+      if (Number.isFinite(down) && Number.isFinite(up)) {
+        trafficSeries.push({down,up});
+        if (trafficSeries.length>45) trafficSeries.shift();
+        el('traffic-rx').textContent='Unduh: '+down.toFixed(1)+' KiB/s';
+        el('traffic-tx').textContent='Unggah: '+up.toFixed(1)+' KiB/s';
+        el('traffic-note').textContent='Sampel nyata dari kernel usb0; bukan estimasi kecepatan maksimum.';
+      }
+    }
+    trafficLast={rx:counter.rx_bytes,tx:counter.tx_bytes,when:now};
+    drawTraffic();
+  } catch (error) {
+    if (session===sid) {
+      el('traffic-note').textContent='Statistik belum tersedia: '+String(error.message || 'unknown');
+      drawTraffic();
+    }
+  } finally { trafficBusy=false; }
+}
+
 let visibilityRequest = 0;
 let configuredVisible = null;
 let savingVisibility = false;
@@ -640,6 +768,45 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   for (const tab of document.querySelectorAll('.tab'))
     tab.addEventListener('click', () => showPage(tab.dataset.page));
+  for (const groupButton of document.querySelectorAll('.subnav .subtab'))
+    groupButton.addEventListener('click', () => {
+      if (!sid) return;
+      const scope = groupButton.closest('.subnav')?.dataset.scope;
+      if (scope === 'network' || scope === 'settings')
+        setSubgroup(scope, groupButton.dataset.group);
+    });
+  el('sms-retry').addEventListener('click', () => {
+    if (!sid) return;
+    el('sms-diagnostics-status').textContent = 'Memeriksa kembali layanan SMS...';
+    void refreshSMS().then(() => {
+      if (sid) el('sms-diagnostics-status').textContent =
+        'Pemeriksaan selesai. Status detail ditampilkan pada SMS Center.';
+    }).catch(error => {
+      if (sid) el('sms-diagnostics-status').textContent =
+        'Pemeriksaan tidak selesai: '+String(error.message || 'unknown');
+    });
+  });
+  el('sms-diagnostics').addEventListener('click', async () => {
+    if (!sid) return;
+    const session=sid, output=el('sms-diagnostics-status');
+    output.textContent='Membaca kesiapan layanan secara aman...';
+    try {
+      const result=await rpc('veci.v2','smsDiagnostics',{},session,8000);
+      if (sid!==session) return;
+      const status=[];
+      status.push('RPCD SMS: '+(result.provider_registered===true ? 'terdaftar' : 'tidak terdaftar'));
+      status.push('Port AT: '+(result.modem_at_port_present===true ? 'terdeteksi' : 'tidak tersedia'));
+      status.push('Konfigurasi: '+(result.config_present===true ? 'ada' : 'tidak tersedia'));
+      status.push('Pengiriman/penerimaan fisik: belum diverifikasi');
+      output.textContent=status.join(' · ');
+    } catch (error) {
+      if (sid===session) output.textContent='Diagnostik tidak tersedia: '+String(error.message || 'unknown');
+    }
+  });
+  if (typeof window.setInterval === 'function') window.setInterval(() => {
+    if (sid && !el('overview').hidden) void sampleTraffic();
+  },6000);
+
   el('ipv6-enabled').addEventListener('change', () => {
     el('ipv6-save').disabled = savedIPv6 === null ||
       el('ipv6-enabled').checked === savedIPv6;

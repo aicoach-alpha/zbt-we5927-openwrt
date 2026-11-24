@@ -1,0 +1,50 @@
+{
+  "board": "zbtlink,zbt-we5927",
+  "date": "2026-11-24",
+  "owner_decisions": {
+    "ussd": {
+      "status": "FAIL_OWNER_HARDWARE_UAT",
+      "decision": "PERMANENTLY_RETIRED",
+      "must_never_return": true
+    },
+    "sms": {
+      "status": "FAIL_OWNER_GUI_UAT",
+      "required_for_release": true,
+      "hardware_verified": false
+    },
+    "ui": {
+      "status": "REJECTED_OWNER_UAT",
+      "top_level_menus": [
+        "Beranda",
+        "Koneksi",
+        "SMS Center",
+        "Pengaturan"
+      ],
+      "subnavigation": true,
+      "real_traffic_charts": true
+    },
+    "lte_uplink": {
+      "router_http": "PASS",
+      "router_https": "PASS",
+      "router_dns": "PASS",
+      "wired_client_tcp": "PASS"
+    },
+    "wifi_ap": {
+      "status": "NOT_TESTED"
+    },
+    "sim_gpio_mapping": {
+      "status": "UNRESOLVED"
+    },
+    "soak72h": {
+      "status": "NOT_TESTED"
+    }
+  },
+  "ship_gate": {
+    "active_core_modules": 39,
+    "retired_modules": [
+      "lte_ussd"
+    ],
+    "never_restore_ussd": true
+  },
+  "sensitive_identifiers_retained": false
+}

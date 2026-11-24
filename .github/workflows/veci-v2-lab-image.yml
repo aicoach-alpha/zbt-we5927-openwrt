@@ -261,9 +261,11 @@ jobs:
           for module in mt7603e rndis_host option; do
             test -s "$rom/lib/modules/6.12.112/$module.ko"
           done
-          for forbidden in www/cgi-bin/luci www/luci-static usr/share/luci usr/lib/lua/luci usr/libexec/rpcd/veci.meter; do
+          for forbidden in www/cgi-bin/luci www/luci-static usr/share/luci usr/lib/lua/luci usr/libexec/rpcd/veci.meter usr/libexec/rpcd/veci.v2.ussd www/veci2/ussd.js; do
             test ! -e "$rom/$forbidden" || { echo "UNWANTED:$forbidden"; exit 1; }
           done
+          ! grep -Fiq 'ussd' "$rom/www/veci2/index.html" || { echo 'RETIRED_USSD_UI_RESURRECTED' >&2; exit 1; }
+          ! grep -Fiq 'veci.v2.ussd' "$rom/usr/share/rpcd/acl.d/veci-v2-runtime.json" || { echo 'RETIRED_USSD_ACL_RESURRECTED' >&2; exit 1; }
           grep -Fq '/veci2/' "$rom/www/index.html"
           sha256sum "$image"
           echo "LAB_IMAGE_BYTES=$bytes"

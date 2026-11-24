@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed BEFORE any OpenWrt compilation until 40 core modules have evidence.
+"""Fail closed BEFORE any OpenWrt compilation until all 39 active core modules have evidence.
 
 Hardware UAT comes later; source completion is a distinct prerequisite.
 This script does not produce binaries, change router config or sign artifacts.

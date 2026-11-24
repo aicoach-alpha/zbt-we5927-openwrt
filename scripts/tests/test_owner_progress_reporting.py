@@ -13,10 +13,12 @@ SPEC.loader.exec_module(PROGRESS)
 class ProgressReporting(unittest.TestCase):
     def test_baseline_is_fixed_at_original_27(self):
         report = PROGRESS.collect()
-        self.assertEqual(report["target_modules"], 27)
+        self.assertEqual(report["target_modules"], 26)
+        self.assertEqual(report["original_target_modules"], 27)
+        self.assertEqual(report["retired_modules"], 1)
         self.assertEqual(len(report["modules"]), 27)
-        self.assertEqual(report["required_core_total"], 40)
-        self.assertEqual(report["completed"] + report["partial"] + report["pending"], 27)
+        self.assertEqual(report["required_core_total"], 39)
+        self.assertEqual(report["completed"] + report["partial"] + report["pending"], 26)
 
     def test_no_completion_from_partial_code_or_generic_tests(self):
         report = PROGRESS.collect()
@@ -24,7 +26,7 @@ class ProgressReporting(unittest.TestCase):
             if item["status"] == "source_verified":
                 self.assertEqual(item["contract_state"], "source_verified")
                 self.assertTrue(item["source_evidence"])
-        self.assertEqual(len(PROGRESS.PARTIAL), 27)
+        self.assertEqual(len(PROGRESS.PARTIAL), 26)
 
     def test_no_false_promotion_when_evidence_missing(self):
         m = {"v2_state": "not_ported_to_v2"}

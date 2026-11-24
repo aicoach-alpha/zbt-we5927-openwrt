@@ -74,7 +74,7 @@ Source regressions -> APK crosscompile -> whole clean image -> hard image
 size and headroom -> metadata board/version match -> trusted-image signing
 -> offline verification -> config backup/rollback -> sysupgrade -T ->
 physical Wi-Fi BSSID/beacon/join -> physical LAN ports/NAT/DNS -> LTE
-dual-SIM/SMS/USSD -> 72-hour wired/Wi-Fi/cellular soak.
+dual-SIM/SMS (USSD permanently retired) -> 72-hour wired/Wi-Fi/cellular soak.
 
 No signed artifact or physical UAT evidence means NO FLASH PERMISSION.
 

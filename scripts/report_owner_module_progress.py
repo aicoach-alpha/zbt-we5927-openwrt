@@ -41,7 +41,6 @@ PARTIAL = {
     "static_routes_policy": [RUNTIME + "veci2-routes", "scripts/tests/test_owner_reuse_existing_source.py"],
     "lte_dual_sim_manual": [RUNTIME + "veci2-sim-manual", "scripts/tests/test_owner_manual_sim_source.py"],
     "lte_apn_pin_puk": [RUNTIME + "veci2-sim-lock", "scripts/tests/test_sim_unlock.py"],
-    "lte_ussd": [RUNTIME + "veci2-ussd", "scripts/tests/test_last_ussd_source.py"],
     "system_logs_diagnostics": [RUNTIME + "veci2-system-admin", "scripts/tests/test_owner_system_admin_source.py"],
     "system_time_ntp": [RUNTIME + "veci2-system-admin", "scripts/tests/test_owner_system_admin_source.py"],
     "system_leds_buttons": [RUNTIME + "veci2-system-admin", "scripts/tests/test_owner_system_admin_source.py"],
@@ -98,8 +97,8 @@ def collect():
         raise ValueError("owner baseline must contain exactly 27 distinct modules")
     contract = json.loads(CONTRACT.read_text())
     index = {item["id"]: item for item in contract["required_core"]}
-    if len(index) != 40 or not set(names).issubset(index):
-        raise ValueError("owner contract mismatch: must contain 40 modules and original 27")
+    if len(index) != 39 or set(names) - set(index) != {"lte_ussd"}:
+        raise ValueError("owner contract mismatch: must contain 39 active modules and 1 retired USSD module from original 27")
     evidence = json.loads(EVIDENCE.read_text()) if EVIDENCE.is_file() else {}
     records = evidence.get("modules", {})
     if not isinstance(records, dict):
@@ -110,6 +109,12 @@ def collect():
             known_tests.update(re.findall(r"^\s*def (test_[A-Za-z0-9_]+)\(", file.read_text(), flags=re.M))
     modules = []
     for name in names:
+        if name == "lte_ussd":
+            modules.append({
+                "id": name, "status": "retired", "contract_state": "owner_permanently_retired",
+                "source_evidence": [], "hardware_uat": "failed_owner"
+            })
+            continue
         item = index[name]
         record = records.get(name)
         if not isinstance(record, dict):
@@ -130,18 +135,20 @@ def collect():
             "source_evidence": proof,
             "hardware_uat": item.get("physical_uat", "not_run"),
         })
-    counts = {key: sum(m["status"] == key for m in modules) for key in ("source_verified", "partial", "pending")}
-    if sum(counts.values()) != 27:
-        raise AssertionError("counts must sum to 27")
+    counts = {key: sum(m["status"] == key for m in modules) for key in ("source_verified", "partial", "pending", "retired")}
+    if sum(counts.values()) != 27 or counts["retired"] != 1:
+        raise AssertionError("historical 27 must preserve one explicitly retired USSD")
     return {
         "updated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source_head": _git_head(),
         "required_core_total": len(index),
-        "target_modules": 27,
+        "target_modules": 26,
+        "original_target_modules": 27,
+        "retired_modules": counts["retired"],
         "completed": counts["source_verified"],
         "partial": counts["partial"],
         "pending": counts["pending"],
-        "completed_percentage": round(100 * counts["source_verified"] / 27, 2),
+        "completed_percentage": round(100 * counts["source_verified"] / 26, 2),
         "modules": modules
     }
 
@@ -155,7 +162,7 @@ def _git_head():
 
 if __name__ == "__main__":
     result = collect()
-    print(f"VeCI 27 MODUL | SELESAI {result['completed']}/27 ({result['completed_percentage']}%)"
+    print(f"VeCI 26 MODUL AKTIF + 1 PENSIUN | SELESAI {result['completed']}/26 ({result['completed_percentage']}%)"
           f" | PARSIAL {result['partial']} | BELUM {result['pending']}"
           f" | commit {result['source_head']}")
     print("STATUS PER MODUL:")

@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
@@ -42,8 +43,8 @@ int main(int argc, char **argv) {
 	struct termios tio;
 	char tx[512], buf[512];
 	int64_t deadline;
-	char line[768], response[768] = "";
-	int acknowledged = 0, overflow = 0;
+	char line[768];
+	int overflow = 0;
 	size_t used = 0;
 
 	if (argc < 3 || argc > 4) {
@@ -55,19 +56,11 @@ int main(int argc, char **argv) {
 	if (timeout_ms < 100) timeout_ms = 100;
 	if (timeout_ms > 30000) timeout_ms = 30000;
 
-	int private_cmd = !strcmp(cmd, "--sim-pin-stdin") || !strcmp(cmd, "--sim-puk-stdin");
-	int ussd = !strcmp(cmd, "--ussd-stdin");
-	int tx_length;
-	if (ussd) {
-		char input[40];
-		size_t length = fread(input, 1, sizeof(input), stdin);
-		if (ferror(stdin) || length < 4 || length > 33 || input[length-1] != '\n' ||
-		    (input[0] != '*' && input[0] != '#') || input[length-2] != '#') return 2;
-		input[--length] = '\0';
-		if (strspn(input, "*#0123456789") != length || !strpbrk(input,"0123456789")) return 2;
-		tx_length = snprintf(tx, sizeof(tx), "AT+CUSD=1,\"%s\",15\r", input);
-	} else tx_length = private_cmd ? pin_command(cmd, tx, sizeof(tx)) :
-		snprintf(tx, sizeof(tx), "%s\r", cmd);
+  int private_cmd = !strcmp(cmd, "--sim-pin-stdin") || !strcmp(cmd, "--sim-puk-stdin");
+  /* Owner hardware UAT: USSD permanently retired, including direct CUSD. */
+  if ((!private_cmd && cmd[0]=='-') || !strncasecmp(cmd,"AT+CUSD",7)) return 2;
+  int tx_length = private_cmd ? pin_command(cmd, tx, sizeof(tx)) :
+      snprintf(tx, sizeof(tx), "%s\r", cmd);
 	if (tx_length < 0 || (size_t)tx_length >= sizeof(tx)) return 2;
 
 	fd = open(dev, O_RDWR | O_NOCTTY | O_NONBLOCK);
@@ -97,7 +90,7 @@ int main(int argc, char **argv) {
 			ssize_t n = read(fd, buf, sizeof(buf)-1);
 			if (n > 0) {
 				buf[n] = '\0';
-				if (!private_cmd && !ussd) { fputs(buf, stdout); fflush(stdout); }
+				if (!private_cmd) { fputs(buf, stdout); fflush(stdout); }
 				for (ssize_t i = 0; i < n; i++) {
 					if (buf[i] != '\r' && buf[i] != '\n') {
 						if (used < sizeof(line) - 1)
@@ -106,17 +99,9 @@ int main(int argc, char **argv) {
 						continue;
 					}
 					line[used] = '\0';
-					if (ussd && !strncmp(line, "+CUSD:", 6)) {
-						if (overflow || response[0]) goto done;
-						memcpy(response, line, used + 1);
-					}
-					if (!strcmp(line, "OK")) acknowledged = 1;
-					if (acknowledged && (!ussd || response[0])) {
-						if (ussd) puts(response);
-						rc = 0;
-						goto done;
-					}
-					if (!strcmp(line, "ERROR") || !strncmp(line, "+CME ERROR:", 11) ||
+	                if (overflow) goto done;
+                if (!strcmp(line, "OK")) { rc = 0; goto done; }
+				if (!strcmp(line, "ERROR") || !strncmp(line, "+CME ERROR:", 11) ||
 					    !strncmp(line, "+CMS ERROR:", 11))
 						goto done;
 					used = 0;

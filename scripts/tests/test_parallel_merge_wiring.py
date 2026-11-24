@@ -52,7 +52,7 @@ class ParallelMergeWiring(unittest.TestCase):
 
     def test_not_ready_for_final_build_even_with_source_presence(self):
         items=json.loads((ROOT/"rebuild/veci-v2/contracts/veci-v2-rebuild-contract.json").read_text())
-        self.assertEqual(len(items["required_core"]),40)
+        self.assertEqual(len(items["required_core"]),39)
         self.assertFalse(items["flash_authorized"])
         self.assertTrue(any(x["v2_state"]=="not_ported_to_v2" for x in items["required_core"]))
 

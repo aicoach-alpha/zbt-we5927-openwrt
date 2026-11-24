@@ -22,7 +22,7 @@
     "all_core_modules_hardware_pass",
     "wifi_beacon_and_client_join",
     "lan_all_ports_ethernet_and_nat",
-    "lte_2sim_safe_switch_sms_ussd",
+    "lte_2sim_safe_switch_sms",
     "signed_ota_and_offline_rollback",
     "package_feed_verified",
     "fuzz_and_security_review",
@@ -162,13 +162,6 @@
     {
       "id": "lte_apn_pin_puk",
       "origin": "OEM cellular configuration",
-      "physical_uat": "not_run",
-      "required": true,
-      "v2_state": "source_verified"
-    },
-    {
-      "id": "lte_ussd",
-      "origin": "OEM modem USSD",
       "physical_uat": "not_run",
       "required": true,
       "v2_state": "source_verified"

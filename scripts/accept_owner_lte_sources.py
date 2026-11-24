@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Re-run real source+PTY tests before granting TWO module source acceptance.
+"""Re-run real source+PTY tests before granting PIN/PUK and APN module source acceptance.
 
 This never writes router state, builds an image, or treats fake modem UAT as
-physical UAT. Generates code/test SHA256 receipts and updates exactly two
+physical UAT. Generates code/test SHA256 receipts and updates only the active
 specific source contract rows after successfully executed tests.
 """
 from pathlib import Path
@@ -27,18 +27,6 @@ SPECS={
     "test_real_rpc_provider_uci_staging_and_no_modem_restart",
     "test_private_sim_and_apn_acl_and_board_safety","test_guarded_transport"],
   "test_patterns":["test_owner_apn_acceptance.py","test_sim_unlock.py"]
- },
- "lte_ussd":{
-  "source_files":[
-    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-ussd",
-    "source/we5927-lte/src/we5927-at.c",
-    "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/ussd.js"
-  ],
-  "test_source_files":["scripts/tests/test_owner_ussd_acceptance.py"],
-  "test_ids":["test_pty_fake_modem_one_shot_timeout_cancel_and_rejects",
-    "test_at_helper_rejects_input_injection_without_opening_modem",
-    "test_rpc_is_scoped_and_fails_closed"],
-  "test_patterns":["test_owner_ussd_acceptance.py"]
  }
 }
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()

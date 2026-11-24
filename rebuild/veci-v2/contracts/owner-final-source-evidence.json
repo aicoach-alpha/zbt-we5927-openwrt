@@ -56,12 +56,12 @@
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sim-lock.js"
       ],
       "receipt": {
-        "executed_utc": "2026-11-20T08:05:29+00:00",
+        "executed_utc": "2026-11-24T03:11:04+00:00",
         "exit_code": 0,
         "hardware_uat": "not_run",
         "kind": "executed_source_tests",
         "log_file": "docs/source-acceptance/lte_apn_pin_puk.txt",
-        "log_sha256": "b9b4997de480c81852f24461fe0e8096760df7d404d6442af28328c341b205e3"
+        "log_sha256": "c60f118317a8456dfdff95fef5b8b480e5b2ddea8842497d0bd0edf7ffb38aa9"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -71,7 +71,7 @@
         "scripts/tests/test_owner_apn_acceptance.py": "1c024a50780b36a8cb0a26bcd118bd0aaa8ac5eb9107ea613e033a1d274c0706",
         "scripts/tests/test_sim_unlock.py": "c97de12743182340ecd5a79d934eebfe6b91457780668d489086747174077bf2",
         "source/we5927-lte/files/usr/sbin/we5927-lte": "7c845f8f34ed50ab0c4e2bebb876b1a271bc26f78bbcb53725a5f672fdcf6019",
-        "source/we5927-lte/src/we5927-at.c": "9708ec1f0441d2e5407d990274a6c93c8e2dc5c14b4afdd4dbd90303e4958119"
+        "source/we5927-lte/src/we5927-at.c": "9b8c075c7f68a160eccf70ff7b3c7aff3f4a4f1f21917dcd01472c2ca990c469"
       },
       "status": "pass",
       "test_ids": [
@@ -83,37 +83,6 @@
       "test_source_files": [
         "scripts/tests/test_owner_apn_acceptance.py",
         "scripts/tests/test_sim_unlock.py"
-      ]
-    },
-    "lte_ussd": {
-      "implementation_files": [
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-ussd",
-        "source/we5927-lte/src/we5927-at.c",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/ussd.js"
-      ],
-      "receipt": {
-        "executed_utc": "2026-11-20T08:05:31+00:00",
-        "exit_code": 0,
-        "hardware_uat": "not_run",
-        "kind": "executed_source_tests",
-        "log_file": "docs/source-acceptance/lte_ussd.txt",
-        "log_sha256": "718ddf05f5a59546a39d1cdae5bde8eddee0c5cf70e9434cccf025ee1ff843b2"
-      },
-      "scope": "source_verified_no_hardware_uat",
-      "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-ussd": "3d32441bb29eaa8ecc3f9a166b381cffa94b0bb97670840e2e2a90a6fb46c264",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/ussd.js": "50552571d285358cb7a89bb6704e44e7b8da53feeaff751542d0307d3211f280",
-        "scripts/tests/test_owner_ussd_acceptance.py": "24668d4007afa808695c9c87b4a49deda2163b3605bf703c6d59062626b1e893",
-        "source/we5927-lte/src/we5927-at.c": "9708ec1f0441d2e5407d990274a6c93c8e2dc5c14b4afdd4dbd90303e4958119"
-      },
-      "status": "pass",
-      "test_ids": [
-        "test_pty_fake_modem_one_shot_timeout_cancel_and_rejects",
-        "test_at_helper_rejects_input_injection_without_opening_modem",
-        "test_rpc_is_scoped_and_fails_closed"
-      ],
-      "test_source_files": [
-        "scripts/tests/test_owner_ussd_acceptance.py"
       ]
     },
     "static_routes_policy": {

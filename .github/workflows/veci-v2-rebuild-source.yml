@@ -56,7 +56,7 @@ jobs:
           import json
           x=json.load(open('/tmp/release-approval.json'))
           assert x['flash_allowed'] is False
-          assert x['required_modules'] == 40
+          assert x['required_modules'] == 39
           assert x['hardware_accepted'] == 0
           print('FLASH_PERMISSION=DENIED_AS_DESIGNED')
           PY

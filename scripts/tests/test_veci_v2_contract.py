@@ -44,8 +44,8 @@ class FeatureContract(unittest.TestCase):
         self.assertEqual(LUCI["application_count"], 107)
         self.assertEqual(len(LUCI["applications"]), 107)
         self.assertEqual(len(LUCI["core_modules"]), 11)
-        self.assertEqual(len(CONTRACT["required_core"]), 40)
-        self.assertEqual(len({f["id"] for f in CONTRACT["required_core"]}), 40)
+        self.assertEqual(len(CONTRACT["required_core"]), 39)
+        self.assertEqual(len({f["id"] for f in CONTRACT["required_core"]}), 39)
 
     def test_no_false_claim_about_luci_full_migration(self):
         self.assertTrue(all(x["migration"] == "not_ported" for x in LUCI["applications"]))
@@ -56,7 +56,7 @@ class FeatureContract(unittest.TestCase):
 
     def test_key_requirements_represented_in_contract(self):
         keys={x["id"] for x in CONTRACT["required_core"]}
-        for key in ("lte_dual_sim_manual","lte_ussd","sms_inbox",
+        for key in ("lte_dual_sim_manual","sms_inbox",
                     "sms_sent_and_drafts","sms_send_and_delete",
                     "sms_multipart_pdu","system_signed_github_ota",
                     "system_manual_sysupgrade","addon_signed_package_manager",
@@ -122,7 +122,7 @@ class FeatureContract(unittest.TestCase):
         self.assertNotIn("AT+CMGS",js)
         for element in re.findall(r"el\('([a-z][a-z0-9-]*)'\)",js):
             self.assertIn('id="'+element+'"',html,element)
-        self.assertIn("preview",html.lower())
+        self.assertIn("router management",html.lower())
 
 
 if __name__=="__main__":
