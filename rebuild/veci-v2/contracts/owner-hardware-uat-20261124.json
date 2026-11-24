@@ -234,6 +234,41 @@
       "authenticated_ssh": "NOT_TESTED_IN_THIS_SNAPSHOT",
       "wifi_radio": "NOT_RETESTED",
       "next": "run already downloaded SHA256-validated read-only triage via SSH; no WiFi activation"
+    },
+    "eighth_physical_triage_20261124_052248_utc": {
+      "source": "owner authenticated SSH read-only triage output",
+      "status": "TRIAGE_END_OK_AND_SSH_EXIT_0",
+      "uptime_seconds": 10583,
+      "netifd_pid_count": 3,
+      "hostapd_pid_count": 1,
+      "ap_disabled_uci": true,
+      "ap_encryption": "none",
+      "ap_key_present": false,
+      "radio0_up": true,
+      "radio0_pending": false,
+      "radio0_primary_ifname": "none",
+      "radio0_autostart": true,
+      "wifi_kernel_netdev": false,
+      "hostapd_bss_rpc": "missing",
+      "mt7603_firmware_init": "DONE",
+      "mcu_timeout": "NOT_OBSERVED_IN_FILTER",
+      "lte_default_route_usb0": true,
+      "lan_bridge": true,
+      "lte_bound_https": "NOT_VERIFIED",
+      "lte_status": "UNKNOWN_DO_NOT_ASSUME_OFFLINE",
+      "repeated_dhcp_notify_proto_denied": true,
+      "affected_interfaces": [
+        "lte usb0",
+        "wan eth0.2"
+      ],
+      "upstream_possible_related_bugs": [
+        "https://github.com/openwrt/openwrt/issues/18807",
+        "https://github.com/openwrt/openwrt/issues/23266"
+      ],
+      "upstream_disclaimer": "upstream mostly action=0 teardown; owner action=1 DHCP launch; not established same cause",
+      "do_not": "kill or restart netifd, reboot, reload networking, modem reset, wifi reenable, or flash",
+      "next_readonly_diagnostic": "scripts/router/veci-netifd-lte-readonly-20261124.sh",
+      "current_firmware_repaired": false
     }
   }
 }
