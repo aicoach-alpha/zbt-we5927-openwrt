@@ -387,6 +387,55 @@
       "netifd_process_conflict": "NOT_RESOLVED",
       "router_mutation": false,
       "next": "one timed ssh banner check plus verbose client trace in same time window; no radio or modem actions"
+    },
+    "thirteenth_owner_netifd_lte_hw_20261124_070115_utc": {
+      "source": "owner authenticated read-only SSH console",
+      "audit": "TRIAGE_END_OK and AUDIT_SSH_EXIT_0",
+      "uptime_seconds": 16490,
+      "netifd_processes": [
+        {
+          "pid": 1366,
+          "ppid": 1,
+          "state": "S",
+          "exe": "/sbin/netifd",
+          "procd_canonical": "UNVERIFIED"
+        },
+        {
+          "pid": 16862,
+          "ppid": 16854,
+          "state": "S",
+          "exe": "/sbin/netifd",
+          "procd_canonical": "UNVERIFIED"
+        }
+      ],
+      "network_ubus_objects": "PRESENT",
+      "lte_ubus_up": true,
+      "lte_pending": false,
+      "lte_available": true,
+      "lte_proto": "dhcp",
+      "lte_device": "usb0",
+      "usb0_present": true,
+      "usb0_carrier": "1",
+      "usb0_ipv4_assigned": false,
+      "lte_default_route": false,
+      "lan_bridge": true,
+      "udhcpc_count": 1,
+      "notify_proto_permission_denied_count": 12,
+      "http_ipv4_usb0": {
+        "curl_exit": 28,
+        "http_code": "000"
+      },
+      "https_usb0": {
+        "curl_exit": 28,
+        "http_code": "000"
+      },
+      "lte_data_plane": "FAILED_AT_OBSERVATION",
+      "radio_registration": "NOT_TESTED",
+      "root_cause": "UNPROVEN: possible extra netifd, possible protocol setup/teardown race",
+      "openwrt_source_inference": "action 1 proto_shell_run_command denies if protocol state teardown/setup_abort",
+      "next_script": "scripts/router/veci-netifd-ownership-readonly-20261124.sh",
+      "recovery_safety": "NO_KILL_NO_RELOAD_NO_REBOOT_NO_MODEM_RESET_NO_FLASH",
+      "physical_changes": false
     }
   }
 }
