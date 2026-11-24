@@ -436,6 +436,40 @@
       "next_script": "scripts/router/veci-netifd-ownership-readonly-20261124.sh",
       "recovery_safety": "NO_KILL_NO_RELOAD_NO_REBOOT_NO_MODEM_RESET_NO_FLASH",
       "physical_changes": false
+    },
+    "fourteenth_owner_netifd_procd_verified_20261124_070705_utc": {
+      "source": "owner authenticated SHA-pinned read-only procd/ownership audit",
+      "audit": "TRIAGE_END_OK_AND_SSH_EXIT_0",
+      "procd_network_pid": 1366,
+      "canonical": {
+        "pid": 1366,
+        "ppid": 1,
+        "state": "S",
+        "exe": "/sbin/netifd"
+      },
+      "orphan_candidate": {
+        "pid": 16862,
+        "ppid": 16854,
+        "state": "S",
+        "exe": "/sbin/netifd"
+      },
+      "orphan_parent": {
+        "pid": 16854,
+        "name": "ash",
+        "ppid": 1,
+        "state": "S",
+        "exe": "/bin/busybox"
+      },
+      "duplicate_process_confirmed": true,
+      "cause_of_lte_data_failure": "NOT_PROVEN",
+      "current_usb0_ipv4": "ABSENT",
+      "current_usb0_default_route": "ABSENT",
+      "udhcpc_count": 2,
+      "lan_bridge": "PRESENT",
+      "safe_next_plan": "guarded exact-PID SIGTERM targeting only non-procd PID 16862, conditional on revalidation, explicit user --apply",
+      "mitigation_source": "scripts/router/veci-netifd-orphan-guarded-mitigation-20261124.sh",
+      "mitigation_physically_executed": false,
+      "avoid": "killall, kill parent ash, restart canonical netifd, ifup/ifdown LTE, modem reset, network reload, flash"
     }
   }
 }
