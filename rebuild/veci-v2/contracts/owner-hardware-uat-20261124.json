@@ -487,6 +487,61 @@
       "safety_precheck": "WORKED",
       "next": "read-only repeat LTE route+direct HTTP+HTTPS and netifd processes from cached sha-pinned script",
       "do_not": "rerun SIGTERM mitigation, reboot, reload network or flash while IPv4 has returned"
+    },
+    "sixteenth_owner_lte_recurrence_canonical_D_20261124_071729_utc": {
+      "source": "owner completed SHA256-pinned read-only netifd/LTE audit",
+      "audit": "TRIAGE_END_OK_AND_AUDIT_SSH_EXIT_0",
+      "uptime_seconds": 17464,
+      "mem_available_kib": 6780,
+      "mem_available_previous_kib": 19332,
+      "netifd_process_count": 2,
+      "procd_managed_netifd": {
+        "pid": 1366,
+        "ppid": 1,
+        "state": "D",
+        "exe": "/sbin/netifd"
+      },
+      "non_procd_netifd": {
+        "pid": 16862,
+        "ppid": 16854,
+        "state": "S",
+        "exe": "/sbin/netifd"
+      },
+      "lte_ubus": {
+        "up": false,
+        "pending": true,
+        "available": true,
+        "autostart": true,
+        "proto": "dhcp",
+        "device": "usb0"
+      },
+      "usb0": {
+        "present": true,
+        "operstate": "unknown",
+        "carrier": "1",
+        "ipv4": false,
+        "default_route": false
+      },
+      "udhcpc_count": 0,
+      "notify_proto_permission_denied_count": 15,
+      "lte_http": {
+        "curl_exit": 28,
+        "code": "000"
+      },
+      "lte_https": {
+        "curl_exit": 28,
+        "code": "000"
+      },
+      "lan_bridge": "PRESENT",
+      "authenticated_ssh": "PASS",
+      "previous_lte_ipv4_reappearance": "TRANSIENT_NOT_DURABLE",
+      "physical_router_mutation": false,
+      "mitigation_status": "DO_NOT_RUN_PREVIOUS_IMMUTABLE_TERM_SCRIPT_WHILE_CANONICAL_D_LOW_RAM_LTE_PENDING_UDHCPC_ZERO",
+      "guarded_mitigation_source_hardened": "scripts/router/veci-netifd-orphan-guarded-mitigation-20261124.sh",
+      "low_overhead_next_readonly": "scripts/router/veci-netifd-wchan-memory-readonly-20261124.sh",
+      "uart_or_live_wchan_result": "NOT_OBSERVED",
+      "next": "bounded read-only wchan/memory snapshot only, preserve wired LAN; no kill/restart/reload/reboot/flash",
+      "hardware_uat": "FAIL_LTE_WAN_AND_WIFI_AP_NOT_VERIFIED"
     }
   }
 }

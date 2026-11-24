@@ -15,6 +15,14 @@ class OrphanNetifdGuard(unittest.TestCase):
                      "call service list","PROCD_NETWORK_PID","orphan_pid_reused",
                      "canonical_netifd_identity_changed","orphan_parent_identity_changed",
                      "unexpected_netifd_count",
+                     "canonical_netifd_not_sleeping_safely",
+                     "available_memory_below_12mib",
+                     "lte_transition_pending_or_unknown",
+                     "dhcp_clients_missing",
+                     "canonical_state_changed_before_signal",
+                     "memory_pressure_before_signal",
+                     "lte_pending_before_signal",
+                     "dhcp_clients_disappeared_before_signal",
                      "lte_ipv4_already_assigned_do_not_touch",
                      "lte_route_already_present_do_not_touch",
                      "procd_owner_changed_before_signal",
@@ -39,6 +47,10 @@ class OrphanNetifdGuard(unittest.TestCase):
         self.assertLess(s.index("orphan_pid_reused"),
                         s.index('kill -TERM "$orphan"'))
         self.assertIn('[ "$owner" = "$canonical" ]',s)
+        self.assertLess(s.index("canonical_netifd_not_sleeping_safely"),
+                        s.index('kill -TERM "$orphan"'))
+        self.assertLess(s.index("lte_pending_before_signal"),
+                        s.index('kill -TERM "$orphan"'))
 
     def test_wrong_device_no_process_mutation(self):
         t=subprocess.run(["sh",str(SCRIPT),"--apply"],capture_output=True,text=True,timeout=3)

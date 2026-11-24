@@ -31,6 +31,18 @@ owner="$(procd_network_pid)" || stop procd_network_query_failed
 [ "$owner" = "$canonical" ] || stop canonical_pid_changed
 say PROCD_NETWORK_PID "$owner"
 check_proc "$canonical" netifd 1 /sbin/netifd || stop canonical_netifd_identity_changed
+# Under resource pressure or uninterruptible procd netifd, do NOT signal
+# another network manager: even a non-procd process may be holding resources.
+canonical_state="$(get_field "$canonical" 'State:')"
+[ "$canonical_state" = S ] || stop canonical_netifd_not_sleeping_safely
+mem_avail="$(awk '$1=="MemAvailable:" {print $2}' /proc/meminfo 2>/dev/null || :)"
+case "$mem_avail" in ''|*[!0-9]*) stop mem_available_unknown;; esac
+[ "$mem_avail" -ge 12000 ] || stop available_memory_below_12mib
+lte_status="$(ubus -S -t 3 call network.interface.lte status '{}' 2>/dev/null)" || stop lte_status_unavailable
+lte_pending="$(printf '%s' "$lte_status" | jsonfilter -e '@.pending' 2>/dev/null || :)"
+[ "$lte_pending" = false ] || stop lte_transition_pending_or_unknown
+dhcp_count="$(pidof udhcpc 2>/dev/null | wc -w | tr -d ' ')"
+[ "$dhcp_count" -ge 1 ] || stop dhcp_clients_missing
 check_proc "$orphan" netifd "$orphan_parent" /sbin/netifd || stop orphan_netifd_identity_changed
 check_proc "$orphan_parent" ash 1 /bin/busybox || stop orphan_parent_identity_changed
 all_pids="$(pidof netifd 2>/dev/null || :)"
@@ -57,6 +69,13 @@ check_proc "$canonical" netifd 1 /sbin/netifd || stop canonical_changed_before_s
 check_proc "$orphan" netifd "$orphan_parent" /sbin/netifd || stop orphan_changed_before_signal
 check_proc "$orphan_parent" ash 1 /bin/busybox || stop parent_changed_before_signal
 [ "$(awk '{print $22}' "/proc/$orphan/stat" 2>/dev/null || :)" = "$starttime" ] || stop orphan_pid_reused
+[ "$(get_field "$canonical" 'State:')" = S ] || stop canonical_state_changed_before_signal
+mem_before_signal="$(awk '$1=="MemAvailable:" {print $2}' /proc/meminfo 2>/dev/null || :)"
+case "$mem_before_signal" in ''|*[!0-9]*) stop memory_state_unknown_before_signal;; esac
+[ "$mem_before_signal" -ge 12000 ] || stop memory_pressure_before_signal
+lte_status="$(ubus -S -t 3 call network.interface.lte status '{}' 2>/dev/null)" || stop lte_query_failed_before_signal
+[ "$(printf '%s' "$lte_status" | jsonfilter -e '@.pending' 2>/dev/null || :)" = false ] || stop lte_pending_before_signal
+[ "$(pidof udhcpc 2>/dev/null | wc -w | tr -d ' ')" -ge 1 ] || stop dhcp_clients_disappeared_before_signal
 # Explicitly NEVER send a signal to procd-owned PID 1366 or parent ash 16854.
 kill -TERM "$orphan" || stop orphan_term_failed
 echo 'ORPHAN_TERM=REQUESTED'
