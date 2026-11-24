@@ -156,6 +156,35 @@
       "route_and_modem_intentionally_untouched": true,
       "correction": "kernel CSPRNG UUIDv4 122bit entropy, 32-char lowercase hex WPA2 secret; tr already confirmed on device",
       "new_regression": "exact shell keygen branch runs without od/base64/openssl and does not emit secrets"
+    },
+    "fourth_physical_attempt_20261124_035500_utc": {
+      "source": "owner PowerShell SSH output",
+      "firmware": "OpenWrt 25.12.6 kernel 6.12.112",
+      "uptime_seconds": 5315,
+      "ram_available_kib": 15148,
+      "overlay_available_kib": 1824,
+      "lte_https_preflight": "PASS_HTTP_200",
+      "radio0_runtime_up": true,
+      "wlan_kernel_netdev_count": 0,
+      "ap_disabled_before": true,
+      "wpa2_key_generation": "BEYOND_PREVIOUS_ERROR",
+      "wifi_backup": "/root/veci-router-uat/wireless-before-20261124T035505Z.uci",
+      "operation": "ubus -S -t 12 call network.wireless up radio0",
+      "operation_did_not_trigger_broad_network_reload": true,
+      "error": "WIFI_REPAIR_STOP=hostapd_ap_not_enabled_rollback",
+      "uci_rollback": "WIFI_UCI_ROLLBACK=PASS",
+      "ap_bss_verified": false,
+      "post_attempt_live_status": "NOT_OBSERVED",
+      "hypotheses": [
+        "radio0 already up, no UCI reload; ubus up may no-op",
+        "missing primary WLAN netdev",
+        "hostapd startup error",
+        "known MT76 driver instability",
+        "selector parser might not find interface"
+      ],
+      "next": "READ_ONLY per-radio ubus, hostapd and netifd/mt76 log diagnostics, no repeated radio mutation",
+      "wifi_hardware_uat": "FAIL",
+      "no_flash": true
     }
   }
 }

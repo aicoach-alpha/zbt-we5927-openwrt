@@ -34,6 +34,18 @@ if [ "$(get wireless.radio0.disabled)" != 1 ] &&
   echo "WIFI_REPAIR_STOP=radio_not_explicitly_disabled_use_readonly_diagnosis"; exit 2
 fi
 
+# Owner field UAT: radio0.up=true while primary wifi-iface was disabled and
+# missing a kernel netdev. "network.wireless up" merely reports success in
+# that state; it does not apply newly saved UCI by itself. Refuse before
+# saving new credentials or touching radio. Never force network reload here.
+pre_status="$(ubus -S -t 3 call network.wireless status 2>/dev/null)" ||
+  die preflight_wireless_status_unavailable
+radio_up="$(printf '%s' "$pre_status" | jsonfilter -e '@.radio0.up' 2>/dev/null)" ||
+  die preflight_radio0_status_invalid
+if [ "$radio_up" = true ] && [ "$(get wireless.default_radio0.disabled)" = 1 ]; then
+  die radio_up_but_ap_disabled_targeted_up_does_not_apply_uci
+fi
+
 backup_dir=/root/veci-router-uat
 mkdir -p "$backup_dir" || die backup_dir_not_writable
 chmod 700 "$backup_dir" || die backup_dir_chmod_failed

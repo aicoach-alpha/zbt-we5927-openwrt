@@ -45,10 +45,13 @@ class HardwareWifiGuard(unittest.TestCase):
                        "wireless.radio0.disabled=0",
                        "wireless.default_radio0.disabled=0",
                        "network.wireless up","hostapd_ap_not_enabled_rollback",
+                       "radio_up_but_ap_disabled_targeted_up_does_not_apply_uci",
                        "wireless.default_radio0.network=lan",
                        "sleep 75","success_flag","ubus -S -t 12",
                        "cp -p"]:
             self.assertIn(prereq,s,prereq)
+        self.assertLess(s.index("radio_up_but_ap_disabled_targeted_up_does_not_apply_uci"),
+                        s.index("backup_dir=/root/veci-router-uat"))
         commands="\n".join(line for line in s.splitlines() if not line.lstrip().startswith("#"))
         for dangerous in ["sysupgrade","reboot","ifdown","ifup","wifi reload",
                           "service network restart","/etc/init.d/network restart","network reload",
