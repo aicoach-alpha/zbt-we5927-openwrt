@@ -54,3 +54,13 @@ Crucial new source finding from the signed ROM /sbin/wifi itself: wifi up radio0
 This is a source-level safety correction, NOT executed on the physical router. Historical owner evidence includes MT76 MCU timeouts after radio down/up, so kernel deadlock cannot be excluded or made safe by a user-space watchdog. Do not claim physical Wi-Fi PASS until beacon/client-DHCP/DNS/HTTPS is observed. No new firmware image was flashed.
 
 Next build permanent regression: no wifi up calling full network reload, no unbounded Wi-Fi action, no unsafely enabled open SSID, no fabricated AP-ready from phy0/ubus; add secured first-use AP wizard and real hardware tests.
+
+## Physical Wi-Fi UAT follow-up, 24 November 2026 03:50 UTC: missing od
+
+Owner ran SHA256-pinned a65fe54 Windows workflow on their only physical WE5927. Pre-audit complete: firmware OpenWrt 25.12.6/kernel 6.12.112, uptime 5022 seconds, 15340 KiB RAM available and 1804 KiB flash overlay free; LAN/USB0 default route, DHCP, NAT, SSH, HTTPS are up; USB0-bound HTTPS 200 PASS. Wi-Fi radio is 2g with phy0/mt7603e and wpad available; default_radio0.disabled=1, encryption NONE, no WPA2 key; radio0.up=true does NOT prove AP netdev exists. SMS RPC object registered, SMS UCI disabled; no MCU timeout detected.
+
+Wi-Fi repair did begin and created a verified original-wireless backup at /root/veci-router-uat/wireless-before-20261124T035014Z.uci. WPA2 key generation failed because od is not installed on this firmware: /bin/sh: od: not found, WIFI_REPAIR_STOP=key_generation_failed. The script printed WIFI_UCI_ROLLBACK=PASS. The script stopped BEFORE UCI wireless commit, radio-targeted ubus call or driver activation; no flashed image, reset, network reload or modem operation. Never present this run as Wi-Fi activation success.
+
+Corrective next-build requirement: A secure first-use AP wizard and router recovery script MUST NOT rely on tools absent from the actual shipped ROM. Remove od/hexdump/base64/openssl prerequisites for password generation. New code uses /proc/sys/kernel/random/uuid, a CSPRNG-generated UUIDv4, strips hyphens with already-observed tr, checks exactly 32 hex characters and version4 pattern. A UUIDv4 carries 122 bits of randomness, sufficient for a 32-character ASCII WPA2 passphrase. Fail closed when kernel random UUID is not readable or malformed. A new regression test runs the exact shell branch without UCI mutations, validates success across five invocations, and never prints keys. Validate the actual physical kernel path before claiming AP PASS.
+
+No extra software is installed into the 1804 KiB overlay, no changes made to the functioning LTE path. Driver/hostapd AP startup and external client beacon/WPA2/DHCP/Internet still NOT VERIFIED.

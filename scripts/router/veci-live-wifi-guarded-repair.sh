@@ -102,8 +102,16 @@ case "$encryption" in psk2|sae|sae-mixed|psk-mixed)
   *) new_key=yes ;;
 esac
 if [ "$new_key" = yes ]; then
-  key="$(dd if=/dev/urandom bs=1 count=24 2>/dev/null | od -An -tx1 | tr -d ' \n')"
-  [ "$(printf %s "$key" | wc -c)" = 48 ] || die key_generation_failed
+  # Kernel CSPRNG UUIDv4 supplies 122 random bits, sufficient for a WPA2
+  # passphrase. Strip separators into 32 hex characters using tr, which is
+  # already present on this physical router. No od/hexdump/base64 dependency.
+  [ -r /proc/sys/kernel/random/uuid ] || die kernel_random_uuid_unavailable
+  key="$(tr -d '-' </proc/sys/kernel/random/uuid 2>/dev/null)" ||
+    die key_generation_failed
+  [ "$(printf %s "$key" | wc -c | tr -d ' ')" = 32 ] ||
+    die key_generation_failed
+  case "$key" in *[!0123456789abcdef]*|'') die invalid_random_password_format;; esac
+  case "$key" in ????????????4*) :;; *) die invalid_uuid_version;; esac
   uci -q set 'wireless.default_radio0.encryption=psk2' || die set_encryption_failed
   uci -q set "wireless.default_radio0.key=$key" || die set_key_failed
 fi

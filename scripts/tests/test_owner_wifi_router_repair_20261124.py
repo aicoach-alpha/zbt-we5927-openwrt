@@ -58,6 +58,28 @@ class HardwareWifiGuard(unittest.TestCase):
         self.assertNotEqual(test.returncode,0)
         self.assertTrue("WIFI_REPAIR_STOP=" in test.stdout)
 
+    def test_kernel_uuid_keygen_branch_without_od_dependency(self):
+        """Run the actual script branch (without UCI mutation or key disclosure)."""
+        source=(ROUTER/"veci-live-wifi-guarded-repair.sh").read_text()
+        self.assertNotIn(" | od ",source)
+        self.assertIn("/proc/sys/kernel/random/uuid",source)
+        self.assertIn('case "$key" in ????????????4*',source)
+        code=source.split('if [ "$new_key" = yes ]; then',1)[1].split("\nfi",1)[0]
+        program = """die() { exit 7; }
+uci() { :; }
+new_key=yes
+if [ "$new_key" = yes ]; then
+""" + code + """
+fi
+[ "$(printf %s "$key" | wc -c | tr -d ' ')" = 32 ] || exit 12
+printf 'KEY_GENERATION_PASS\\n'
+"""
+        for _ in range(5):
+            result=subprocess.run(["sh","-c",program],capture_output=True,
+                                  text=True,timeout=5)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(result.stdout.strip(),"KEY_GENERATION_PASS")
+
     def test_windows_wrapper_validates_fingerprint_hash_and_redacts_wifi_password(self):
         s=(ROUTER/"VeCI-WE5927-Audit-and-Repair-WiFi.ps1").read_text()
         self.assertIn("StrictHostKeyChecking=yes",s)

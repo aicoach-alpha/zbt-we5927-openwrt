@@ -138,6 +138,24 @@
       "hardware_executed": false,
       "source_commit": "27976b9c799c065800aac44a9b1ee3e75680cbb4",
       "new_wrapper_sha256": "a295e8399a9d9b437a449af34fd278abf177b993606c5b756267f67e29774eae"
+    },
+    "third_physical_attempt_20261124_035008_utc": {
+      "source": "owner PowerShell SSH output",
+      "board": "zbtlink,zbt-we5927",
+      "kernel": "6.12.112",
+      "ram_available_kib": 15340,
+      "overlay_available_kib": 1804,
+      "lte_bound_https": "PASS_HTTP_200",
+      "wireless_disabled": true,
+      "wireless_psk_present": false,
+      "backup": "/root/veci-router-uat/wireless-before-20261124T035014Z.uci",
+      "failure": "WIFI_REPAIR_STOP=key_generation_failed; /bin/sh: od: not found",
+      "rollback": "WIFI_UCI_ROLLBACK=PASS",
+      "driver_activation_attempted": false,
+      "wifi_hardware_pass": false,
+      "route_and_modem_intentionally_untouched": true,
+      "correction": "kernel CSPRNG UUIDv4 122bit entropy, 32-char lowercase hex WPA2 secret; tr already confirmed on device",
+      "new_regression": "exact shell keygen branch runs without od/base64/openssl and does not emit secrets"
     }
   }
 }
