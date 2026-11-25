@@ -1,8 +1,6 @@
 name: OEM Updated development image (not flash approved)
 on:
-  push:
-    branches: [build/oem-updated-we5927-2sim]
-    paths: ['.github/workflows/oem-updated-lab-image.yml']
+  # Full compilation is deliberately manual. Source CI is independent.
   workflow_dispatch:
 permissions:
   contents: read

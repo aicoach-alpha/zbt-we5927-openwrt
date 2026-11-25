@@ -23,3 +23,10 @@ This produces static assets and an operation inventory, not a bootable image. Do
 3. Port LAN/WAN, Wi-Fi main and guest, LTE dual SIM, SMS, DHCP, DNS, firewall, diagnostics, watchdog, upgrade and backup; preserve supported OEM menu and settings. Hidden/unsupported options must be recorded honestly. Local migration allowlist only; no baked-in credentials.
 4. Verify firmware image size including sufficient overlay reserve, RAM, root landing, API integration, feature regressions, signature and trust anchor. No writing U-Boot or calibration partitions.
 5. Physical boot, LTE DHCP and recovery, Wi-Fi, rollback and 72-hour acceptance are separate from source tests. Existing VeCI hardware evidence cannot be transferred to OEM Updated. Until then: BACKEND_READY=NO, FIRMWARE_BUILT=NO, FLASH_ALLOWED=NO.
+
+## Full-build discipline (owner requirement)
+- Do not launch full firmware compilation on individual source changes or on a timer. Run lightweight source and integration tests as often as required.
+- First complete the required OEM operation inventory, native backend, security, hardware policy parity, and all feasible offline regressions. Record evidence against the exact candidate commit. Unknown, unimplemented or untested required functionality blocks a full build; do not treat syntax checks as functional acceptance.
+- Dispatch the full-image workflow only after the pre-build acceptance review passes. Require actual downloadable BIN, manifest, SHA256, round-trip verification and post-build checks. This lab workflow remains explicitly not flash-approved.
+- If post-build inspection fails, aggregate findings, fix all known defects, rerun affected offline tests, then dispatch one new full build. Do not rerun unchanged failing builds.
+- Physical boot, modem, actual Wi-Fi and 72-hour stability remain separate hardware gates; never claim these passed based on a source test.
