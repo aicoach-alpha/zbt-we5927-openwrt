@@ -1,0 +1,49 @@
+name: OEM Updated isolated source gate
+on:
+  push:
+    branches: [build/oem-updated-we5927-2sim]
+    paths: ['rebuild/oem-updated/**', '.github/workflows/oem-updated-source.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate isolated source and staging guards
+        run: |
+          set -eu
+          python3 -m py_compile rebuild/oem-updated/stage_oem_ui.py
+          sh -n rebuild/oem-updated/backend/read-only-adapter.sh
+          python3 - <<'PY'
+          import importlib.util, tempfile, json
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location("stage", "rebuild/oem-updated/stage_oem_ui.py")
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          with tempfile.TemporaryDirectory() as tmp:
+              p=Path(tmp); root=p/"root"; (root/"www/assets").mkdir(parents=True)
+              for i in range(79): (root/"www/assets"/f"{i}.js").write_text("/* synthetic fixture */")
+              for name in m.STATIC[1:]: (root/name).write_text("{}")
+              (root/"www/menu_conf1.json").write_text(json.dumps({"fixture":{str(i):1 for i in range(20)}}))
+              (root/"www/cgi-bin").mkdir()
+              (root/m.API).write_text("\n".join('[ "$op" == "op%d" ]' % i for i in range(158)))
+              result=m.prepare(root,p/"preview")
+              assert len(result["assets"])==85 and len(result["operations"])==158
+              assert not result["flash_allowed"] and not result["backend_ready"]
+              assert not (p/"preview/preview/www/cgi-bin").exists()
+              (root/"www/assets/link.js").symlink_to(root/m.API)
+              try: m.prepare(root,p/"rejected")
+              except ValueError: pass
+              else: raise AssertionError("symlink accepted")
+              assert not (p/"rejected").exists()
+              invalid=p/"invalid.bin"; invalid.write_bytes(b"not OEM")
+              try: m.validate_image(invalid)
+              except ValueError: pass
+              else: raise AssertionError("unverified image accepted")
+          print("SYNTHETIC_STAGING_GUARDS_PASS")
+          PY
+          echo FIRMWARE_BUILT=NO
+          echo FLASH_ALLOWED=NO
