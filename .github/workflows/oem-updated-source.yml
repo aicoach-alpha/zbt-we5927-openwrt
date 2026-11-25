@@ -2,7 +2,7 @@ name: OEM Updated isolated source gate
 on:
   push:
     branches: [build/oem-updated-we5927-2sim]
-    paths: ['rebuild/oem-updated/**', 'scripts/tests/test_oem_cgi_routes.py', '.github/workflows/oem-updated-source.yml']
+    paths: ['rebuild/oem-updated/**', 'scripts/tests/test_oem_*.py', '.github/workflows/oem-updated-source.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,7 +17,7 @@ jobs:
           set -eu
           python3 -m py_compile rebuild/oem-updated/stage_oem_ui.py
           sh -n rebuild/oem-updated/backend/read-only-adapter.sh
-          python3 -m unittest discover -s scripts/tests -p 'test_oem_cgi_routes.py' -v
+          python3 -m unittest discover -s scripts/tests -p 'test_oem_*.py' -v
           python3 -m unittest discover -s scripts/tests -p 'test_lte_*.py' -v
           python3 - <<'PY'
           import importlib.util, tempfile, json

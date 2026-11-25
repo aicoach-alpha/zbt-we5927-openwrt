@@ -1,0 +1,487 @@
+{
+  "schema": 1,
+  "reference_sha256": "80529b8e9c31d686eb7f63a1517d6dbcf781f26cb4aceb7b8b1ff27c2d51d1f9",
+  "operations": {
+    "activate_ngrokc": {
+      "state": "UNIMPLEMENTED"
+    },
+    "app_home": {
+      "state": "UNIMPLEMENTED"
+    },
+    "bootflag": {
+      "state": "UNIMPLEMENTED"
+    },
+    "change_password": {
+      "state": "UNIMPLEMENTED"
+    },
+    "change_password_nocommit": {
+      "state": "UNIMPLEMENTED"
+    },
+    "config_ss_redir": {
+      "state": "UNIMPLEMENTED"
+    },
+    "config_ss_tunnel_dns": {
+      "state": "UNIMPLEMENTED"
+    },
+    "config_ss_tunnel_server": {
+      "state": "UNIMPLEMENTED"
+    },
+    "ddns_detection": {
+      "state": "UNIMPLEMENTED"
+    },
+    "delete_static_dhcp": {
+      "state": "UNIMPLEMENTED"
+    },
+    "enable_mptcp_set": {
+      "state": "UNIMPLEMENTED"
+    },
+    "getAutoreboot": {
+      "state": "UNIMPLEMENTED"
+    },
+    "getWiFi2": {
+      "state": "UNIMPLEMENTED"
+    },
+    "getWiFi5": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_4g": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_4g_log": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_ac_info": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_ac_switch": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_acl_rule": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_acl_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_arp": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_cloud_login": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_days_traffic": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_ddns": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_ddns_log": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_ddns_stat": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_dhcp_allocation": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_dhcp_config": {
+      "state": "PROTOTYPE"
+    },
+    "get_disk": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_dmz": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_fw_setting": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_gps": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_imei": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_l2tp_msg": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_l2tp_sl_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_l2tp_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_lan_config": {
+      "state": "PROTOTYPE"
+    },
+    "get_lan_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_log_list": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_mac_blacklist": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_mesh_topology": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_module_signal": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_module_status": {
+      "state": "FIXTURE_PASS"
+    },
+    "get_mptcp_info": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_n2n": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_n2n_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_nat_acceleration": {
+      "state": "PROTOTYPE"
+    },
+    "get_netwatchdog": {
+      "state": "PROTOTYPE"
+    },
+    "get_network_topology": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_ntp": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_openvpn_msg": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_openvpn_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_parents_ctrl_rule": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_parents_ctrl_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_port": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_pppoe_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_pptp_msg": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_pptp_sl_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_pptp_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_qos": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_qos_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_redirect_dnat": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_samba_info": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_ss_dns": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_ss_redir": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_ss_tunnel_info": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_static_dhcp": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_static_route": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_sys_version": {
+      "state": "PROTOTYPE"
+    },
+    "get_system_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_ttl": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_voice": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_wan_config": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_wan_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_wan_traffic": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_web_msg": {
+      "state": "PROTOTYPE"
+    },
+    "get_wifi_apclient_config": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_wifi_apclient_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_wifi_client": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_wifi_guest": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_wifi_guest5": {
+      "state": "UNIMPLEMENTED"
+    },
+    "get_wifi_power": {
+      "state": "UNIMPLEMENTED"
+    },
+    "guide_commit": {
+      "state": "UNIMPLEMENTED"
+    },
+    "home_json": {
+      "state": "UNIMPLEMENTED"
+    },
+    "language_get": {
+      "state": "PROTOTYPE"
+    },
+    "language_set": {
+      "state": "UNIMPLEMENTED"
+    },
+    "login": {
+      "state": "PROTOTYPE"
+    },
+    "logout": {
+      "state": "PROTOTYPE"
+    },
+    "long_link": {
+      "state": "PROTOTYPE"
+    },
+    "mesh_botton": {
+      "state": "UNIMPLEMENTED"
+    },
+    "online_upgrade_apply": {
+      "state": "UNIMPLEMENTED"
+    },
+    "online_upgrade_check": {
+      "state": "UNIMPLEMENTED"
+    },
+    "pppoe_detection": {
+      "state": "UNIMPLEMENTED"
+    },
+    "pppoe_disconnect": {
+      "state": "UNIMPLEMENTED"
+    },
+    "pppoe_reconnect": {
+      "state": "UNIMPLEMENTED"
+    },
+    "reboot": {
+      "state": "UNIMPLEMENTED"
+    },
+    "refresh_days_traffic": {
+      "state": "UNIMPLEMENTED"
+    },
+    "reset": {
+      "state": "UNIMPLEMENTED"
+    },
+    "search_ctcode_and_channals": {
+      "state": "UNIMPLEMENTED"
+    },
+    "send_at": {
+      "state": "UNIMPLEMENTED"
+    },
+    "setAutoreboot": {
+      "state": "UNIMPLEMENTED"
+    },
+    "setWiFi2": {
+      "state": "UNIMPLEMENTED"
+    },
+    "setWiFi2_nocommit": {
+      "state": "UNIMPLEMENTED"
+    },
+    "setWiFi5": {
+      "state": "UNIMPLEMENTED"
+    },
+    "setWiFi5_nocommit": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_4g": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_4g_sim": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_ac_info": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_ac_switch": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_acl_rule": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_acl_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_cloud_login": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_ddns": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_dhcp_config": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_disk": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_dmz": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_fw_setting": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_imei": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_l2tp": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_lan_config": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_mac_blacklist": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_n2n": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_nat_acceleration": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_netwatchdog": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_ntp": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_openvpn": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_parents_ctrl_rule": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_parents_ctrl_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_port": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_pptp": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_qos": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_qos_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_redirect_dnat": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_samba_info": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_samba_status": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_static_dhcp": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_static_route": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_ttl": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_voice": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_wan_config": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_wan_config_nocommit": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_wifi_apclient": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_wifi_client": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_wifi_guest": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_wifi_guest5": {
+      "state": "UNIMPLEMENTED"
+    },
+    "set_wifi_power": {
+      "state": "UNIMPLEMENTED"
+    },
+    "setbootflag": {
+      "state": "UNIMPLEMENTED"
+    },
+    "site_survey": {
+      "state": "UNIMPLEMENTED"
+    },
+    "sysupgrade_backup": {
+      "state": "UNIMPLEMENTED"
+    },
+    "sysupgrade_backup_execute": {
+      "state": "UNIMPLEMENTED"
+    },
+    "sysupgrade_backup_upload": {
+      "state": "UNIMPLEMENTED"
+    },
+    "sysupgrade_execute": {
+      "state": "UNIMPLEMENTED"
+    },
+    "sysupgrade_upload_file": {
+      "state": "UNIMPLEMENTED"
+    },
+    "test_nslookup": {
+      "state": "UNIMPLEMENTED"
+    },
+    "test_ping": {
+      "state": "UNIMPLEMENTED"
+    },
+    "test_traceroute": {
+      "state": "UNIMPLEMENTED"
+    },
+    "test_wget": {
+      "state": "UNIMPLEMENTED"
+    },
+    "url_upgrade": {
+      "state": "UNIMPLEMENTED"
+    }
+  },
+  "additional_gates": {
+    "lte_policy_parity": false,
+    "full_ui_integration": false,
+    "security_regression": false,
+    "native_service_integration": false,
+    "release_signing_preflight": false
+  }
+}

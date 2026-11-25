@@ -70,6 +70,41 @@ case "$1" in
         json_add_string dhcp_option "$options"
         json_close_object
         ;;
+    get_module_status)
+        # Exactly one physical modem (two selectable SIM slots).
+        # Do not report public Internet from a USB DHCP address.
+        [ "$(get network.lte.device)" = usb0 ] || error "LTE device mismatch"
+        state="$(ubus -t 3 call network.interface.lte status)" || error "LTE state unavailable"
+        [ -n "$state" ] || error "LTE state unavailable"
+        up="$(printf '%s' "$state" | jsonfilter -e '@.up')" || error "LTE state invalid"
+        case "$up" in true|false) ;; *) error "LTE state invalid";; esac
+        uptime="$(printf '%s' "$state" | jsonfilter -e '@.uptime' || true)"
+        addr="$(printf '%s' "$state" | jsonfilter -e '@["ipv4-address"][0].address' || true)"
+        [ "$up" = true ] || { addr=""; uptime=0; }
+        case "$uptime" in ''|*[!0-9]*) uptime=0;; esac
+        mac="$(cat /sys/class/net/usb0/address 2>/dev/null | tr 'a-z' 'A-Z')" || error "LTE MAC unavailable"
+        rx="$(cat /sys/class/net/usb0/statistics/rx_bytes 2>/dev/null)" || error "LTE counters unavailable"
+        tx="$(cat /sys/class/net/usb0/statistics/tx_bytes 2>/dev/null)" || error "LTE counters unavailable"
+        case "$rx:$tx" in *[!0-9:]*|:*|*:) error "LTE counters invalid";; esac
+        [ -n "$mac" ] || error "LTE MAC unavailable"
+        ipv6="$(printf '%s' "$state" | jsonfilter -e '@["ipv6-address"][*].address' || true)"
+        success "get module status success"
+        json_add_array data
+        json_add_object
+        json_add_string ifname usb0
+        json_add_string host "${addr:-0.0.0.0}"
+        json_add_string macaddr "$mac"
+        json_add_string txall "$tx"
+        json_add_string rxall "$rx"
+        json_add_string uptime "$uptime"
+        json_add_array ipv6
+        if [ "$up" = true ]; then
+            for address in $ipv6; do json_add_string "" "$address"; done
+        fi
+        json_close_array
+        json_close_object
+        json_close_array
+        ;;
     get_netwatchdog)
         # Do not claim legacy settings are active before native policy migration.
         host1="$(get oem_updated.watchdog.detect_host1)" || error "OEM policy not configured"

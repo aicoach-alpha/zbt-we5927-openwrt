@@ -15,17 +15,27 @@ QUERY_STRING="${QUERY_STRING:-}"
 [ "${#QUERY_STRING}" -le 1024 ] || err -4 "query too large"
 # Only the operation is consumed. No eval, shell-sourced input, or legacy CGI.
 op=
+module_section=
+module_seen=0
 oldifs=$IFS; IFS='&'; set -f
 for arg in $QUERY_STRING; do
     case "$arg" in
         op=*) [ -z "$op" ] || err -4 "duplicate operation"; op="${arg#op=}";;
         access_token=*|password=*|username=*) err -4 "credentials in URL refused";;
+        module_section=*)
+            [ "$module_seen" = 0 ] || err -4 "duplicate module"
+            module_seen=1
+            module_section="${arg#module_section=}"
+            case "$module_section" in lte|4gwan|4gwan1) ;; *) err -4 "unknown modem";; esac;;
         t=*) ;;
         *) err -4 "unexpected parameter";;
     esac
 done
 IFS=$oldifs
 case "$op" in ''|*[!a-zA-Z0-9_]*) err -4 "invalid operation";; esac
+if [ "$module_seen" = 1 ]; then
+    [ "$op" = get_module_status ] || err -4 "unexpected module parameter"
+fi
 case "$op" in
     language_get)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
@@ -45,7 +55,7 @@ case "$op" in
     long_link)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         reply '{"code":"1","reason":"success"}' ;;
-    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg)
+    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         data="$(/usr/libexec/oem-updated/read-only-adapter "$op")" || err -4 "backend unavailable"
         [ -n "$data" ] || err -4 "backend unavailable"
