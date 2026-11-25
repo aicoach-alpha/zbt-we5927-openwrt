@@ -168,7 +168,7 @@ new file mode 100755
 index 0000000..651c45b
 --- /dev/null
 +++ b/package/we5927-lte/files/etc/uci-defaults/99-we5927-lte
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,49 @@
 +#!/bin/sh
 +# LTE defaults. Preserve existing user settings when upgrading.
 +
@@ -198,9 +198,10 @@ index 0000000..651c45b
 +set network.lte.device='usb0'
 +set network.lte.proto='dhcp'
 +set network.lte.metric='5'
-+set network.lte.peerdns='0'
-+add_list network.lte.dns='94.140.14.14'
-+add_list network.lte.dns='94.140.15.15'
++# Follow the operator/modem DHCP DNS by default. Do not force an
++# unreachable public resolver on cellular WAN. Existing LTE config remains
++# untouched when present and user-selected DNS stays respected.
++set network.lte.peerdns='1'
 +EOF
 +	uci -q commit network
 +fi

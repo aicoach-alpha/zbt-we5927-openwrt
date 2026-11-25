@@ -27,9 +27,10 @@ set network.lte=interface
 set network.lte.device='usb0'
 set network.lte.proto='dhcp'
 set network.lte.metric='5'
-set network.lte.peerdns='0'
-add_list network.lte.dns='94.140.14.14'
-add_list network.lte.dns='94.140.15.15'
+# Follow the operator/modem DHCP DNS by default. Do not force an
+# unreachable public resolver on cellular WAN. Existing LTE config remains
+# untouched when present and user-selected DNS stays respected.
+set network.lte.peerdns='1'
 EOF
 	uci -q commit network
 fi
