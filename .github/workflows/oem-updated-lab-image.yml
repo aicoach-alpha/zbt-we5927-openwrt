@@ -125,3 +125,75 @@ jobs:
           echo BACKEND_READY=NO
           echo RELEASE_SIGNATURE_VERIFIED=NO
           echo FLASH_ALLOWED=NO
+      - name: Package inspected OEM lab image and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt-oem"
+          out="$RUNNER_TEMP/oem-lab-artifact"
+          mkdir -p "$out"
+          mapfile -t images < <(find "$root/bin/targets/ramips/mt76x8" -maxdepth 1 -name '*zbt-we5927*squashfs-sysupgrade.bin' -type f -print)
+          test "${#images[@]}" -eq 1
+          img="${images[0]}"
+          test -s "$img"
+          install -m 0644 "$img" "$out/ZBT-WE5927-OEM-Updated-LAB-NOT-FLASH-APPROVED.bin"
+          python3 - "$out" "$root" <<'PY'
+          import hashlib,json,os,pathlib,struct,subprocess,sys
+          out,root=map(pathlib.Path,sys.argv[1:])
+          p=out/"ZBT-WE5927-OEM-Updated-LAB-NOT-FLASH-APPROVED.bin"
+          b=p.read_bytes()
+          off=b.find(b"hsqs")
+          assert 0<off and off+48<=len(b)<=7995392
+          used=struct.unpack_from("<Q",b,off+40)[0]
+          assert 96<=used<=len(b)-off
+          reserve=7995392-((off+used+65535)//65536)*65536
+          assert reserve>=524288
+          digest=hashlib.sha256(b).hexdigest()
+          manifest=dict(variant="OEM Updated",channel="lab",file=p.name,bytes=len(b),
+                        sha256=digest,nominal_overlay_reserve_bytes=reserve,
+                        source_commit=os.environ["GITHUB_SHA"],run_id=os.environ["GITHUB_RUN_ID"],
+                        run_attempt=os.environ["GITHUB_RUN_ATTEMPT"],
+                        openwrt_commit=subprocess.check_output(["git","-C",str(root),"rev-parse","HEAD"],text=True).strip(),
+                        rom_inspection="PASS",backend_ready=False,lte_policy_parity="NOT_VERIFIED",
+                        release_signature_verified=False,flash_allowed=False)
+          (out/"build-manifest.json").write_text(json.dumps(manifest,indent=2)+"\n")
+          (out/"SHA256SUMS").write_text(f"{digest}  {p.name}\n")
+          (out/"READ-ME-LAB-ONLY.txt").write_text("For offline inspection and software testing only. Do not flash. OEM backend and LTE parity are not verified. Release signature is not verified.\n")
+          PY
+          (cd "$out"; sha256sum -c SHA256SUMS)
+      - name: Upload mandatory firmware artifact
+        id: publish
+        uses: actions/upload-artifact@v7
+        with:
+          name: WE5927-OEM-Updated-LAB-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/oem-lab-artifact/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+      - name: Download published firmware for independent byte verification
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.publish.outputs.artifact-id }}
+          path: ${{ runner.temp }}/oem-lab-roundtrip
+          digest-mismatch: error
+      - name: Require intact downloadable deliverable
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.publish.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.publish.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.publish.outputs.artifact-url }}
+        run: |
+          set -euo pipefail
+          test -n "$ARTIFACT_ID"
+          test -n "$ARTIFACT_URL"
+          [[ "$ARTIFACT_DIGEST" =~ ^[a-fA-F0-9]{64}$ ]]
+          cd "$RUNNER_TEMP/oem-lab-roundtrip"
+          test -s SHA256SUMS
+          test -s build-manifest.json
+          test -s READ-ME-LAB-ONLY.txt
+          sha256sum -c SHA256SUMS
+          cmp build-manifest.json "$RUNNER_TEMP/oem-lab-artifact/build-manifest.json"
+          cmp SHA256SUMS "$RUNNER_TEMP/oem-lab-artifact/SHA256SUMS"
+          cmp ZBT-WE5927-OEM-Updated-LAB-NOT-FLASH-APPROVED.bin "$RUNNER_TEMP/oem-lab-artifact/ZBT-WE5927-OEM-Updated-LAB-NOT-FLASH-APPROVED.bin"
+          printf '## OEM Updated lab deliverable\n\nArtifact: %s\n\nArchive SHA256: %s\n\nRound-trip byte verification: PASS\n\nFLASH_ALLOWED=NO\n' "$ARTIFACT_URL" "$ARTIFACT_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+
