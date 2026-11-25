@@ -1,0 +1,7 @@
+test_exact_oem_gpio37_reset38_lan_leds_and_sim46_not_confused (test_owner_board_hardware_acceptance.BoardHardwareAcceptance.test_exact_oem_gpio37_reset38_lan_leds_and_sim46_not_confused) ... ok
+test_led_button_runtime_uses_kernel_sysfs_and_no_gpio_writes (test_owner_board_hardware_acceptance.BoardHardwareAcceptance.test_led_button_runtime_uses_kernel_sysfs_and_no_gpio_writes) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.014s
+
+OK

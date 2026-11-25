@@ -1,9 +1,7 @@
-$ python3 -m unittest discover -s /home/andre/projects/zbt-we2825-veci-openwrt/worktrees/build-zbt-we2825-oem-veci-20261119/scripts/tests -p test_owner_ntp_acceptance.py -v
-
 test_real_rpc_ntp_staging_and_rollback (test_owner_ntp_acceptance.NtpSourceAcceptance.test_real_rpc_ntp_staging_and_rollback) ... ok
 test_uci_acl_and_no_radio_lte_modification (test_owner_ntp_acceptance.NtpSourceAcceptance.test_uci_acl_and_no_radio_lte_modification) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 5.649s
+Ran 2 tests in 8.803s
 
 OK

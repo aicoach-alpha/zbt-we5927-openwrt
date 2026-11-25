@@ -43,8 +43,10 @@ define Package/veci-v2-ui/install
 	$(INSTALL_DATA) ./files/www/veci2/cron.js $(1)/www/veci2/cron.js
 	$(INSTALL_DATA) ./files/www/veci2/services.js $(1)/www/veci2/services.js
 	$(INSTALL_BIN) ./files/www/cgi-bin/veci2-backup $(1)/www/cgi-bin/veci2-backup
+	$(INSTALL_BIN) ./files/www/cgi-bin/veci2-restore $(1)/www/cgi-bin/veci2-restore
 	$(INSTALL_DATA) ./files/www/veci2/backup.js $(1)/www/veci2/backup.js
 	$(INSTALL_DATA) ./files/www/veci2/watchdog-status.js $(1)/www/veci2/watchdog-status.js
+	$(INSTALL_DATA) ./files/www/veci2/observability.js $(1)/www/veci2/observability.js
 	$(INSTALL_DATA) ./files/www/veci2/guest-check.js $(1)/www/veci2/guest-check.js
 	$(INSTALL_DATA) ./files/www/veci2/update-policy.js $(1)/www/veci2/update-policy.js
 	$(INSTALL_DATA) ./files/www/veci2/addon-profiles.js $(1)/www/veci2/addon-profiles.js

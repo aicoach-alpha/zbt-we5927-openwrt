@@ -1,0 +1,7 @@
+{
+  "veci-v2-observability": {
+    "description": "Read-only exact-board bounded network health telemetry",
+    "read": {"ubus": {"veci.v2.observability": ["status"]}},
+    "write": {"ubus": {}}
+  }
+}

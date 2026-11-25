@@ -1,0 +1,13 @@
+test_configured_network_must_belong_to_selected_modem (test_lte_rndis_identity.RndisIdentity.test_configured_network_must_belong_to_selected_modem) ... ok
+test_cli_reports_usb_registration_binding_and_link (test_lte_rndis_identity.RndisIdentity.test_cli_reports_usb_registration_binding_and_link) ... ok
+test_rndis_local_link_not_claimed_as_public_internet (test_lte_coldboot_phase.TestColdbootReadiness.test_rndis_local_link_not_claimed_as_public_internet) ... ok
+test_invalid_lte_protocol_fails_closed (test_lte_coldboot_phase.TestColdbootReadiness.test_invalid_lte_protocol_fails_closed) ... ok
+test_missing_usb_interface (test_lte_coldboot_phase.TestColdbootReadiness.test_missing_usb_interface) ... ok
+test_manual_reconnect_skips_healthy_internet (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_skips_healthy_internet) ... ok
+test_manual_reconnect_renews_missing_local_gateway_first (test_lte_recovery_guard.TestLowDowntimeReconnect.test_manual_reconnect_renews_missing_local_gateway_first) ... ok
+test_detached_modem_allows_reset (test_lte_recovery_guard.TestLowDowntimeReconnect.test_detached_modem_allows_reset) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.553s
+
+OK

@@ -42,9 +42,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The source-only gate is intentionally first. It neither fetches
+          # nor compiles OpenWrt firmware and rejects incomplete modules.
           python3 rebuild/veci-v2/ci/source-completion-gate.py
-          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -q
-          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py' -q
 
       - name: Install OpenWrt host dependencies
         shell: bash
@@ -53,8 +53,32 @@ jobs:
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential clang bison flex gawk gettext git gcc-multilib \
-            libncurses-dev libssl-dev rsync subversion swig unzip wget \
+            libncurses-dev libssl-dev libjson-c-dev cmake pkg-config busybox \
+            rsync subversion swig unzip wget \
             zlib1g-dev python3 python3-setuptools file xz-utils zstd squashfs-tools
+
+      # Host-only test dependencies are compiled AFTER the 40/40 source gate.
+      # These are native UCI/json tools, NOT firmware or flashable artifacts.
+      - name: Provision pinned native UCI and libubox test environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/provision-native-uci-tests.sh "$RUNNER_TEMP/veci-host-test-tools"
+
+      - name: Execute all native source tests before OpenWrt firmware build
+        shell: bash
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/veci-host-test-tools/native-test-env.sh"
+          test -x "$VECI_HOST_UCI"
+          test -x "$VECI_LIBUBOX_PREFIX/bin/jshn"
+          # Check every referenced original commit, immutable remote tag and
+          # source checksum; full git history alone does not fetch dangling
+          # local commits absent from GitHub refs.
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/ci/verify-provenance-refs.py
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -q
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py' -q
+          echo SOURCE_NATIVE_REGRESSION_COMPLETE=PASS
 
       - name: Pin, stage and verify exact 2SIM board sources
         shell: bash
@@ -194,6 +218,9 @@ jobs:
           # returns exit code 2 even when regular files are extracted.
           # Extract as root so device-node errors remain a hard gate.
           sudo unsquashfs -no-progress -d "$rom" "$squash"
+          # Verify all 40 required modules' exact reviewed source payloads
+          # in the FINAL extracted image, not merely package metadata.
+          python3 "$GITHUB_WORKSPACE/rebuild/veci-v2/ci/check-all-core-rom.py" "$rom"
           test -s "$rom/usr/libexec/rpcd/veci.v2" || {
             echo 'FINAL_SQUASHFS_MISSING_RPCD_V2' >&2; exit 1;
           }
@@ -281,7 +308,7 @@ jobs:
       # Deliberately restricted to an explicitly requested, reviewed build
       # branch. Only manual explicit export or a marked build commit exports; ordinary pushes/PR runs cannot.
       - name: Prepare verified unsigned VeCI v2 image for offline signing
-        if: ${{ ((github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))) || (github.ref == 'refs/heads/build/zbt-we2825-oem-veci-20261119' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]'))))) }}
+        if: ${{ (github.ref == 'refs/heads/feat/we5927-39module-reconcile-20261124' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.ref == 'refs/heads/development/we2825-all13-integration-20261123' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (((github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))) || (github.ref == 'refs/heads/build/zbt-we2825-oem-veci-20261119' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))))) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -367,7 +394,7 @@ jobs:
           printf '%s\n' 'UNSIGNED LABORATORY IMAGE. DO NOT FLASH.' 'Hardware UAT, offline signing, router trust anchor, recovery validation still required.' > "$out/DO_NOT_FLASH.txt"
 
       - name: Upload explicit unsigned image for independent offline verification
-        if: ${{ ((github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))) || (github.ref == 'refs/heads/build/zbt-we2825-oem-veci-20261119' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]'))))) }}
+        if: ${{ (github.ref == 'refs/heads/feat/we5927-39module-reconcile-20261124' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.ref == 'refs/heads/development/we2825-all13-integration-20261123' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (((github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))) || (github.ref == 'refs/heads/build/zbt-we2825-oem-veci-20261119' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))))) }}
         uses: actions/upload-artifact@v4
         with:
           name: veci-v2-we5927-2sim-unsigned-${{ github.sha }}

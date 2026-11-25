@@ -396,13 +396,28 @@ async function verifyInternetLive() {
     if (sid !== session) return;
     const verified = result.verified === true && result.https_code === 200 &&
       result.dns_verified === true && result.source === 'usb0_https';
+    const publicWithoutDns = result.source === 'usb0_https' &&
+      result.reason === 'hostname_dns_or_endpoint_unavailable' &&
+      result.public_https_verified === true;
+    const modemButNoInternet = result.source === 'usb0_https' &&
+      result.reason === 'modem_connected_public_unavailable_check_quota' &&
+      result.modem_http_verified === true;
     badge.className = verified ? 'indicator good' : 'indicator';
-    badge.textContent = verified ? 'Internet LTE aktif' : 'Belum terverifikasi';
+    badge.textContent = verified ? 'Internet LTE aktif' :
+      modemButNoInternet ? 'Modem aktif, internet publik gagal' :
+      publicWithoutDns ? 'HTTPS langsung aktif, DNS perlu diperiksa' :
+      'Internet belum terverifikasi';
     detail.textContent = verified ? 'HTTPS 200 · DNS berhasil · via USB0' :
-      'Tidak ada keberhasilan HTTPS yang terkonfirmasi';
+      modemButNoInternet ?
+        'Modem terhubung tetapi koneksi publik belum berhasil. Periksa kuota/paket data atau gangguan operator sebelum merestart modem.' :
+      publicWithoutDns ?
+        'HTTPS publik tanpa DNS berhasil. Periksa DNS atau endpoint; jaringan LTE tidak perlu langsung direset.' :
+        'Belum ada akses publik HTTPS yang terkonfirmasi. Bukan bukti modem atau kuota rusak.';
     const text = card.querySelector('strong');
     text.className = verified ? 'good' : 'warn';
-    text.textContent = verified ? 'HTTPS & DNS berhasil' : 'Belum terverifikasi';
+    text.textContent = verified ? 'HTTPS & DNS berhasil' :
+      modemButNoInternet ? 'Modem aktif, internet belum tersedia' :
+      publicWithoutDns ? 'HTTPS langsung berhasil' : 'Belum terverifikasi';
   } catch (error) {
     if (sid !== session) return;
     badge.textContent = 'Belum terverifikasi';

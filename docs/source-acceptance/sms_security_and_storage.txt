@@ -1,0 +1,9 @@
+test_sms_requires_user_action_and_never_retries_unknown_outcome (test_veci_v2_sms_ui.SmsCenterV2.test_sms_requires_user_action_and_never_retries_unknown_outcome) ... ok
+test_sms_private_data_cleared_on_logout (test_veci_v2_sms_ui.SmsCenterV2.test_sms_private_data_cleared_on_logout) ... ok
+test_port_change_before_delete (test_sms_port_transaction.SmsPortTransaction.test_port_change_before_delete) ... ok
+test_port_change_before_submit (test_sms_port_transaction.SmsPortTransaction.test_port_change_before_submit) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 1.950s
+
+OK

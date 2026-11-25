@@ -26,11 +26,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Provision real native UCI and libubox test tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential cmake pkg-config libjson-c-dev
+          bash scripts/ci/provision-native-uci-tests.sh "$RUNNER_TEMP/veci-host-test-tools"
       - name: Validate source and regressions
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+          source "$RUNNER_TEMP/veci-host-test-tools/native-test-env.sh"
+          test -x "$VECI_HOST_UCI"
+          test -x "$VECI_LIBUBOX_PREFIX/bin/jshn"
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
           for script in rebuild/veci-v2/packages/veci-v2-runtime/veci2-status \
                         rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk \
                         rebuild/veci-v2/ci/stage-v2-source.sh \

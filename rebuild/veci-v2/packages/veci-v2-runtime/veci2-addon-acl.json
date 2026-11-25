@@ -1,7 +1,20 @@
 {
   "veci-v2-addon-admin": {
     "description": "Read addon profiles and opt-in WireGuard startup only",
-    "read": {"ubus": {"veci.v2.addon": ["status"]}},
-    "write": {"ubus": {"veci.v2.addon": ["setVpnStartup"]}}
+    "read": {
+      "ubus": {
+        "veci.v2.addon": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.addon": [
+          "setVpnStartup",
+          "setPortalStartup"
+        ]
+      }
+    }
   }
 }

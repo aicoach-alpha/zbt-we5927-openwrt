@@ -1,0 +1,12 @@
+test_wrong_hash_refused (test_verify_veci_image.FailClosedImageTests.test_wrong_hash_refused) ... ok
+test_signature_missing_refused (test_verify_veci_image.FailClosedImageTests.test_signature_missing_refused) ... ok
+test_size_limit_refused (test_verify_veci_image.FailClosedImageTests.test_size_limit_refused) ... ok
+test_wrong_board_refused (test_verify_veci_image.FailClosedImageTests.test_wrong_board_refused) ... ok
+test_missing_trust_anchor_refused (test_verify_veci_image.FailClosedImageTests.test_missing_trust_anchor_refused) ... ok
+test_saved_policy_controls_both_apply_paths (test_veci_update_policy.PolicyTest.test_saved_policy_controls_both_apply_paths) ... ok
+test_updates_only_in_updates_page (test_veci_single_firmware_update_ui.NativeUXGate.test_updates_only_in_updates_page) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.201s
+
+OK

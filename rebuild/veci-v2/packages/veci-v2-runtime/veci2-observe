@@ -1,0 +1,110 @@
+#!/bin/sh
+# VeCI v2 kernel/network observability for the exact ZBT-WE5927.
+# Source-only until hardware UAT: NEVER reboot, toggle GPIO, reset modem,
+# restart Wi-Fi/LTE, or claim the external Internet is reachable.
+set -eu
+umask 077
+export LC_ALL=C
+store=/tmp/veci2-observe
+log=$store/samples.jsonl
+lock=/var/run/veci2-observe.lock
+board=/tmp/sysinfo/board_name
+case "$(cat "$board" 2>/dev/null || :)" in
+  zbtlink,zbt-we5927) ;;
+  *) echo '{"ok":false,"error":"unsupported_board"}'; exit 1 ;;
+esac
+digits() { case "$1" in ''|*[!0-9]*) printf 0 ;; *) printf '%s' "$1" ;; esac; }
+valid_state() { case "$1" in up|down|dormant|unknown) printf '%s' "$1";; *) printf unknown;; esac; }
+get_lte() {
+  value=$(cat /sys/class/net/usb0/carrier 2>/dev/null || :)
+  case "$value" in 0|1) printf '%s' "$value" ;; *) printf -1 ;; esac
+}
+get_ipv4() {
+  # netifd's usb0 address: only return a boolean, never store customer IPs.
+  line=$(ip -o -4 addr show dev usb0 2>/dev/null | head -n 1 || :)
+  case "$line" in *" inet "*) printf 1 ;; *) printf 0 ;; esac
+}
+get_route() {
+  # This is NOT public Internet reachability proof.
+  ip -4 route show default 2>/dev/null | grep -Eq '(^|[[:space:]])dev[[:space:]]usb0([[:space:]]|$)' &&
+    printf 1 || printf 0
+}
+sample() {
+  exec 9>"$lock"
+  flock -n 9 || { echo '{"ok":false,"error":"collector_busy"}'; return 1; }
+  mkdir -p "$store" || return 1
+  chmod 700 "$store" || return 1
+  [ ! -L "$log" ] || return 1
+  epoch=$(digits "$(date +%s)")
+  uptime=$(digits "$(cut -d. -f1 /proc/uptime 2>/dev/null || :)")
+  memory=$(digits "$(awk '/^MemAvailable:/ {print $2;exit}' /proc/meminfo 2>/dev/null || :)")
+  carrier=$(get_lte)
+  ipv4=$(get_ipv4)
+  route=$(get_route)
+  wifi=$(valid_state "$(cat /sys/class/net/wlan0/operstate 2>/dev/null || :)")
+  rxerr=$(digits "$(cat /sys/class/net/usb0/statistics/rx_errors 2>/dev/null || :)")
+  txerr=$(digits "$(cat /sys/class/net/usb0/statistics/tx_errors 2>/dev/null || :)")
+  state=unknown
+  if [ "$carrier" = 1 ] && [ "$ipv4" = 1 ] && [ "$route" = 1 ]; then
+    state=local_path_ready
+  elif [ "$carrier" = 0 ] || { [ "$carrier" = 1 ] && [ "$ipv4" = 0 ] && [ "$route" = 0 ]; }; then
+    state=local_path_degraded
+  elif [ "$carrier" != -1 ]; then
+    state=partial
+  fi
+  alert=none
+  if [ "$state" = local_path_degraded ] && [ -f "$log" ]; then
+    # Require three consecutive unhealthy local observations; don't infer
+    # upstream outage from a single failed probe or unknown source.
+    prior=$(tail -n 2 "$log" | grep -Fc '"state":"local_path_degraded"' || :)
+    if [ "$prior" = 2 ]; then alert=degraded_3_samples; fi
+  fi
+  record=$(printf '{"epoch_s":%s,"uptime_s":%s,"memory_available_kib":%s,"usb0_carrier":%s,"usb0_ipv4":%s,"lte_default_route":%s,"wifi_operstate":"%s","usb0_rx_errors":%s,"usb0_tx_errors":%s,"state":"%s","alert":"%s"}' \
+    "$epoch" "$uptime" "$memory" "$carrier" "$ipv4" "$route" "$wifi" "$rxerr" "$txerr" "$state" "$alert")
+  printf '%s\n' "$record" >> "$log" || return 1
+  chmod 600 "$log" || return 1
+  # Bounded tmpfs, no NOR flash wear; samples never carry IP/MAC/IMEI/SSID.
+  # At 30s cadence keep a one-day history, external wired collector for 72h.
+  if [ "$(wc -c < "$log")" -ge 524288 ]; then
+    temp=$(mktemp "$store/prune.XXXXXX") || return 1
+    tail -n 2880 "$log" > "$temp" && chmod 600 "$temp" &&
+      mv "$temp" "$log" || { rm -f "$temp"; return 1; }
+  fi
+  printf '%s\n' "$record"
+}
+status() {
+  if [ ! -f "$log" ] || [ -L "$log" ]; then
+    echo '{"ok":true,"telemetry":"unavailable","hardware_uat":"not_run"}'
+    return 0
+  fi
+  last=$(tail -n 1 "$log" 2>/dev/null || :)
+  [ "$(printf %s "$last" | wc -c)" -le 350 ] || last=
+  case "$last" in
+    '{"epoch_s":'*',"alert":"'*'"}') ;;
+    *) last= ;;
+  esac
+  if [ -z "$last" ]; then
+    echo '{"ok":true,"telemetry":"unavailable","hardware_uat":"not_run"}'
+    return 0
+  fi
+  timestamp=$(printf '%s' "$last" | jsonfilter -e '@.epoch_s' 2>/dev/null || :)
+  case "$timestamp" in ''|*[!0-9]*) echo '{"ok":true,"telemetry":"invalid","hardware_uat":"not_run"}'; return 0 ;; esac
+  now=$(digits "$(date +%s)")
+  age=$((now-timestamp))
+  [ "$age" -ge 0 ] && [ "$age" -le 120 ] || {
+    echo '{"ok":true,"telemetry":"stale","hardware_uat":"not_run"}'; return 0;
+  }
+  printf '{"ok":true,"telemetry":"collected","sample":%s,"hardware_uat":"not_run"}\n' "$last"
+}
+case "$1" in
+  once) sample ;;
+  status) status ;;
+  daemon)
+    while :; do
+      # Use the same code path as single-shot collection. Transient failure
+      # is observable via missed samples; it cannot trigger LTE/AP resets.
+      "$0" once >/dev/null 2>&1 || :
+      sleep 30
+    done ;;
+  *) echo '{"ok":false,"error":"unsupported_method"}'; exit 1 ;;
+esac

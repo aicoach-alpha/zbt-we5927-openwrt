@@ -210,16 +210,33 @@ main() {
       printf '{"source":"kernel_interface_counters","interface":"usb0","rx_bytes":%s,"tx_bytes":%s,"lan_rx_bytes":%s,"lan_tx_bytes":%s}\n' "$rx" "$tx" "$lan_rx" "$lan_tx"
       ;;
     call:internetCheck)
-      # Explicit on-demand probe of USB0 HTTPS + DNS. A DHCP lease alone is not Internet.
+      # Differentiate cellular modem local access from verified public Internet.
+      # Quota can be exhausted while RNDIS IPv4+route+modem admin remain healthy.
+      # Never infer balance, invoke modem AT or change network from a probe.
       if [ ! -d /sys/class/net/usb0 ]; then
         printf '{"verified":false,"source":"usb0_https","reason":"lte_interface_unavailable"}\n'
       else
-        http="$(curl --disable --ipv4 --noproxy '*' --interface 'if!usb0' --connect-timeout 3 --max-time 7 --silent --output /dev/null --write-out '%{http_code}' 'https://www.cloudflare.com/cdn-cgi/trace' 2>/dev/null)" && code=0 || code=$?
+        http="$(curl --disable --ipv4 --noproxy '*' --interface 'if!usb0' --connect-timeout 2 --max-time 5 --silent --output /dev/null --write-out '%{http_code}' 'https://www.cloudflare.com/cdn-cgi/trace' 2>/dev/null)" && code=0 || code=$?
         if [ "$code" -eq 0 ] && [ "$http" = 200 ]; then
-          printf '{"verified":true,"source":"usb0_https","https_code":200,"dns_verified":true}\n'
+          printf '{"verified":true,"source":"usb0_https","https_code":200,"dns_verified":true,"public_https_verified":true,"reason":"verified_public_https_and_dns"}\n'
         else
-          case "$http" in ''|*[!0-9]*) http=0;; esac
-          printf '{"verified":false,"source":"usb0_https","https_code":%s,"reason":"https_or_dns_not_verified"}\n' "$http"
+          # SNI HTTPS pinned to numeric IP bypasses DNS (not certificate validation).
+          direct="$(curl --disable --ipv4 --noproxy '*' --interface 'if!usb0' --resolve 'one.one.one.one:443:1.1.1.1' --connect-timeout 2 --max-time 5 --silent --output /dev/null --write-out '%{http_code}' 'https://one.one.one.one/' 2>/dev/null)" && direct_code=0 || direct_code=$?
+          # curl uses HTTP "000" when no response. That is NOT a JSON
+          # number: never serialize it as an unquoted integer with leading 0s.
+          case "$http" in [1-5][0-9][0-9]) :;; *) http=0;; esac
+          case "$direct" in [1-5][0-9][0-9]) :;; *) direct=0;; esac
+          if [ "$direct_code" -eq 0 ] && [ "$direct" -ge 200 ] && [ "$direct" -lt 400 ]; then
+            printf '{"verified":false,"source":"usb0_https","https_code":%s,"direct_https_code":%s,"public_https_verified":true,"dns_verified":false,"reason":"hostname_dns_or_endpoint_unavailable"}\n' "$http" "$direct"
+          else
+            # Local modem HTTP is a separate connection state, not quota proof.
+            modem="$(curl --disable --ipv4 --noproxy '*' --interface 'if!usb0' --connect-timeout 2 --max-time 3 --silent --output /dev/null --write-out '%{http_code}' 'http://192.168.7.1/' 2>/dev/null)" && modem_code=0 || modem_code=$?
+            if [ "$modem_code" -eq 0 ] && [ "$modem" = 200 ]; then
+              printf '{"verified":false,"source":"usb0_https","https_code":%s,"direct_https_code":%s,"modem_http_verified":true,"reason":"modem_connected_public_unavailable_check_quota"}\n' "$http" "$direct"
+            else
+              printf '{"verified":false,"source":"usb0_https","https_code":%s,"direct_https_code":%s,"modem_http_verified":false,"reason":"public_and_modem_unavailable"}\n' "$http" "$direct"
+            fi
+          fi
         fi
       fi
       ;;

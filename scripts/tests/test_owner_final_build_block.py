@@ -31,8 +31,10 @@ class OwnerBuildBlockedUntilComplete(unittest.TestCase):
 
     def test_missing_module_blocks(self):
         issues = MODULE.audit(CONTRACT, {})
-        self.assertTrue(any("not_source_verified:" in x for x in issues))
-        self.assertTrue(any("source_evidence_missing" in x for x in issues))
+        # An empty evidence index must be refused even after all 40 source
+        # modules have legitimately reached source_verified.
+        self.assertTrue(any("missing_implementation_or_test_evidence:" in x for x in issues))
+        self.assertIn("source_evidence_missing_or_extra_modules", issues)
 
     def test_fake_evidence_does_not_override_contract(self):
         data = {
@@ -44,7 +46,9 @@ class OwnerBuildBlockedUntilComplete(unittest.TestCase):
                 } for x in CONTRACT["required_core"]
             }
         }
-        self.assertTrue(any("not_source_verified" in x for x in MODULE.audit(CONTRACT, data)))
+        failures = MODULE.audit(CONTRACT, data)
+        self.assertTrue(any("missing_scoped_source_acceptance:" in x for x in failures))
+        self.assertTrue(any("invalid_test_reference:" in x for x in failures))
 
     def test_missing_or_unverified_actual_test_blocks(self):
         modified = json.loads(json.dumps(CONTRACT))
