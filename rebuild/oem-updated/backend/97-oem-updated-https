@@ -5,6 +5,7 @@ set -eu
 [ "$(uci -q get uhttpd.main)" = uhttpd ] || exit 1
 uci -q set uhttpd.main.redirect_https='1'
 uci -q set uhttpd.main.ubus_prefix='/ubus'
+uci -q set uhttpd.main.cgi_prefix='/cgi-bin'
 uci -q set uhttpd.defaults.organization='ZBT OEM Updated'
 uci -q set uhttpd.defaults.commonname='we5927.lan'
 uci -q set uhttpd.defaults.key_type='ec'

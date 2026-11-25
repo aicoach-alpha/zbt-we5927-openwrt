@@ -54,6 +54,26 @@ $(eval $(call BuildPackage,oem-updated-ui-dev))
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
+def route_oem_cgi(www):
+    """Route every known OEM CGI URL to the installed modern gateway."""
+    count = 0
+    for path in sorted(www.rglob("*")):
+        if not path.is_file() or path.suffix not in (".js", ".html"):
+            continue
+        original = path.read_text()
+        code = original
+        for legacy in ('"/webapi/webapi?', '"/webapi/?', '"/webapi?',
+                       "'/webapi/webapi?", "'/webapi/?", "'/webapi?"):
+            count += code.count(legacy)
+            code = code.replace(legacy, legacy[0] + "/cgi-bin/webapi?")
+        if any(x in code for x in ('"/webapi', "'/webapi")):
+            raise ValueError("unmapped OEM CGI URL: " + str(path))
+        if code != original:
+            path.write_text(code)
+            if path.suffix == ".js":
+                subprocess.run(["node", "--check", str(path)], check=True)
+    return count
+
 def stage(image, out):
     data = image.read_bytes()
     digest = sha(data)
@@ -82,6 +102,10 @@ def stage(image, out):
                 raise ValueError("unexpected frontend transport anchor")
             code = code.replace(old, new)
         app.write_text(code)
+        routed = route_oem_cgi(files / "www")
+        if routed < 100:
+            raise ValueError("incomplete OEM CGI route inventory")
+        code = app.read_text()
         # JS syntax validation is mandatory at staging.
         subprocess.run(["node", "--check", str(app)], check=True)
         cgi = files / "www/cgi-bin/webapi"
@@ -107,7 +131,7 @@ def stage(image, out):
         (pkg / "Makefile").write_text(MAKEFILE)
         m.update({"reference_sha256":digest, "original_asset_digest":asset_digest,
                   "transport_patch": {"path":APP, "before":sha(original.encode()),
-                                      "after":sha(code.encode())},
+                                      "after":sha(code.encode()), "cgi_routes_rewritten":routed},
                   "backend_ready":False, "flash_allowed":False,
                   "openwrt_pin":OPENWRT_BASE})
         (pkg / "development-manifest.json").write_text(json.dumps(m, indent=2)+"\n")
