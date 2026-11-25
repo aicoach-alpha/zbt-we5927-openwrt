@@ -7,6 +7,6 @@ test_provider_exposes_independent_link_and_verification (test_cellular_link_stat
 test_ui_requires_explicit_auth_no_persistent_session (test_veci_v2_contract.FeatureContract.test_ui_requires_explicit_auth_no_persistent_session) ... ok
 
 ----------------------------------------------------------------------
-Ran 7 tests in 1.537s
+Ran 7 tests in 3.071s
 
 OK

@@ -4,6 +4,6 @@ test_signed_repository_allowlist_and_resource_guards (test_veci_v2_rebuild.V2Bui
 test_exact_files_from_package_recipes (test_veci_compiled_apk_gate.CompiledApkGateTests.test_exact_files_from_package_recipes) ... ok
 
 ----------------------------------------------------------------------
-Ran 4 tests in 0.535s
+Ran 4 tests in 0.888s
 
 OK

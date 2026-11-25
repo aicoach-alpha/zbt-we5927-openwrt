@@ -5,6 +5,6 @@ test_default_is_ipv6_off_with_one_time_initializer (test_veci_v2_ipv6_simple_men
 test_boot_ipv6_mode_is_before_network_only (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_boot_ipv6_mode_is_before_network_only) ... ok
 
 ----------------------------------------------------------------------
-Ran 3 tests in 11.358s
+Ran 3 tests in 17.323s
 
 OK

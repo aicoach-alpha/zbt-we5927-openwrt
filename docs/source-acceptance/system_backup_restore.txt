@@ -5,6 +5,6 @@ test_ui_acl_install_and_shell_syntax (test_owner_backup_restore_native.RestoreSo
 test_export_requires_live_grant_and_intact_archive (test_veci_backup_export.BackupExport.test_export_requires_live_grant_and_intact_archive) ... ok
 
 ----------------------------------------------------------------------
-Ran 5 tests in 3.825s
+Ran 5 tests in 5.028s
 
 OK

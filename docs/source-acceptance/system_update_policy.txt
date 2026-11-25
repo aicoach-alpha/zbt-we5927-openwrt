@@ -6,6 +6,6 @@ test_updates_failures_distinguish_no_network_from_bad_manifest (test_veci_single
 test_lte_modem_and_sms_preserved (test_veci_single_firmware_update_ui.NativeUXGate.test_lte_modem_and_sms_preserved) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 1.750s
+Ran 6 tests in 1.289s
 
 OK

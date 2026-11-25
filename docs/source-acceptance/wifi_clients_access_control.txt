@@ -4,6 +4,6 @@ test_incompatible_band_and_failed_commit_preserve_configuration (test_owner_wifi
 test_privileged_actions_have_write_acl (test_owner_wifi_acceptance.OwnerWifi.test_privileged_actions_have_write_acl) ... ok
 
 ----------------------------------------------------------------------
-Ran 4 tests in 16.971s
+Ran 4 tests in 14.327s
 
 OK

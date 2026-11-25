@@ -7,6 +7,6 @@ test_no_false_root_cause_from_ping (test_veci_link_monitor.Tests.test_no_false_r
 test_uat_coverage_uses_full_requested_72h_not_only_success_span (test_veci_link_monitor.Tests.test_uat_coverage_uses_full_requested_72h_not_only_success_span) ... ok
 
 ----------------------------------------------------------------------
-Ran 7 tests in 1.238s
+Ran 7 tests in 2.549s
 
 OK

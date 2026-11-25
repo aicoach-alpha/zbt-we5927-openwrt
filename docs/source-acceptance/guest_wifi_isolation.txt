@@ -6,6 +6,6 @@ test_failed_provision_rolls_back_without_wifi_reload (test_guest_startup_guard.G
 test_inactive_guest_cleanup_does_not_restart_network (test_guest_startup_guard.GuestSafety.test_inactive_guest_cleanup_does_not_restart_network) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 0.505s
+Ran 6 tests in 1.643s
 
 OK

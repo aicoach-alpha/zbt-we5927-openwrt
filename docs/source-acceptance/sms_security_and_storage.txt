@@ -4,6 +4,6 @@ test_port_change_before_delete (test_sms_port_transaction.SmsPortTransaction.tes
 test_port_change_before_submit (test_sms_port_transaction.SmsPortTransaction.test_port_change_before_submit) ... ok
 
 ----------------------------------------------------------------------
-Ran 4 tests in 1.302s
+Ran 4 tests in 1.950s
 
 OK

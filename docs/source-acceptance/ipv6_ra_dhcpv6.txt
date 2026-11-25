@@ -4,6 +4,6 @@ test_native_ipv6_provision_toggle_rollback_and_ra_profiles (test_owner_ipv6_nati
 test_read_api_reports_configuration_and_runtime_separately (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_read_api_reports_configuration_and_runtime_separately) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 8.102s
+Ran 2 tests in 15.415s
 
 OK

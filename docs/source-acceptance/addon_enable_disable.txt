@@ -5,6 +5,6 @@ test_existing_daemon_reused (test_owner_addon_profiles_source.AddonProfiles.test
 test_read_and_write_acl_exact_and_guarded (test_owner_addon_profiles_source.AddonProfiles.test_read_and_write_acl_exact_and_guarded) ... ok
 
 ----------------------------------------------------------------------
-Ran 5 tests in 4.516s
+Ran 5 tests in 9.563s
 
 OK

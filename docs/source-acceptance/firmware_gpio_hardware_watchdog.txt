@@ -4,6 +4,6 @@ test_only_exact_board_controller_and_parameters_are_reported (test_gpio_watchdog
 test_exact_oem_gpio37_reset38_lan_leds_and_sim46_not_confused (test_owner_board_hardware_acceptance.BoardHardwareAcceptance.test_exact_oem_gpio37_reset38_lan_leds_and_sim46_not_confused) ... ok
 
 ----------------------------------------------------------------------
-Ran 4 tests in 0.157s
+Ran 4 tests in 0.345s
 
 OK

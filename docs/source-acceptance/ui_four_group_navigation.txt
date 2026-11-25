@@ -4,6 +4,6 @@ test_gui_hooks_valid_and_authenticated (test_owner_controls_native_integration.N
 test_group_navigation_remains_simple (test_owner_controls_native_integration.NativeOwnerControlsIntegration.test_group_navigation_remains_simple) ... ok
 
 ----------------------------------------------------------------------
-Ran 4 tests in 2.298s
+Ran 4 tests in 2.195s
 
 OK
