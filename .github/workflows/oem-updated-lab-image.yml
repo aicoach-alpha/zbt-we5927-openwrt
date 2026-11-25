@@ -96,7 +96,14 @@ jobs:
           used=struct.unpack_from("<Q",b,off+40)[0]
           reserve=7995392-((off+used+65535)//65536)*65536
           assert reserve>=524288, "less than 512 KiB nominal overlay reserve"
-          subprocess.run(["unsquashfs","-no-progress","-offset",str(off),"-d",sys.argv[2],str(p)],check=True)
+          # Audit only relevant ROM paths; full extraction tries to create
+          # /dev/console, which requires privileges on GitHub runners.
+          # Keep check=True: real extraction errors must still fail the job.
+          assert 96<=used<=len(b)-off, "invalid SquashFS bytes_used"
+          subprocess.run(["unsquashfs","-no-progress","-offset",str(off),
+                          "-d",sys.argv[2],str(p),"www","usr/sbin/we5927-lte",
+                          "etc/uci-defaults","etc/oem-updated-release.json",
+                          "usr/libexec/oem-updated","usr/share/rpcd/acl.d"],check=True)
           print("IMAGE_BYTES",len(b),"SHA256",hashlib.sha256(b).hexdigest(),"NOMINAL_OVERLAY_RESERVE",reserve)
           PY
           rom="$RUNNER_TEMP/rom"
@@ -104,10 +111,17 @@ jobs:
           cmp "$rom/www/index.html" "$root/package/oem-updated-ui-dev/files/www/index.html"
           test -x "$rom/www/cgi-bin/webapi"
           test -x "$rom/usr/sbin/we5927-lte"
+          test -x "$rom/usr/libexec/oem-updated/read-only-adapter"
+          test -x "$rom/etc/uci-defaults/97-oem-updated-https"
+          cmp "$rom/www/cgi-bin/webapi" "$root/package/oem-updated-ui-dev/files/www/cgi-bin/webapi"
+          cmp "$rom/usr/libexec/oem-updated/read-only-adapter" "$root/package/oem-updated-ui-dev/files/usr/libexec/oem-updated/read-only-adapter"
+          cmp "$rom/usr/share/rpcd/acl.d/oem-updated.json" "$root/package/oem-updated-ui-dev/files/usr/share/rpcd/acl.d/oem-updated.json"
+          test -s "$rom/etc/oem-updated-release.json"
+          test ! -e "$rom/dev"
           test ! -e "$rom/www/veci2/index.html"
           test ! -e "$rom/www/cgi-bin/webapi.common"
           echo OEM_LAB_IMAGE_BUILT=YES
           echo LTE_POLICY_PARITY=NOT_VERIFIED
           echo BACKEND_READY=NO
-          echo FIRMWARE_SIGNED=NO
+          echo RELEASE_SIGNATURE_VERIFIED=NO
           echo FLASH_ALLOWED=NO
