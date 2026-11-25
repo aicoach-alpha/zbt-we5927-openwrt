@@ -46,6 +46,8 @@ define Package/oem-updated-ui-dev/install
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/read-only-adapter $(1)/usr/libexec/oem-updated/read-only-adapter
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/oem-updated.json $(1)/usr/share/rpcd/acl.d/oem-updated.json
 	$(INSTALL_BIN) ./files/www/cgi-bin/webapi $(1)/www/cgi-bin/webapi
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/97-oem-updated-https $(1)/etc/uci-defaults/97-oem-updated-https
 endef
 $(eval $(call BuildPackage,oem-updated-ui-dev))
 """
@@ -97,6 +99,11 @@ def stage(image, out):
         acl.write_text(json.dumps({"oem-updated-read": {
             "description": "Authenticated OEM read-only development API",
             "read": {"ubus": {"oem.updated": ["read"]}}}}, indent=2)+"\n")
+        defaults = files / "etc/uci-defaults/97-oem-updated-https"
+        defaults.parent.mkdir(parents=True)
+        shutil.copyfile(HERE / "backend/97-oem-updated-https", defaults)
+        defaults.chmod(0o755)
+        subprocess.run(["sh", "-n", str(defaults)], check=True)
         (pkg / "Makefile").write_text(MAKEFILE)
         m.update({"reference_sha256":digest, "original_asset_digest":asset_digest,
                   "transport_patch": {"path":APP, "before":sha(original.encode()),
