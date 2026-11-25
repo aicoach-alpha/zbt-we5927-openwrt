@@ -11,6 +11,7 @@ reply() {
 }
 err() { json_init; json_add_string code "$1"; json_add_string reason "$2"; reply "$(json_dump)"; }
 [ "${HTTPS:-}" = on ] || err -1 "HTTPS required"
+QUERY_STRING="${QUERY_STRING:-}"
 [ "${#QUERY_STRING}" -le 1024 ] || err -4 "query too large"
 # Only the operation is consumed. No eval, shell-sourced input, or legacy CGI.
 op=
@@ -34,7 +35,7 @@ session="${HTTP_X_OEM_SESSION:-}"
 case "$session" in ''|*[!0-9a-f]*|00000000000000000000000000000000) err -1 "access denied";; esac
 [ "${#session}" -eq 32 ] || err -1 "access denied"
 # Require an authenticated native rpcd session with explicit OEM read scope.
-permit="$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"access-group\",\"object\":\"oem-updated-read\",\"function\":\"read\"}" | jsonfilter -e '@.access')" || err -1 "session unavailable"
+permit="$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"ubus\",\"object\":\"oem.updated\",\"function\":\"read\"}" | jsonfilter -e '@.access')" || err -1 "session unavailable"
 [ "$permit" = true ] || err -1 "access denied"
 case "$op" in
     logout)
