@@ -1,0 +1,113 @@
+name: OEM Updated development image (not flash approved)
+on:
+  push:
+    branches: [build/oem-updated-we5927-2sim]
+    paths: ['.github/workflows/oem-updated-lab-image.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: oem-updated-lab
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install exact-board build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential clang bison flex gawk gettext git gcc-multilib libncurses-dev libssl-dev libjson-c-dev cmake pkg-config busybox rsync subversion swig unzip wget zlib1g-dev python3 python3-setuptools file xz-utils zstd squashfs-tools
+      - name: Stage original public vendor UI and modern core
+        shell: bash
+        run: |
+          set -euo pipefail
+          vendor="$RUNNER_TEMP/oem-reference.bin"
+          curl --fail --location --retry 2 --max-time 120 'https://cdn.shopify.com/s/files/1/0760/0416/3873/files/WE2825-2SIM_V26.03.04_V26.08.09.bin?v=1786953217' -o "$vendor"
+          echo "80529b8e9c31d686eb7f63a1517d6dbcf781f26cb4aceb7b8b1ff27c2d51d1f9  $vendor" | sha256sum -c -
+          root="$RUNNER_TEMP/openwrt-oem"
+          mkdir -p "$root"
+          git -C "$root" init -q
+          git -C "$root" fetch -q --depth=1 https://github.com/openwrt/openwrt.git 64900e756efa667774214f9c6b17c113222e01f7
+          git -C "$root" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$root" rev-parse HEAD)" = "$(cat source/openwrt-source-commit.txt)"
+          grep -Fq 'LINUX_VERSION-6.12 = .112' "$root/target/linux/generic/kernel-6.12"
+          git -C "$root" apply --check "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          git -C "$root" apply "$GITHUB_WORKSPACE/source/openwrt-zbt-we5927-current.patch"
+          sh scripts/stage-veci-reliability-rc.sh "$root"
+          sh rebuild/veci-v2/ci/stage-v2-source.sh "$root"
+          python3 rebuild/oem-updated/stage_variant.py "$vendor" "$root/package/oem-updated-ui-dev"
+          # Remove only the known VeCI root landing created by our stagers.
+          cmp "$root/files/www/index.html" rebuild/veci-v2/packages/veci-v2-ui/files/www/index.html
+          rm "$root/files/www/index.html"
+          test -f "$root/files/www/veci/build.json"
+          rm "$root/files/www/veci/build.json"
+          cp "$root/package/veci-app-catalog-we5927/files/etc/veci-release.json" "$root/files/etc/veci-release.json"
+          printf '{"variant":"OEM Updated","channel":"development","backend_ready":false,"flash_allowed":false}\n' > "$root/files/etc/oem-updated-release.json"
+          install -Dm644 rebuild/veci-v2/trust/1d8759d36251c36c "$root/files/etc/opkg/keys/1d8759d36251c36c"
+          platform="$root/target/linux/ramips/mt76x8/base-files/lib/upgrade/platform.sh"
+          grep -Fxq 'REQUIRE_IMAGE_METADATA=1' "$platform"
+          sed -i '/^REQUIRE_IMAGE_METADATA=1$/a REQUIRE_IMAGE_SIGNATURE=1' "$platform"
+          cp source/openwrt-we5927.config "$root/.config"
+          cat >> "$root/.config" <<'PKGS'
+          CONFIG_PACKAGE_veci-v2-runtime=y
+          CONFIG_PACKAGE_veci-v2-package-manager=y
+          CONFIG_PACKAGE_veci-v2-sms=y
+          CONFIG_PACKAGE_veci-v2-ipv6=y
+          CONFIG_PACKAGE_oem-updated-ui-dev=y
+          CONFIG_PACKAGE_veci-wifi-guardian=y
+          CONFIG_PACKAGE_we5927-lte=y
+          CONFIG_PACKAGE_libustream-mbedtls=y
+          CONFIG_PACKAGE_ucert=y
+          CONFIG_PACKAGE_px5g-mbedtls=y
+          PKGS
+      - name: Compile OEM Updated lab image
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/openwrt-oem"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+          grep -Fxq 'CONFIG_PACKAGE_oem-updated-ui-dev=y' .config
+          grep -Fxq 'CONFIG_PACKAGE_we5927-lte=y' .config
+          if grep -E '^CONFIG_PACKAGE_(veci-v2-ui|veci-default-ui|veci-cellular-we5927|luci([-A-Za-z0-9_]*)?)=y$' .config; then
+            echo conflicting_frontend_or_dialer; exit 1
+          fi
+          make -j2 V=s tools/install
+          make -j2 V=s toolchain/install
+          make -j2 V=s
+      - name: Inspect image and report lab-only evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/openwrt-oem"
+          img=$(find "$root/bin/targets/ramips/mt76x8" -maxdepth 1 -name '*zbt-we5927*squashfs-sysupgrade.bin' -type f -print)
+          test -f "$img"
+          python3 - "$img" "$RUNNER_TEMP/rom" <<'PY'
+          import pathlib,sys,hashlib,subprocess,struct
+          p=pathlib.Path(sys.argv[1]); b=p.read_bytes()
+          assert len(b)<=7995392, "firmware partition exceeded"
+          off=b.find(b"hsqs")
+          assert off>0
+          used=struct.unpack_from("<Q",b,off+40)[0]
+          reserve=7995392-((off+used+65535)//65536)*65536
+          assert reserve>=524288, "less than 512 KiB nominal overlay reserve"
+          subprocess.run(["unsquashfs","-no-progress","-offset",str(off),"-d",sys.argv[2],str(p)],check=True)
+          print("IMAGE_BYTES",len(b),"SHA256",hashlib.sha256(b).hexdigest(),"NOMINAL_OVERLAY_RESERVE",reserve)
+          PY
+          rom="$RUNNER_TEMP/rom"
+          cmp "$rom/www/assets/js/app.d4300432.js" "$root/package/oem-updated-ui-dev/files/www/assets/js/app.d4300432.js"
+          cmp "$rom/www/index.html" "$root/package/oem-updated-ui-dev/files/www/index.html"
+          test -x "$rom/www/cgi-bin/webapi"
+          test -x "$rom/usr/sbin/we5927-lte"
+          test ! -e "$rom/www/veci2/index.html"
+          test ! -e "$rom/www/cgi-bin/webapi.common"
+          echo OEM_LAB_IMAGE_BUILT=YES
+          echo LTE_POLICY_PARITY=NOT_VERIFIED
+          echo BACKEND_READY=NO
+          echo FIRMWARE_SIGNED=NO
+          echo FLASH_ALLOWED=NO
