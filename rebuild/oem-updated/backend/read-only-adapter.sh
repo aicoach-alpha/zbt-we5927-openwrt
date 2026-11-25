@@ -1,7 +1,9 @@
 #!/bin/sh
 # Internal read-only adapter prototype. NOT a CGI. Never expose under /www
 # or rpcd until authenticated ACL integration is complete.
-set -eu
+set -e
+set -f
+# jshn uses optional unset namespace variables.
 . /usr/share/libubox/jshn.sh
 get() { uci -q get "$1"; }
 error() {
@@ -15,6 +17,21 @@ success() {
     json_init
     json_add_string code "1"
     json_add_string reason "$1"
+}
+# Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
+native_read() {
+    case "$1:$2" in
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status) ;;
+        *) return 1;;
+    esac
+    result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
+    [ "$(printf '%s' "$result" | jsonfilter -e '@.ok')" = true ] || return 1
+    printf '%s' "$result"
+}
+field() { printf '%s' "$native" | jsonfilter -e "$1"; }
+# Only real, complete LAN neighbours are eligible for the OEM picker.
+lan_neighbours() {
+    awk 'NR>1 && $3=="0x2" && $6=="br-lan" && $4!="00:00:00:00:00:00" {print toupper($4) "(" $1 ")"}' /proc/net/arp
 }
 [ "$#" -eq 1 ] || error "operation required"
 case "$1" in
@@ -90,7 +107,7 @@ case "$1" in
         ipv6="$(printf '%s' "$state" | jsonfilter -e '@["ipv6-address"][*].address' || true)"
         success "get module status success"
         json_add_array data
-        json_add_object
+        json_add_object ""
         json_add_string ifname usb0
         json_add_string host "${addr:-0.0.0.0}"
         json_add_string macaddr "$mac"
@@ -104,6 +121,78 @@ case "$1" in
         json_close_array
         json_close_object
         json_close_array
+        ;;
+    get_ntp)
+        native="$(native_read veci.v2.system ntp)" || error "native NTP unavailable"
+        enabled="$(field '@.enabled')" || error "NTP state unavailable"
+        case "$enabled" in 0|1) ;; *) error "NTP state unknown";; esac
+        server="$(get system.ntp.enable_server || true)"
+        case "$server" in ''|0) server=0;; 1) ;; *) error "NTP server state invalid";; esac
+        timezone="$(get system.@system[0].timezone)" || error "timezone unavailable"
+        [ -n "$timezone" ] || error "timezone unavailable"
+        first="$(field '@.servers[0]' || true)"
+        second="$(field '@.servers[1]' || true)"
+        success "get ntp success"
+        json_add_string enable_ntp_server "$server"
+        json_add_string enable_ntp_client "$enabled"
+        json_add_string server_primary "$first"
+        json_add_string server_secondary "$second"
+        json_add_string timezone "$timezone"
+        # Only report the actual configured timezone until the picker has
+        # a reviewed mapping to modern OpenWrt POSIX/TZ database values.
+        json_add_array timezone_list
+        json_add_string "" "$timezone"
+        json_close_array
+        ;;
+    get_static_dhcp)
+        native="$(native_read veci.v2.dhcp status)" || error "native DHCP unavailable"
+        # Confirm the provider returned an array, not a partial error object.
+        (json_load "$native" && json_get_type typ leases && [ "$typ" = array ]) || error "DHCP inventory invalid"
+        neighbours="$(lan_neighbours)" || error "LAN neighbours unavailable"
+        success "get_static_dhcp success"
+        json_add_array arp_mac_list
+        for neighbour in $neighbours; do json_add_string "" "$neighbour"; done
+        json_close_array
+        json_add_array data
+        idx=0
+        while [ "$idx" -lt 256 ]; do
+            index="$(field "@.leases[$idx].index" || true)"
+            [ -n "$index" ] || break
+            [ "$index" = "$idx" ] || error "DHCP index mismatch"
+            mac="$(field "@.leases[$idx].mac")" || error "DHCP MAC unavailable"
+            ip="$(field "@.leases[$idx].ip")" || error "DHCP address unavailable"
+            name="$(field "@.leases[$idx].name" || true)"
+            json_add_object ""
+            json_add_string name "$name"
+            json_add_string mac "$mac"
+            json_add_string ip "$ip"
+            json_add_string leasetime ""
+            json_close_object
+            idx=$((idx+1))
+        done
+        json_close_array
+        ;;
+    get_dmz)
+        native="$(native_read veci.v2.firewall status)" || error "native firewall unavailable"
+        dest="$(field '@.dmz_destination')" || error "DMZ state unavailable"
+        enabled=0
+        ports=""
+        if [ -n "$dest" ]; then
+            # The shared VeCI DMZ contract supports all ports, not OEM
+            # arbitrary ranges. Report only the canonical managed rule.
+            [ "$(get firewall.veci_owner_dmz)" = redirect ] || error "DMZ rule unavailable"
+            [ "$(get firewall.veci_owner_dmz.target)" = DNAT ] || error "DMZ rule invalid"
+            [ "$(get firewall.veci_owner_dmz.src)" = wan ] || error "DMZ source invalid"
+            [ "$(get firewall.veci_owner_dmz.dest)" = lan ] || error "DMZ destination invalid"
+            [ -z "$(get firewall.veci_owner_dmz.src_dport || true)" ] || error "DMZ port range unsupported"
+            case "$(get firewall.veci_owner_dmz.enabled || true)" in
+                ''|1) enabled=1; ports=1-65535;; 0) ;; *) error "DMZ enabled state invalid";;
+            esac
+        fi
+        success "get dmz success"
+        json_add_string ipaddr "$dest"
+        json_add_string sport "$ports"
+        json_add_string enabled "$enabled"
         ;;
     get_netwatchdog)
         # Do not claim legacy settings are active before native policy migration.

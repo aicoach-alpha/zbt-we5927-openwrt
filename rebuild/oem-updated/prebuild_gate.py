@@ -20,7 +20,7 @@ def check(manifest, acceptance):
         state = row["state"]
         # Denying an unsafe/nonexistent hardware feature must be reviewed and
         # its UI disabled and negative behavior tested, not silently counted.
-        if state not in {"FUNCTIONAL_PASS", "REVIEWED_DISABLED_PASS"} or not row.get("evidence"):
+        if state not in {"FUNCTIONAL_PASS", "REVIEWED_DISABLED_PASS"} or not row.get("evidence") or row.get("limitations"):
             blocked.append(op)
     gates = acceptance["additional_gates"]
     if set(gates) != REQUIRED_GATES:

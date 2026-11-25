@@ -29,6 +29,12 @@ class PrebuildGate(unittest.TestCase):
         a = copy.deepcopy(self.a)
         for row in a["operations"].values():
             row["state"] = "FUNCTIONAL_PASS"
+            row.pop("evidence", None)
         for gate in a["additional_gates"]:
             a["additional_gates"][gate] = True
         self.assertEqual(len(check(self.m, a)[1]), 158)
+
+    def test_known_limitations_block_promoted_fixture(self):
+        a = copy.deepcopy(self.a)
+        a["operations"]["get_ntp"]["state"] = "FUNCTIONAL_PASS"
+        self.assertIn("get_ntp", check(self.m, a)[1])

@@ -90,7 +90,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_dmz": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "veci.v2.firewall:status",
+      "evidence": "scripts/tests/test_oem_native_reuse.py",
+      "limitations": "Canonical full-port managed DMZ only; arbitrary OEM ranges unsupported."
     },
     "get_fw_setting": {
       "state": "UNIMPLEMENTED"
@@ -150,7 +153,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_ntp": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "veci.v2.system:ntp",
+      "evidence": "scripts/tests/test_oem_native_reuse.py",
+      "limitations": "Configured timezone only; full picker mapping pending."
     },
     "get_openvpn_msg": {
       "state": "UNIMPLEMENTED"
@@ -201,7 +207,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_static_dhcp": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "veci.v2.dhcp:status",
+      "evidence": "scripts/tests/test_oem_native_reuse.py",
+      "limitations": "Read-only list; per-entry lease time and write integration pending."
     },
     "get_static_route": {
       "state": "UNIMPLEMENTED"
