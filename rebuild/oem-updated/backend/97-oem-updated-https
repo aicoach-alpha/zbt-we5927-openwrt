@@ -1,0 +1,12 @@
+#!/bin/sh
+# OEM Updated development image: same OEM appearance, native HTTPS/rpcd.
+set -eu
+[ -f /www/assets/js/app.d4300432.js ] || exit 1
+[ "$(uci -q get uhttpd.main)" = uhttpd ] || exit 1
+uci -q set uhttpd.main.redirect_https='1'
+uci -q set uhttpd.main.ubus_prefix='/ubus'
+uci -q set uhttpd.defaults.organization='ZBT OEM Updated'
+uci -q set uhttpd.defaults.commonname='we5927.lan'
+uci -q set uhttpd.defaults.key_type='ec'
+uci -q set uhttpd.defaults.ec_curve='P-256'
+uci -q commit uhttpd
