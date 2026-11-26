@@ -189,6 +189,31 @@ def stage(image, out):
             ('var e=this.arr_to_obj(this.values,["enabled","remote","port","ca","cert","key"]);console.log(e),this.proxy_req("post","/webapi?op=set_openvpn",e,this.get_openvpn,!0)',
              'this.$message.warning("OpenVPN configuration is read-only in this version.")'),
         ])
+        # Strip privileged controls from the two OEM LTE views. Preserve their
+        # existing modem configuration forms and the separate identity read.
+        for name in ("chunk-bcfb963a.0b89faf7.js", "chunk-1ef12905.aa3de63a.js"):
+            source = (files / "www/assets/js" / name).read_text()
+            start = source.index('1==t.$config.isAt?a("div",{staticClass:"atBox"}')
+            end = source.index(":t._e()", start) + len(":t._e()")
+            method = source.index("set_at:function()")
+            next_method = source.index("get_4g:function(", method)
+            edit_chunk(name, [
+                (source[start:end], 't._e()'),
+                (source[method:next_method], ''),
+            ])
+        name = "chunk-2d0b2983.5d159001.js"
+        source = (files / "www/assets/js" / name).read_text()
+        start = source.index(',t("os-input",{attrs:{item:e.origin.set_imei}')
+        end = source.index("],1)},s=[]", start)
+        method = source.index("setImei:function()")
+        next_method = source.index("getPollingState:function(", method)
+        edit_chunk(name, [
+            (source[start:end], ''),
+            (source[method:next_method], ''),
+            (',set_imei:""', ''),
+            ('console.log(t),i.imei=t.imei,e||(i.set_imei=t.imei)', 'i.imei=t.imei'),
+            ('beforeDestroyed:function()', 'beforeDestroy:function()'),
+        ])
         lan_name="chunk-2d22c110.8a7728fb.js"
         lan_source=(files / "www/assets/js" / lan_name).read_text()
         lan_start=lan_source.index("set_lan_config:function()")

@@ -481,7 +481,9 @@
       "limitations": "Current regulatory domain permitted channels only, no country changes; legacy POST form transport pending."
     },
     "send_at": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Manual modem commands are outside the supported LTE controls.",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_privileged_modem_controls_are_disabled"
     },
     "setAutoreboot": {
       "state": "PROTOTYPE",
@@ -563,7 +565,9 @@
       "limitations": "Drop-invalid and SYN flood settings only; WAN input remains REJECT, IPv6 and redirect policy unchanged. Browser and live reload acceptance pending."
     },
     "set_imei": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Hardware identity is read-only. The masked get_imei view is retained.",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_privileged_modem_controls_are_disabled"
     },
     "set_l2tp": {
       "state": "UNIMPLEMENTED"

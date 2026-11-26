@@ -82,6 +82,20 @@ esac
                     denied = self.run_script("gateway", QUERY_STRING="op="+op, PERMIT="false", REQUEST_METHOD=method)
                     self.assertIn("access denied", denied.stdout)
 
+    def test_privileged_modem_controls_are_disabled(self):
+        for op, message in (("send_at", "Raw modem commands disabled"),
+                            ("set_imei", "Modem identity is read-only")):
+            for method in ("GET", "POST"):
+                with self.subTest(op=op, method=method):
+                    args = dict(QUERY_STRING="op="+op, REQUEST_METHOD=method)
+                    allowed_session = self.run_script("gateway", **args)
+                    self.assertIn(message, allowed_session.stdout)
+                    self.assertNotIn("ADAPTER_CALLED", allowed_session.stdout)
+                    denied = self.run_script("gateway", HTTP_X_OEM_SESSION="", **args)
+                    self.assertIn("access denied", denied.stdout)
+        identity = self.run_script("gateway", QUERY_STRING="op=get_imei")
+        self.assertIn("ADAPTER_CALLED:get_imei", identity.stdout)
+
     def test_ddns_events_hide_credentials_and_unrelated_messages(self):
         self.command("jsonfilter", """case "$2" in
           '@.ok') echo true;;
