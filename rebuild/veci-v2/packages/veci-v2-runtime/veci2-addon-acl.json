@@ -4,7 +4,10 @@
     "read": {
       "ubus": {
         "veci.v2.addon": [
-          "status"
+          "status",
+          "ddnsStatus",
+          "sqmStatus",
+          "ddnsLookup"
         ]
       }
     },
@@ -12,7 +15,8 @@
       "ubus": {
         "veci.v2.addon": [
           "setVpnStartup",
-          "setPortalStartup"
+          "setPortalStartup",
+          "setOptionalStartup"
         ]
       }
     }
