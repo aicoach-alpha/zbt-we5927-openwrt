@@ -135,10 +135,16 @@
       "state": "PROTOTYPE"
     },
     "get_lan_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "netifd network.interface.lan + kernel counters",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Bounded live sampling; browser and actual interface acceptance pending."
     },
     "get_log_list": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.system:logs",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Native redacted logs translated to OEM format; browser and redaction validation pending."
     },
     "get_mac_blacklist": {
       "state": "UNIMPLEMENTED"
@@ -252,7 +258,10 @@
       "state": "PROTOTYPE"
     },
     "get_system_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "Linux procfs + veci.v2.wifi:info",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "CPU and memory measured; primary Wi-Fi station count only; full guest client coverage and browser acceptance pending."
     },
     "get_ttl": {
       "state": "UNIMPLEMENTED"
@@ -267,7 +276,10 @@
       "limitations": "DHCP/static WAN supported by shared provider; PPPoE and write integration pending."
     },
     "get_wan_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "netifd network.interface.wan + kernel counters",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Bounded live sampling; browser and actual interface acceptance pending."
     },
     "get_wan_traffic": {
       "state": "UNIMPLEMENTED"
@@ -282,7 +294,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_wifi_client": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.wifi:info + LAN ARP",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Primary AP inventory; signal/rate and client firewall action not yet exposed."
     },
     "get_wifi_guest": {
       "state": "PROTOTYPE",
@@ -354,7 +369,10 @@
       "state": "UNIMPLEMENTED"
     },
     "setWiFi2": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.wifi:setSsid/setChannel/setAutoChannel/setVisibility/setAuth/setAccess",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "One explicit action per request, no global reload; original combined form needs frontend adaptation; remaining radio controls pending."
     },
     "setWiFi2_nocommit": {
       "state": "UNIMPLEMENTED"
@@ -366,10 +384,16 @@
       "state": "UNIMPLEMENTED"
     },
     "set_4g": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.lte:setApn/setFailover",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "One explicit action per request; legacy combined form and per-SIM APN profile not yet supported."
     },
     "set_4g_sim": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.sim:switchSim",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "POST explicit slot confirmation; legacy credential GET disabled; physical switching and timing pending."
     },
     "set_ac_info": {
       "state": "UNIMPLEMENTED"
@@ -411,7 +435,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_lan_config": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.interfaces:status/save",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Explicit confirmation and revision; OEM form adaptation and manual network activation pending."
     },
     "set_mac_blacklist": {
       "state": "UNIMPLEMENTED"
@@ -423,7 +450,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_netwatchdog": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.lte:setMonitor",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Interval only with previous value; host and legacy global-reset actions rejected; OEM form adaptation pending."
     },
     "set_ntp": {
       "state": "PROTOTYPE",
@@ -477,7 +507,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_wan_config": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.interfaces:status/save",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "DHCP/static only; DNS and PPPoE writes require separate support; OEM form and activation pending."
     },
     "set_wan_config_nocommit": {
       "state": "UNIMPLEMENTED"

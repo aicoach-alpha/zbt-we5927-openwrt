@@ -59,7 +59,10 @@ case "$1" in
         esac
         mac="$(cat /sys/class/net/br-lan/address | tr 'a-z' 'A-Z')" || error "LAN MAC unavailable"
         [ -n "$mac" ] && [ -n "$address" ] && [ -n "$mask" ] || error "LAN unavailable"
+        native="$(native_read veci.v2.interfaces status || true)"
+        revision="$(field '@.revision' || true)"
         success "get lan config success"
+        json_add_string revision "$revision"
         json_add_object data
         json_add_string proto "$proto"
         json_add_string ipaddr "$address"
@@ -297,7 +300,9 @@ case "$1" in
         nameserver="$(live '@["dns-server"][0]' || true)"
         ipv6="$(live '@["ipv6-address"][*].address' || true)"
         [ "$up" = true ] || { nameserver=""; ipv6=""; }
+        revision="$(field '@.revision' || true)"
         success "get wan config success"
+        json_add_string revision "$revision"
         json_add_object data
         json_add_string proto "$mode"
         json_add_string macaddr "$mac"
@@ -515,6 +520,93 @@ case "$1" in
         json_add_array zone_list
         for zone in $(uci -q show firewall | sed -nE "s/^firewall\.[^.]+\.name='([a-zA-Z0-9_]+)'$/\1/p"); do
             case "$zone" in lan|wan|veci_guest) json_add_string "" "$zone";; esac
+        done
+        json_close_array
+        ;;
+    get_log_list)
+        native="$(native_read veci.v2.system logs)" || error "native logs unavailable"
+        logs="$(field '@.logs')" || error "native logs unavailable"
+        success "get log list success"
+        # OEM browser expects date, type and quoted text per line.
+        # Escape quote delimiters in the already redacted native log text.
+        formatted="$(printf '%s\n' "$logs" | awk 'NF>=5 {d=$2" "$3" "$4; sub(/^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +/,""); gsub(/"/,"\047"); printf "%s system: \"%s\"\n",d,$0}')"
+        json_add_string data "$formatted"
+        ;;
+    get_lan_status|get_wan_status)
+        case "$1" in get_lan_status) network=lan;; *) network=wan;; esac
+        state="$(ubus -t 3 call "network.interface.$network" status '{}')" || error "interface state unavailable"
+        live() { printf '%s' "$state" | jsonfilter -e "$1"; }
+        up="$(live '@.up')" || error "link state unavailable"
+        case "$up" in true|false) ;; *) error "invalid link state";; esac
+        dev="$(live '@.l3_device' || live '@.device' || true)"
+        case "$dev" in ''|.|..|-*|*[!a-zA-Z0-9_.-]*) error "interface unavailable";; esac
+        proto="$(live '@.proto' || get "network.$network.proto")" || error "protocol unavailable"
+        address="$(live '@["ipv4-address"][0].address' || true)"
+        ipv6="$(live '@["ipv6-address"][*].address' || true)"
+        uptime="$(live '@.uptime' || true)"
+        [ "$up" = true ] || { address=""; ipv6=""; uptime=0; }
+        mac="$(cat "/sys/class/net/$dev/address" 2>/dev/null || true)"
+        rx="$(cat "/sys/class/net/$dev/statistics/rx_bytes" 2>/dev/null)" || error "RX unavailable"
+        tx="$(cat "/sys/class/net/$dev/statistics/tx_bytes" 2>/dev/null)" || error "TX unavailable"
+        case "$rx:$tx" in *[!0-9:]*|:*|*:) error "invalid counters";; esac
+        # Bounded sampling; never fabricate rates from link speed or use a
+        # shell-sourced shared cache. On counter reset, rate is unknown.
+        rx_rate=""; tx_rate=""
+        if [ "$up" = true ]; then
+            sleep 1
+            next_rx="$(cat "/sys/class/net/$dev/statistics/rx_bytes" 2>/dev/null || true)"
+            next_tx="$(cat "/sys/class/net/$dev/statistics/tx_bytes" 2>/dev/null || true)"
+            case "$next_rx:$next_tx" in *[!0-9:]*|:*|*:) ;; *)
+                rx_rate="$(awk -v a="$rx" -v b="$next_rx" 'BEGIN{if(b>=a)printf "%.0f",b-a}')"
+                tx_rate="$(awk -v a="$tx" -v b="$next_tx" 'BEGIN{if(b>=a)printf "%.0f",b-a}')"
+                rx="$next_rx"; tx="$next_tx";;
+            esac
+        fi
+        success "get interface status success"
+        json_add_object data
+        json_add_string rx "$rx_rate"; json_add_string tx "$tx_rate"
+        json_add_string rxall "$rx"; json_add_string txall "$tx"
+        json_add_string uptime "$uptime"; json_add_string proto "$proto"
+        json_add_string ipaddr "$address"; json_add_string macaddr "$mac"
+        json_add_array ipv6
+        for ip in $ipv6; do json_add_string "" "$ip"; done
+        json_close_array; json_close_object
+        ;;
+    get_system_status)
+        uptime="$(cut -d. -f1 /proc/uptime)" || error "uptime unavailable"
+        load="$(awk '{print $1" "$2" "$3}' /proc/loadavg)"
+        memory="$(awk '/^MemTotal:/{t=$2}/^MemAvailable:/{a=$2;found=1}END{if(t>0&&found&&a<=t)printf "%.0f",100*(t-a)/t}' /proc/meminfo)"
+        [ -n "$memory" ] || error "memory unavailable"
+        first="$(awk '/^cpu /{s=0;for(i=2;i<=9;i++)s+=$i;print s,$5+$6;exit}' /proc/stat)"
+        sleep 1
+        second="$(awk '/^cpu /{s=0;for(i=2;i<=9;i++)s+=$i;print s,$5+$6;exit}' /proc/stat)"
+        cpu="$(printf '%s\n%s\n' "$first" "$second" | awk 'NR==1{t=$1;i=$2}NR==2{d=$1-t;idle=$2-i;if(d>0&&idle>=0&&idle<=d)printf "%.0f",100*(d-idle)/d}')"
+        native="$(native_read veci.v2.wifi info)" || native=""
+        clients=""
+        if [ -n "$native" ] && (json_load "$native" && json_get_type typ clients && [ "$typ" = array ]); then
+            clients="$(field '@.clients[*]' | awk 'NF{n++}END{print n+0}')"
+        fi
+        success "get system status success"
+        json_add_string uptime "$uptime"; json_add_string load_avg "$load"
+        json_add_string cpu_usage "$cpu"; json_add_string memory_usage "$memory"
+        json_add_string online_user_num "$clients"
+        ;;
+    get_wifi_client)
+        native="$(native_read veci.v2.wifi info)" || error "Wi-Fi provider unavailable"
+        (json_load "$native" && json_get_type typ clients && [ "$typ" = array ]) || error "client inventory unavailable"
+        ssid="$(get wireless.default_radio0.ssid)" || error "SSID unavailable"
+        clients="$(field '@.clients[*]' || true)"
+        success "get wifi client success"
+        json_add_string device_table 1
+        json_add_array list
+        for mac in $clients; do
+            ip="$(awk -v mac="$mac" 'tolower($4)==tolower(mac)&&$3=="0x2"&&$6=="br-lan"{print $1;exit}' /proc/net/arp)"
+            json_add_object ""
+            json_add_string macaddr "$mac"; json_add_string ipaddr "$ip"
+            json_add_string wifi_type_ssid "2.4G/$ssid"
+            json_add_string rssi ""; json_add_string speed ""; json_add_string bandwidth ""
+            json_add_string operation ""
+            json_close_object
         done
         json_close_array
         ;;
