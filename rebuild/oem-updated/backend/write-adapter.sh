@@ -47,6 +47,37 @@ case "$op" in
         json_add_string revision "$revision"; json_add_string confirmation "$confirm"
         rpc veci.v2.cron setReboot "$(json_dump)"
         ;;
+    set_wifi_client)
+        mac="$(read_field '@.macaddr')" || fail "MAC required"
+        operation="$(read_field '@.operation')" || fail "operation required"
+        revision="$(read_field '@.revision')" || fail "firewall revision required"
+        confirm="$(read_field '@.confirmation')" || fail "confirmation required"
+        printf '%s\n' "$mac" | grep -Eiq '^[0-9a-f][02468ace](:[0-9a-f]{2}){5}$' || fail "invalid MAC"
+        mac="$(printf '%s' "$mac" | tr A-F a-f)"
+        [ "$mac" != 00:00:00:00:00:00 ] || fail "invalid MAC"
+        case "$operation:$confirm" in REJECT:BLOCK_CLIENT|ACCEPT:UNBLOCK_CLIENT) ;; *) fail "confirmation mismatch";; esac
+        rpc veci.v2.firewall status '{}'
+        [ "$(native_field '@.revision')" = "$revision" ] || fail "stale firewall configuration"
+        (json_load "$native" && json_get_type typ blocked_macs && [ "$typ" = array ]) || fail "MAC inventory unavailable"
+        addresses=""; found=0
+        for entry in $(native_field '@.blocked_macs[*]' || true); do
+            printf '%s\n' "$entry" | grep -Eiq '^[0-9a-f]{2}(:[0-9a-f]{2}){5}$' || fail "invalid existing MAC"
+            entry="$(printf '%s' "$entry" | tr A-F a-f)"
+            if [ "$entry" = "$mac" ]; then found=1; continue; fi
+            addresses="${addresses:+$addresses }$entry"
+        done
+        if [ "$operation" = REJECT ]; then addresses="${addresses:+$addresses }$mac"; fi
+        # Idempotent request, preserve all other entries. Native revision guard
+        # prevents races with the full-list editor.
+        if [ "$operation:$found" != ACCEPT:0 ] && [ "$operation:$found" != REJECT:1 ]; then
+            json_init; json_add_string revision "$revision"; json_add_string confirmation SAVE_MAC_BLOCK
+            json_add_string addresses "$addresses"
+            rpc veci.v2.firewall setMacBlock "$(json_dump)"
+        fi
+        json_init; json_add_string code 1; json_add_string reason "native client policy accepted"
+        json_add_string return_operation "$operation"; json_add_string scope lan_to_wan
+        json_dump; exit 0
+        ;;
     set_mac_blacklist)
         revision="$(read_field '@.revision')" || fail "firewall revision required"
         confirm="$(read_field '@.confirmation')" || fail "explicit confirmation required"

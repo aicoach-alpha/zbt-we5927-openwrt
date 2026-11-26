@@ -603,7 +603,12 @@ case "$1" in
         (json_load "$native" && json_get_type typ clients && [ "$typ" = array ]) || error "client inventory unavailable"
         ssid="$(get wireless.default_radio0.ssid)" || error "SSID unavailable"
         clients="$(field '@.clients[*]' || true)"
+        native="$(native_read veci.v2.firewall status)" || error "MAC block status unavailable"
+        revision="$(field '@.revision')" || error "firewall revision unavailable"
+        (json_load "$native" && json_get_type typ blocked_macs && [ "$typ" = array ]) || error "MAC block inventory unavailable"
+        blocked="$(field '@.blocked_macs[*]' || true)"
         success "get wifi client success"
+        json_add_string revision "$revision"
         json_add_string device_table 1
         json_add_array list
         for mac in $clients; do
@@ -612,7 +617,13 @@ case "$1" in
             json_add_string macaddr "$mac"; json_add_string ipaddr "$ip"
             json_add_string wifi_type_ssid "2.4G/$ssid"
             json_add_string rssi ""; json_add_string speed ""; json_add_string bandwidth ""
-            json_add_string operation ""
+            operation=ACCEPT
+            for entry in $blocked; do
+                if [ "$(printf '%s' "$entry" | tr A-F a-f)" = "$(printf '%s' "$mac" | tr A-F a-f)" ]; then operation=REJECT; break; fi
+            done
+            json_add_string operation "$operation"
+            json_add_string operation_scope lan_to_wan
+            json_add_string revision "$revision"
             json_close_object
         done
         json_close_array
@@ -827,6 +838,37 @@ case "$1" in
         json_add_string interface "$dev"; json_add_string route_state "$selected"
         json_add_string internet_status unknown
         json_add_string rx "$rx"; json_add_string tx "$tx"
+        ;;
+    get_acl_rule|get_acl_status)
+        # Inspect the actual native firewall rules. No synthetic OEM ACL switch.
+        native="$(native_read veci.v2.firewall status)" || error "firewall unavailable"
+        revision="$(field '@.revision')" || error "firewall revision unavailable"
+        rules="$(uci -q show firewall | sed -nE 's/^firewall\.([a-zA-Z0-9_]+|@rule\[[0-9]+\])=rule$/\1/p')"
+        success "native firewall rule inventory"
+        json_add_string revision "$revision"
+        json_add_string acl_enabled ""
+        json_add_string management_scope read_only_native
+        json_add_string global_acl_switch_supported 0
+        json_add_array data
+        count=0
+        for rule in $rules; do
+            count=$((count+1)); [ "$count" -le 128 ] || error "rule inventory exceeds limit"
+            enabled="$(get "firewall.$rule.enabled" || true)"
+            case "$enabled" in ''|1) enabled=1;; 0) ;; *) error "invalid rule state";; esac
+            json_add_object ""
+            json_add_string name "$rule"
+            json_add_string label "$(get "firewall.$rule.name" || true)"
+            for option in proto src src_ip src_port dest dest_ip dest_port target; do
+                json_add_string "$option" "$(get "firewall.$rule.$option" || true)"
+            done
+            dest="$(get "firewall.$rule.dest" || true)"
+            if [ -n "$dest" ]; then json_add_string data_flow forward; else json_add_string data_flow input; fi
+            json_add_string enabled "$enabled"
+            json_add_string editable 0
+            json_close_object
+        done
+        json_close_array
+        json_add_int rule_count "$count"
         ;;
     get_mac_blacklist)
         native="$(native_read veci.v2.firewall status)" || error "firewall unavailable"

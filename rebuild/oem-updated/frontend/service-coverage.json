@@ -90,7 +90,8 @@
         "setMacBlock"
       ],
       "scope": "LAN to WAN, not router management",
-      "state": "SOURCE_STAGED_NOT_RUNTIME_VERIFIED"
+      "state": "SOURCE_STAGED_NOT_RUNTIME_VERIFIED",
+      "original_oem_client_action": "source adapted; browser/runtime pending"
     },
     "wifi_power": {
       "provider": "veci.v2.wifi",
@@ -111,6 +112,11 @@
     },
     "language": {
       "provider": "browser local storage",
+      "state": "SOURCE_INTEGRATED_NOT_UAT"
+    },
+    "native_acl_inventory": {
+      "provider": "OpenWrt firewall UCI + native status",
+      "scope": "read-only; no global ACL switch",
       "state": "SOURCE_INTEGRATED_NOT_UAT"
     }
   },

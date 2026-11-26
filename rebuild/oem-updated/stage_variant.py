@@ -142,6 +142,16 @@ def stage(image, out):
             dashboard = dashboard.replace(old,new)
         home.write_text(dashboard)
         subprocess.run(["node","--check",str(home)],check=True)
+        # Wire the original OEM connected-client action to the same native MAC
+        # block list, with explicit confirmation and stale-revision protection.
+        client = files / "www/assets/js/chunk-2d0c8fa4.ea2af3a8.js"
+        client_code = client.read_text()
+        old = 'operate:function(t){var e=this;console.log(t.operation);var i="REJECT"==t.operation?"ACCEPT":"REJECT";this.proxy_req("post","/webapi?op=set_wifi_client",{macaddr:t.macaddr,operation:i},(function(t){e.get_wifi_client()}),!0)}'
+        new = 'operate:function(t){var e=this;if(!/^[0-9a-f]{64}$/.test(t.revision||"")||["ACCEPT","REJECT"].indexOf(t.operation)<0)return;var i="REJECT"==t.operation?"ACCEPT":"REJECT";if(!window.confirm(i==="REJECT"?"Block this client from WAN? Software flow offload will be disabled.":"Remove this client from the WAN block list?"))return;this.$req.post("/webapi?op=set_wifi_client",{macaddr:t.macaddr,operation:i,revision:t.revision,confirmation:i==="REJECT"?"BLOCK_CLIENT":"UNBLOCK_CLIENT"}).then(function(r){if(!r||r.code!=="1")throw Error("Client policy rejected");e.get_wifi_client()}).catch(function(){e.$message.error("Client policy unavailable or changed; refresh.");e.get_wifi_client()})}'
+        if client_code.count(old)!=1:
+            raise ValueError("OEM client policy anchor changed")
+        client.write_text(client_code.replace(old,new))
+        subprocess.run(["node","--check",str(client)],check=True)
         routed = route_oem_cgi(files / "www")
         if routed < 100:
             raise ValueError("incomplete OEM CGI route inventory")

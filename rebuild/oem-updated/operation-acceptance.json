@@ -77,10 +77,16 @@
       "state": "UNIMPLEMENTED"
     },
     "get_acl_rule": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "OpenWrt firewall UCI + native firewall status",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Read-only native rules inventory, no legacy rule editing or global switch; original ACL table mapping and runtime pending."
     },
     "get_acl_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "OpenWrt firewall UCI + native firewall status",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Actual native rule count and revision; no global legacy ACL toggle, UI mapping pending."
     },
     "get_arp": {
       "state": "FIXTURE_PASS",
@@ -335,7 +341,7 @@
       "state": "PROTOTYPE",
       "provider": "veci.v2.wifi:info + LAN ARP",
       "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Primary AP inventory; signal/rate and client firewall action not yet exposed."
+      "limitations": "Primary station inventory with scoped MAC block state and revision. Signal/rate remain unavailable; browser and runtime pending."
     },
     "get_wifi_guest": {
       "state": "PROTOTYPE",
@@ -602,7 +608,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_wifi_client": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:status/setMacBlock",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Individual client LAN-to-WAN block/unblock with explicit confirmation and revision guard; original OEM client form source adapted; runtime/browser acceptance pending."
     },
     "set_wifi_guest": {
       "state": "PROTOTYPE",
