@@ -9,11 +9,19 @@ async function exercise(destroyCode) {
     if (!elements.has(id)) elements.set(id, {
       value: '', hidden: false, reset() {}, replaceChildren() {}, append() {},
       addEventListener(name, fn) { this[name] = fn; },
+      setAttribute(name, value) { this[name] = String(value); },
       querySelector(name) { return element(id + name); }
     });
     return elements.get(id);
   }
+  const bodyClasses = new Set();
   const document = {
+    body: {classList:{
+      add(name) { bodyClasses.add(name); },
+      remove(name) { bodyClasses.delete(name); },
+      contains(name) { return bodyClasses.has(name); },
+      toggle(name) { if (bodyClasses.has(name)) { bodyClasses.delete(name); return false; } bodyClasses.add(name); return true; }
+    }},
     getElementById: element, createElement: element, querySelectorAll: () => [],
     addEventListener(name, fn) { this[name] = fn; }
   };
