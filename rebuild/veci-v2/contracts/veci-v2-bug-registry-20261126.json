@@ -77,7 +77,7 @@
       "protection": "Source mitigates trigger: AP activation is UCI-only with no global network reload, wifi down/up, modem power-cycle or automatic restart; mt76 MCU timeout/root cause is NOT proven fixed. LAB compilation permitted after real source tests, but firmware release/physical flash needs driver UAT and recovery proof.",
       "live_production_passive_evidence": {
         "evidence_path": "rebuild/veci-v2/contracts/owner-mt76-production-passive-20261126.json",
-        "status": "PASS_READ_ONLY_IDLE_30_OF_30",
+        "status": "PASS_READ_ONLY_IDLE_35_OF_35",
         "new_mt76_errors": 0,
         "connected_clients_observed": 0,
         "driver_root_cause_resolved": false,
@@ -100,6 +100,14 @@
           "hostapd_clients_each_sample": 0,
           "phone_connected_during_sample": "UNCONFIRMED",
           "mt76_root_cause_resolved": false
+        },
+        "fifth_diagnostic": {
+          "read_only_lte_wifi_pass": "5/5",
+          "iw_hostapd_counter_match": "5/5",
+          "positive_client_samples": "0/5",
+          "new_mt76_errors": 0,
+          "associated_client_uat": "NOT_PROVEN",
+          "candidate_hardware_uat": "NOT_RUN"
         }
       }
     },

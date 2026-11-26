@@ -143,3 +143,9 @@ Uncertainties are never converted into PASS on the strength of source code.
 - Counts are UNKNOWN rather than fabricated 0 when either API or parser fails; five 2-second spaced samples distinguish empty, positive and inconsistent associations.
 - Regression tests simulate empty map, one station, disagreement and wrong-board denial; no radio, network, SIM, modem or firmware mutations.
 - A positive association is still NOT equivalent to traffic/stress stability. WIFI-003 remains a physical UAT blocker for the new firmware.
+
+## Production client evidence V2, 26 Nov 2026 at 16:35 local
+- Owner Windows log VeCI-WE5927-MT76-ClientEvidence-V2-20261126_163538.log was pasted into chat; original full logfile has not been uploaded.
+- Five read-only samples: WIFI and LTE HTTPS 204 PASS 5/5; baseline and new MT76 errors zero; IW and hostapd APIs exit 0, station counters match 5/5, both 0 clients throughout.
+- Across monitored Wi-Fi/LTE sets, 35/35 samples passed control-plane health (10 + 20 + 5). The earlier five-sample association-only probe is tracked separately.
+- Client presence with live Wi-Fi Internet remains unconfirmed; no stress test or proof the driver root cause is resolved. Candidate hardware UAT remains NOT RUN.

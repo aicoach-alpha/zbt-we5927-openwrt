@@ -63,9 +63,9 @@
     "note": "Original script discards iw station dump stderr; grep -c may print zero on iw execution failure."
   },
   "aggregate_observations": {
-    "wifi_control_plane_pass_samples": 30,
-    "lte_https_pass_samples": 30,
-    "total_samples": 30,
+    "wifi_control_plane_pass_samples": 35,
+    "lte_https_pass_samples": 35,
+    "total_samples": 35,
     "new_mt76_log_events_detected": 0,
     "client_count_positive_samples": 0,
     "connected_client_stability": "NOT_TESTED"
@@ -102,5 +102,35 @@
     "mt76_driver_failure_proven": false,
     "client_load_acceptance": "NOT_TESTED",
     "router_configuration_modified": false
+  },
+  "fifth_session_client_evidence_v2": {
+    "date_local": "2026-11-26",
+    "source": "Owner-supplied PowerShell console",
+    "reported_log_name": "VeCI-WE5927-MT76-ClientEvidence-V2-20261126_163538.log",
+    "read_only": true,
+    "sample_count": 5,
+    "interval_seconds": 2,
+    "security": "psk2",
+    "radio_disabled": 0,
+    "ap_disabled": 0,
+    "wifi_pass_samples": 5,
+    "radio_up_samples": 5,
+    "hostapd_enabled_samples": 5,
+    "iw_exit_success_samples": 5,
+    "iw_client_count_all_samples": 0,
+    "hostapd_exit_success_samples": 5,
+    "hostapd_client_count_all_samples": 0,
+    "matching_counter_samples": 5,
+    "positive_client_samples": 0,
+    "lte_https_pass_samples": 5,
+    "lte_https_code": 204,
+    "driver_error_count_baseline": 0,
+    "new_mt76_events": 0,
+    "reported_result": "PASS_PASSIVE_OBSERVATION_ONLY",
+    "physical_connected_client_test": "NOT_PROVEN",
+    "phone_connected_during_test": "UNCONFIRMED",
+    "new_candidate_test": "NOT_RUN",
+    "no_configuration_changed": true,
+    "log_not_uploaded": true
   }
 }
