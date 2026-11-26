@@ -78,6 +78,10 @@
     "source/we5927-lte/files/etc/uci-defaults/99-we5927-lte": "2a68fd13c7364ba7213850426facf574586f730cab3d73da13b3e85f3c05dcaa",
     "source/we5927-lte/files/usr/sbin/we5927-lte": "bcca58415d00777d3f15a5ecf18426777d126e3ec7e891b447e890f7d7c611b4",
     "source/we5927-lte/src/veci-sms-cmgs.c": "8c07b048602904291d15d77c4089c977b9c976c8edb982278ce4cf1cf3ffda1d",
-    "source/we5927-lte/src/we5927-at.c": "9b8c075c7f68a160eccf70ff7b3c7aff3f4a4f1f21917dcd01472c2ca990c469"
+    "source/we5927-lte/src/we5927-at.c": "9b8c075c7f68a160eccf70ff7b3c7aff3f4a4f1f21917dcd01472c2ca990c469",
+    "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "dcebdf3557a76d75b2427c0cd73bb90f1d62250335a54cd72b855fae71372344"
+  },
+  "file_upstream_commits": {
+    "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "f3dd4247fadf76055c766e4fe7484dd1adb7d006"
   }
 }
