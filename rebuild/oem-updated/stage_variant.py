@@ -111,6 +111,15 @@ def stage(image, out):
             if code.count(old) != 1:
                 raise ValueError("unexpected frontend transport anchor")
             code = code.replace(old, new)
+        # Language is a browser preference, not a privileged router mutation.
+        language_old = 'setLang:function(e){var t=this;this.$req.get("webapi?op=language_set&language="+e).then((function(a){t.$i18n.locale=e,localStorage.removeItem("lang"),localStorage.setItem("lang",e),localStorage.setItem("numberSum","1"),window.location.reload()}))}'
+        language_new = 'setLang:function(e){if(["zh","en","fr","id","vi","th","de","kr","ru"].indexOf(e)<0)return;this.$i18n.locale=e;localStorage.setItem("lang",e);localStorage.setItem("numberSum","1");window.location.reload()}'
+        lang_get = 'this.$req.get("/webapi?op=language_get").then((function(t){if(t.language&&""!=t.language)'
+        lang_local = 'Promise.resolve({language:(["zh","en","fr","id","vi","th","de","kr","ru"].indexOf(localStorage.getItem("lang"))>=0?localStorage.getItem("lang"):"")}).then((function(t){if(t.language&&""!=t.language)'
+        for old,new in ((language_old,language_new),(lang_get,lang_local),('localStorage.setItem("en","en")','localStorage.setItem("lang","en")')):
+            if code.count(old)!=1:
+                raise ValueError("OEM language preference anchor changed")
+            code=code.replace(old,new)
         app.write_text(code)
         # Fix the vendor dashboard's random suppression of high CPU usage,
         # disable overlapping polls, and preserve unknown samples as gaps.
@@ -225,6 +234,17 @@ def stage(image, out):
             '<button id="mac-refresh" type="button">Baca daftar</button><form id="mac-form">'
             '<label>MAC address, satu per baris<textarea id="mac-list" rows="5" maxlength="288"></textarea></label>'
             '<button id="mac-save" disabled>Simpan daftar</button></form><p id="mac-result" role="status"></p></article>'
+            '<article><h2>Wi-Fi transmit power</h2><p>Power dBm, or auto. Manual setting must be within the current regulatory limit. No live radio restart.</p>'
+            '<button id="power-refresh" type="button">Baca power</button><form id="power-form">'
+            '<label>Power (auto atau dBm)<input id="power-value" required maxlength="4"></label>'
+            '<button id="power-save" disabled>Simpan untuk boot berikutnya</button></form><p id="power-result" role="status"></p></article>'
+            '<article><h2>Scheduled reboot (optional)</h2><p>Disabled by default. Enabling this schedule will interrupt connections at the selected time.</p>'
+            '<button id="schedule-refresh" type="button">Baca jadwal</button><form id="schedule-form">'
+            '<label><input id="schedule-enabled" type="checkbox">Enable scheduled reboot</label>'
+            '<label>Hour<input id="schedule-hour" type="number" min="0" max="23" required></label>'
+            '<label>Minute<input id="schedule-minute" type="number" min="0" max="59" required></label>'
+            '<label>Days (0 Sunday to 6 Saturday, comma separated)<input id="schedule-days" required maxlength="13"></label>'
+            '<button id="schedule-save" disabled>Simpan jadwal</button></form><p id="schedule-result" role="status"></p></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

@@ -91,6 +91,27 @@
       ],
       "scope": "LAN to WAN, not router management",
       "state": "SOURCE_STAGED_NOT_RUNTIME_VERIFIED"
+    },
+    "wifi_power": {
+      "provider": "veci.v2.wifi",
+      "methods": [
+        "power",
+        "setPower"
+      ],
+      "state": "SOURCE_INTEGRATED_NOT_UAT"
+    },
+    "scheduled_reboot": {
+      "provider": "veci.v2.cron",
+      "methods": [
+        "rebootStatus",
+        "setReboot"
+      ],
+      "default": "disabled",
+      "state": "SOURCE_INTEGRATED_NOT_UAT"
+    },
+    "language": {
+      "provider": "browser local storage",
+      "state": "SOURCE_INTEGRATED_NOT_UAT"
     }
   },
   "remaining": [

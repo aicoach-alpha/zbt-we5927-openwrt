@@ -33,6 +33,7 @@ function clearSession() {
   el('backup-message').textContent = '';
   dhcpRevision = ''; el('dhcp-form').reset(); el('dhcp-save').disabled = true;
   el('dhcp-result').textContent = ''; el('traffic-result').textContent = '';
+  powerExpected=null; scheduleRevision=null; el('power-form').reset(); el('schedule-form').reset(); el('power-save').disabled=true; el('schedule-save').disabled=true; el('power-result').textContent=''; el('schedule-result').textContent='';
   macRevision=''; el('mac-form').reset(); el('mac-save').disabled=true; el('mac-result').textContent='';
   fwRevision=''; el('fw-save').disabled=true; el('offload-save').disabled=true; el('fw-form').reset(); el('offload-form').reset(); el('fw-result').textContent='';
   guestState=''; el('guest-enable').disabled=true; el('guest-disable').disabled=true; el('guest-result').textContent='';
@@ -237,4 +238,50 @@ el('mac-form').onsubmit=async e=>{
     await oem('set_mac_blacklist',{mac_blacklist:list,revision,confirmation:'SAVE_MAC_BLOCK'},token);
     if(sid===token)el('mac-result').textContent='Konfigurasi diterima. Baca ulang dan uji konektivitas klien.';
   }catch(err){if(sid===token)el('mac-result').textContent=err.message;}
+};
+
+let powerExpected=null,powerCap=null,scheduleRevision=null;
+el('power-refresh').onclick=async()=>{
+  const token=sid,b=el('power-refresh');if(!token||b.disabled)return;
+  b.disabled=true;powerExpected=null;el('power-save').disabled=true;
+  try{
+    const x=await oem('get_wifi_power',undefined,token);
+    if(!/^(auto|[0-9]{1,2})$/.test(x.configured||''))throw Error('Invalid configured power');
+    powerExpected=x.configured;powerCap=/^[0-9]{1,2}$/.test(x.safe_max_dbm||'')?Number(x.safe_max_dbm):null;
+    el('power-value').value=x.configured;el('power-save').disabled=false;
+    el('power-result').textContent=powerCap===null?'Regulatory cap unavailable; only auto can be selected.':'Current safe cap: '+powerCap+' dBm. Live output is unverified.';
+  }catch(err){if(sid===token)el('power-result').textContent=err.message;}
+  finally{b.disabled=false;}
+};
+el('power-form').onsubmit=async e=>{
+  e.preventDefault();const token=sid,expected=powerExpected,value=el('power-value').value.trim();
+  if(!token||expected===null)return;
+  if(value!=='auto'&&(!/^[1-9][0-9]?$/.test(value)||powerCap===null||Number(value)>powerCap)){el('power-result').textContent='Invalid or unavailable power limit.';return;}
+  if(!window.confirm('Simpan power Wi-Fi untuk reboot manual berikutnya?'))return;
+  powerExpected=null;el('power-save').disabled=true;
+  try{await oem('set_wifi_power',{dbm:value,expected,confirmation:'SAVE_TXPOWER_NEXT_BOOT'},token);
+    if(sid===token)el('power-result').textContent='Konfigurasi tersimpan. Tidak ada reboot atau reload otomatis.';
+  }catch(err){if(sid===token)el('power-result').textContent=err.message;}
+};
+el('schedule-refresh').onclick=async()=>{
+  const token=sid,b=el('schedule-refresh');if(!token||b.disabled)return;
+  b.disabled=true;scheduleRevision=null;el('schedule-save').disabled=true;
+  try{
+    const x=await oem('getAutoreboot',undefined,token);
+    if(!/^(?:[0-9a-f]{64})?$/.test(x.revision)||!['0','1'].includes(x.enabled))throw Error('Schedule unavailable');
+    scheduleRevision=x.revision;el('schedule-enabled').checked=x.enabled==='1';
+    el('schedule-hour').value=x.hour;el('schedule-minute').value=x.minute;el('schedule-days').value=x.weekdays;
+    el('schedule-save').disabled=false;el('schedule-result').textContent='Managed schedule loaded. Other administrator cron jobs are not changed.';
+  }catch(err){if(sid===token)el('schedule-result').textContent=err.message;}
+  finally{b.disabled=false;}
+};
+el('schedule-form').onsubmit=async e=>{
+  e.preventDefault();const token=sid,revision=scheduleRevision;
+  if(!token||revision===null)return;
+  const enabled=el('schedule-enabled').checked,hour=el('schedule-hour').value,minute=el('schedule-minute').value,weekdays=el('schedule-days').value.trim();
+  if(!window.confirm(enabled?'Enable automatic reboot at the chosen times? This will interrupt LTE and Wi-Fi.':'Disable the managed reboot schedule?'))return;
+  scheduleRevision=null;el('schedule-save').disabled=true;
+  try{await oem('setAutoreboot',{enabled:enabled?'1':'0',hour,minute,weekdays,revision,confirmation:enabled?'ENABLE_SCHEDULED_REBOOT':'DISABLE_SCHEDULED_REBOOT'},token);
+    if(sid===token)el('schedule-result').textContent='Jadwal disimpan. Baca ulang status.';
+  }catch(err){if(sid===token)el('schedule-result').textContent=err.message;}
 };

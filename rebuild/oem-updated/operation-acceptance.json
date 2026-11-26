@@ -42,7 +42,10 @@
       "state": "UNIMPLEMENTED"
     },
     "getAutoreboot": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.cron:rebootStatus",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Managed schedule only; no entry means disabled with suggested time; unmanaged cron jobs not audited; runtime pending."
     },
     "getWiFi2": {
       "state": "PROTOTYPE",
@@ -347,9 +350,9 @@
     },
     "get_wifi_power": {
       "state": "PROTOTYPE",
-      "provider": "OpenWrt wireless UCI",
+      "provider": "veci.v2.wifi:power",
       "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Configured dBm or regulatory auto; OEM legacy low/medium/high UI mapping pending, no invented percentage conversion."
+      "limitations": "Configured dBm and live-derived conservative cap. Actual transmit power unverified; OEM legacy selector not yet adapted."
     },
     "guide_commit": {
       "state": "UNIMPLEMENTED"
@@ -364,7 +367,10 @@
       "state": "PROTOTYPE"
     },
     "language_set": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "Browser local preference",
+      "evidence": "rebuild/oem-updated/stage_variant.py",
+      "limitations": "Replacement for legacy server-wide language mutation; uses original OEM language selector and local storage, no router write. Browser acceptance pending."
     },
     "login": {
       "state": "PROTOTYPE"
@@ -418,7 +424,10 @@
       "state": "UNIMPLEMENTED"
     },
     "setAutoreboot": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.cron:setReboot",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Explicit opt-in, revision guarded and owned cron record; existing cron jobs preserved. Actual scheduled reboot acceptance pending."
     },
     "setWiFi2": {
       "state": "PROTOTYPE",
@@ -607,7 +616,10 @@
       "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "set_wifi_power": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.wifi:setPower",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Native dBm or regulatory auto, conservative cap from live permitted channels, next manual boot only. Legacy high/medium/low form not mapped; radio UAT pending."
     },
     "setbootflag": {
       "state": "UNIMPLEMENTED"

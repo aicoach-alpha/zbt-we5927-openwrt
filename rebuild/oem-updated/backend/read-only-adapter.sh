@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -726,13 +726,22 @@ case "$1" in
         json_close_array
         ;;
     get_wifi_power)
-        # OpenWrt txpower is dBm, not legacy percentage. Never invent a conversion.
-        power="$(get wireless.radio0.txpower || true)"
-        case "$power" in ''|*[!0-9]*) power="";; esac
+        native="$(native_read veci.v2.wifi power)" || error "power provider unavailable"
+        power="$(field '@.configured')" || error "power unavailable"
+        cap="$(field '@.safe_max_dbm' || true)"
         success "get native Wi-Fi power success"
-        json_add_string wifi_power "native"
-        json_add_string txpower_dbm "$power"
-        json_add_string power_mode "$(if [ -n "$power" ]; then printf configured; else printf regulatory_auto; fi)"
+        json_add_string wifi_power native
+        json_add_string configured "$power"
+        json_add_string safe_max_dbm "$cap"
+        json_add_string live_power_verified false
+        ;;
+    getAutoreboot)
+        native="$(native_read veci.v2.cron rebootStatus)" || error "schedule unavailable"
+        success "get managed reboot schedule"
+        for key in enabled hour minute weekdays revision scope; do
+            value="$(field "@.$key" || true)"
+            json_add_string "$key" "$value"
+        done
         ;;
     search_ctcode_and_channals)
         native="$(native_read veci.v2.wifi info)" || error "Wi-Fi capabilities unavailable"
