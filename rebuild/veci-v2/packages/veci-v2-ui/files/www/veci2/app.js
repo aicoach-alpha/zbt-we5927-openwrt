@@ -227,13 +227,58 @@ verifyRelease.addEventListener('click', async () => {
   }
 });
 
+function closeMobileNav() {
+  document.body.classList.remove('veci-nav-open');
+  const toggle = el('mobile-nav-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+function updateShellStatus(id, label, tone = '') {
+  const node = el(id);
+  if (!node) return;
+  node.textContent = label;
+  node.className = tone ? 'state-' + tone : '';
+}
+function updateShortcutSelection(activePage) {
+  for (const button of document.querySelectorAll('.nav-shortcut')) {
+    const current = activePage === button.dataset.targetPage &&
+      document.querySelector('#' + activePage + ' .subnav .subtab.active')?.dataset.group ===
+        button.dataset.targetGroup;
+    button.classList.toggle('active', current);
+    if (current) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+}
+function navigateShortcut(button) {
+  if (!sid) return;
+  const target = button.dataset.targetPage;
+  const group = button.dataset.targetGroup;
+  if (!['overview', 'network', 'sms', 'settings'].includes(target)) return;
+  const exists = document.querySelector('#' + target + ' .subnav .subtab[data-group="' + group + '"]');
+  if (!exists) return;
+  showPage(target);
+  setSubgroup(target, group);
+  if (target === 'overview' && group === 'health') void refreshHealth();
+  if (target === 'overview' && group === 'dashboard') void sampleTraffic();
+  if (target === 'network' && group === 'sim') {
+    void refreshLtePolicy();
+    void refreshLtePathStatus();
+  }
+  closeMobileNav();
+  window.scrollTo?.({top: 0, behavior: 'instant'});
+}
 function showWorkspace() {
+  document.body.classList.add('veci-authenticated');
   globalThis.VeciSmsCenter.activate();
   el('login').hidden = true;
   el('workspace').hidden = false;
   el('logout').hidden = false;
 }
 function showLogin() {
+  closeMobileNav();
+  document.body.classList.remove('veci-authenticated');
+  updateShellStatus('shell-lte-status', 'Belum diverifikasi');
+  updateShellStatus('shell-wifi-status', 'Belum diperiksa');
+  updateShellStatus('shell-router-status', 'Belum diperiksa');
   el('lte-apn').value = '';
   el('lte-apn').disabled = true;
   el('lte-apn-save').disabled = true;
@@ -301,6 +346,7 @@ function setSubgroup(scope, group) {
   }
   for (const panel of (page.querySelectorAll?.(':scope > article[data-group]') || []))
     panel.hidden = panel.dataset.group !== group;
+  if (!page.hidden) updateShortcutSelection(scope);
 }
 function showPage(id) {
   for (const page of document.querySelectorAll('.page'))
@@ -328,6 +374,8 @@ function showPage(id) {
   const [title,summary] = titles[id] || titles.overview;
   el('page-title').textContent = title;
   el('page-summary').textContent = summary;
+  updateShortcutSelection(id);
+  closeMobileNav();
   if (id === 'overview' && document.querySelector?.('#overview .subtab.active')?.dataset.group === 'health')
     void refreshHealth();
   if (id === 'network') {
@@ -373,6 +421,15 @@ async function refreshOverview() {
     Number.isFinite(data.memory_available_kb) ?
       Math.round(data.memory_available_kb / 1024) + ' MiB' : 'Unknown'));
   el('status-grid').replaceChildren(...cards);
+  updateShellStatus('shell-lte-status', lteLink === true ?
+    'Jalur modem tersedia · cek HTTPS' : 'Jalur LTE belum siap', lteLink === true ? 'warn' : 'bad');
+  updateShellStatus('shell-wifi-status', data.wifi_ap_enabled === true ?
+    'AP aktif · klien belum diuji' : data.wifi_ap_configured === false ?
+    'AP dinonaktifkan' : 'AP belum terverifikasi',
+    data.wifi_ap_enabled === true ? 'good' : data.wifi_ap_configured === false ? '' : 'warn');
+  updateShellStatus('shell-router-status', data.netifd_count === 1 ?
+    'Netifd normal' : 'Perlu pemeriksaan netifd',
+    data.netifd_count === 1 ? 'good' : 'warn');
   el('path-modem').textContent = data.lte_usb_state === 'carrier_up' ? 'USB modem terhubung' :
     data.lte_usb_state === 'modem_missing' ? 'Modem belum terdeteksi' : 'Status modem perlu diperiksa';
   el('path-router').textContent = lteLink === true ? 'IP dan rute tersedia, internet belum diuji' :
@@ -407,6 +464,11 @@ async function verifyInternetLive() {
     const modemButNoInternet = result.source === 'usb0_https' &&
       result.reason === 'modem_connected_public_unavailable_check_quota' &&
       result.modem_http_verified === true;
+    updateShellStatus('shell-lte-status', verified ? 'Online · HTTPS & DNS PASS' :
+      publicWithoutDns ? 'HTTPS aktif · DNS perlu dicek' :
+      modemButNoInternet ? 'Modem aktif · internet gagal' :
+      'Internet belum terverifikasi',
+      verified ? 'good' : 'warn');
     badge.className = verified ? 'indicator good' : 'indicator';
     badge.textContent = verified ? 'Internet LTE aktif' :
       modemButNoInternet ? 'Modem aktif, internet publik gagal' :
@@ -425,6 +487,7 @@ async function verifyInternetLive() {
       publicWithoutDns ? 'HTTPS langsung berhasil' : 'Belum terverifikasi';
   } catch (error) {
     if (sid !== session) return;
+    updateShellStatus('shell-lte-status', 'Pemeriksaan LTE gagal', 'warn');
     badge.textContent = 'Belum terverifikasi';
     detail.textContent = 'Pemeriksaan gagal: ' + String(error.message || 'Unknown');
     const text = card.querySelector('strong');
@@ -962,6 +1025,21 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   for (const tab of document.querySelectorAll('.tab'))
     tab.addEventListener('click', () => showPage(tab.dataset.page));
+  for (const shortcut of document.querySelectorAll('[data-target-page][data-target-group]'))
+    shortcut.addEventListener('click', () => navigateShortcut(shortcut));
+  el('mobile-nav-toggle').addEventListener('click', () => {
+    if (!sid) return;
+    const opened = document.body.classList.toggle('veci-nav-open');
+    el('mobile-nav-toggle').setAttribute('aria-expanded', opened ? 'true' : 'false');
+  });
+  el('mobile-nav-dismiss').addEventListener('click', closeMobileNav);
+  el('mobile-nav-backdrop').addEventListener('click', closeMobileNav);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && document.body.classList.contains('veci-nav-open')) {
+      closeMobileNav();
+      el('mobile-nav-toggle').focus();
+    }
+  });
   for (const groupButton of document.querySelectorAll('.subnav .subtab'))
     groupButton.addEventListener('click', () => {
       if (!sid) return;

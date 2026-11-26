@@ -53,6 +53,7 @@ define Package/veci-v2-ui/install
 	$(INSTALL_DATA) ./files/www/veci2/monitor-settings.js $(1)/www/veci2/monitor-settings.js
 	$(INSTALL_DATA) ./files/www/veci2/sim-lock.js $(1)/www/veci2/sim-lock.js
 	$(INSTALL_DATA) ./files/www/veci2/app.css $(1)/www/veci2/app.css
+	$(INSTALL_DATA) ./files/www/veci2/veci-design.css $(1)/www/veci2/veci-design.css
 endef
 
 $(eval $(call BuildPackage,veci-v2-ui))
