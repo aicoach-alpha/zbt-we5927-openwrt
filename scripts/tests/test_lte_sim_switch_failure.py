@@ -10,6 +10,8 @@ FUNCTIONS, DISPATCH = SOURCE.rsplit('\ncase "$1" in', 1)
 
 def simulate(stubs, command, *args):
     safe = "network_manager_safe() { :; }\n"
+    if command.startswith('case "$1" in'):
+        safe += 'cfg() { [ "$1" = sim ] && echo 1; }\nselector_slot() { echo 1; }\n'
     return subprocess.run(["sh", "-c", FUNCTIONS + "\n" + safe + stubs + "\n" + command,
                            "we5927-lte", *args], capture_output=True, text=True, timeout=5)
 
@@ -92,9 +94,11 @@ gpio_path() { echo unexpected >&2; return 1; }
                 self.assertEqual(result.stderr, '')
 
     def test_manual_reconnect_stops_at_failed_stage(self):
-        for failed, expected in (('power', ['power']), ('at', ['power']),
-                                 ('apn', ['power', 'apn']),
-                                 ('ifup', ['power', 'apn', 'ifup'])):
+        # Manual failure now triggers one rollback/start attempt for original SIM.
+        for failed, expected in (('power', ['power', 'power']),
+                                 ('at', ['power', 'power']),
+                                 ('apn', ['power', 'apn', 'power', 'apn']),
+                                 ('ifup', ['power', 'apn', 'ifup', 'power', 'apn', 'ifup'])):
             stubs = """
 set_sim() { :; }
 cycle_modem_power() { echo power >&3; [ "$failed" != power ]; }

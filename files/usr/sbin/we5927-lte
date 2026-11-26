@@ -1284,8 +1284,37 @@ case "$1" in
 		power_cycle
 		;;
 	sim)
+		# A selected SIM must not be left stranded when modem start/APN fails.
+		# Roll back the verified prior selector exactly once, and always
+		# report the original failure (even if the old SIM also lacks service).
+		old_slot="$(cfg sim 2>/dev/null)" || old_slot=
+		old_selector="$(selector_slot 2>/dev/null)" || old_selector=
+		case "$old_slot:$old_selector" in
+			1:1|2:2) ;;
+			*) log "SIM switch refused: original selector/config mismatch"; exit 3 ;;
+		esac
 		set_sim "$2" || exit $?
-		start_selected_sim manual
+		if start_selected_sim manual; then
+			:
+		else
+			switch_rc=$?
+			if [ "$2" != "$old_slot" ]; then
+				log "SIM$2 modem start failed (rc=$switch_rc); attempting SIM$old_slot rollback"
+				if set_sim "$old_slot"; then
+					start_selected_sim restore ||
+						log "Original SIM$old_slot selected; modem restore incomplete"
+					new_selector="$(selector_slot 2>/dev/null)" || new_selector=
+					if [ "$new_selector" = "$old_slot" ] && [ "$(cfg sim)" = "$old_slot" ]; then
+						log "SIM selector/config rollback confirmed to SIM$old_slot; modem service still unverified"
+					else
+						log "SIM rollback NOT confirmed; manual inspection required"
+					fi
+				else
+					log "SIM rollback failed: selector/config must be inspected"
+				fi
+			fi
+			exit "$switch_rc"
+		fi
 		;;
 	usb-repair)
 		usb_repair
