@@ -29,9 +29,9 @@ lan_host() {
 }
 [ "$#" -ge 1 ] || fail unsupported_method
 case "$1" in
-  list) echo '{"status":{},"addForward":{"from_port":"Integer","to_port":"Integer","protocol":"String","destination":"String","confirmation":"String"},"deleteForward":{"name":"String","confirmation":"String"},"setDmz":{"destination":"String","confirmation":"String"},"setDefaults":{"drop_invalid":"String","syn_flood":"String","revision":"String","confirmation":"String"},"setOffload":{"enabled":"String","revision":"String","confirmation":"String"},"setMacBlock":{"addresses":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
+  list) echo '{"status":{},"addForward":{"from_port":"Integer","to_port":"Integer","protocol":"String","destination":"String","confirmation":"String"},"deleteForward":{"name":"String","confirmation":"String"},"setDmz":{"destination":"String","confirmation":"String"},"setDefaults":{"drop_invalid":"String","syn_flood":"String","revision":"String","confirmation":"String"},"setOffload":{"enabled":"String","revision":"String","confirmation":"String"},"setMacBlock":{"addresses":"String","revision":"String","confirmation":"String"},"ttlStatus":{},"setTtl":{"enabled":"String","ttl":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
   call) [ "$#" -ge 2 ] || fail unsupported_method
-    case "$2" in status|addForward|deleteForward|setDmz|setDefaults|setOffload|setMacBlock) ;; *) fail unsupported_method ;; esac ;;
+    case "$2" in status|addForward|deleteForward|setDmz|setDefaults|setOffload|setMacBlock|ttlStatus|setTtl) ;; *) fail unsupported_method ;; esac ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
@@ -90,6 +90,84 @@ status() {
   json_add_string dmz_destination "$(uci -q get firewall.veci_owner_dmz.dest_ip || :)"
   json_dump; echo
 }
+# Native firewall4 table include; no shell include, no carrier-specific rule.
+ttl_file=/etc/nftables.d/90-veci-ttl.nft
+ttl_render() {
+  printf 'chain veci_ttl_forward {\n  type filter hook forward priority mangle; policy accept;\n  iifname "br-lan" oifname { "eth0.2", "pppoe-wan", "usb0" } ip ttl set %s counter comment "VeCI managed IPv4 TTL"\n}\n' "$1"
+}
+ttl_read() {
+  ttl_enabled=0; ttl_value=""; ttl_digest=absent
+  [ ! -L "$ttl_file" ] || fail unsafe_ttl_path
+  if [ -e "$ttl_file" ]; then
+    [ -f "$ttl_file" ] || fail invalid_ttl_file
+    ttl_value=$(sed -nE 's/.*ip ttl set ([0-9]+) counter comment "VeCI managed IPv4 TTL"$/\1/p' "$ttl_file")
+    case "$ttl_value" in [1-9]|[1-9][0-9]|[1-9][0-9][0-9]) ;; *) fail invalid_ttl_file;; esac
+    [ "$ttl_value" -le 255 ] || fail invalid_ttl_file
+    ttl_digest=$(sha256sum "$ttl_file") || fail config_unavailable
+    ttl_digest=${ttl_digest%% *}
+    expected_digest=$(ttl_render "$ttl_value" | sha256sum)
+    [ "$ttl_digest" = "${expected_digest%% *}" ] || fail foreign_ttl_file
+    ttl_enabled=1
+  fi
+  fw_digest=$(sha256sum /etc/config/firewall) || fail config_unavailable
+  ttl_revision=$(printf '%s:%s' "${fw_digest%% *}" "$ttl_digest" | sha256sum)
+  ttl_revision=${ttl_revision%% *}
+}
+ttl_status() {
+  ttl_read
+  live=unknown
+  if command -v nft >/dev/null 2>&1; then
+    if chain=$(nft list chain inet fw4 veci_ttl_forward 2>/dev/null); then
+      if [ "$ttl_enabled" = 1 ] && printf '%s\n' "$chain" | grep -Fq "ip ttl set $ttl_value counter"; then live=rule_present; else live=unexpected_rule; fi
+    elif nft list table inet fw4 >/dev/null 2>&1; then live=rule_absent; fi
+  fi
+  set +u
+  . /usr/share/libubox/jshn.sh
+  json_init; json_add_boolean ok 1
+  json_add_string revision "$ttl_revision"; json_add_string enabled "$ttl_enabled"
+  json_add_string ttl "$ttl_value"; json_add_string runtime "$live"
+  json_add_string scope lan_to_wan_ipv4_forward
+  json_add_boolean packet_verified 0
+  json_dump
+}
+if [ "$2" = ttlStatus ] || [ "$2" = setTtl ]; then
+  exec 9<"$0"; flock -n 9 || fail busy
+  if [ "$2" = ttlStatus ]; then ttl_status; exit 0; fi
+  request=$(head -c 513)
+  [ "${#request}" -le 512 ] || fail request_too_large
+  enabled=$(jsonfilter -s "$request" -e '@.enabled') || fail invalid_request
+  confirm=$(jsonfilter -s "$request" -e '@.confirmation') || fail invalid_request
+  revision=$(jsonfilter -s "$request" -e '@.revision') || fail invalid_request
+  case "$enabled:$confirm" in 0:DISABLE_FORWARD_TTL|1:ENABLE_FORWARD_TTL) ;; *) fail confirmation_required;; esac
+  ttl_read
+  [ "$revision" = "$ttl_revision" ] || fail stale_configuration
+  pending=$(uci -q changes firewall) || fail config_unavailable
+  [ -z "$pending" ] || fail pending_firewall_changes
+  [ -d /etc/nftables.d ] && [ ! -L /etc/nftables.d ] || fail unsafe_ttl_path
+  if [ "$enabled" = 1 ]; then
+    value=$(jsonfilter -s "$request" -e '@.ttl') || fail invalid_request
+    case "$value" in [1-9]|[1-9][0-9]|[1-9][0-9][0-9]) ;; *) fail invalid_ttl;; esac
+    [ "$value" -le 255 ] || fail invalid_ttl
+    for option in flow_offloading flow_offloading_hw; do
+      case "$(uci -q get "firewall.@defaults[0].$option" || :)" in ''|0) ;; *) fail offload_must_be_disabled;; esac
+    done
+  fi
+  tmp=$(mktemp -d /tmp/veci2-ttl.XXXXXX) || fail tmp_failed
+  staged=$(mktemp /etc/nftables.d/.veci-ttl.XXXXXX) || { rm -rf "$tmp"; fail tmp_failed; }
+  trap 'rm -rf "$tmp"; rm -f "$staged"' EXIT
+  if [ "$ttl_enabled" = 1 ]; then cp "$ttl_file" "$tmp/previous" || fail backup_failed; fi
+  if [ "$enabled" = 1 ]; then ttl_render "$value" > "$staged" && mv "$staged" "$ttl_file" || fail stage_failed
+  else rm -f "$ttl_file" || fail stage_failed; fi
+  if ! fw4 check >/dev/null 2>&1 || ! /etc/init.d/firewall reload >/dev/null 2>&1 ||
+     { [ "$enabled" = 1 ] && ! nft list chain inet fw4 veci_ttl_forward 2>/dev/null | grep -Fq "ip ttl set $value counter"; } ||
+     { [ "$enabled" = 0 ] && nft list chain inet fw4 veci_ttl_forward >/dev/null 2>&1; }; then
+    if [ -f "$tmp/previous" ]; then cp "$tmp/previous" "$staged" && mv "$staged" "$ttl_file" || fail rollback_failed
+    else rm -f "$ttl_file" || fail rollback_failed; fi
+    /etc/init.d/firewall reload >/dev/null 2>&1 || fail rollback_failed
+    fail ttl_apply_failed_rollback_attempted
+  fi
+  ttl_status; exit 0
+fi
 if [ "$2" = status ]; then status; exit 0; fi
 request=$(head -c 513)
 [ "$(printf %s "$request" | wc -c)" -le 512 ] || fail request_too_large
@@ -149,6 +227,7 @@ if [ "$2" = setDefaults ] || [ "$2" = setOffload ] || [ "$2" = setMacBlock ]; th
     case "$enabled" in 0|1) ;; *) fail invalid_flag;; esac
     if [ "$enabled" = 1 ] && mac_rule_owned; then fail mac_block_requires_offload_disabled; fi
     if [ "$enabled" = 1 ] && [ "$(uci -q get sqm.veci.enabled || :)" = 1 ]; then fail sqm_requires_offload_disabled; fi
+    if [ "$enabled" = 1 ] && { [ -e "$ttl_file" ] || [ -L "$ttl_file" ]; }; then fail ttl_requires_offload_disabled; fi
     # Software offload only. Do not enable an unverified hardware path.
     uci -q -t "$tmp" set "firewall.@defaults[0].flow_offloading=$enabled" &&
     uci -q -t "$tmp" set "firewall.@defaults[0].flow_offloading_hw=0" || fail stage_failed

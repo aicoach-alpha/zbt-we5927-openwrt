@@ -52,7 +52,8 @@
     "read": {
       "ubus": {
         "veci.v2.firewall": [
-          "status"
+          "status",
+          "ttlStatus"
         ]
       }
     },
@@ -64,7 +65,8 @@
           "setDmz",
           "setDefaults",
           "setOffload",
-          "setMacBlock"
+          "setMacBlock",
+          "setTtl"
         ]
       }
     }
