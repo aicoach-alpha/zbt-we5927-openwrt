@@ -3,6 +3,6 @@ test_parser_add_remove_preserves_oem_and_rejects_invalid_ranges (test_owner_cron
 test_native_ui_add_edit_remove_confirmation_and_acl (test_owner_cron_acceptance.CronAcceptance.test_native_ui_add_edit_remove_confirmation_and_acl) ... ok
 
 ----------------------------------------------------------------------
-Ran 3 tests in 3.309s
+Ran 3 tests in 0.309s
 
 OK

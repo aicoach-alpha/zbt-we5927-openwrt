@@ -7,6 +7,6 @@ test_manual_success_runs_expected_reconnect_steps (test_lte_sim_switch_failure.S
 test_selector_readback_handles_polarity_and_missing_line (test_lte_sim_switch_failure.SimSwitchFailureTests.test_selector_readback_handles_polarity_and_missing_line) ... ok
 
 ----------------------------------------------------------------------
-Ran 7 tests in 4.746s
+Ran 7 tests in 0.417s
 
 OK

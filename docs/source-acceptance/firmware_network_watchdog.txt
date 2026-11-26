@@ -7,6 +7,6 @@ test_bad_telemetry_cannot_inflate_72h_coverage (test_veci_link_monitor.Tests.tes
 test_no_false_root_cause_from_ping (test_veci_link_monitor.Tests.test_no_false_root_cause_from_ping) ... ok
 
 ----------------------------------------------------------------------
-Ran 7 tests in 0.079s
+Ran 7 tests in 0.008s
 
 OK

@@ -63,7 +63,7 @@
       "severity": "critical",
       "summary": "mt76 MCU timeout/hung AP can stop connectivity",
       "root_cause": "Hardware driver/radio reconfiguration hangs have occurred; kernel fix and long-run recovery not proven",
-      "source_state": "source_open",
+      "source_state": "requires_hardware_verification",
       "candidate_hardware": "not_tested",
       "affected_modules": [
         "wifi_ap_2g",
@@ -73,7 +73,7 @@
         "test_wifi_guardian_observe_only.py",
         "test_owner_wifi_readonly_triage_20261124.py"
       ],
-      "protection": "Prevent automatic radio reload/retry; block release until driver and hardware acceptance"
+      "protection": "Source mitigates trigger: AP activation is UCI-only with no global network reload, wifi down/up, modem power-cycle or automatic restart; mt76 MCU timeout/root cause is NOT proven fixed. LAB compilation permitted after real source tests, but firmware release/physical flash needs driver UAT and recovery proof."
     },
     {
       "id": "WIFI-004",
@@ -344,7 +344,7 @@
       "severity": "critical",
       "summary": "31 source module receipts have outdated SHA256 and release source gate blocks build",
       "root_cause": "New implementation and tests changed without evidence renewal",
-      "source_state": "source_open",
+      "source_state": "source_fixed",
       "candidate_hardware": "not_tested",
       "affected_modules": [
         "system_manual_sysupgrade",
@@ -354,7 +354,15 @@
         "test_owner_source_evidence_integrity.py",
         "test_owner_final_build_block.py"
       ],
-      "protection": "Re-run CI native tests then collect real receipts and current source digests; never fake PASS"
+      "protection": "Renewed actual native CI source receipts for all 39 active modules, 175 scoped test executions, commit e275946043ceebce061a97042041620c0a80edf7, GitHub workflow run 45758892212; exact log and source hashes independently verified",
+      "source_evidence": {
+        "commit": "e275946043ceebce061a97042041620c0a80edf7",
+        "workflow_run_id": 45758892212,
+        "scoped_test_executions": 175,
+        "modules_accepted": 39,
+        "evidence_origin": "GitHub_Actions_native_UCI_libubox",
+        "hardware_pass": false
+      }
     },
     {
       "id": "REL-002",

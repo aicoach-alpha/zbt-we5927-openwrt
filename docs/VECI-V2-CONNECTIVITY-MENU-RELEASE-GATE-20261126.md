@@ -91,3 +91,16 @@ Uncertainties are never converted into PASS on the strength of source code.
 - The firmware build/source-completion gate is BLOCKED and will stay
   blocked until actual source acceptance and risk closure; the one physical
   router is untouched.
+
+## Accepted exact-source native CI evidence
+- CI workflow run: 45758892212; source: e275946043ceebce061a97042041620c0a80edf7.
+- Native UCI/libubox source suite: passed.
+- 39/39 scoped modules, 175 executed scoped unittest methods; all checked-in
+  transcripts are byte copies of the verified CI artifact.
+- Every transcript digest and each implementation/test SHA256 independently
+  matched the exact tested source; zero test skips or synthetic PASS receipts.
+- WIFI-003 moved from unresolved SOURCE build-blocker to unresolved HARDWARE
+  verification: its kernel MCU failure remains unproven fixed. This does NOT
+  relax the flash gate or the 39 physical acceptance requirements.
+- REL-001 source receipts renewed based on actual CI evidence. A lab build
+  remains UNSIGNED and cannot be used as an owner flash image.

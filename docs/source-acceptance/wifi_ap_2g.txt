@@ -2,8 +2,9 @@ test_primary_ap_native_uci (test_owner_wifi_acceptance.OwnerWifi.test_primary_ap
 test_channel_survey_acl_and_auth_native_uci (test_owner_wifi_acceptance.OwnerWifi.test_channel_survey_acl_and_auth_native_uci) ... ok
 test_incompatible_band_and_failed_commit_preserve_configuration (test_owner_wifi_acceptance.OwnerWifi.test_incompatible_band_and_failed_commit_preserve_configuration) ... ok
 test_privileged_actions_have_write_acl (test_owner_wifi_acceptance.OwnerWifi.test_privileged_actions_have_write_acl) ... ok
+test_activation_has_acl_and_one_shot_fail_closed (test_veci_v2_connectivity_menu_regression_20261126.ConnectivityMenuRegressions.test_activation_has_acl_and_one_shot_fail_closed) ... ok
 
 ----------------------------------------------------------------------
-Ran 4 tests in 14.703s
+Ran 5 tests in 1.567s
 
 OK

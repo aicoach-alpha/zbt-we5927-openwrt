@@ -6,6 +6,6 @@ test_no_modem_or_wifi_mutations (test_owner_system_admin_source.SystemSource.tes
 test_reject_unsupported (test_owner_system_admin_source.SystemSource.test_reject_unsupported) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 1.040s
+Ran 6 tests in 0.067s
 
 OK

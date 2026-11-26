@@ -3,8 +3,9 @@ test_existing_wireguard_guest_voucher_native_uci_switches (test_owner_addon_life
 test_acl_ui_and_no_duplicate_modem_control (test_owner_addon_lifecycle_native.OriginalAddonLifecycle.test_acl_ui_and_no_duplicate_modem_control) ... ok
 test_existing_daemon_reused (test_owner_addon_profiles_source.AddonProfiles.test_existing_daemon_reused) ... ok
 test_read_and_write_acl_exact_and_guarded (test_owner_addon_profiles_source.AddonProfiles.test_read_and_write_acl_exact_and_guarded) ... ok
+test_both_existing_menus_have_single_live_handler_path (test_veci_v2_services_addon_dom_20261126.ServicesAddonDom.test_both_existing_menus_have_single_live_handler_path) ... ok
 
 ----------------------------------------------------------------------
-Ran 5 tests in 9.563s
+Ran 6 tests in 0.692s
 
 OK
