@@ -4,14 +4,17 @@
     "read": {
       "ubus": {
         "veci.v2.interfaces": [
-          "status"
+          "status",
+          "pppoeStatus",
+          "pppoeDiscovery"
         ]
       }
     },
     "write": {
       "ubus": {
         "veci.v2.interfaces": [
-          "save"
+          "save",
+          "pppoeAction"
         ]
       }
     }
