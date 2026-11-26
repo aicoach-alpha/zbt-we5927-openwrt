@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -425,6 +425,98 @@ case "$1" in
         content="$(printf '%s\n' "$logs" | grep -Ei 'we5927-lte|veci2-lte|usb0|rndis_host' | tail -n 30 || true)"
         success "get 4g log success"
         json_add_string content "$content"
+        ;;
+    get_wifi_guest)
+        native="$(native_read veci.v2.guest status)" || error "guest provider unavailable"
+        installed="$(field '@.installed')" || error "guest status unavailable"
+        configured="$(field '@.configured')" || error "guest configuration unavailable"
+        enabled="$(field '@.enabled_configured')" || error "guest enabled state unavailable"
+        case "$installed:$configured:$enabled" in true:true:true|true:true:false|true:false:false|false:false:false) ;; *) error "invalid guest status";; esac
+        ssid=""
+        if [ "$configured" = true ]; then
+            ssid="$(get wireless.veci_guest.ssid)" || error "guest SSID unavailable"
+        fi
+        success "get wifi guest success"
+        case "$enabled" in true) json_add_string guest_enabled 1;; false) json_add_string guest_enabled 0;; esac
+        json_add_string guest_ssid "$ssid"
+        json_add_string installed "$installed"
+        json_add_string configured "$configured"
+        json_add_string isolation_verified unknown
+        ;;
+    get_static_route)
+        native="$(native_read veci.v2.routes status)" || error "route provider unavailable"
+        (json_load "$native" && json_get_type typ entries && [ "$typ" = array ]) || error "route inventory invalid"
+        revision="$(field '@.revision')" || error "route revision unavailable"
+        success "get static route success"
+        json_add_string revision "$revision"
+        json_add_array interface_list
+        for iface in $(uci -q show network | sed -nE 's/^network\.([a-zA-Z0-9_]+)=interface$/\1/p'); do
+            [ "$iface" != loopback ] || continue
+            json_add_string "" "$iface"
+        done
+        json_close_array
+        json_add_array data
+        idx=0
+        while [ "$idx" -lt 256 ]; do
+            section="$(field "@.entries[$idx].section" || true)"
+            [ -n "$section" ] || break
+            kind="$(field "@.entries[$idx].kind")" || error "route type unavailable"
+            if [ "$kind" = route ]; then
+                target="$(field "@.entries[$idx].target")" || error "route target unavailable"
+                case "$target" in */*) prefix="${target##*/}"; target="${target%/*}";; *) prefix="";; esac
+                mask=""
+                case "$prefix" in '') ;; *[!0-9]*) error "route prefix invalid";; *) [ "$prefix" -le 32 ] || error "route prefix invalid"; mask="$(awk -v p="$prefix" 'BEGIN {for(i=0;i<4;i++){n=p>8?8:p;if(n<0)n=0;printf "%s%d",i?".":"",256-2^(8-n);p-=n}}')";; esac
+                json_add_object ""
+                json_add_string name "$section"
+                json_add_string target "$target"
+                json_add_string netmask "$mask"
+                json_add_string interface "$(field "@.entries[$idx].interface" || true)"
+                json_add_string gateway "$(field "@.entries[$idx].gateway" || true)"
+                json_add_string table "$(field "@.entries[$idx].table" || true)"
+                json_add_string editable "$(field "@.entries[$idx].editable" || true)"
+                json_add_string metric "$(get "network.$section.metric" || true)"
+                json_close_object
+            fi
+            idx=$((idx+1))
+        done
+        json_close_array
+        ;;
+    get_redirect_dnat)
+        native="$(native_read veci.v2.firewall status)" || error "firewall provider unavailable"
+        (json_load "$native" && json_get_type typ forwards && [ "$typ" = array ]) || error "forward inventory invalid"
+        success "firewall redirect get success"
+        json_add_array data
+        idx=0
+        while [ "$idx" -lt 256 ]; do
+            name="$(field "@.forwards[$idx].name" || true)"
+            index="$(field "@.forwards[$idx].index" || true)"
+            [ -n "$name$index" ] || break
+            if [ -n "$index" ]; then
+                case "$index" in *[!0-9]*) error "invalid firewall index";; esac
+                section="@redirect[$index]"
+            else
+                case "$name" in veci_port_tcp_*|veci_port_udp_*) section="$name";; *) error "unknown named forward";; esac
+            fi
+            [ "$(get "firewall.$section.target" || true)" = DNAT ] || { idx=$((idx+1)); continue; }
+            json_add_object ""
+            json_add_string name "$name"
+            json_add_string proto "$(field "@.forwards[$idx].protocol" || true)"
+            json_add_string src "$(get "firewall.$section.src" || true)"
+            json_add_string src_dport "$(field "@.forwards[$idx].source_port" || true)"
+            json_add_string dest "$(get "firewall.$section.dest" || true)"
+            json_add_string dest_ip "$(field "@.forwards[$idx].destination" || true)"
+            json_add_string dest_port "$(field "@.forwards[$idx].destination_port" || true)"
+            enabled="$(get "firewall.$section.enabled" || true)"
+            json_add_string enabled "${enabled:-1}"
+            json_close_object
+            idx=$((idx+1))
+        done
+        json_close_array
+        json_add_array zone_list
+        for zone in $(uci -q show firewall | sed -nE "s/^firewall\.[^.]+\.name='([a-zA-Z0-9_]+)'$/\1/p"); do
+            case "$zone" in lan|wan|veci_guest) json_add_string "" "$zone";; esac
+        done
+        json_close_array
         ;;
     get_netwatchdog)
         native="$(native_read veci.v2.lte status)" || error "LTE monitor unavailable"

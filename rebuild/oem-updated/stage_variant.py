@@ -29,7 +29,7 @@ REPLACEMENTS = (
 MAKEFILE = """include $(TOPDIR)/rules.mk
 PKG_NAME:=oem-updated-ui-dev
 PKG_VERSION:=0.1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 include $(INCLUDE_DIR)/package.mk
 define Package/oem-updated-ui-dev
   SECTION:=admin
@@ -44,6 +44,7 @@ define Package/oem-updated-ui-dev/install
 	$(CP) ./files/www/. $(1)/www/
 	$(INSTALL_DIR) $(1)/usr/libexec/oem-updated $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/read-only-adapter $(1)/usr/libexec/oem-updated/read-only-adapter
+	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/write-adapter $(1)/usr/libexec/oem-updated/write-adapter
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/oem-updated.json $(1)/usr/share/rpcd/acl.d/oem-updated.json
 	$(INSTALL_BIN) ./files/www/cgi-bin/webapi $(1)/www/cgi-bin/webapi
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
@@ -116,13 +117,18 @@ def stage(image, out):
         adapter.parent.mkdir(parents=True)
         shutil.copyfile(HERE / "backend/read-only-adapter.sh", adapter)
         adapter.chmod(0o755)
-        for script in (cgi, adapter):
+        writer = adapter.parent / "write-adapter"
+        shutil.copyfile(HERE / "backend/write-adapter.sh", writer)
+        writer.chmod(0o755)
+        for script in (cgi, adapter, writer):
             subprocess.run(["sh", "-n", str(script)], check=True)
         acl = files / "usr/share/rpcd/acl.d/oem-updated.json"
         acl.parent.mkdir(parents=True)
         acl.write_text(json.dumps({"oem-updated-read": {
             "description": "Authenticated OEM read-only development API",
-            "read": {"ubus": {"oem.updated": ["read"]}}}}, indent=2)+"\n")
+            "read": {"ubus": {"oem.updated": ["read"]}}},
+            "oem-updated-write": {"description": "Authenticated OEM configuration API",
+                "write": {"ubus": {"oem.updated": ["write"]}}}}, indent=2)+"\n")
         defaults = files / "etc/uci-defaults/97-oem-updated-https"
         defaults.parent.mkdir(parents=True)
         shutil.copyfile(HERE / "backend/97-oem-updated-https", defaults)

@@ -30,7 +30,10 @@
       "state": "UNIMPLEMENTED"
     },
     "delete_static_dhcp": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.dhcp:status/delete",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Single MAC per request, native revision guard; bulk deletion UI pending."
     },
     "enable_mptcp_set": {
       "state": "UNIMPLEMENTED"
@@ -216,7 +219,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_redirect_dnat": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:status",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "OEM browser and named/anonymous redirect inventory review pending."
     },
     "get_samba_info": {
       "state": "UNIMPLEMENTED"
@@ -237,7 +243,10 @@
       "limitations": "Read-only list; per-entry lease time and write integration pending."
     },
     "get_static_route": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.routes:status",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "OEM route editing and policy-rule presentation pending."
     },
     "get_sys_version": {
       "state": "PROTOTYPE"
@@ -276,7 +285,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_wifi_guest": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.guest:status",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Guest package selection, UI and actual isolation pending."
     },
     "get_wifi_guest5": {
       "state": "UNIMPLEMENTED"
@@ -384,7 +396,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_dmz": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:setDmz",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Explicit confirmation required; full-port canonical DMZ only; OEM confirmation UI pending."
     },
     "set_fw_setting": {
       "state": "UNIMPLEMENTED"
@@ -411,7 +426,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_ntp": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.system:setNtp",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "NTP server addresses only; timezone and enable flags remain unchanged, browser integration pending."
     },
     "set_openvpn": {
       "state": "UNIMPLEMENTED"
@@ -444,7 +462,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_static_dhcp": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.dhcp:add",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Native add only; editing existing lease and custom lease duration not yet supported. JSON transport integration pending."
     },
     "set_static_route": {
       "state": "UNIMPLEMENTED"

@@ -1,5 +1,5 @@
 #!/bin/sh
-# OEM-compatible read-only CGI gateway. Development only; no flash approval.
+# OEM-compatible authenticated CGI gateway. Development only; no flash approval.
 # Login is performed through native /ubus session.login, not this CGI.
 set -e
 umask 077
@@ -63,7 +63,19 @@ case "$op" in
     long_link)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         reply '{"code":"1","reason":"success"}' ;;
-    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status|get_ntp|get_static_dhcp|get_dmz|get_module_signal|get_arp|get_dhcp_allocation|get_wan_config|getWiFi2|get_pppoe_status|get_4g|get_4g_log)
+    set_static_dhcp|delete_static_dhcp|set_ntp|set_dmz)
+        [ "${REQUEST_METHOD:-}" = POST ] || err -4 "method refused"
+        case "${CONTENT_TYPE:-}" in application/json|application/json\;*) ;; *) err -4 "JSON required";; esac
+        case "${CONTENT_LENGTH:-}" in ''|*[!0-9]*) err -4 "invalid body length";; esac
+        [ "${#CONTENT_LENGTH}" -le 4 ] && [ "$CONTENT_LENGTH" -gt 0 ] && [ "$CONTENT_LENGTH" -le 2048 ] || err -4 "invalid body length"
+        permit="$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"ubus\",\"object\":\"oem.updated\",\"function\":\"write\"}" | jsonfilter -e '@.access')" || err -1 "write permission unavailable"
+        [ "$permit" = true ] || err -1 "write permission denied"
+        body="$(head -c "$CONTENT_LENGTH")"
+        [ "$(printf '%s' "$body" | wc -c)" = "$CONTENT_LENGTH" ] || err -4 "body length mismatch"
+        data="$(printf '%s' "$body" | /usr/libexec/oem-updated/write-adapter "$op" "$session")" || err -4 "native write failed"
+        [ -n "$data" ] || err -4 "native write unavailable"
+        reply "$data" ;;
+    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status|get_ntp|get_static_dhcp|get_dmz|get_module_signal|get_arp|get_dhcp_allocation|get_wan_config|getWiFi2|get_pppoe_status|get_4g|get_4g_log|get_wifi_guest|get_static_route|get_redirect_dnat)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         if [ "$sim_seen" = 1 ]; then
             data="$(/usr/libexec/oem-updated/read-only-adapter "$op" "$sim_preview")" || err -4 "backend unavailable"
