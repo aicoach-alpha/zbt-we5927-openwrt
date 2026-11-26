@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -609,6 +609,78 @@ case "$1" in
             json_close_object
         done
         json_close_array
+        ;;
+    get_fw_setting)
+        native="$(native_read veci.v2.firewall status)" || error "firewall unavailable"
+        wan="$(field '@.wan_input')" || error "WAN policy unavailable"
+        case "$wan" in ACCEPT) input=1;; REJECT|DROP) input=0;; *) error "invalid WAN policy";; esac
+        success "get fw setting success"
+        json_add_object data
+        for option in drop_invalid disable_ipv6 syn_flood accept_redirects; do
+            value="$(get "firewall.@defaults[0].$option" || true)"
+            case "$value" in 0|1|'') ;; *) error "invalid firewall option";; esac
+            json_add_string "$option" "$value"
+        done
+        json_add_string prohibit_wan_ping "$input"
+        json_add_string wan_input "$wan"
+        json_close_object
+        ;;
+    get_port|get_network_topology)
+        native="$(ubus -t 5 call veci.v2 ethernetPorts '{}')" || error "Ethernet inventory unavailable"
+        [ "$(field '@.available')" = true ] || error "Ethernet inventory unavailable"
+        (json_load "$native" && json_get_type typ ports && [ "$typ" = array ]) || error "port inventory invalid"
+        success "get status success"
+        # No invented physical port labels. Report exact switch port numbers.
+        if [ "$1" = get_network_topology ]; then
+            state="$(ubus -t 3 call veci.v2 status '{}')" || error "native status unavailable"
+            status_field() { printf '%s' "$state" | jsonfilter -e "$1"; }
+            [ "$(status_field '@.board_supported')" = true ] || error "unsupported board"
+            ap="$(status_field '@.wifi_ap_enabled')" || error "AP status unavailable"
+            case "$ap" in true) wifi=1;; false) wifi=0;; *) wifi="";; esac
+            route="$(ip -4 route show default | awk 'NR==1{for(i=1;i<NF;i++)if($i=="dev"){print $(i+1);exit}}')"
+            case "$route" in usb0) internet=4g;; '') internet=none;; *) internet=ether;; esac
+            lan="$(ubus -t 3 call network.interface.lan status '{}' | jsonfilter -e '@.up')" || error "LAN state unavailable"
+            case "$lan" in true) lan=1;; false) lan=0;; *) error "invalid LAN state";; esac
+            json_add_string internet "$internet"; json_add_string internet_verified unknown
+            json_add_string lan "$lan"; json_add_string wifi2 "$wifi"; json_add_string wifi5 0
+        fi
+        json_add_array port
+        i=0
+        while [ "$i" -lt 5 ]; do
+            port="$(field "@.ports[$i].port" || true)"
+            [ -n "$port" ] || break
+            case "$port" in 0|1|2|3|4) ;; *) error "invalid switch port";; esac
+            link="$(field "@.ports[$i].link")" || error "link status unavailable"
+            case "$link" in up) link=1;; down) link=0;; unknown) link="";; *) error "invalid link state";; esac
+            json_add_object ""; json_add_string port "$port"; json_add_string status "$link"; json_close_object
+            i=$((i+1))
+        done
+        json_close_array
+        if [ "$1" = get_port ]; then
+            json_add_string port_wan ""
+            json_add_string enable_set_port 0
+        fi
+        ;;
+    get_wan_traffic)
+        native="$(ubus -t 3 call veci.v2 traffic '{}')" || error "traffic counters unavailable"
+        [ "$(field '@.source')" = kernel_interface_counters ] || error "unexpected counter source"
+        rx="$(field '@.rx_bytes')" || error "RX unavailable"
+        tx="$(field '@.tx_bytes')" || error "TX unavailable"
+        case "$rx:$tx" in *[!0-9:]*|:*|*:) error "invalid counters";; esac
+        success "get traffic counters success"
+        json_add_object data
+        json_add_string interface usb0; json_add_string rxall "$rx"; json_add_string txall "$tx"
+        json_close_object
+        ;;
+    online_upgrade_check)
+        native="$(native_read veci.v2.updatepolicy status)" || error "update policy unavailable"
+        mode="$(field '@.mode')" || error "update policy invalid"
+        case "$mode" in manual|verify_only) ;; *) error "update policy invalid";; esac
+        # There is no approved OEM release catalog yet. Never return an OTA URL.
+        json_init; json_add_string code -6
+        json_add_string reason "No verified OEM release catalog available"
+        json_add_string update_policy "$mode"
+        json_add_string release_status unverified
         ;;
     get_netwatchdog)
         native="$(native_read veci.v2.lte status)" || error "LTE monitor unavailable"

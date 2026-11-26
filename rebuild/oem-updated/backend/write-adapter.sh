@@ -8,7 +8,7 @@ fail() { json_init; json_add_string code -4; json_add_string reason "$1"; json_d
 read_field() { printf '%s' "$body" | jsonfilter -e "$1"; }
 native_field() { printf '%s' "$native" | jsonfilter -e "$1"; }
 rpc() {
-    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.system:setNtp|veci.v2.firewall:setDmz|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess) ;; *) fail "unsupported RPC";; esac
+    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.system:setNtp|veci.v2.firewall:setDmz|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
     # Do not bypass the session's permission on the actual backend method.
     json_init; json_add_string ubus_rpc_session "$session"; json_add_string scope ubus
     json_add_string object "$1"; json_add_string function "$2"
@@ -183,8 +183,62 @@ case "$op" in
             *) fail "unsupported Wi-Fi action";;
         esac
         ;;
+    set_static_route)
+        revision="$(read_field '@.revision')" || fail "route revision required"
+        name="$(read_field '@.name')" || fail "route name required"
+        action="$(read_field '@.confirmation')" || fail "explicit route confirmation required"
+        case "$name" in veci2_route_*) name="${name#veci2_route_}";; esac
+        case "$name" in ''|*[!a-zA-Z0-9_]*) fail "invalid route name";; esac
+        [ "${#name}" -le 24 ] || fail "invalid route name"
+        json_init; json_add_string name "$name"; json_add_string revision "$revision"
+        case "$action" in
+            DELETE_ROUTE)
+                [ "$(read_field '@.name_delete' || true)" = 1 ] || fail "delete flag required"
+                rpc veci.v2.routes remove "$(json_dump)";;
+            SAVE_ROUTE)
+                [ -z "$(read_field '@.name_delete' || true)" ] || fail "unexpected delete flag"
+                target="$(read_field '@.target')" || fail "route target required"
+                mask="$(read_field '@.netmask')" || fail "route mask required"
+                iface="$(read_field '@.interface')" || fail "interface required"
+                gateway="$(read_field '@.gateway' || true)"
+                metric="$(read_field '@.metric' || true)"
+                case "$metric" in ''|0) ;; *) fail "custom route metric unsupported";; esac
+                prefix="$(awk -v m="$mask" 'BEGIN{if(split(m,a,"[.]")!=4)exit 1; v=0; for(i=1;i<=4;i++){if(a[i]!~/^(0|[1-9][0-9]?[0-9]?)$/||a[i]>255)exit 1;v=v*256+a[i]} for(p=0;p<=32;p++)if(v==4294967296-2^(32-p)){print p;exit}exit 1}')" || fail "invalid route mask"
+                json_add_string kind route; json_add_string prefix "$target/$prefix"
+                json_add_string interface "$iface"; json_add_string gateway "$gateway"; json_add_string table 254
+                rpc veci.v2.routes save "$(json_dump)";;
+            *) fail "confirmation mismatch";;
+        esac
+        ;;
+    set_redirect_dnat)
+        action="$(read_field '@.action')" || fail "explicit forwarding action required"
+        confirm="$(read_field '@.confirmation')" || fail "explicit forwarding confirmation required"
+        case "$action" in
+            ADD_FORWARD)
+                from="$(read_field '@.src_dport')" || fail "source port required"
+                to="$(read_field '@.dest_port')" || fail "destination port required"
+                proto="$(read_field '@.proto')" || fail "protocol required"
+                dest="$(read_field '@.dest_ip')" || fail "destination required"
+                [ "$(read_field '@.src')" = wan ] && [ "$(read_field '@.dest')" = lan ] || fail "unsupported zones"
+                [ "$(read_field '@.enabled')" = 1 ] || fail "disabled forward unsupported"
+                for port in "$from" "$to"; do
+                    case "$port" in ''|0*|*[!0-9]*) fail "single nonzero port required";; esac
+                    [ "${#port}" -le 5 ] && [ "$port" -le 65535 ] || fail "invalid port"
+                done
+                [ "$confirm" = "FORWARD_$from" ] || fail "confirmation mismatch"
+                json_init; json_add_int from_port "$from"; json_add_int to_port "$to"
+                json_add_string protocol "$proto"; json_add_string destination "$dest"; json_add_string confirmation "$confirm"
+                rpc veci.v2.firewall addForward "$(json_dump)";;
+            DELETE_FORWARD)
+                name="$(read_field '@.name')" || fail "forward name required"
+                [ "$confirm" = "DELETE_$name" ] || fail "confirmation mismatch"
+                json_init; json_add_string name "$name"; json_add_string confirmation "$confirm"
+                rpc veci.v2.firewall deleteForward "$(json_dump)";;
+            *) fail "unsupported forwarding action";;
+        esac
+        ;;
     *) fail "operation not implemented";;
 esac
 json_init; json_add_string code 1; json_add_string reason "native operation accepted"
-case "$op" in set_lan_config|set_wan_config|setWiFi2) json_add_string apply_state pending_manual_activation;; esac
+case "$op" in set_lan_config|set_wan_config|setWiFi2|set_static_route) json_add_string apply_state pending_manual_activation;; esac
 json_dump

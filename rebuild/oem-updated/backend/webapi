@@ -20,6 +20,11 @@ module_section=
 module_seen=0
 sim_seen=0
 sim_preview=
+host=
+host_seen=0
+version=4
+version_seen=0
+mode_seen=0
 oldifs=$IFS; IFS='&'; set -f
 for arg in $QUERY_STRING; do
     case "$arg" in
@@ -34,6 +39,17 @@ for arg in $QUERY_STRING; do
             [ "$sim_seen" = 0 ] || err -4 "duplicate SIM preview"
             sim_seen=1; sim_preview="${arg#SIMX=}"
             case "$sim_preview" in SIM1|SIM2) ;; *) err -4 "invalid SIM preview";; esac;;
+        host=*)
+            [ "$host_seen" = 0 ] || err -4 "duplicate host"
+            host_seen=1; host="${arg#host=}"
+            case "$host" in ''|-*|*[!a-zA-Z0-9.:-]*) err -4 "invalid host";; esac;;
+        ipversion=*)
+            [ "$version_seen" = 0 ] || err -4 "duplicate IP version"
+            version_seen=1; version="${arg#ipversion=}"
+            case "$version" in 4|6) ;; *) err -4 "invalid IP version";; esac;;
+        wifimode=*)
+            [ "$mode_seen" = 0 ] || err -4 "duplicate Wi-Fi mode"
+            mode_seen=1; [ "${arg#wifimode=}" = 2 ] || err -4 "only 2.4 GHz is supported";;
         t=*) ;;
         *) err -4 "unexpected parameter";;
     esac
@@ -44,6 +60,10 @@ if [ "$module_seen" = 1 ]; then
     case "$op" in get_module_status|get_module_signal|get_4g|get_4g_log|set_4g|set_4g_sim) ;; *) err -4 "unexpected module parameter";; esac
 fi
 [ "$sim_seen" = 0 ] || [ "$op" = get_4g ] || err -4 "unexpected SIM parameter"
+if [ "$host_seen" = 1 ] || [ "$version_seen" = 1 ]; then
+    case "$op" in test_ping|test_nslookup|test_traceroute) ;; *) err -4 "unexpected diagnostic parameter";; esac
+fi
+[ "$mode_seen" = 0 ] || [ "$op" = site_survey ] || err -4 "unexpected Wi-Fi mode"
 case "$op" in
     language_get)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
@@ -56,6 +76,17 @@ case "$session" in ''|*[!0-9a-f]*|00000000000000000000000000000000) err -1 "acce
 permit="$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"ubus\",\"object\":\"oem.updated\",\"function\":\"read\"}" | jsonfilter -e '@.access')" || err -1 "session unavailable"
 [ "$permit" = true ] || err -1 "access denied"
 case "$op" in
+    test_ping|test_nslookup|test_traceroute|site_survey)
+        [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
+        data="$(/usr/libexec/oem-updated/diagnostics-adapter "$op" "$host" "$version" "$session")" || err -4 "diagnostic unavailable"
+        [ -n "$data" ] || err -4 "diagnostic unavailable"
+        reply "$data" ;;
+    sysupgrade_backup)
+        # Stream the existing native authenticated backup; never publish a
+        # private archive in the document root or use a token in its URL.
+        [ "${REQUEST_METHOD:-}" = POST ] || err -4 "POST required for private backup"
+        printf '%s' "$session" | REQUEST_METHOD=POST CONTENT_TYPE=application/octet-stream CONTENT_LENGTH=32 QUERY_STRING= /usr/libexec/oem-updated/shared-backup
+        exit 0 ;;
     logout)
         [ "${REQUEST_METHOD:-}" = POST ] || err -4 "method refused"
         ubus -t 3 call session destroy "{\"ubus_rpc_session\":\"$session\"}" >/dev/null || err -4 "logout failed"
@@ -63,7 +94,7 @@ case "$op" in
     long_link)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         reply '{"code":"1","reason":"success"}' ;;
-    set_static_dhcp|delete_static_dhcp|set_ntp|set_dmz|set_lan_config|set_wan_config|set_4g|set_4g_sim|set_netwatchdog|setWiFi2)
+    set_static_dhcp|delete_static_dhcp|set_ntp|set_dmz|set_lan_config|set_wan_config|set_4g|set_4g_sim|set_netwatchdog|setWiFi2|set_static_route|set_redirect_dnat)
         [ "${REQUEST_METHOD:-}" = POST ] || err -4 "method refused"
         case "${CONTENT_TYPE:-}" in application/json|application/json\;*) ;; *) err -4 "JSON required";; esac
         case "${CONTENT_LENGTH:-}" in ''|*[!0-9]*) err -4 "invalid body length";; esac
@@ -75,7 +106,7 @@ case "$op" in
         data="$(printf '%s' "$body" | /usr/libexec/oem-updated/write-adapter "$op" "$session")" || err -4 "native write failed"
         [ -n "$data" ] || err -4 "native write unavailable"
         reply "$data" ;;
-    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status|get_ntp|get_static_dhcp|get_dmz|get_module_signal|get_arp|get_dhcp_allocation|get_wan_config|getWiFi2|get_pppoe_status|get_4g|get_4g_log|get_wifi_guest|get_static_route|get_redirect_dnat|get_log_list|get_lan_status|get_wan_status|get_system_status|get_wifi_client)
+    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status|get_ntp|get_static_dhcp|get_dmz|get_module_signal|get_arp|get_dhcp_allocation|get_wan_config|getWiFi2|get_pppoe_status|get_4g|get_4g_log|get_wifi_guest|get_static_route|get_redirect_dnat|get_log_list|get_lan_status|get_wan_status|get_system_status|get_wifi_client|get_fw_setting|get_port|get_network_topology|get_wan_traffic|online_upgrade_check)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         if [ "$sim_seen" = 1 ]; then
             data="$(/usr/libexec/oem-updated/read-only-adapter "$op" "$sim_preview")" || err -4 "backend unavailable"

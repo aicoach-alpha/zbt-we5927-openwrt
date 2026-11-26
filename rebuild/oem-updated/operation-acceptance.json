@@ -114,7 +114,10 @@
       "limitations": "Canonical full-port managed DMZ only; arbitrary OEM ranges unsupported."
     },
     "get_fw_setting": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:status + firewall4 UCI",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Legacy flags mapped to native configuration, browser semantics and write integration pending."
     },
     "get_gps": {
       "state": "UNIMPLEMENTED"
@@ -180,7 +183,10 @@
       "limitations": "Native recovery policy exposed; OEM legacy action picker, writes and V3 parity pending."
     },
     "get_network_topology": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2:ethernetPorts/status + netifd",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Native link states; default route is not proof of public internet, physical port ordering pending."
     },
     "get_ntp": {
       "state": "FIXTURE_PASS",
@@ -201,7 +207,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_port": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2:ethernetPorts",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Exact switch indexes; physical port order not yet verified, no port remapping."
     },
     "get_pppoe_status": {
       "state": "PROTOTYPE",
@@ -282,7 +291,10 @@
       "limitations": "Bounded live sampling; browser and actual interface acceptance pending."
     },
     "get_wan_traffic": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2:traffic",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Canonical USB modem counters; OEM vendor operation was empty, history and UI mapping pending."
     },
     "get_web_msg": {
       "state": "PROTOTYPE"
@@ -339,7 +351,10 @@
       "state": "UNIMPLEMENTED"
     },
     "online_upgrade_check": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.updatepolicy:status",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Fail-closed no verified OEM release catalog; does not implement actual OTA discovery."
     },
     "pppoe_detection": {
       "state": "UNIMPLEMENTED"
@@ -483,7 +498,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_redirect_dnat": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:addForward/deleteForward",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Single-port WAN-to-LAN native rules, explicit confirmation; ranges/edit and OEM form pending."
     },
     "set_samba_info": {
       "state": "UNIMPLEMENTED"
@@ -498,7 +516,10 @@
       "limitations": "Native add only; editing existing lease and custom lease duration not yet supported. JSON transport integration pending."
     },
     "set_static_route": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.routes:save/remove",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Explicit revision and confirmation, managed IPv4 routes only; custom metric and OEM form pending."
     },
     "set_ttl": {
       "state": "UNIMPLEMENTED"
@@ -534,10 +555,16 @@
       "state": "UNIMPLEMENTED"
     },
     "site_survey": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.wifi:survey",
+      "evidence": "rebuild/oem-updated/backend/diagnostics-adapter.sh",
+      "limitations": "2.4 GHz only, native RPC permission and passive scan; MT76 hardware acceptance and browser encryption presentation pending."
     },
     "sysupgrade_backup": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "shared veci2-backup native CGI",
+      "evidence": "rebuild/oem-updated/backend/webapi",
+      "limitations": "Authenticated POST streams private archive; OEM download button transport not yet adapted, actual backup pending."
     },
     "sysupgrade_backup_execute": {
       "state": "UNIMPLEMENTED"
@@ -552,13 +579,22 @@
       "state": "UNIMPLEMENTED"
     },
     "test_nslookup": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "OpenWrt nslookup",
+      "evidence": "rebuild/oem-updated/backend/diagnostics-adapter.sh",
+      "limitations": "Bounded host-only diagnostic; actual DNS and OEM query integration pending."
     },
     "test_ping": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "OpenWrt ping/ping6",
+      "evidence": "rebuild/oem-updated/backend/diagnostics-adapter.sh",
+      "limitations": "Bounded host-only diagnostic; target applet and OEM query integration pending."
     },
     "test_traceroute": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "OpenWrt traceroute/traceroute6",
+      "evidence": "rebuild/oem-updated/backend/diagnostics-adapter.sh",
+      "limitations": "Bounded five-hop diagnostic; applet dependencies and browser integration pending."
     },
     "test_wget": {
       "state": "UNIMPLEMENTED"

@@ -29,7 +29,7 @@ REPLACEMENTS = (
 MAKEFILE = """include $(TOPDIR)/rules.mk
 PKG_NAME:=oem-updated-ui-dev
 PKG_VERSION:=0.1
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 include $(INCLUDE_DIR)/package.mk
 define Package/oem-updated-ui-dev
   SECTION:=admin
@@ -45,6 +45,8 @@ define Package/oem-updated-ui-dev/install
 	$(INSTALL_DIR) $(1)/usr/libexec/oem-updated $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/read-only-adapter $(1)/usr/libexec/oem-updated/read-only-adapter
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/write-adapter $(1)/usr/libexec/oem-updated/write-adapter
+	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/diagnostics-adapter $(1)/usr/libexec/oem-updated/diagnostics-adapter
+	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/shared-backup $(1)/usr/libexec/oem-updated/shared-backup
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/oem-updated.json $(1)/usr/share/rpcd/acl.d/oem-updated.json
 	$(INSTALL_BIN) ./files/www/cgi-bin/webapi $(1)/www/cgi-bin/webapi
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
@@ -120,7 +122,13 @@ def stage(image, out):
         writer = adapter.parent / "write-adapter"
         shutil.copyfile(HERE / "backend/write-adapter.sh", writer)
         writer.chmod(0o755)
-        for script in (cgi, adapter, writer):
+        diagnostics = adapter.parent / "diagnostics-adapter"
+        shutil.copyfile(HERE / "backend/diagnostics-adapter.sh", diagnostics)
+        diagnostics.chmod(0o755)
+        backup = adapter.parent / "shared-backup"
+        shutil.copyfile(HERE.parent / "veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-backup", backup)
+        backup.chmod(0o755)
+        for script in (cgi, adapter, writer, diagnostics, backup):
             subprocess.run(["sh", "-n", str(script)], check=True)
         acl = files / "usr/share/rpcd/acl.d/oem-updated.json"
         acl.parent.mkdir(parents=True)
