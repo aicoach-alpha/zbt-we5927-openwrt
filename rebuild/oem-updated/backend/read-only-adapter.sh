@@ -302,7 +302,12 @@ case "$1" in
                 table="$(live "@.route[$idx].table" || true)"
                 if [ "$target" = 0.0.0.0 ] && [ "$(live "@.route[$idx].mask" || true)" = 0 ]; then
                     case "$table" in ''|main|254)
-                        gateway="$(live "@.route[$idx].nexthop" || true)"; break;; esac
+                        kind="$(live "@.route[$idx].type" || true)"
+                        hop="$(live "@.route[$idx].nexthop" || true)"
+                        case "$kind" in ''|1)
+                            case "$hop" in ''|0.0.0.0) ;; *) gateway="$hop"; break;; esac
+                        esac;;
+                    esac
                 fi
                 idx=$((idx+1))
             done

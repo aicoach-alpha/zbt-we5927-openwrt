@@ -68,7 +68,7 @@ except (KeyError,IndexError,TypeError,ValueError,StopIteration): sys.exit(1)
     def invoke(self,op,**env):
         defaults={"MODEM":json.dumps({"sim":1,"operator":"Example","model":"4108","signal_dbm":-85,"access_tech":"LTE","imei":"secret","iccid":"secret2"}),
           "NATIVE":json.dumps({"ok":True,"wan_mode":"dhcp"}),
-          "LIVE":json.dumps({"up":True,"device":"eth0.2","ipv4-address":[{"address":"192.168.2.2","mask":24}],"route":[{"target":"0.0.0.0","nexthop":"192.168.2.1"}],"dns-server":["1.1.1.1"],"ipv6-address":[{"address":"2001:db8::1"}]})}
+          "LIVE":json.dumps({"up":True,"device":"eth0.2","ipv4-address":[{"address":"192.168.2.2","mask":24}],"route":[{"target":"0.0.0.0","mask":0,"nexthop":"192.168.2.1"}],"dns-server":["1.1.1.1"],"ipv6-address":[{"address":"2001:db8::1"}]})}
         defaults.update(env)
         return subprocess.run(["sh",str(self.d/"adapter"),op],env=dict(os.environ,PATH=str(self.d)+":"+os.environ["PATH"],**defaults),capture_output=True,text=True,timeout=5)
 
@@ -107,15 +107,29 @@ except (KeyError,IndexError,TypeError,ValueError,StopIteration): sys.exit(1)
         self.assertIn("ipaddr=10.0.0.2",r.stdout)
         self.assertIn("gateway=10.0.0.1",r.stdout)
 
+    def test_pppoe_uses_only_main_unicast_default_gateway(self):
+        # netifd ubus.c interface_ip_dump_route_list emits target, mask,
+        # nexthop and optional numeric type/table. Only a real gateway counts.
+        route = {"target": "0.0.0.0", "mask": 0, "nexthop": "192.0.2.9"}
+        routes = [route | {"mask": 8}, route | {"table": 100},
+                  route | {"type": 6}, route | {"nexthop": "0.0.0.0"},
+                  route | {"table": 254, "type": 1, "nexthop": "192.0.2.1"}]
+        r = self.invoke("get_wan_config", NATIVE=json.dumps({"ok": True, "wan_mode": "pppoe"}),
+                        LIVE=json.dumps({"up": True, "device": "eth0.2", "route": routes}))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("proto=pppoe", r.stdout)
+        self.assertIn("gateway=192.0.2.1\n", r.stdout)
+        self.assertNotIn("192.0.2.9", r.stdout)
+
     def test_wan_failure_closed(self):
-        for native in ['{"ok":false}', '{"ok":true,"wan_mode":"pppoe"}']:
+        for native in ['{"ok":false}', '{"ok":true,"wan_mode":"unknown"}']:
             r=self.invoke("get_wan_config",NATIVE=native)
             self.assertNotEqual(r.returncode,0)
         r=self.invoke("get_wan_config",LIVE='{"device":"../../etc"}')
         self.assertNotEqual(r.returncode,0)
 
     def test_wan_down_does_not_return_stale_dhcp_address(self):
-        r=self.invoke("get_wan_config",LIVE=json.dumps({"up":False,"device":"eth0.2","ipv4-address":[{"address":"192.168.2.2","mask":24}],"route":[{"target":"0.0.0.0","nexthop":"192.168.2.1"}],"dns-server":["1.1.1.1"],"ipv6-address":[{"address":"2001:db8::1"}]}))
+        r=self.invoke("get_wan_config",LIVE=json.dumps({"up":False,"device":"eth0.2","ipv4-address":[{"address":"192.168.2.2","mask":24}],"route":[{"target":"0.0.0.0","mask":0,"nexthop":"192.168.2.1"}],"dns-server":["1.1.1.1"],"ipv6-address":[{"address":"2001:db8::1"}]}))
         self.assertEqual(r.returncode,0,r.stderr)
         self.assertIn("ipaddr=0.0.0.0",r.stdout)
         self.assertNotIn("192.168.2.1",r.stdout)
