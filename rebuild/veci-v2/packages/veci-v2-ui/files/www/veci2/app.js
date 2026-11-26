@@ -673,19 +673,21 @@ async function refreshLtePathStatus() {
   try {
     const [router, modem]=await Promise.all([
       rpc('veci.v2','status',{},session,8500),
-      rpc('veci.cellular','status',{},session,8500)
+      rpc('veci.v2.lte','status',{},session,8500)
     ]);
     if (sid!==session) return;
     if (modem.ok===false) throw Error(modem.error||'Status modem tidak tersedia');
     const describe=v=>v===true?'tersedia':v===false?'tidak tersedia':'belum diketahui';
     const packet=modem.packet_status || 'belum terverifikasi';
     const registration=modem.registration_status || 'belum terverifikasi';
+    const phase=modem.modem_phase || 'belum terverifikasi';
     const usb=router.lte_usb_state || 'belum terverifikasi';
     output.textContent='RNDIS: '+usb+
       ' · IPv4: '+describe(router.lte_ipv4)+
       ' · Gateway: '+describe(router.lte_default_route)+
       ' · Registrasi: '+registration+
       ' · Sesi paket data: '+packet+
+      ' · Modem: '+phase+
       ' · Internet: perlu uji HTTPS terpisah';
     button.disabled=false;
   }catch(error) {
@@ -1057,7 +1059,7 @@ document.addEventListener('DOMContentLoaded', () => {
     button.disabled=true;
     resultText.textContent='Mengirim perintah pemulihan LTE bertahap…';
     try {
-      const result=await rpc('veci.cellular','reconnect',{},session,8500);
+      const result=await rpc('veci.v2.lte','reconnect',{},session,8500);
       if(sid!==session) return;
       if(result.ok!==true || result.queued!==true) throw Error(result.error||'Permintaan tidak diterima');
       resultText.textContent='Permintaan reconnect diterima, belum berarti data seluler sudah aktif. Periksa kembali status setelah proses selesai.';

@@ -20,8 +20,9 @@ class Controls(unittest.TestCase):
   self.assertIn('data-group="dashboard"',html)
  def test_modem_reconnect_is_existing_backend_not_browser_http_guess(self):
   js=(UI/"app.js").read_text()
-  self.assertIn("rpc('veci.cellular','reconnect',{},session",js)
+  self.assertIn("rpc('veci.v2.lte','reconnect',{},session",js)
   self.assertIn('result.queued!==true',js)
+  self.assertNotIn("rpc('veci.cellular'",js)
   self.assertIn('refreshLtePathStatus()',js)
   self.assertIn('data.connection_enabled',js)
   self.assertIn('window.confirm(',js)
@@ -31,6 +32,8 @@ class Controls(unittest.TestCase):
  def test_connection_policy_method_is_guarded_and_does_not_fake_online(self):
   s=(RUNTIME/"veci2-lte-policy").read_text()
   self.assertIn('enableConnection',s)
+  self.assertIn('call:reconnect',s)
+  self.assertIn('we5927-lte reconnect',s)
   self.assertIn('ENABLE_CONNECTION',s)
   self.assertIn('activation_requested',s)
   self.assertIn('connection_enabled',s)
@@ -39,6 +42,7 @@ class Controls(unittest.TestCase):
   subprocess.run(["sh","-n",str(RUNTIME/"veci2-lte-policy")],check=True)
   acl=json.loads((RUNTIME/"veci2-status-acl.json").read_text())
   self.assertIn('enableConnection',acl["veci-v2-lte"]["write"]["ubus"]["veci.v2.lte"])
+  self.assertIn('reconnect',acl["veci-v2-lte"]["write"]["ubus"]["veci.v2.lte"])
  def test_no_active_ussd_command_probe(self):
   self.assertNotIn('AT+CUSD',CAP.read_text())
   html=(UI/"index.html").read_text()

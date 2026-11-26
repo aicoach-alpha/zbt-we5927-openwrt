@@ -111,7 +111,8 @@
           "setFailover",
           "setApn",
           "setMonitor",
-          "enableConnection"
+          "enableConnection",
+          "reconnect"
         ],
         "veci.v2.simlock": [
           "unlock"
