@@ -69,5 +69,19 @@
     "new_mt76_log_events_detected": 0,
     "client_count_positive_samples": 0,
     "connected_client_stability": "NOT_TESTED"
+  },
+  "third_session_station_diagnostic": {
+    "date_local": "2026-11-26",
+    "source": "Owner-supplied Windows PowerShell SSH output",
+    "wifi_interface": "phy0-ap0",
+    "iw_exit_code": 0,
+    "iw_station_count": 0,
+    "hostapd_get_clients_exit_code": 0,
+    "hostapd_authorized_count": "UNKNOWN",
+    "reason_for_unknown": "jsonfilter wildcard lookup did not provide a usable authorized-entry count; raw get_clients body not inspected",
+    "interpretation": "Kernel station-dump command succeeded and reported zero associated stations at this instant; hostapd RPC reachable but client count remains unverified",
+    "client_traffic_test_proven": false,
+    "driver_fault_proven": false,
+    "configuration_modified": false
   }
 }

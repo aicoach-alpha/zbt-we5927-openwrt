@@ -119,3 +119,10 @@ Uncertainties are never converted into PASS on the strength of source code.
 - CLIENT_COUNT=0 for all 20 samples, again. Across both sessions: 30/30 control-plane and LTE PASS, zero detected new MT76 errors, and zero observed clients.
 - Original script discards iw station dump stderr and pipes output through grep -c, which may report 0 even if iw fails. Client association remains unverified until iw exit and station count are checked independently.
 - WIFI-003 remains NOT PROVEN RESOLVED; no new-image physical hardware acceptance. No router configuration mutated.
+
+## MT76 diagnostic after second production passive run (26 Nov 2026)
+- Owner query: iw dev phy0-ap0 station dump exit 0, Station lines=0.
+- Hostapd UBUS get_clients call exit 0, but jsonfilter wildcard authorized counter=UNKNOWN.
+- This proves the station dump returned 0 associations at that instant, not that the phone was connected or MT76 failed.
+- Use native libubox jshn json_load, json_select clients, json_get_keys to distinguish empty hostapd client map from JSON parse failure. Keep MACs hidden.
+- WIFI-003 remains requires_hardware_verification, root cause unresolved and next-image hardware not tested.

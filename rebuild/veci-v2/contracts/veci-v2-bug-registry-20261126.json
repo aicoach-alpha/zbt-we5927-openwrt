@@ -81,7 +81,14 @@
         "connected_clients_observed": 0,
         "driver_root_cause_resolved": false,
         "new_candidate_verified": false,
-        "station_dump_failure_excluded": false
+        "station_dump_failure_excluded": false,
+        "third_diagnostic": {
+          "iw_exit": 0,
+          "iw_stations": 0,
+          "hostapd_get_clients_exit": 0,
+          "authorized_count": "UNKNOWN",
+          "active_client_test_proven": false
+        }
       }
     },
     {
