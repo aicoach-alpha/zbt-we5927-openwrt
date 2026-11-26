@@ -7,7 +7,7 @@ const rootSid = '00000000000000000000000000000000';
 async function rpc(object, method, args = {}, token = sid) {
   if (!token) throw Error('Login required');
   const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), method === 'sendMessage' ? 46000 : method === 'listMessages' ? 15000 : 12000);
+  const timer = setTimeout(() => abort.abort(), method === 'sendMessage' ? 46000 : method === 'listMessages' ? 15000 : method === 'internetCheck' ? 20000 : 12000);
   try {
     const response = await fetch('/ubus', {method:'POST', credentials:'omit', cache:'no-store',
       headers:{'Content-Type':'application/json'}, signal:abort.signal,
@@ -32,7 +32,7 @@ function clearSession() {
   el('backup-restore-file').dispatchEvent(new Event('change'));
   el('backup-message').textContent = '';
   dhcpRevision = ''; el('dhcp-form').reset(); el('dhcp-save').disabled = true;
-  el('dhcp-result').textContent = ''; el('traffic-result').textContent = '';
+  el('dhcp-result').textContent = ''; el('traffic-result').textContent = ''; el('internet-result').textContent = '';
   powerExpected=null; scheduleRevision=null; el('power-form').reset(); el('schedule-form').reset(); el('power-save').disabled=true; el('schedule-save').disabled=true; el('power-result').textContent=''; el('schedule-result').textContent='';
   resetOptional();
   ttlRevision='';el('ttl-form').reset();el('ttl-save').disabled=true;el('ttl-result').textContent='';
@@ -128,6 +128,29 @@ el('dhcp-form').onsubmit=async e=>{
       dhcp_lease:el('dhcp-lease').value,revision,confirmation:'SAVE_DHCP_POOL'},token);
     if(sid===token)el('dhcp-result').textContent='Konfigurasi diterima. Baca ulang dan periksa koneksi klien.';
   }catch(err){if(sid===token)el('dhcp-result').textContent=err.message;}
+};
+el('internet-check').onclick = async () => {
+  const token = sid, button = el('internet-check'), output = el('internet-result');
+  if (!token || button.disabled) return;
+  button.disabled = true;
+  output.textContent = 'Memeriksa koneksi melalui modem LTE…';
+  try {
+    const result = await rpc('veci.v2', 'internetCheck', {}, token);
+    const outcomes = {
+      verified_public_https_and_dns: 'DNS dan HTTPS publik berhasil melalui LTE.',
+      hostname_dns_or_endpoint_unavailable: 'HTTPS langsung berhasil. Periksa DNS atau endpoint yang menggunakan nama domain.',
+      modem_connected_public_unavailable_check_quota: 'Modem lokal merespons, tetapi HTTPS publik gagal. Periksa kuota dan status layanan operator.',
+      public_and_modem_unavailable: 'Modem lokal dan HTTPS publik tidak merespons saat diuji.',
+      lte_interface_unavailable: 'Interface LTE usb0 belum tersedia.'
+    };
+    if (result.source !== 'usb0_https' || !Object.hasOwn(outcomes, result.reason))
+      throw Error('Hasil pemeriksaan koneksi tidak dikenali.');
+    output.textContent = outcomes[result.reason];
+  } catch (err) {
+    if (token === sid) output.textContent = err.message;
+  } finally {
+    button.disabled = false;
+  }
 };
 el('traffic-refresh').onclick=async ()=>{
   const token=sid, button=el('traffic-refresh');

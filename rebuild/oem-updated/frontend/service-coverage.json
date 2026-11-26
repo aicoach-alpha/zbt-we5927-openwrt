@@ -167,6 +167,14 @@
       "scope": "IPv4 forwarding LAN to WAN",
       "state": "SOURCE_INTEGRATED_NOT_UAT",
       "limitations": "fw4 and kernel compatibility, packet verification and original OEM form pending"
+    },
+    "lte_internet_diagnostics": {
+      "provider": "veci.v2",
+      "methods": [
+        "internetCheck"
+      ],
+      "activation": "manual",
+      "interface": "usb0"
     }
   },
   "remaining": [
