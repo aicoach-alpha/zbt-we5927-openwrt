@@ -25,9 +25,9 @@ valid_name() {
 }
 [ "$#" -ge 1 ] || fail unsupported_method
 case "$1" in
-  list) echo '{"status":{},"add":{"mac":"String","ip":"String","name":"String"},"delete":{"index":"Integer","revision":"String","confirmation":"String"}}'; exit 0 ;;
+  list) echo '{"status":{},"add":{"mac":"String","ip":"String","name":"String"},"delete":{"index":"Integer","revision":"String","confirmation":"String"},"setPool":{"start":"String","limit":"String","lease":"String","enabled":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
   call) [ "$#" -ge 2 ] || fail unsupported_method
-    case "$2" in status|add|delete) ;; *) fail unsupported_method ;; esac ;;
+    case "$2" in status|add|delete|setPool) ;; *) fail unsupported_method ;; esac ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
@@ -55,8 +55,8 @@ read_status() (
   json_dump
   echo
 )
-data=$(head -c 257)
-[ "$(printf '%s' "$data" | wc -c)" -le 256 ] || fail request_too_long
+data=$(head -c 513)
+[ "$(printf '%s' "$data" | wc -c)" -le 512 ] || fail request_too_long
 exec 9>>/var/lock/veci2-dhcp.lock
 flock -n 9 || fail busy
 pending=$(uci -q changes dhcp) || fail dhcp_changes_unknown
@@ -68,7 +68,37 @@ tmp=$(mktemp -d /tmp/veci2-dhcp.XXXXXX) || fail cannot_prepare
 trap 'rm -rf "$tmp"' EXIT
 trap 'exit 1' HUP INT TERM
 cp /etc/config/dhcp "$tmp/original" || fail backup_failed
-if [ "$2" = add ]; then
+if [ "$2" = setPool ]; then
+  expected=$(jsonfilter -s "$data" -e '@.revision') || fail stale_configuration
+  [ "$expected" = "$revision" ] || fail stale_configuration
+  confirm=$(jsonfilter -s "$data" -e '@.confirmation') || fail invalid_request
+  [ "$confirm" = SAVE_DHCP_POOL ] || fail confirmation_required
+  start=$(jsonfilter -s "$data" -e '@.start') || fail invalid_request
+  limit=$(jsonfilter -s "$data" -e '@.limit') || fail invalid_request
+  lease=$(jsonfilter -s "$data" -e '@.lease') || fail invalid_request
+  enabled=$(jsonfilter -s "$data" -e '@.enabled') || fail invalid_request
+  case "$enabled" in 0|1) ;; *) fail invalid_enabled ;; esac
+  for n in "$start" "$limit"; do
+    case "$n" in ''|0*|*[!0-9]*) fail invalid_pool ;; esac
+    [ "${#n}" -le 5 ] || fail invalid_pool
+  done
+  # Restrict lease to a simple positive duration, 2 minutes to 7 days.
+  printf '%s\n' "$lease" | awk '/^[1-9][0-9]*[smhd]$/{n=substr($0,1,length($0)-1)+0;u=substr($0,length($0));t=n*(u=="s"?1:u=="m"?60:u=="h"?3600:86400);if(t>=120&&t<=604800)ok=1}END{exit !ok}' || fail invalid_lease
+  . /usr/libexec/veci2-lan-bounds
+  bounds=$(lan_bounds) || fail invalid_lan
+  set -- "$1" "$2" $bounds
+  usable=$3; router=$4
+  end=$((start+limit-1))
+  [ "$start" -ge 1 ] && [ "$end" -le "$usable" ] || fail invalid_pool
+  if [ "$router" -ge "$start" ] && [ "$router" -le "$end" ]; then fail pool_contains_router; fi
+  # Refuse to mutate another user's pending network change.
+  changes=$(uci -q changes network) || fail network_state_unknown
+  [ -z "$changes" ] || fail pending_network_changes
+  uci -q -t "$tmp" set "dhcp.lan.start=$start" &&
+  uci -q -t "$tmp" set "dhcp.lan.limit=$limit" &&
+  uci -q -t "$tmp" set "dhcp.lan.leasetime=$lease" &&
+  uci -q -t "$tmp" set "dhcp.lan.ignore=$((1-enabled))" || fail save_failed
+elif [ "$2" = add ]; then
   mac=$(jsonfilter -s "$data" -e '@.mac') || fail invalid_request
   ip=$(jsonfilter -s "$data" -e '@.ip') || fail invalid_request
   name=$(jsonfilter -s "$data" -e '@.name' 2>/dev/null || :)
@@ -104,6 +134,8 @@ else
   [ "$(uci -q get "dhcp.@host[$index]" || :)" = host ] || fail unknown_lease
   uci -q -t "$tmp" delete "dhcp.@host[$index]" || fail save_failed
 fi
+current=$(sha256sum /etc/config/dhcp) || fail config_unavailable
+[ "${current%% *}" = "$revision" ] && [ -z "$(uci -q changes dhcp)" ] || fail stale_configuration
 if ! uci -q -t "$tmp" commit dhcp ||
    ! /etc/init.d/dnsmasq restart >/dev/null 2>&1 ||
    ! pidof dnsmasq >/dev/null 2>&1; then
