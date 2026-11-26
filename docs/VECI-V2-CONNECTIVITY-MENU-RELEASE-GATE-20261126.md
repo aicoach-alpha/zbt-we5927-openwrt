@@ -113,3 +113,9 @@ Uncertainties are never converted into PASS on the strength of source code.
 - No network reload, Wi-Fi restart, reboot, SIM change or flash performed.
 - WIFI-003 remains awaiting true MT76 fault-condition testing and new candidate hardware acceptance; passive idle PASS does not prove root cause fixed.
 - Machine evidence: rebuild/veci-v2/contracts/owner-mt76-production-passive-20261126.json.
+
+## Second owner passive MT76 production run, 26 November 2026
+- 20 samples at 30-second intervals: Wi-Fi control plane PASS 20/20; LTE HTTPS 204 PASS 20/20; MT76 new errors 0.
+- CLIENT_COUNT=0 for all 20 samples, again. Across both sessions: 30/30 control-plane and LTE PASS, zero detected new MT76 errors, and zero observed clients.
+- Original script discards iw station dump stderr and pipes output through grep -c, which may report 0 even if iw fails. Client association remains unverified until iw exit and station count are checked independently.
+- WIFI-003 remains NOT PROVEN RESOLVED; no new-image physical hardware acceptance. No router configuration mutated.

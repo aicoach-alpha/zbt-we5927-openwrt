@@ -44,5 +44,30 @@
     "owner_reported_local_log": "VeCI-WE5927-MT76-Production-ReadOnly-20261126_123635.log",
     "local_log_not_uploaded": true,
     "evidence_available": "console_output_pasted_into_current_chat"
+  },
+  "second_session": {
+    "owner_local_date": "2026-11-26",
+    "source": "Owner-pasted Windows PowerShell console output",
+    "log_reported_filename": "VeCI-WE5927-MT76-Production-ReadOnly-20261126_124415.log",
+    "sample_count": 20,
+    "interval_seconds": 30,
+    "read_only": true,
+    "wifi_control_plane_pass_samples": 20,
+    "lte_https_pass_samples": 20,
+    "lte_http_code_each_sample": 204,
+    "mt76_error_count_baseline": 0,
+    "new_mt76_log_events": 0,
+    "client_count_all_samples": 0,
+    "client_presence_in_this_run": "NOT_PROVEN",
+    "station_dump_execution_error": "NOT_OBSERVED_BY_SCRIPT",
+    "note": "Original script discards iw station dump stderr; grep -c may print zero on iw execution failure."
+  },
+  "aggregate_observations": {
+    "wifi_control_plane_pass_samples": 30,
+    "lte_https_pass_samples": 30,
+    "total_samples": 30,
+    "new_mt76_log_events_detected": 0,
+    "client_count_positive_samples": 0,
+    "connected_client_stability": "NOT_TESTED"
   }
 }
