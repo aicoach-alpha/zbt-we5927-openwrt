@@ -56,7 +56,7 @@ case "$op" in
     long_link)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         reply '{"code":"1","reason":"success"}' ;;
-    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status|get_ntp|get_static_dhcp|get_dmz|get_module_signal|get_arp|get_dhcp_allocation|get_wan_config)
+    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status|get_ntp|get_static_dhcp|get_dmz|get_module_signal|get_arp|get_dhcp_allocation|get_wan_config|getWiFi2|get_pppoe_status)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         data="$(/usr/libexec/oem-updated/read-only-adapter "$op")" || err -4 "backend unavailable"
         [ -n "$data" ] || err -4 "backend unavailable"

@@ -38,7 +38,7 @@ jobs:
           sh scripts/stage-veci-reliability-rc.sh "$root"
           sh rebuild/veci-v2/ci/stage-v2-source.sh "$root"
           python3 rebuild/oem-updated/stage_variant.py "$vendor" "$root/package/oem-updated-ui-dev"
-          python3 rebuild/oem-updated/prebuild_gate.py "$root/package/oem-updated-ui-dev/development-manifest.json" rebuild/oem-updated/operation-acceptance.json
+          python3 rebuild/oem-updated/prebuild_gate.py --candidate "$root/package/oem-updated-ui-dev/development-manifest.json" rebuild/oem-updated/operation-acceptance.json
           # Remove only the known VeCI root landing created by our stagers.
           cmp "$root/files/www/index.html" rebuild/veci-v2/packages/veci-v2-ui/files/www/index.html
           rm "$root/files/www/index.html"

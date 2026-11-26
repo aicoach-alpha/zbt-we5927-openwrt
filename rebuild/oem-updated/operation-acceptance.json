@@ -39,7 +39,10 @@
       "state": "UNIMPLEMENTED"
     },
     "getWiFi2": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.wifi:info/status + OpenWrt UCI",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Primary AP read adapter; Wi-Fi key intentionally omitted; OEM UI mapping and write integration pending."
     },
     "getWiFi5": {
       "state": "UNIMPLEMENTED"
@@ -183,7 +186,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_pppoe_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "OpenWrt netifd + UCI",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Read adapter only; PPPoE configuration and physical WAN validation pending."
     },
     "get_pptp_msg": {
       "state": "UNIMPLEMENTED"
@@ -504,5 +510,11 @@
     "security_regression": false,
     "native_service_integration": false,
     "release_signing_preflight": false
+  },
+  "candidate_gates": {
+    "required_features_implemented": false,
+    "unsupported_ui_handled": false,
+    "dependencies_and_target_reviewed": false,
+    "security_and_rollback_reviewed": false
   }
 }

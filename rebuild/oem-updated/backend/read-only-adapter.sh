@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -313,6 +313,70 @@ case "$1" in
         for address in $ipv6; do json_add_string "" "$address"; done
         json_close_array
         json_close_object
+        ;;
+    getWiFi2)
+        # Use the exact-board Wi-Fi provider for primary-AP layout and
+        # access policy. Do not import legacy MediaTek private controls.
+        native="$(native_read veci.v2.wifi info)" || error "native Wi-Fi unavailable"
+        enc="$(field '@.encryption')" || error "Wi-Fi encryption unavailable"
+        case "$enc" in psk2|psk-mixed|sae|sae-mixed|none) ;; *) error "Wi-Fi encryption unsupported";; esac
+        access="$(field '@.access')" || error "Wi-Fi access policy unavailable"
+        case "$access" in disable|allow|deny) ;; *) error "Wi-Fi access policy unsupported";; esac
+        macs="$(field '@.addresses[*]' || true)"
+        native="$(native_read veci.v2.wifi status)" || error "native Wi-Fi state unavailable"
+        visible="$(field '@.configured_visible')" || error "Wi-Fi visibility unavailable"
+        case "$visible" in true) hidden=0;; false) hidden=1;; *) error "Wi-Fi visibility invalid";; esac
+        channel="$(field '@.configured_channel')" || error "Wi-Fi channel unavailable"
+        case "$channel" in auto) channel=0;; [1-9]|1[0-4]) ;; *) error "Wi-Fi channel invalid";; esac
+        radio_disabled="$(get wireless.radio0.disabled || true)"
+        ap_disabled="$(get wireless.default_radio0.disabled || true)"
+        case "$radio_disabled:$ap_disabled" in *[!01:]*) error "Wi-Fi enabled state invalid";; esac
+        enabled=1
+        [ "$radio_disabled" != 1 ] && [ "$ap_disabled" != 1 ] || enabled=0
+        ht="$(get wireless.radio0.htmode)" || error "Wi-Fi width unavailable"
+        case "$ht" in HT20) ht=ht20;; HT40|HT40+|HT40-) ht=ht40;; *) error "Wi-Fi width unsupported";; esac
+        ssid="$(get wireless.default_radio0.ssid)" || error "Wi-Fi SSID unavailable"
+        snapshot="$(ubus -t 3 call network.wireless status '{}')" || error "wireless state unavailable"
+        iface="$(printf '%s' "$snapshot" | jsonfilter -e '@.radio0.interfaces[@.section="default_radio0"].ifname' || true)"
+        bssid=""
+        if [ -n "$iface" ]; then
+            case "$iface" in -*|*[!A-Za-z0-9_.-]*) error "Wi-Fi interface invalid";; esac
+            bssid="$(cat "/sys/class/net/$iface/address" 2>/dev/null || true)"
+        fi
+        success "getWiFi2 success"
+        json_add_string enabled "$enabled"
+        json_add_string country "$(get wireless.radio0.country || true)"
+        json_add_string channel "$channel"
+        json_add_string htmode "$ht"
+        json_add_string threshold "$(get wireless.radio0.frag || true)"
+        json_add_string rts_threshold "$(get wireless.radio0.rts || true)"
+        json_add_string wmm "$(get wireless.default_radio0.wmm || true)"
+        json_add_string isolated "$(get wireless.default_radio0.isolate || true)"
+        json_add_string bssid "$bssid"
+        json_add_string ssid "$ssid"
+        json_add_string hidden "$hidden"
+        json_add_string encryption "$enc"
+        # Never disclose stored Wi-Fi keys through periodic read requests.
+        json_add_string key ""
+        json_add_string macfilter "$access"
+        json_add_string ApCliEnable "0"
+        json_add_string channel_disabled "0"
+        json_add_array maclist
+        for mac in $macs; do json_add_string "" "$mac"; done
+        json_close_array
+        ;;
+    get_pppoe_status)
+        proto="$(get network.wan.proto)" || error "WAN protocol unavailable"
+        status=0
+        if [ "$proto" = pppoe ]; then
+            state="$(ubus -t 3 call network.interface.wan status)" || error "PPPoE status unavailable"
+            up="$(printf '%s' "$state" | jsonfilter -e '@.up')" || error "PPPoE link unavailable"
+            case "$up" in true|false) ;; *) error "PPPoE link invalid";; esac
+            addr="$(printf '%s' "$state" | jsonfilter -e '@["ipv4-address"][0].address' || true)"
+            if [ "$up" = true ] && [ -n "$addr" ] && [ "$addr" != 0.0.0.0 ]; then status=1; fi
+        fi
+        success "get_pppoe_status success"
+        json_add_string pppoe_status "$status"
         ;;
     get_netwatchdog)
         # Do not claim legacy settings are active before native policy migration.

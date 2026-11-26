@@ -28,17 +28,41 @@ def check(manifest, acceptance):
     missing = sorted(k for k, v in gates.items() if v is not True)
     return counts, blocked, missing
 
+# A lab build is needed before full integrated testing is possible.
+# Candidate source review is separate from functional/release acceptance.
+CANDIDATE_GATES = {
+    "required_features_implemented", "unsupported_ui_handled",
+    "dependencies_and_target_reviewed", "security_and_rollback_reviewed",
+}
+
+def check_candidate(manifest, acceptance):
+    counts, _, _ = check(manifest, acceptance)
+    entries = acceptance["operations"]
+    blocked = []
+    for op, row in entries.items():
+        if (row["state"] not in {"SOURCE_COMPLETE", "SOURCE_DISABLED_REVIEWED",
+                                 "FUNCTIONAL_PASS", "REVIEWED_DISABLED_PASS"}
+                or not row.get("evidence") or row.get("limitations")):
+            blocked.append(op)
+    gates = acceptance.get("candidate_gates", {})
+    if set(gates) != CANDIDATE_GATES:
+        raise ValueError("candidate gate inventory mismatch")
+    missing = sorted(k for k, v in gates.items() if v is not True)
+    return counts, blocked, missing
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("manifest", type=Path)
     p.add_argument("acceptance", type=Path)
+    p.add_argument("--candidate", action="store_true", help="source-complete lab build only; never release approval")
     a = p.parse_args()
-    counts, blocked, missing = check(json.loads(a.manifest.read_text()), json.loads(a.acceptance.read_text()))
+    verifier = check_candidate if a.candidate else check
+    counts, blocked, missing = verifier(json.loads(a.manifest.read_text()), json.loads(a.acceptance.read_text()))
     print(json.dumps({"operation_states":counts,"blocked_operations":blocked,
                       "blocked_gates":missing},indent=2))
     if blocked or missing:
         raise SystemExit("PREBUILD_BLOCKED: complete and verify functionality before compiling")
-    print("PREBUILD_ACCEPTANCE=PASS")
+    print("CANDIDATE_SOURCE_GATE=PASS; FLASH_ALLOWED=NO" if a.candidate else "PREBUILD_ACCEPTANCE=PASS")
 
 if __name__ == "__main__":
     main()
