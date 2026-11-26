@@ -322,6 +322,11 @@ def stage(image, out):
             '<p id="ddns-result" role="status"></p><button id="ddns-toggle" disabled>Toggle DDNS</button>'
             '<button id="ddns-check" disabled>Check DNS lookup</button><pre id="ddns-lookup-result" class="result"></pre>'
             '<p id="sqm-result" role="status"></p><button id="sqm-toggle" disabled>Toggle SQM</button></article>'
+            '<article><h2>IPv4 forwarding TTL (optional)</h2><p>Default disabled. Scope: LAN to WAN forwarding only, not locally originated traffic. Flow offload must be disabled.</p>'
+            '<button id="ttl-refresh" type="button">Baca TTL</button><form id="ttl-form">'
+            '<label><input id="ttl-enabled" type="checkbox">Enable forwarding TTL policy</label>'
+            '<label>TTL (1–255)<input id="ttl-value" type="number" min="1" max="255" required value="64"></label>'
+            '<button id="ttl-save" disabled>Simpan TTL</button></form><p id="ttl-result" role="status"></p></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

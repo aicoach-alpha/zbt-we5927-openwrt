@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus|veci.v2.firewall:ttlStatus) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -884,18 +884,16 @@ case "$1" in
         json_add_int rule_count "$count"
         ;;
     get_ttl)
-        # Local stack TTL is observable, but not equivalent to rewriting
-        # forwarded traffic. Do not invent a legacy firewall rule state.
-        ttl="$(cat /proc/sys/net/ipv4/ip_default_ttl)" || error "kernel TTL unavailable"
-        case "$ttl" in ''|0*|*[!0-9]*) error "invalid kernel TTL";; esac
-        [ "${#ttl}" -le 3 ] && [ "$ttl" -le 255 ] || error "invalid kernel TTL"
-        success "local IPv4 TTL observation"
-        json_add_string local_ipv4_default_ttl "$ttl"
-        json_add_string scope locally_originated_packets
-        json_add_string ttl_enabled unknown
-        json_add_string ttl_cnt ""
-        json_add_string forwarding_rewrite_verified false
-        json_add_string configuration_supported 0
+        native="$(native_read veci.v2.firewall ttlStatus)" || error "TTL policy unavailable"
+        local_ttl="$(cat /proc/sys/net/ipv4/ip_default_ttl)" || error "local TTL unavailable"
+        success "native IPv4 TTL policy"
+        json_add_string ttl_enabled "$(field '@.enabled')"
+        json_add_string ttl_cnt "$(field '@.ttl' || true)"
+        json_add_string revision "$(field '@.revision')"
+        json_add_string runtime "$(field '@.runtime')"
+        json_add_string scope lan_to_wan_ipv4_forward
+        json_add_string local_ipv4_default_ttl "$local_ttl"
+        json_add_string packet_verified false
         ;;
     get_ddns|get_ddns_stat)
         native="$(native_read veci.v2.addon ddnsStatus)" || error "DDNS profile unavailable"

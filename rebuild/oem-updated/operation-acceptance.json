@@ -315,9 +315,9 @@
     },
     "get_ttl": {
       "state": "PROTOTYPE",
-      "provider": "Linux IPv4 kernel sysctl read",
+      "provider": "veci.v2.firewall:ttlStatus + local IPv4 sysctl",
       "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Local originated packet TTL observation only; forwarded TTL policy and write support remain unimplemented."
+      "limitations": "Separates configured forwarding policy, live rule observation and local stack TTL; packet verification pending."
     },
     "get_voice": {
       "state": "UNIMPLEMENTED"
@@ -623,7 +623,10 @@
       "limitations": "Explicit revision and confirmation, managed IPv4 routes only; custom metric and OEM form pending."
     },
     "set_ttl": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:setTtl",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Opt-in scoped IPv4 forwarding rule, requires flow offload disabled; fw4 validation, reload and rollback implemented in source. Kernel expression support, rule activation and actual packet TTL not runtime verified; original OEM TTL form not mapped."
     },
     "set_voice": {
       "state": "UNIMPLEMENTED"

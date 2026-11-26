@@ -35,6 +35,7 @@ function clearSession() {
   el('dhcp-result').textContent = ''; el('traffic-result').textContent = '';
   powerExpected=null; scheduleRevision=null; el('power-form').reset(); el('schedule-form').reset(); el('power-save').disabled=true; el('schedule-save').disabled=true; el('power-result').textContent=''; el('schedule-result').textContent='';
   resetOptional();
+  ttlRevision='';el('ttl-form').reset();el('ttl-save').disabled=true;el('ttl-result').textContent='';
   macRevision=''; el('mac-form').reset(); el('mac-save').disabled=true; el('mac-result').textContent='';
   fwRevision=''; el('fw-save').disabled=true; el('offload-save').disabled=true; el('fw-form').reset(); el('offload-form').reset(); el('fw-result').textContent='';
   guestState=''; el('guest-enable').disabled=true; el('guest-disable').disabled=true; el('guest-result').textContent='';
@@ -334,4 +335,28 @@ el('ddns-check').onclick=async()=>{
     if(sid===token)el('ddns-lookup-result').textContent='DNS lookup exit: '+x.exit_code+' (provider update unverified)\n'+x.detection_ret;
   }catch(e){if(sid===token)el('ddns-lookup-result').textContent=e.message;}
   finally{if(sid===token&&optionalProfiles.ddns)b.disabled=false;}
+};
+
+let ttlRevision='';
+el('ttl-refresh').onclick=async()=>{
+  const token=sid,b=el('ttl-refresh');if(!token||b.disabled)return;
+  b.disabled=true;ttlRevision='';el('ttl-save').disabled=true;
+  try{
+    const x=await oem('get_ttl',undefined,token);
+    if(!/^[0-9a-f]{64}$/.test(x.revision||'')||!['0','1'].includes(x.ttl_enabled))throw Error('TTL policy unavailable');
+    ttlRevision=x.revision;el('ttl-enabled').checked=x.ttl_enabled==='1';
+    el('ttl-value').value=x.ttl_cnt||'64';el('ttl-save').disabled=false;
+    el('ttl-result').textContent='Runtime: '+x.runtime+'; local default TTL: '+x.local_ipv4_default_ttl+'; packet behavior not verified.';
+  }catch(e){if(sid===token)el('ttl-result').textContent=e.message;}
+  finally{b.disabled=false;}
+};
+el('ttl-form').onsubmit=async e=>{
+  e.preventDefault();const token=sid,revision=ttlRevision;if(!token||!revision)return;
+  const enabled=el('ttl-enabled').checked,ttl=el('ttl-value').value;
+  if(!window.confirm('Apply IPv4 forwarding TTL policy? Firewall reload may briefly interrupt connections.'))return;
+  ttlRevision='';el('ttl-save').disabled=true;clearFirewall();
+  try{
+    const x=await oem('set_ttl',{ttl_enabled:enabled?'1':'0',ttl_cnt:ttl,revision,confirmation:enabled?'ENABLE_FORWARD_TTL':'DISABLE_FORWARD_TTL'},token);
+    if(sid===token)el('ttl-result').textContent='Policy saved. Runtime: '+x.runtime+'; packet verification pending.';
+  }catch(e){if(sid===token)el('ttl-result').textContent=e.message;}
 };

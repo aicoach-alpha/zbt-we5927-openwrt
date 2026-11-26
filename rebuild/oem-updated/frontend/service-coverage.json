@@ -156,6 +156,17 @@
       "scope": "LAN, DHCP/static WAN, DHCP pool, single reservation deletion",
       "state": "SOURCE_PATCH_SYNTAX_VERIFIED_NOT_UAT",
       "activation": "LAN/WAN saved for manual activation; DHCP uses existing native rollback"
+    },
+    "forwarding_ttl": {
+      "provider": "veci.v2.firewall",
+      "methods": [
+        "ttlStatus",
+        "setTtl"
+      ],
+      "default": "disabled",
+      "scope": "IPv4 forwarding LAN to WAN",
+      "state": "SOURCE_INTEGRATED_NOT_UAT",
+      "limitations": "fw4 and kernel compatibility, packet verification and original OEM form pending"
     }
   },
   "remaining": [
