@@ -132,3 +132,8 @@ Uncertainties are never converted into PASS on the strength of source code.
 - iw station dump: exit 0, stations 0; hostapd.phy0-ap0 get_clients: exit 0, native jshn client map count 0.
 - Both sources show zero associated stations at this sampling instant; prior JSON-filter UNKNOWN is resolved.
 - Still not evidence of MT76 fault or stability under actual client load. Next safe step is phone airplane mode plus manually enabled Wi-Fi, confirmed SSID and a brief read-only association check.
+
+## Five-sample live association diagnostic, 26 Nov 2026
+- Owner read-only script checked every two seconds over five samples: iw exit 0, IW_CLIENTS=0; hostapd get_clients exit 0, HOSTAPD_CLIENTS=0 on all samples.
+- Phone connection, airplane mode, and successful Wi-Fi internet during the exact sampling window were not explicitly confirmed in this message.
+- No observed association under load, no demonstrated driver failure. WIFI-003 stays pending active-client testing; no router changes.

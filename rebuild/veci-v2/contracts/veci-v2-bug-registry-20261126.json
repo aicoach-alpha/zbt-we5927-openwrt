@@ -90,6 +90,15 @@
           "active_client_test_proven": false,
           "hostapd_clients": 0,
           "client_count_parser": "native_libubox_jshn"
+        },
+        "fourth_diagnostic": {
+          "five_samples": 5,
+          "iw_exit_all": 0,
+          "iw_clients_each_sample": 0,
+          "hostapd_exit_all": 0,
+          "hostapd_clients_each_sample": 0,
+          "phone_connected_during_sample": "UNCONFIRMED",
+          "mt76_root_cause_resolved": false
         }
       }
     },
