@@ -148,6 +148,7 @@ if [ "$2" = setDefaults ] || [ "$2" = setOffload ] || [ "$2" = setMacBlock ]; th
     enabled=$(jsonfilter -s "$request" -e '@.enabled') || fail invalid_request
     case "$enabled" in 0|1) ;; *) fail invalid_flag;; esac
     if [ "$enabled" = 1 ] && mac_rule_owned; then fail mac_block_requires_offload_disabled; fi
+    if [ "$enabled" = 1 ] && [ "$(uci -q get sqm.veci.enabled || :)" = 1 ]; then fail sqm_requires_offload_disabled; fi
     # Software offload only. Do not enable an unverified hardware path.
     uci -q -t "$tmp" set "firewall.@defaults[0].flow_offloading=$enabled" &&
     uci -q -t "$tmp" set "firewall.@defaults[0].flow_offloading_hw=0" || fail stage_failed

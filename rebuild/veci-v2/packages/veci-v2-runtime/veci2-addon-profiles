@@ -99,3 +99,111 @@ set_portal_startup() {
   eq "$option" "$value" || fail save_failed
   profile_status
 }
+
+# Optional DDNS/SQM profile controls, not a replacement for their daemons.
+service_profile() {
+  case "$1" in ddns) package=ddns; section=service;; sqm) package=sqm; section=queue;; *) fail unsupported_service;; esac
+  state=absent; revision=""; enabled=0; runtime=unknown
+  installed_app "$package" || return 0
+  [ -x "/etc/init.d/$package" ] || return 0
+  state=unconfigured
+  config="/etc/config/$package"
+  [ -f "$config" ] && [ ! -L "$config" ] || return 0
+  digest=$(sha256sum "$config") || fail config_unavailable
+  revision=${digest%% *}
+  [ "$(uci -q get "$package.veci" || :)" = "$section" ] || return 0
+  case "$(uci -q get "$package.veci.enabled" || :)" in 0) state=disabled;; 1) state=enabled; enabled=1;; *) return 0;; esac
+  if "/etc/init.d/$package" enabled >/dev/null 2>&1; then boot=enabled; else boot=disabled; fi
+}
+optional_status() {
+  service_profile "$1"
+  json_init; json_add_boolean ok 1
+  json_add_string service "$package"; json_add_string state "$state"
+  json_add_string revision "$revision"; json_add_string enabled "$enabled"
+  json_add_string runtime "$runtime"; json_add_string service_startup "${boot:-unknown}"
+  if [ "$state" = enabled ] || [ "$state" = disabled ]; then
+    if [ "$package" = ddns ]; then
+      for key in service_name lookup_host domain ip_network; do
+        json_add_string "$key" "$(uci -q get "ddns.veci.$key" || :)"
+      done
+      # Never return credentials or raw provider logs.
+      json_add_boolean credential_set "$(if uci -q get ddns.veci.password | grep -q .; then echo 1; else echo 0; fi)"
+    else
+      for key in interface download upload qdisc script; do
+        json_add_string "$key" "$(uci -q get "sqm.veci.$key" || :)"
+      done
+    fi
+  fi
+  json_dump
+}
+optional_toggle() {
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var service service; json_get_var expected revision
+  json_get_var enabled_request enabled; json_get_var confirm confirmation
+  case "$service:$enabled_request:$confirm" in
+    ddns:1:ENABLE_DDNS_NEXT_BOOT|ddns:0:DISABLE_DDNS_NEXT_BOOT|sqm:1:ENABLE_SQM_NEXT_BOOT|sqm:0:DISABLE_SQM_NEXT_BOOT) ;;
+    *) fail confirmation_required;;
+  esac
+  exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  # Serialize SQM enable with the existing native firewall writer.
+  if [ "$service" = sqm ]; then
+    exec 8</usr/libexec/rpcd/veci.v2.firewall; flock -n 8 || fail firewall_busy
+  fi
+  service_profile "$service"
+  case "$state" in enabled|disabled) ;; *) fail profile_unavailable;; esac
+  [ "$revision" = "$expected" ] || fail stale_configuration
+  changes=$(uci -q changes "$package") || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  if [ "$enabled_request" = 1 ]; then
+    [ "$boot" = enabled ] || fail service_startup_disabled
+    if [ "$service" = ddns ]; then
+      provider=$(uci -q get ddns.veci.service_name || :)
+      case "$provider" in cloudflare.com-v4|duckdns.org|no-ip.com) ;; *) fail unsupported_provider;; esac
+      [ "$(uci -q get ddns.veci.use_https || :)" = 1 ] || fail https_required
+      for key in lookup_host domain; do
+        value=$(uci -q get "ddns.veci.$key" || :)
+        case "$value" in ''|-*|*[!a-zA-Z0-9._-]*) fail invalid_profile;; esac
+      done
+      uci -q get ddns.veci.password | grep -q . || fail credentials_missing
+      case "$(uci -q get ddns.veci.ip_network || :)" in lte|wan) ;; *) fail unsupported_network;; esac
+    else
+      for key in flow_offloading flow_offloading_hw; do
+        case "$(uci -q get "firewall.@defaults[0].$key" || :)" in 0|'') ;; *) fail offload_must_be_disabled;; esac
+      done
+      iface=$(uci -q get sqm.veci.interface || :)
+      case "$iface" in usb0|eth0.2|pppoe-wan) ;; *) fail unsupported_interface;; esac
+      [ -d "/sys/class/net/$iface" ] || fail interface_unavailable
+      for key in download upload; do
+        value=$(uci -q get "sqm.veci.$key" || :)
+        case "$value" in ''|0*|*[!0-9]*) fail invalid_rate;; esac
+        [ "${#value}" -le 7 ] && [ "$value" -ge 64 ] && [ "$value" -le 2000000 ] || fail invalid_rate
+      done
+      case "$(uci -q get sqm.veci.qdisc || :)":"$(uci -q get sqm.veci.script || :)" in
+        cake:piece_of_cake.qos|cake:layer_cake.qos|fq_codel:simple.qos) ;; *) fail unsupported_queue;;
+      esac
+    fi
+  fi
+  tmp=$(mktemp -d /tmp/veci2-optional.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  uci -q -t "$tmp" set "$package.veci.enabled=$enabled_request" || fail stage_failed
+  [ "$(sha256sum "$config")" = "$digest" ] || fail stale_configuration
+  changes=$(uci -q changes "$package") || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  uci -q -t "$tmp" commit "$package" || fail commit_failed
+  [ "$(uci -q get "$package.veci.enabled")" = "$enabled_request" ] || fail commit_failed
+  # Save only. No service restart or network reload.
+  optional_status "$service"
+}
+ddns_lookup() {
+  service_profile ddns
+  case "$state" in enabled|disabled) ;; *) fail profile_unavailable;; esac
+  host=$(uci -q get ddns.veci.lookup_host || :)
+  case "$host" in ''|-*|.*|*[!a-zA-Z0-9.-]*) fail invalid_lookup_host;; esac
+  [ "${#host}" -le 253 ] || fail invalid_lookup_host
+  rc=0; output=$(timeout 8 nslookup "$host" 2>&1) || rc=$?
+  json_init; json_add_boolean ok 1; json_add_int exit_code "$rc"
+  json_add_string output "$(printf '%s' "$output" | head -c 2048)"
+  json_add_boolean provider_update_verified 0
+  json_dump
+}
