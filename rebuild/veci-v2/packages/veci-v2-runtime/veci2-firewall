@@ -29,9 +29,9 @@ lan_host() {
 }
 [ "$#" -ge 1 ] || fail unsupported_method
 case "$1" in
-  list) echo '{"status":{},"addForward":{"from_port":"Integer","to_port":"Integer","protocol":"String","destination":"String","confirmation":"String"},"deleteForward":{"name":"String","confirmation":"String"},"setDmz":{"destination":"String","confirmation":"String"}}'; exit 0 ;;
+  list) echo '{"status":{},"addForward":{"from_port":"Integer","to_port":"Integer","protocol":"String","destination":"String","confirmation":"String"},"deleteForward":{"name":"String","confirmation":"String"},"setDmz":{"destination":"String","confirmation":"String"},"setDefaults":{"drop_invalid":"String","syn_flood":"String","revision":"String","confirmation":"String"},"setOffload":{"enabled":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
   call) [ "$#" -ge 2 ] || fail unsupported_method
-    case "$2" in status|addForward|deleteForward|setDmz) ;; *) fail unsupported_method ;; esac ;;
+    case "$2" in status|addForward|deleteForward|setDmz|setDefaults|setOffload) ;; *) fail unsupported_method ;; esac ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
@@ -44,6 +44,8 @@ status() {
   set +u
   . /usr/share/libubox/jshn.sh
   json_init; json_add_boolean ok 1
+  digest=$(sha256sum /etc/config/firewall) || fail config_unavailable
+  json_add_string revision "${digest%% *}"
   json_add_string wan_input "$(uci -q get firewall.@zone[1].input)"
   json_add_string wan_forward "$(uci -q get firewall.@zone[1].forward)"
   json_add_array forwards
@@ -84,7 +86,30 @@ tmp=$(mktemp -d /tmp/veci2-firewall.XXXXXX) || fail tmp_failed
 trap 'rm -rf "$tmp"' EXIT
 trap 'exit 1' HUP INT TERM
 cp /etc/config/firewall "$tmp/previous" || fail backup_failed
-if [ "$2" = addForward ]; then
+if [ "$2" = setDefaults ] || [ "$2" = setOffload ]; then
+  digest=$(sha256sum /etc/config/firewall) || fail config_unavailable
+  expected=$(jsonfilter -s "$request" -e '@.revision') || fail invalid_request
+  [ "$expected" = "${digest%% *}" ] || fail stale_configuration
+  confirm=$(jsonfilter -s "$request" -e '@.confirmation') || fail invalid_request
+  [ "$(uci -q get 'firewall.@defaults[0]')" = defaults ] || fail defaults_missing
+  if [ "$2" = setDefaults ]; then
+    [ "$confirm" = SAVE_FIREWALL_DEFAULTS ] || fail confirmation_required
+    drop=$(jsonfilter -s "$request" -e '@.drop_invalid') || fail invalid_request
+    syn=$(jsonfilter -s "$request" -e '@.syn_flood') || fail invalid_request
+    case "$drop:$syn" in 0:0|0:1|1:0|1:1) ;; *) fail invalid_flag;; esac
+    uci -q -t "$tmp" set "firewall.@defaults[0].drop_invalid=$drop" &&
+    uci -q -t "$tmp" set "firewall.@defaults[0].synflood_protect=$syn" || fail stage_failed
+  else
+    [ "$confirm" = SAVE_SOFTWARE_OFFLOAD ] || fail confirmation_required
+    enabled=$(jsonfilter -s "$request" -e '@.enabled') || fail invalid_request
+    case "$enabled" in 0|1) ;; *) fail invalid_flag;; esac
+    # Software offload only. Do not enable an unverified hardware path.
+    uci -q -t "$tmp" set "firewall.@defaults[0].flow_offloading=$enabled" &&
+    uci -q -t "$tmp" set "firewall.@defaults[0].flow_offloading_hw=0" || fail stage_failed
+  fi
+  pending=$(uci -q changes firewall) || fail config_state_unknown
+  [ -z "$pending" ] && [ "$(sha256sum /etc/config/firewall)" = "$digest" ] || fail stale_configuration
+elif [ "$2" = addForward ]; then
   from=$(jsonfilter -s "$request" -e '@.from_port') || fail invalid_request
   to=$(jsonfilter -s "$request" -e '@.to_port') || fail invalid_request
   proto=$(jsonfilter -s "$request" -e '@.protocol') || fail invalid_request
@@ -133,7 +158,7 @@ else
     uci -q -t "$tmp" set firewall.veci_owner_dmz.target=DNAT || fail stage_failed
   fi
 fi
-if ! uci -q -t "$tmp" commit firewall || ! /etc/init.d/firewall reload >/dev/null 2>&1; then
+if ! uci -q -t "$tmp" commit firewall || ! fw4 check >/dev/null 2>&1 || ! /etc/init.d/firewall reload >/dev/null 2>&1; then
   cp "$tmp/previous" /etc/config/firewall || fail rollback_failed
   /etc/init.d/firewall reload >/dev/null 2>&1 || fail rollback_failed
   fail firewall_apply_failed_rollback_attempted
