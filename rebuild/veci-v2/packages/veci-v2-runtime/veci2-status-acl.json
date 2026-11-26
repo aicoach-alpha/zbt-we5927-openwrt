@@ -24,7 +24,8 @@
       "ubus": {
         "veci.v2.dhcp": [
           "add",
-          "delete"
+          "delete",
+          "setPool"
         ]
       }
     }
