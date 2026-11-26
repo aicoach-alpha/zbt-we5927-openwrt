@@ -110,7 +110,16 @@
           "candidate_hardware_uat": "NOT_RUN"
         },
         "owner_confirms_wifi_internet": "YES_SEPARATE_REPORT_NOT_CONCURRENT_WITH_SAMPLES",
-        "next_action": "Compare client BSSID with current primary AP and observe association concurrently under traffic; no forced reconnect or network reload"
+        "next_action": "Compare client BSSID with current primary AP and observe association concurrently under traffic; no forced reconnect or network reload",
+        "ap_identity_check": {
+          "ssid": "VeCI-WE5927",
+          "interface": "phy0-ap0",
+          "mode": "AP",
+          "phy": "phy0",
+          "channel": 1,
+          "phone_bssid_match": "UNCONFIRMED",
+          "driver_root_cause_resolved": false
+        }
       }
     },
     {

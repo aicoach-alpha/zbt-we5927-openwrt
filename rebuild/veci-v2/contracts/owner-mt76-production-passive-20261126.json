@@ -141,5 +141,22 @@
     "phone_connected_during_exact_five_samples_confirmed": false,
     "reconciliation": "Functional Wi-Fi connectivity confirmed by owner separately; zero-client API samples remain unexplained until concurrent same-AP BSSID/association check",
     "mt76_driver_root_cause_resolved": false
+  },
+  "owner_iw_ap_info_confirmation": {
+    "source": "Owner-pasted SSH command result",
+    "date_local": "2026-11-26",
+    "interface": "phy0-ap0",
+    "interface_type": "AP",
+    "ssid": "VeCI-WE5927",
+    "wiphy": 0,
+    "channel": 1,
+    "frequency_mhz": 2412,
+    "channel_width_mhz": 20,
+    "txpower_dbm": 20,
+    "ap_mac": "REDACTED_FROM_PUBLIC_EVIDENCE",
+    "association_count_not_in_this_command": true,
+    "phone_bssid_match": "NOT_VERIFIED",
+    "mt76_driver_fault": "NOT_PROVEN",
+    "hardware_new_candidate_test": "NOT_RUN"
   }
 }

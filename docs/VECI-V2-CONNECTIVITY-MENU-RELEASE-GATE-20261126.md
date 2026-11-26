@@ -154,3 +154,9 @@ Uncertainties are never converted into PASS on the strength of source code.
 - Owner explicitly confirms Wi-Fi can connect and internet works (26 Nov 2026). This statement does not establish that a client was connected during the five V2 diagnostic samples.
 - The zero-client counts from kernel station table and hostapd remain unexplained, not a proven driver failure. Check the serving AP BSSID/interface and count during the same active-traffic interval.
 - Preserve read-only production state. WIFI-003 remains unverified until actual on-air association/traffic and stability are observed.
+
+## Owner live primary AP metadata, 26 Nov 2026
+- SSH read-only iw dev phy0-ap0 info: SSID VeCI-WE5927, type AP, wiphy 0, channel 1 / 2412 MHz / 20 MHz, TX power 20 dBm.
+- Full AP BSSID was shown to owner but is intentionally excluded from public source evidence.
+- TXQ counters are not evidence of associated clients. Compare phone BSSID and AP BSSID during live traffic before attributing zero stations to MT76.
+- This does not change WIFI-003 source or candidate hardware acceptance status.
