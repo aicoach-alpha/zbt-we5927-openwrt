@@ -3,6 +3,7 @@ name: WE5927 MT7603 exact-source cross-build
 on:
   push:
     branches-ignore:
+      - feat/veci-v2-native-gui-refresh-20261126
       - build/zbt-we2825-oem-veci-20261119
     paths:
       - 'source/mt76-patches/**'
@@ -27,6 +28,8 @@ concurrency:
 
 jobs:
   kernel-compile:
+    # The owner branch uses an explicit candidate build after source acceptance.
+    if: github.event_name != 'pull_request' || github.head_ref != 'feat/veci-v2-native-gui-refresh-20261126'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:

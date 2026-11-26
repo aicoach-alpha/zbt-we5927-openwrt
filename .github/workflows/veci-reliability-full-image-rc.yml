@@ -38,6 +38,8 @@ concurrency:
 
 jobs:
   full-image-build:
+    # The owner branch uses an explicit candidate build after source acceptance.
+    if: github.event_name != 'pull_request' || github.head_ref != 'feat/veci-v2-native-gui-refresh-20261126'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
