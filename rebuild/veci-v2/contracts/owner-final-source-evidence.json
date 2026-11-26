@@ -1477,7 +1477,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/wifi_ap_2g.txt",
-        "log_sha256": "57b093f7d4c64995b2dcf77fdd330fb8a051dcf99e9286ab6ad77036d642a6be"
+        "log_sha256": "57d33f37d042fbd0f05cc54032e1b27adbf1ed377dc09255cc5f4233262f5345"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -1485,15 +1485,16 @@
         "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "67067a4ab9a5bd719e180a30fa4f3cfe58ac65685e77de8c8b49cbcd4d1e9437",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi": "8ec1da484b8dab5389f3819b80c399ea9476bcc8feb2d5ff6c925d420f3d5d2c",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "0fe50a2af635734887cf285e8ebdb00d0d2f43bf586237e8455fc8fae375ebaa",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "58b5d918c42116fe6d8c00d18768088ae8145a7d97b31eb148345a9a4bec2b30",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "57594d0cd564c990b82def66b0d3f79aeabdad751199b76db9a92157794fcec9",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "1e91d4871c76531c8c4e86b337d9524bc515b7c0c6bdd7dd727ecde02b709d38",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "fd2cec01c84a23fbf9df3c6473f9f1f3ffe63194a3f12a5e262b708594fd8f23",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-activate": "7b1a2929b9e88a58e025866404b0b53d8b29702e631d74a7180410e21a5670fa",
         "scripts/tests/test_owner_wifi_acceptance.py": "bcbf947c56b66dd86780e9ea7c37aaa0dc4b609b927e0a1680062cb9d754388f",
         "scripts/uat/test-wifi-name-host.py": "706d9092644e5ef2fddb662dc4426a9ba076f73680167c109ddf0fe68ecbacee",
-        "scripts/uat/test-wifi-controls-host.py": "d0afd2db2a52a0576fbca1ec9560ea66262bb920c539237d9381b5bbc6284023",
-        "scripts/tests/test_veci_v2_connectivity_menu_regression_20261126.py": "74127550323c8e4bbdbd6855ccfc9db1be82afbbfcd98c0302d766a54ebe2f8b"
+        "scripts/uat/test-wifi-controls-host.py": "a733d0955af6e7dda7f84c8e581f562afd7ff3c92f519acb6e05556a0384a1a5",
+        "scripts/tests/test_veci_v2_connectivity_menu_regression_20261126.py": "74127550323c8e4bbdbd6855ccfc9db1be82afbbfcd98c0302d766a54ebe2f8b",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py": "281fbea65dd7d70db8281b63aed2f9d07699379bf5bcef87ed4820881f07b851"
       },
       "status": "pass",
       "test_ids": [
@@ -1501,13 +1502,16 @@
         "test_channel_survey_acl_and_auth_native_uci",
         "test_incompatible_band_and_failed_commit_preserve_configuration",
         "test_privileged_actions_have_write_acl",
-        "test_activation_has_acl_and_one_shot_fail_closed"
+        "test_activation_has_acl_and_one_shot_fail_closed",
+        "test_real_ui_render_handles_five_distinct_cases",
+        "test_dual_source_is_read_only_and_never_equates_zero_to_disconnected"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_wifi_acceptance.py",
         "scripts/uat/test-wifi-name-host.py",
         "scripts/uat/test-wifi-controls-host.py",
-        "scripts/tests/test_veci_v2_connectivity_menu_regression_20261126.py"
+        "scripts/tests/test_veci_v2_connectivity_menu_regression_20261126.py",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py"
       ]
     },
     "wifi_clients_access_control": {
@@ -1526,7 +1530,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/wifi_clients_access_control.txt",
-        "log_sha256": "74166ce11bc7614c80a545285e3e9a4fc1f5bcfaf461c9135325cea6cb3eb13e"
+        "log_sha256": "209bd1f79f6e46536f45e617361590204038f553a25e7dd61d822a5460f4dd89"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -1534,25 +1538,29 @@
         "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "67067a4ab9a5bd719e180a30fa4f3cfe58ac65685e77de8c8b49cbcd4d1e9437",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi": "8ec1da484b8dab5389f3819b80c399ea9476bcc8feb2d5ff6c925d420f3d5d2c",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "0fe50a2af635734887cf285e8ebdb00d0d2f43bf586237e8455fc8fae375ebaa",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "58b5d918c42116fe6d8c00d18768088ae8145a7d97b31eb148345a9a4bec2b30",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "57594d0cd564c990b82def66b0d3f79aeabdad751199b76db9a92157794fcec9",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "1e91d4871c76531c8c4e86b337d9524bc515b7c0c6bdd7dd727ecde02b709d38",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "fd2cec01c84a23fbf9df3c6473f9f1f3ffe63194a3f12a5e262b708594fd8f23",
         "scripts/tests/test_owner_wifi_acceptance.py": "bcbf947c56b66dd86780e9ea7c37aaa0dc4b609b927e0a1680062cb9d754388f",
         "scripts/uat/test-wifi-name-host.py": "706d9092644e5ef2fddb662dc4426a9ba076f73680167c109ddf0fe68ecbacee",
-        "scripts/uat/test-wifi-controls-host.py": "d0afd2db2a52a0576fbca1ec9560ea66262bb920c539237d9381b5bbc6284023"
+        "scripts/uat/test-wifi-controls-host.py": "a733d0955af6e7dda7f84c8e581f562afd7ff3c92f519acb6e05556a0384a1a5",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py": "281fbea65dd7d70db8281b63aed2f9d07699379bf5bcef87ed4820881f07b851"
       },
       "status": "pass",
       "test_ids": [
         "test_primary_ap_native_uci",
         "test_channel_survey_acl_and_auth_native_uci",
         "test_incompatible_band_and_failed_commit_preserve_configuration",
-        "test_privileged_actions_have_write_acl"
+        "test_privileged_actions_have_write_acl",
+        "test_real_ui_render_handles_five_distinct_cases",
+        "test_dual_source_is_read_only_and_never_equates_zero_to_disconnected"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_wifi_acceptance.py",
         "scripts/uat/test-wifi-name-host.py",
-        "scripts/uat/test-wifi-controls-host.py"
+        "scripts/uat/test-wifi-controls-host.py",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py"
       ]
     },
     "wifi_survey_channel": {
@@ -1571,7 +1579,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/wifi_survey_channel.txt",
-        "log_sha256": "13a62e6ad6230049b91608834c97d8b074a0d5b79f8d5d2f11c7b352b5b3494a"
+        "log_sha256": "87358ee28f0fc6e0e4c2f87bf0e34685cde011112dd766d51e8204ef5d423330"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -1579,25 +1587,29 @@
         "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "67067a4ab9a5bd719e180a30fa4f3cfe58ac65685e77de8c8b49cbcd4d1e9437",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi": "8ec1da484b8dab5389f3819b80c399ea9476bcc8feb2d5ff6c925d420f3d5d2c",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "0fe50a2af635734887cf285e8ebdb00d0d2f43bf586237e8455fc8fae375ebaa",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "58b5d918c42116fe6d8c00d18768088ae8145a7d97b31eb148345a9a4bec2b30",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "57594d0cd564c990b82def66b0d3f79aeabdad751199b76db9a92157794fcec9",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "1e91d4871c76531c8c4e86b337d9524bc515b7c0c6bdd7dd727ecde02b709d38",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "fd2cec01c84a23fbf9df3c6473f9f1f3ffe63194a3f12a5e262b708594fd8f23",
         "scripts/tests/test_owner_wifi_acceptance.py": "bcbf947c56b66dd86780e9ea7c37aaa0dc4b609b927e0a1680062cb9d754388f",
         "scripts/uat/test-wifi-name-host.py": "706d9092644e5ef2fddb662dc4426a9ba076f73680167c109ddf0fe68ecbacee",
-        "scripts/uat/test-wifi-controls-host.py": "d0afd2db2a52a0576fbca1ec9560ea66262bb920c539237d9381b5bbc6284023"
+        "scripts/uat/test-wifi-controls-host.py": "a733d0955af6e7dda7f84c8e581f562afd7ff3c92f519acb6e05556a0384a1a5",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py": "281fbea65dd7d70db8281b63aed2f9d07699379bf5bcef87ed4820881f07b851"
       },
       "status": "pass",
       "test_ids": [
         "test_primary_ap_native_uci",
         "test_channel_survey_acl_and_auth_native_uci",
         "test_incompatible_band_and_failed_commit_preserve_configuration",
-        "test_privileged_actions_have_write_acl"
+        "test_privileged_actions_have_write_acl",
+        "test_real_ui_render_handles_five_distinct_cases",
+        "test_dual_source_is_read_only_and_never_equates_zero_to_disconnected"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_wifi_acceptance.py",
         "scripts/uat/test-wifi-name-host.py",
-        "scripts/uat/test-wifi-controls-host.py"
+        "scripts/uat/test-wifi-controls-host.py",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py"
       ]
     }
   }

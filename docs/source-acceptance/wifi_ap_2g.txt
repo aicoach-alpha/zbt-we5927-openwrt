@@ -3,8 +3,10 @@ test_channel_survey_acl_and_auth_native_uci (test_owner_wifi_acceptance.OwnerWif
 test_incompatible_band_and_failed_commit_preserve_configuration (test_owner_wifi_acceptance.OwnerWifi.test_incompatible_band_and_failed_commit_preserve_configuration) ... ok
 test_privileged_actions_have_write_acl (test_owner_wifi_acceptance.OwnerWifi.test_privileged_actions_have_write_acl) ... ok
 test_activation_has_acl_and_one_shot_fail_closed (test_veci_v2_connectivity_menu_regression_20261126.ConnectivityMenuRegressions.test_activation_has_acl_and_one_shot_fail_closed) ... ok
+test_real_ui_render_handles_five_distinct_cases (test_veci_v2_wifi_client_observation_20261126.ClientObservationContract.test_real_ui_render_handles_five_distinct_cases) ... ok
+test_dual_source_is_read_only_and_never_equates_zero_to_disconnected (test_veci_v2_wifi_client_observation_20261126.ClientObservationContract.test_dual_source_is_read_only_and_never_equates_zero_to_disconnected) ... ok
 
 ----------------------------------------------------------------------
-Ran 5 tests in 1.567s
+Ran 7 tests in 16.162s
 
 OK

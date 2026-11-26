@@ -160,3 +160,10 @@ Uncertainties are never converted into PASS on the strength of source code.
 - Full AP BSSID was shown to owner but is intentionally excluded from public source evidence.
 - TXQ counters are not evidence of associated clients. Compare phone BSSID and AP BSSID during live traffic before attributing zero stations to MT76.
 - This does not change WIFI-003 source or candidate hardware acceptance status.
+
+## Next-firmware client-status reconciliation fix (source only)
+- WIFI-008 fixes the unsupported client-offline claim in GUI. The existing Wi-Fi info RPC now cross-checks iw station dump and hostapd get_clients using native libubox JSON parsing in a subshell.
+- New response client_observation.state is observed, zero_observed, mismatch, or unavailable; counts are included only when the corresponding source succeeded. Existing clients array is retained for backwards compatibility.
+- GUI distinguishes zero clients detected AT SAMPLE TIME (not proof of disconnect), disagreement, unavailable and positively observed clients. Client display is not a driver-level stress PASS.
+- Native UCI fixture exercises real libubox parse; Node VM executes actual render function with five cases; three Wi-Fi core modules require NEW exact-source acceptance receipts before next image compilation.
+- This source edit has NOT been flashed, deployed or hardware-tested. Current production LTE and Wi-Fi unchanged. WIFI-003 remains under physical verification.
