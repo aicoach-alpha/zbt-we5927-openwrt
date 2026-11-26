@@ -112,7 +112,27 @@
             <button type="button" class="subtab" data-group="lan">LAN &amp; DHCP</button>
             <button type="button" class="subtab" data-group="lte">Pemantauan LTE</button>
           </nav>
-<article class="panel" data-group="sim">
+<article class="panel lte-control-panel" data-group="sim">
+            <div class="lte-control-heading">
+              <div><span class="eyebrow">MOBILE NETWORK</span><h2>Koneksi LTE &amp; SIM</h2>
+                <p>Status SIM, jaringan, paket data dan modem diverifikasi terpisah.</p></div>
+              <button id="lte-status-refresh" type="button" class="quiet">Perbarui status</button>
+            </div>
+            <p id="lte-connection-status" class="result" role="status">Memeriksa koneksi LTE…</p>
+            <div class="lte-action-buttons">
+              <button id="lte-connection-enable" type="button" disabled>Aktifkan layanan LTE</button>
+              <button id="lte-reconnect" type="button" disabled>Reconnect LTE</button>
+            </div>
+            <p id="lte-action-result" class="notice" role="status">Reconnect manual dapat memutus internet sementara, tanpa merestart LAN atau SSH.</p>
+            <h3>APN operator</h3>
+            <form id="lte-apn-form">
+              <label>APN<input id="lte-apn" required maxlength="100" autocomplete="off" disabled placeholder="internet"></label>
+              <button id="lte-apn-save" type="submit" disabled>Simpan APN</button>
+            </form>
+            <p class="notice">Perubahan APN disimpan untuk koneksi berikutnya. Tidak otomatis melakukan reconnect.</p>
+            <h3>Failover dual-SIM</h3>
+            <p id="lte-policy-status" role="status"></p>
+            <button id="lte-policy-change" type="button" disabled>Ubah failover</button>
             <details><summary>PIN dan PUK SIM</summary>
               <button type="button" id="sim-lock-read">Baca status kunci</button>
               <p id="sim-lock-status" role="status"></p>
@@ -183,13 +203,8 @@
             <h2>Koneksi</h2>
             <p>Satu tempat untuk LTE dua SIM, Wi-Fi, LAN/WAN, DHCP dan perangkat. Fitur detail mengikuti modul yang benar-benar tersedia.</p>
             <div id="network-status" class="grid" aria-live="polite"></div>
-            <h3>Failover dual-SIM</h3>
-            <p id="lte-policy-status" role="status"></p>
-            <button id="lte-policy-change" type="button" disabled>Ubah failover</button>
-            <form id="lte-apn-form">
-              <label>APN operator <input id="lte-apn" required maxlength="100" autocomplete="off" disabled></label>
-              <button id="lte-apn-save" type="submit" disabled>Simpan APN</button>
-            </form>
+            <p>Kontrol reconnect, APN dan SIM berada pada submenu LTE &amp; SIM.</p>
+            <button id="lte-open-controls" class="quiet" type="button">Buka pengaturan LTE &amp; SIM</button>
             <h3>Wi-Fi utama</h3>
             <form id="wifi-name-form">
               <label>Nama jaringan (SSID, 1–32 byte) <input id="wifi-name" required maxlength="32" autocomplete="off" disabled></label>

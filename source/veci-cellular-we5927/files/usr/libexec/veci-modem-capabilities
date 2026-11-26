@@ -1,5 +1,5 @@
 #!/bin/sh
-# VeCI WE5927: ONLY 3GPP AT test-commands; NO SMS send/read or USSD execution.
+# VeCI WE5927: ONLY 3GPP AT test-commands; NO SMS send/read; retired modem dial actions are never invoked.
 # This is explicit-on-demand and shares the existing we5927-at.lock.
 set -eu
 umask 077
@@ -11,7 +11,7 @@ unavailable() {
         modem_port_unavailable|at_tool_unavailable|lock_unavailable|modem_busy) reason="$1" ;;
         *) reason=unavailable ;;
     esac
-    printf '{ "ok": false, "state": "unavailable", "reason": "%s", "sms_mode": "not_tested", "sms_storage": "not_tested", "sms_notifications": "not_tested", "ussd": "not_tested" }\n' "$reason"
+    printf '{ "ok": false, "state": "unavailable", "reason": "%s", "sms_mode": "not_tested", "sms_storage": "not_tested", "sms_notifications": "not_tested" }\n' "$reason"
 }
 
 
@@ -40,16 +40,15 @@ probe_capabilities() {
     command -v flock >/dev/null 2>&1 || { unavailable lock_unavailable; return; }
     at_port="$(/usr/sbin/we5927-lte at-port)" || { unavailable modem_port_unavailable; return; }
 
-    # One nonblocking exclusive lock over all four probes, shared with
+    # One nonblocking exclusive lock over three SMS-only probes, shared with
     # /usr/sbin/we5927-lte. Never wait indefinitely behind watchdog/IMEI.
     (
         flock -n -x 9 || { unavailable modem_busy; exit 0; }
         sms_mode="$(test_at 'AT+CMGF=?' '+CMGF:')"
         sms_storage="$(test_at 'AT+CPMS=?' '+CPMS:')"
         sms_notifications="$(test_at 'AT+CNMI=?' '+CNMI:')"
-        ussd="$(test_at 'AT+CUSD=?' '+CUSD:')"
-        printf '{ "ok": true, "state": "probed", "source": "read_only_at_test", "sms_mode": "%s", "sms_storage": "%s", "sms_notifications": "%s", "ussd": "%s" }\n' \
-            "$sms_mode" "$sms_storage" "$sms_notifications" "$ussd"
+        printf '{ "ok": true, "state": "probed", "source": "read_only_at_test", "sms_mode": "%s", "sms_storage": "%s", "sms_notifications": "%s" }\n' \
+            "$sms_mode" "$sms_storage" "$sms_notifications"
     ) 9>/var/lock/we5927-at.lock
 }
 

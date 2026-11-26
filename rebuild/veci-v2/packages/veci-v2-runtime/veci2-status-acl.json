@@ -94,7 +94,7 @@
     }
   },
   "veci-v2-lte": {
-    "description": "Read cellular preferences and change automatic SIM failover",
+    "description": "Read cellular policy; explicitly enable LTE manager; configure SIM failover and APN",
     "read": {
       "ubus": {
         "veci.v2.lte": [
@@ -110,7 +110,8 @@
         "veci.v2.lte": [
           "setFailover",
           "setApn",
-          "setMonitor"
+          "setMonitor",
+          "enableConnection"
         ],
         "veci.v2.simlock": [
           "unlock"

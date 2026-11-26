@@ -1,5 +1,5 @@
 // Offline-only display helpers for future opt-in modem messaging UI.
-// Does not issue AT commands, initiate USSD sessions, or persist SMS/OTP.
+// Does not issue AT commands or persist SMS/OTP.
 const MAX_MESSAGE_CHARS = 1024;
 const MAX_MESSAGES = 50;
 
@@ -37,19 +37,4 @@ export function parseSmsTextList(raw) {
 	}
 	if (current && records.length < MAX_MESSAGES) records.push(current);
 	return records.filter(item => item.index <= 255 && item.text.length > 0);
-}
-
-// AT+CUSD unsolicited output may use encoded GSM/hex payloads. Decode only
-// UCS2/UTF16BE DCS=72 (0x48), otherwise return explicitly unsupported.
-// A read-only parser never sends AT+CUSD or responds to interactive menus.
-export function decodeUssdUcs2(payload, dcs) {
-	if (dcs !== 72 || typeof payload !== 'string' || payload.length > 2048) return null;
-	if (!/^(?:[0-9A-Fa-f]{4})+$/.test(payload)) return null;
-	let text = '';
-	for (let i = 0; i < payload.length; i += 4) {
-		const unit = Number.parseInt(payload.slice(i, i + 4), 16);
-		if (unit >= 0xd800 && unit <= 0xdfff) return null;
-		text += String.fromCharCode(unit);
-	}
-	return text;
 }
