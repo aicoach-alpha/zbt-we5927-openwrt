@@ -1,0 +1,122 @@
+"""Exercise actual OEM network adapter using isolated native provider fixtures."""
+import json
+import os
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+BASE=Path(__file__).resolve().parents[2]/"rebuild/oem-updated/backend"
+
+class NetworkReads(unittest.TestCase):
+    def setUp(self):
+        tmp=tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.d=Path(tmp.name)
+        self.cmd("jshn", """json_init() { :; }
+json_add_string() { printf '%s=%s\\n' "$1" "$2"; }
+json_add_array() { printf 'array:%s\\n' "$1"; }
+json_add_object() { :; }
+json_close_object() { :; }
+json_close_array() { :; }
+json_dump() { :; }
+json_load() { [ -n "$1" ]; }
+""")
+        self.cmd("lte", "#!/bin/sh\n[ \"$1\" = status-fast ] && printf '%s' \"$MODEM\"\n")
+        self.cmd("date", "#!/bin/sh\necho 1000\n")
+        self.cmd("ubus", """#!/bin/sh
+case "$4:$5" in
+ veci.v2.interfaces:status) printf '%s' "$NATIVE";;
+ network.interface.wan:status) printf '%s' "$LIVE";;
+ *) exit 1;;
+esac
+""")
+        self.cmd("uci", "#!/bin/sh\n[ \"$3\" = network.wan.dns ] && echo '1.1.1.1 8.8.8.8'\n")
+        self.cmd("cat", """#!/bin/sh
+case "$1" in
+ /sys/class/net/eth0.2/address) echo aa:bb:cc:dd:ee:ff;;
+ *) exit 1;;
+esac
+""")
+        self.cmd("jsonfilter", """#!/usr/bin/env python3
+import json,re,sys
+try:
+ x=json.load(sys.stdin)
+ q=sys.argv[2]
+ if q=="@.route[@.target='0.0.0.0' && !@.table].nexthop":
+  x=next(r["nexthop"] for r in x["route"] if r["target"]=="0.0.0.0" and "table" not in r)
+ elif q=='@["ipv6-address"][*].address':
+  print("\\n".join(r["address"] for r in x["ipv6-address"]));sys.exit()
+ else:
+  for a,b,c in re.findall(r'\\.([A-Za-z_]+)|\\["([^"]+)"\\]|\\[(\\d+)\\]',q):
+   x=x[a or b] if (a or b) else x[int(c)]
+ if isinstance(x,bool): print(str(x).lower())
+ elif isinstance(x,(str,int)): print(x)
+ else: sys.exit(1)
+except (KeyError,IndexError,TypeError,ValueError,StopIteration): sys.exit(1)
+""")
+        (self.d/"arp").write_text("IP address HW type Flags HW address Mask Device\n192.168.1.2 0x1 0x2 aa:bb:cc:dd:ee:ff * br-lan\n192.168.7.1 0x1 0x2 aa:bb:cc:dd:ee:01 * usb0\n192.168.1.9 0x1 0x0 00:00:00:00:00:00 * br-lan\n")
+        (self.d/"leases").write_text("1200 aa:bb:cc:dd:ee:ff 192.168.1.2 client *\n900 aa:bb:cc:dd:ee:01 192.168.1.3 expired *\n0 aa:bb:cc:dd:ee:02 192.168.1.4 * *\n1200 aa:bb:cc:dd:ee:03 192.168.1.5 $(touch\u0020/tmp/no-oem-exec) *\n9999999999999999999999 aa:bb:cc:dd:ee:04 192.168.1.6 overflow *\n")
+        s=(BASE/"read-only-adapter.sh").read_text()
+        for old,new in [("/usr/share/libubox/jshn.sh",self.d/"jshn"),("/usr/sbin/we5927-lte",self.d/"lte"),("/proc/net/arp",self.d/"arp"),("/tmp/dhcp.leases",self.d/"leases")]:
+            s=s.replace(old,str(new))
+        (self.d/"adapter").write_text(s)
+
+    def cmd(self,name,body):
+        p=self.d/name;p.write_text(body);p.chmod(0o755)
+
+    def invoke(self,op,**env):
+        defaults={"MODEM":json.dumps({"sim":1,"operator":"Example","model":"4108","signal_dbm":-85,"access_tech":"LTE","imei":"secret","iccid":"secret2"}),
+          "NATIVE":json.dumps({"ok":True,"wan_mode":"dhcp"}),
+          "LIVE":json.dumps({"up":True,"device":"eth0.2","ipv4-address":[{"address":"192.168.2.2","mask":24}],"route":[{"target":"0.0.0.0","nexthop":"192.168.2.1"}],"dns-server":["1.1.1.1"],"ipv6-address":[{"address":"2001:db8::1"}]})}
+        defaults.update(env)
+        return subprocess.run(["sh",str(self.d/"adapter"),op],env=dict(os.environ,PATH=str(self.d)+":"+os.environ["PATH"],**defaults),capture_output=True,text=True,timeout=5)
+
+    def test_signal_native_and_no_subscriber_id(self):
+        r=self.invoke("get_module_signal")
+        self.assertEqual(r.returncode,0,r.stderr)
+        for value in ["signal=-85","module_sim=SIM1","net_type=LTE","operator=Example"]:
+            self.assertIn(value,r.stdout)
+        self.assertNotIn("secret",r.stdout)
+        r=self.invoke("get_module_signal",MODEM='{"sim":3}')
+        self.assertNotEqual(r.returncode,0)
+
+    def test_arp_lan_only(self):
+        r=self.invoke("get_arp")
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn("ipaddr=192.168.1.2",r.stdout)
+        self.assertNotIn("192.168.7.1",r.stdout)
+        self.assertNotIn("192.168.1.9",r.stdout)
+
+    def test_dhcp_current_and_nonexecuted_host(self):
+        r=self.invoke("get_dhcp_allocation")
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn("dhcp_remain_lease=200",r.stdout)
+        self.assertIn("dhcp_ip=192.168.1.4",r.stdout)
+        self.assertIn("dhcp_host=$(touch",r.stdout)
+        self.assertNotIn("expired",r.stdout)
+        self.assertNotIn("overflow",r.stdout)
+
+    def test_wan_dhcp_and_static(self):
+        r=self.invoke("get_wan_config")
+        self.assertEqual(r.returncode,0,r.stderr)
+        for value in ["proto=dhcp","ipaddr=192.168.2.2","netmask=255.255.255.0","gateway=192.168.2.1","dns_primary=1.1.1.1","=2001:db8::1"]:
+            self.assertIn(value,r.stdout)
+        r=self.invoke("get_wan_config",NATIVE=json.dumps({"ok":True,"wan_mode":"static","wan":"10.0.0.2","wan_mask":"24","gateway":"10.0.0.1"}))
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn("ipaddr=10.0.0.2",r.stdout)
+        self.assertIn("gateway=10.0.0.1",r.stdout)
+
+    def test_wan_failure_closed(self):
+        for native in ['{"ok":false}', '{"ok":true,"wan_mode":"pppoe"}']:
+            r=self.invoke("get_wan_config",NATIVE=native)
+            self.assertNotEqual(r.returncode,0)
+        r=self.invoke("get_wan_config",LIVE='{"device":"../../etc"}')
+        self.assertNotEqual(r.returncode,0)
+
+    def test_wan_down_does_not_return_stale_dhcp_address(self):
+        r=self.invoke("get_wan_config",LIVE=json.dumps({"up":False,"device":"eth0.2","ipv4-address":[{"address":"192.168.2.2","mask":24}],"route":[{"target":"0.0.0.0","nexthop":"192.168.2.1"}],"dns-server":["1.1.1.1"],"ipv6-address":[{"address":"2001:db8::1"}]}))
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn("ipaddr=0.0.0.0",r.stdout)
+        self.assertNotIn("192.168.2.1",r.stdout)
+        self.assertNotIn("2001:db8::1",r.stdout)

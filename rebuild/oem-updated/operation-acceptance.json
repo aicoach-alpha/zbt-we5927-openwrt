@@ -63,7 +63,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_arp": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "Linux /proc/net/arp",
+      "evidence": "scripts/tests/test_oem_network_reads.py; scripts/tests/test_oem_module_status.py",
+      "limitations": "Complete LAN neighbours only; actual device and OEM UI integration pending."
     },
     "get_cloud_login": {
       "state": "UNIMPLEMENTED"
@@ -81,7 +84,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_dhcp_allocation": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "OpenWrt dnsmasq lease table",
+      "evidence": "scripts/tests/test_oem_network_reads.py; scripts/tests/test_oem_module_status.py",
+      "limitations": "Active leases only; physical DHCP and browser validation pending."
     },
     "get_dhcp_config": {
       "state": "PROTOTYPE"
@@ -129,7 +135,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_module_signal": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "we5927-lte status-fast",
+      "evidence": "scripts/tests/test_oem_network_reads.py; scripts/tests/test_oem_module_status.py",
+      "limitations": "Canonical cached modem status; subscriber IDs deliberately redacted; actual modem and browser acceptance pending."
     },
     "get_module_status": {
       "state": "FIXTURE_PASS"
@@ -228,7 +237,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_wan_config": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "veci.v2.interfaces:status + netifd",
+      "evidence": "scripts/tests/test_oem_network_reads.py; scripts/tests/test_oem_module_status.py",
+      "limitations": "DHCP/static WAN supported by shared provider; PPPoE and write integration pending."
     },
     "get_wan_status": {
       "state": "UNIMPLEMENTED"

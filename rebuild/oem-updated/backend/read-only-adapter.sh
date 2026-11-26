@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -193,6 +193,126 @@ case "$1" in
         json_add_string ipaddr "$dest"
         json_add_string sport "$ports"
         json_add_string enabled "$enabled"
+        ;;
+    get_module_signal)
+        # Existing single modem service; never invoke raw AT from CGI.
+        native="$(/usr/sbin/we5927-lte status-fast)" || error "modem state unavailable"
+        (json_load "$native") || error "modem state invalid"
+        operator="$(field '@.operator' || true)"
+        model="$(field '@.model' || true)"
+        sim="$(field '@.sim')" || error "SIM state unavailable"
+        case "$sim" in 1|2) ;; *) error "SIM state invalid";; esac
+        signal="$(field '@.signal_dbm' || true)"
+        case "$signal" in -[0-9]|-[0-9][0-9]|-1[0-9][0-9]) ;; *) signal="";; esac
+        tech="$(field '@.access_tech' || true)"
+        success "get module signal success"
+        json_add_array data
+        json_add_object ""
+        json_add_string operator "$operator"
+        json_add_string model "$model"
+        # No subscriber identifiers in polling responses.
+        json_add_string imei ""
+        json_add_string iccid ""
+        json_add_string signal "$signal"
+        json_add_string module_sim "SIM$sim"
+        json_add_string net_type "$tech"
+        json_close_object
+        json_close_array
+        ;;
+    get_arp)
+        # Consume the kernel neighbour table, not vendor collection daemons.
+        [ -r /proc/net/arp ] || error "neighbour table unavailable"
+        success "success"
+        json_add_array list
+        while read -r ip hw flags mac mask device; do
+            [ "$flags" = 0x2 ] && [ "$device" = br-lan ] || continue
+            [ "$mac" != 00:00:00:00:00:00 ] || continue
+            json_add_object ""
+            json_add_string ipaddr "$ip"
+            json_add_string macaddr "$mac"
+            json_add_string interface "$device"
+            json_close_object
+        done < /proc/net/arp
+        json_close_array
+        ;;
+    get_dhcp_allocation)
+        # dnsmasq is the authoritative source. Never eval a lease hostname.
+        [ -r /tmp/dhcp.leases ] || error "DHCP lease table unavailable"
+        now="$(date +%s)"
+        case "$now" in ''|*[!0-9]*) error "clock unavailable";; esac
+        success "get dhcp allocation success"
+        json_add_array data
+        while read -r expiry mac ip host rest; do
+            case "$expiry" in 0|[1-9]|[1-9][0-9]*) ;; *) continue;; esac
+            case "$expiry" in *[!0-9]*) continue;; esac
+            # Reject overflow before arithmetic, and skip expired leases.
+            [ "${#expiry}" -le 10 ] || continue
+            [ "$expiry" -eq 0 ] || [ "$expiry" -gt "$now" ] || continue
+            remain=0
+            [ "$expiry" -eq 0 ] || remain=$((expiry-now))
+            [ "$host" != "*" ] || host=""
+            json_add_object ""
+            json_add_string dhcp_remain_lease "$remain"
+            json_add_string dhcp_mac "$mac"
+            json_add_string dhcp_ip "$ip"
+            json_add_string dhcp_host "$host"
+            json_close_object
+        done < /tmp/dhcp.leases
+        json_close_array
+        ;;
+    get_wan_config)
+        native="$(native_read veci.v2.interfaces status)" || error "native WAN unavailable"
+        mode="$(field '@.wan_mode')" || error "WAN mode unavailable"
+        case "$mode" in dhcp|static) ;; *) error "WAN mode unsupported";; esac
+        state="$(ubus -t 3 call network.interface.wan status)" || error "WAN state unavailable"
+        live() { printf '%s' "$state" | jsonfilter -e "$1"; }
+        up="$(live '@.up')" || error "WAN link state unavailable"
+        case "$up" in true|false) ;; *) error "WAN link state invalid";; esac
+        dev="$(live '@.device' || true)"
+        case "$dev" in ''|*[!a-zA-Z0-9_.-]*) error "WAN device unavailable";; esac
+        mac="$(cat "/sys/class/net/$dev/address" 2>/dev/null)" || error "WAN MAC unavailable"
+        [ -n "$mac" ] || error "WAN MAC unavailable"
+        if [ "$mode" = static ]; then
+            address="$(field '@.wan')" || error "WAN address unavailable"
+            mask="$(field '@.wan_mask')" || error "WAN mask unavailable"
+            gateway="$(field '@.gateway')" || error "WAN gateway unavailable"
+        else
+            address="$(live '@["ipv4-address"][0].address' || true)"
+            mask="$(live '@["ipv4-address"][0].mask' || true)"
+            gateway="$(live "@.route[@.target='0.0.0.0' && !@.table].nexthop" | head -n 1)"
+            [ "$up" = true ] || { address=""; mask=""; gateway=""; }
+        fi
+        case "$mask" in
+            '' ) ;;
+            *.*) ;;
+            *[!0-9]*) error "WAN mask invalid";;
+            *) [ "$mask" -le 32 ] || error "WAN mask invalid"
+               mask="$(awk -v p="$mask" 'BEGIN {for(i=0;i<4;i++){n=p>8?8:p;if(n<0)n=0;printf "%s%d",i?".":"",256-2^(8-n);p-=n}}')" ;;
+        esac
+        dns="$(get network.wan.dns || true)"
+        dns1="$(printf '%s' "$dns" | awk '{print $1}')"
+        dns2="$(printf '%s' "$dns" | awk '{print $2}')"
+        nameserver="$(live '@["dns-server"][0]' || true)"
+        ipv6="$(live '@["ipv6-address"][*].address' || true)"
+        [ "$up" = true ] || { nameserver=""; ipv6=""; }
+        success "get wan config success"
+        json_add_object data
+        json_add_string proto "$mode"
+        json_add_string macaddr "$mac"
+        json_add_string ipaddr "${address:-0.0.0.0}"
+        json_add_string netmask "$mask"
+        json_add_string gateway "$gateway"
+        json_add_string dns_primary "$dns1"
+        json_add_string dns_secondary "$dns2"
+        json_add_string nameserver "$nameserver"
+        json_add_string username ""
+        json_add_string password ""
+        json_add_string service ""
+        json_add_string ac ""
+        json_add_array ipv6
+        for address in $ipv6; do json_add_string "" "$address"; done
+        json_close_array
+        json_close_object
         ;;
     get_netwatchdog)
         # Do not claim legacy settings are active before native policy migration.

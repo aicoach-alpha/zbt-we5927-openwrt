@@ -100,3 +100,14 @@ esac
         ):
             r = self.run_script("gateway", QUERY_STRING=query, **env)
             self.assertNotIn("ADAPTER_CALLED", r.stdout)
+
+    def test_network_read_dispatch_and_duplicate_empty_op(self):
+        for op in ("get_module_signal","get_arp","get_dhcp_allocation","get_wan_config"):
+            r = self.run_script("gateway", QUERY_STRING="op="+op)
+            self.assertIn("ADAPTER_CALLED:"+op,r.stdout)
+            r = self.run_script("gateway", QUERY_STRING="op="+op, PERMIT="false")
+            self.assertNotIn("ADAPTER_CALLED",r.stdout)
+            r = self.run_script("gateway", QUERY_STRING="op=&op="+op)
+            self.assertNotIn("ADAPTER_CALLED",r.stdout)
+        r = self.run_script("gateway", QUERY_STRING="op=get_module_signal&module_section=4gwan")
+        self.assertIn("ADAPTER_CALLED:get_module_signal",r.stdout)
