@@ -3,8 +3,8 @@ set -ef
 umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 case "$1:${2:-}" in
-  list:*) echo '{"status":{},"save":{"revision":"String","confirm":"String","lan":"String","lan_mask":"String","wan_mode":"String","wan":"String","wan_mask":"String","gateway":"String"}}'; exit 0 ;;
-  call:save|call:status) ;;
+  list:*) echo '{"status":{},"pppoeStatus":{},"pppoeDiscovery":{},"pppoeAction":{"action":"String","revision":"String","confirmation":"String"},"save":{"revision":"String","confirm":"String","lan":"String","lan_mask":"String","wan_mode":"String","wan":"String","wan_mask":"String","gateway":"String"}}'; exit 0 ;;
+  call:save|call:status|call:pppoeStatus|call:pppoeDiscovery|call:pppoeAction) ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail board_mismatch
@@ -16,8 +16,77 @@ cfg=/etc/config/network
 revision() { digest=$(sha256sum "$cfg") || return 1; echo "${digest%% *}"; }
 get() { uci -q get "network.$1" || :; }
 [ "$(get lan)" = interface ] && [ "$(get wan)" = interface ] && [ "$(get lan.proto)" = static ] || fail unsupported_layout
+# Ethernet PPPoE must never operate on the cellular RNDIS device.
+pppoe_device() {
+  dev=$(get wan.device)
+  expected=$(jsonfilter -i /etc/board.json -e '@.network.wan.device' 2>/dev/null) || return 1
+  [ "$dev" = eth0.2 ] && [ "$expected" = "$dev" ] && [ -d "/sys/class/net/$dev" ] || return 1
+  [ "$(get lte.device)" = usb0 ] || return 1
+  [ "$(get lan.device)" != "$dev" ] || return 1
+  printf '%s' "$dev"
+}
+pppoe_status() {
+  proto=$(get wan.proto)
+  snapshot=$(ubus -t 3 call network.interface.wan status '{}') || fail wan_state_unavailable
+  live_proto=$(printf '%s' "$snapshot" | jsonfilter -e '@.proto' || :)
+  up=$(printf '%s' "$snapshot" | jsonfilter -e '@.up' || :)
+  pending=$(printf '%s' "$snapshot" | jsonfilter -e '@.pending' || :)
+  case "$up:$pending" in true:true|true:false|false:true|false:false) ;; *) fail invalid_wan_state;; esac
+  ip=$(printf '%s' "$snapshot" | jsonfilter -e '@["ipv4-address"][0].address' || :)
+  state=not_configured
+  if [ "$proto" = pppoe ]; then
+    state=disconnected
+    if [ "$live_proto" != pppoe ]; then state=pending_activation
+    elif [ "$pending" = true ]; then state=connecting
+    elif [ "$up" = true ] && [ -n "$ip" ] && [ "$ip" != 0.0.0.0 ]; then state=connected
+    elif [ "$up" = true ]; then state=link_up_no_ipv4; fi
+  fi
+  [ "$state" = connected ] || ip=
+  json_init; json_add_boolean ok 1
+  json_add_string revision "$(revision)"
+  json_add_string configured_protocol "$proto"
+  json_add_string state "$state"; json_add_string ipv4 "$ip"
+  json_add_boolean internet_verified 0
+  json_dump
+}
+case "$2" in
+  pppoeStatus) pppoe_status; exit 0;;
+  pppoeDiscovery)
+    dev=$(pppoe_device) || fail ethernet_wan_unverified
+    [ -x /usr/sbin/pppoe-discovery ] || fail discovery_tool_unavailable
+    # Discovery only, no session establishment or link reset.
+    rc=0
+    output=$(timeout 12 /usr/sbin/pppoe-discovery -I "$dev" 2>&1) || rc=$?
+    json_init; json_add_boolean ok 1; json_add_int exit_code "$rc"
+    json_add_string interface "$dev"
+    json_add_string output "$(printf '%s' "$output" | head -c 2048)"
+    json_add_boolean session_established 0
+    json_dump; exit 0;;
+  pppoeAction)
+    dev=$(pppoe_device) || fail ethernet_wan_unverified
+    [ "$(get wan.proto)" = pppoe ] || fail pppoe_not_configured
+    changes=$(uci -q changes network) || fail config_unavailable
+    [ -z "$changes" ] || fail pending_network_changes
+    request=$(head -c 513)
+    [ "${#request}" -le 512 ] && json_load "$request" || fail invalid_request
+    json_get_var token revision; json_get_var action action; json_get_var confirm confirmation
+    [ "$token" = "$(revision)" ] || fail stale_configuration
+    case "$action:$confirm" in disconnect:DISCONNECT_ETHERNET_PPPOE|reconnect:RECONNECT_ETHERNET_PPPOE) ;; *) fail confirmation_required;; esac
+    snapshot=$(ubus -t 3 call network.interface.wan status '{}') || fail wan_state_unavailable
+    [ "$(printf '%s' "$snapshot" | jsonfilter -e '@.proto')" = pppoe ] || fail pending_activation
+    live_dev=$(printf '%s' "$snapshot" | jsonfilter -e '@.device' || :)
+    [ "$live_dev" = "$dev" ] || fail ethernet_wan_unverified
+    # Scope netifd to Ethernet WAN only. No network reload, LTE restart or modem action.
+    ubus -t 5 call network.interface.wan down '{}' >/dev/null || fail disconnect_failed
+    if [ "$action" = reconnect ]; then
+      ubus -t 5 call network.interface.wan up '{}' >/dev/null || fail reconnect_failed
+    fi
+    json_init; json_add_boolean ok 1; json_add_boolean requested 1
+    json_add_string state pending_verification; json_add_boolean internet_verified 0
+    json_dump; exit 0;;
+esac
 mode=$(get wan.proto)
-case "$mode" in dhcp|static) ;; *) fail unsupported_wan_protocol ;; esac
+case "$mode" in dhcp|static|pppoe) ;; *) fail unsupported_wan_protocol ;; esac
 pending=$(uci -q changes network) || fail config_unavailable
 [ -z "$pending" ] || fail pending_network_changes
 lan=$(get lan.ipaddr); lan_mask=$(get lan.netmask)
@@ -32,6 +101,8 @@ for section in lan wan; do
 done
 current=$(revision) || fail config_unavailable
 if [ "$2" = save ]; then
+  # Existing generic editor cannot silently replace a PPPoE profile.
+  [ "$mode" != pppoe ] || fail use_dedicated_pppoe_configuration
   input=$(head -c 1025)
   [ "${#input}" -le 1024 ] && json_load "$input" || fail invalid_request
   json_get_var token revision ''; json_get_var confirm confirm ''
