@@ -194,6 +194,8 @@ case "$op" in
         start="$(read_field '@.dhcp_start')" || fail "DHCP start required"
         end="$(read_field '@.dhcp_end')" || fail "DHCP end required"
         lease="$(read_field '@.dhcp_lease')" || fail "DHCP lease required"
+        # OEM original sends seconds; native OpenWrt accepts a duration suffix.
+        case "$lease" in *[!0-9]*) ;; '') fail "invalid lease";; *) lease="${lease}s";; esac
         enabled="$(read_field '@.dhcp_enabled')" || fail "DHCP enable flag required"
         revision="$(read_field '@.revision')" || fail "DHCP revision required"
         confirm="$(read_field '@.confirmation')" || fail "explicit DHCP confirmation required"
@@ -224,12 +226,14 @@ case "$op" in
         ;;
     delete_static_dhcp)
         json_get_type typ maclist && [ "$typ" = array ] || fail "MAC list required"
-        json_select maclist; json_get_keys keys; [ "$keys" = 1 ] || fail "select one reservation at a time"
+        json_select maclist; json_get_keys keys; set -- $keys; [ "$#" = 1 ] && [ "$1" = 1 ] || fail "select one reservation at a time"
         json_get_var mac 1; json_select ..
         mac="$(printf '%s' "$mac" | tr A-F a-f)"
         printf '%s\n' "$mac" | grep -Eiq '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || fail "invalid MAC"
         rpc veci.v2.dhcp status '{}'
         revision="$(native_field '@.revision')" || fail "revision unavailable"
+        [ "$(read_field '@.revision')" = "$revision" ] || fail "stale reservation list"
+        [ "$(read_field '@.confirmation')" = DELETE_RESERVATION ] || fail "confirmation required"
         idx=0; match=""
         while [ "$idx" -lt 256 ]; do
             n="$(native_field "@.leases[$idx].index" || true)"
@@ -285,6 +289,9 @@ case "$op" in
         if [ "$op" = set_lan_config ]; then
             lan="$(read_field '@.ipaddr')" || fail "LAN address required"
             lan_mask="$(read_field '@.netmask')" || fail "LAN mask required"
+            requested_mac="$(read_field '@.macaddr' || true)"
+            current_mac="$(cat /sys/class/net/br-lan/address 2>/dev/null || true)"
+            [ -z "$requested_mac" ] || [ "$(printf '%s' "$requested_mac" | tr A-F a-f)" = "$(printf '%s' "$current_mac" | tr A-F a-f)" ] || fail "LAN MAC override unsupported"
         else
             mode="$(read_field '@.proto')" || fail "WAN protocol required"
             case "$mode" in dhcp) wan=""; wan_mask=""; gateway="";;
@@ -294,7 +301,12 @@ case "$op" in
                 *) fail "WAN protocol unsupported";;
             esac
             # Do not silently discard a DNS or PPPoE change.
-            for key in dns_primary dns_secondary username password service ac; do
+            dns="$(uci -q get network.wan.dns || true)"
+            dns1="$(printf '%s' "$dns" | awk '{print $1}')"
+            dns2="$(printf '%s' "$dns" | awk '{print $2}')"
+            [ "$(read_field '@.dns_primary' || true)" = "$dns1" ] &&
+            [ "$(read_field '@.dns_secondary' || true)" = "$dns2" ] || fail "use native DNS settings for DNS changes"
+            for key in username password service ac; do
                 [ -z "$(read_field "@.$key" || true)" ] || fail "separate DNS or PPPoE configuration required"
             done
         fi

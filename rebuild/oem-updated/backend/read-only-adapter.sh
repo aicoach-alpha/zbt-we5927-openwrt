@@ -44,6 +44,8 @@ case "$1" in
         json_add_string sysversion "$version"
         ;;
     get_lan_config)
+        native="$(native_read veci.v2.interfaces status)" || error "LAN revision unavailable"
+        before="$(field '@.revision')" || error "LAN revision unavailable"
         proto="$(get network.lan.proto)" || error "LAN protocol unavailable"
         address="$(get network.lan.ipaddr)" || error "LAN address unavailable"
         case "$address" in
@@ -59,8 +61,9 @@ case "$1" in
         esac
         mac="$(cat /sys/class/net/br-lan/address | tr 'a-z' 'A-Z')" || error "LAN MAC unavailable"
         [ -n "$mac" ] && [ -n "$address" ] && [ -n "$mask" ] || error "LAN unavailable"
-        native="$(native_read veci.v2.interfaces status || true)"
-        revision="$(field '@.revision' || true)"
+        native="$(native_read veci.v2.interfaces status)" || error "LAN revision unavailable"
+        revision="$(field '@.revision')" || error "LAN revision unavailable"
+        [ "$before" = "$revision" ] || error "LAN configuration changed"
         success "get lan config success"
         json_add_string revision "$revision"
         json_add_object data
@@ -879,6 +882,20 @@ case "$1" in
         done
         json_close_array
         json_add_int rule_count "$count"
+        ;;
+    get_ttl)
+        # Local stack TTL is observable, but not equivalent to rewriting
+        # forwarded traffic. Do not invent a legacy firewall rule state.
+        ttl="$(cat /proc/sys/net/ipv4/ip_default_ttl)" || error "kernel TTL unavailable"
+        case "$ttl" in ''|0*|*[!0-9]*) error "invalid kernel TTL";; esac
+        [ "${#ttl}" -le 3 ] && [ "$ttl" -le 255 ] || error "invalid kernel TTL"
+        success "local IPv4 TTL observation"
+        json_add_string local_ipv4_default_ttl "$ttl"
+        json_add_string scope locally_originated_packets
+        json_add_string ttl_enabled unknown
+        json_add_string ttl_cnt ""
+        json_add_string forwarding_rewrite_verified false
+        json_add_string configuration_supported 0
         ;;
     get_ddns|get_ddns_stat)
         native="$(native_read veci.v2.addon ddnsStatus)" || error "DDNS profile unavailable"

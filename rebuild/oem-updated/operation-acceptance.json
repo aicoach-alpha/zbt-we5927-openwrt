@@ -39,7 +39,7 @@
       "state": "PROTOTYPE",
       "provider": "veci.v2.dhcp:status/delete",
       "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Single MAC per request, native revision guard; bulk deletion UI pending."
+      "limitations": "Original OEM delete form uses displayed revision, explicit confirmation, one reservation at a time; runtime pending."
     },
     "enable_mptcp_set": {
       "state": "UNIMPLEMENTED"
@@ -314,7 +314,10 @@
       "limitations": "CPU and memory measured; primary Wi-Fi station count only; full guest client coverage and browser acceptance pending."
     },
     "get_ttl": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "Linux IPv4 kernel sysctl read",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Local originated packet TTL observation only; forwarded TTL policy and write support remain unimplemented."
     },
     "get_voice": {
       "state": "UNIMPLEMENTED"
@@ -515,7 +518,7 @@
       "state": "PROTOTYPE",
       "provider": "veci.v2.dhcp:setPool",
       "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Shared native DHCP pool write with revision, subnet and lease validation. Custom DHCP options not changed; supplemental OEM form staged in source, runtime validation pending."
+      "limitations": "Original OEM pool form adapted; native lease duration conversion and revision guard; runtime pending."
     },
     "set_disk": {
       "state": "UNIMPLEMENTED"
@@ -542,7 +545,7 @@
       "state": "PROTOTYPE",
       "provider": "veci.v2.interfaces:status/save",
       "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Explicit confirmation and revision; OEM form adaptation and manual network activation pending."
+      "limitations": "Original OEM LAN form uses revision and explicit confirmation; no automatic redirect, network activation manual; runtime pending."
     },
     "set_mac_blacklist": {
       "state": "PROTOTYPE",
@@ -629,7 +632,7 @@
       "state": "PROTOTYPE",
       "provider": "veci.v2.interfaces:status/save",
       "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "DHCP/static only; DNS and PPPoE writes require separate support; OEM form and activation pending."
+      "limitations": "Original OEM WAN form adapted for DHCP/static only; separate DNS controls, PPPoE provisioning and runtime pending."
     },
     "set_wan_config_nocommit": {
       "state": "UNIMPLEMENTED"

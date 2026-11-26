@@ -151,6 +151,11 @@
       "default": "optional absent",
       "scope": "preconfigured interface queue; software and hardware offload conflict guard",
       "state": "SOURCE_INTEGRATED_NOT_UAT"
+    },
+    "original_network_forms": {
+      "scope": "LAN, DHCP/static WAN, DHCP pool, single reservation deletion",
+      "state": "SOURCE_PATCH_SYNTAX_VERIFIED_NOT_UAT",
+      "activation": "LAN/WAN saved for manual activation; DHCP uses existing native rollback"
     }
   },
   "remaining": [

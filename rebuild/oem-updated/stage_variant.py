@@ -168,6 +168,52 @@ def stage(image, out):
             raise ValueError("OEM PPPoE discovery anchor changed")
         wan.write_text(wan_code.replace(old,new))
         subprocess.run(["node","--check",str(wan)],check=True)
+        # Keep the original OEM forms; save against the revision actually shown
+        # to the user, never fetch a newer revision just before overwriting it.
+        def edit_chunk(name, edits):
+            path = files / "www/assets/js" / name
+            value = path.read_text()
+            for old,new in edits:
+                if value.count(old)!=1:
+                    raise ValueError("OEM network form anchor changed: "+name+" "+old[:70])
+                value=value.replace(old,new)
+            path.write_text(value)
+            subprocess.run(["node","--check",str(path)],check=True)
+        lan_name="chunk-2d22c110.8a7728fb.js"
+        lan_source=(files / "www/assets/js" / lan_name).read_text()
+        lan_start=lan_source.index("set_lan_config:function()")
+        lan_end=lan_source.index(",created:function()",lan_start)
+        edit_chunk(lan_name, (
+            ('get_lan_config:function(){var t=this;this.$req.get','get_lan_config:function(){var t=this;return this.$req.get'),
+            ('var s=a.data;t.ipaddr=s.ipaddr,t.netmask=s.netmask,t.lan_config=a.data',
+             'if(!a||a.code!=="1"||!a.data)throw Error("LAN unavailable");t._lanRevision=a.revision;var s=a.data;t.ipaddr=s.ipaddr,t.netmask=s.netmask,t.lan_config=a.data'),
+            (lan_source[lan_start:lan_end],
+             'set_lan_config:function(){var t=this;if(t._lanBusy||!t.isValidIP(t.ipaddr,t.netmask)||!/^[0-9a-f]{64}$/.test(t._lanRevision||""))return;if(!window.confirm("Save LAN configuration for next manual activation? Record the new IP address."))return;t._lanBusy=true;var a={ipaddr:t.ipaddr,netmask:t.netmask,revision:t._lanRevision,confirmation:"SAVE_NETWORK"};t._lanRevision="";t.$req.post("/webapi?op=set_lan_config",a).then(function(r){if(!r||r.code!=="1")throw Error("Save rejected");t.$message.success("Saved for next manual activation; no redirect or automatic restart.");return t.get_lan_config()}).catch(function(){t.$message.error("LAN save not confirmed; refresh configuration.")}).finally(function(){t._lanBusy=false})}}'),
+            ('this.timer=setInterval(this.get_lan_config,3e3)','this.timer=setInterval(this.get_lan_status,3e3)'),
+        ))
+        wan_name="chunk-4f3e33ae.e79f6535.js"
+        wan_source=(files / "www/assets/js" / wan_name).read_text()
+        wan_start=wan_source.index("handleSave:function()")
+        wan_end=wan_source.index(",create_pppoe_interval:function()",wan_start)
+        edit_chunk(wan_name, (
+            ('var i=e.data;console.log(e.data),t.selected_protocol=i.proto',
+             'if(!e||e.code!=="1"||!e.data)throw Error("WAN unavailable");t._wanRevision=e.revision;var i=e.data;t.selected_protocol=i.proto'),
+            (wan_source[wan_start:wan_end],
+             'handleSave:function(){var t=this;if(t._wanBusy||!/^[0-9a-f]{64}$/.test(t._wanRevision||""))return;var p=t.selected_protocol;if(p!=="dhcp"&&p!=="static"){t.$message.error("PPPoE profile creation is not available yet.");return}var a={proto:p,revision:t._wanRevision,confirmation:"SAVE_NETWORK"};if(p==="static"){Object.assign(a,{ipaddr:t.value_static[0],netmask:t.value_static[1],gateway:t.value_static[2],dns_primary:t.value_static[3]||"",dns_secondary:t.value_static[4]||""})}else Object.assign(a,{dns_primary:t.value_dhcp[0]||"",dns_secondary:t.value_dhcp[1]||""});if(!window.confirm("Save Ethernet WAN configuration for next manual activation?"))return;t._wanBusy=true;t._wanRevision="";t.$req.post("/webapi?op=set_wan_config",a).then(function(r){if(!r||r.code!=="1")throw Error("Save rejected");t.$message.success("Saved for next manual activation.");return t.get_wan_config()}).catch(function(){t.$message.error("WAN save not confirmed; refresh. Use native DNS settings for DNS changes.")}).finally(function(){t._wanBusy=false})}'),
+        ))
+        dhcp_name="chunk-003dfc75.536cfc93.js"
+        edit_chunk(dhcp_name, (
+            ('get_dhcp_config:function(){var t=this;this.$req.get','get_dhcp_config:function(){var t=this;return this.$req.get'),
+            ('get_static_dhcp:function(){var t=this;this.$req.get','get_static_dhcp:function(){var t=this;return this.$req.get'),
+            ('console.log(e.data),t.prefix=e.data.dhcp_head','if(!e||e.code!=="1"||!e.data)throw Error("DHCP unavailable");t._dhcpRevision=e.revision;t.prefix=e.data.dhcp_head'),
+            ('var a=parseInt(e.data.dhcp_lease),i=Math.floor(a/3600),s=Math.floor(a/60%60);i>0?(t.$set(t.dhcp_state,3,i),t.$set(t.dhcp_state,4,"h")):(t.$set(t.dhcp_state,3,s),t.$set(t.dhcp_state,4,"m"))',
+             'var m=/^([0-9]+)([smhd]?)$/.exec(String(e.data.dhcp_lease));if(!m)throw Error("Unsupported lease format");var a=Number(m[1])*({"":1,s:1,m:60,h:3600,d:86400}[m[2]]);if(a%60!==0)throw Error("Lease not a whole minute");a%3600===0?(t.$set(t.dhcp_state,3,a/3600),t.$set(t.dhcp_state,4,"h")):(t.$set(t.dhcp_state,3,a/60),t.$set(t.dhcp_state,4,"m"))'),
+            ('this.proxy_req("get","/webapi?op=set_dhcp_config",s,(function(t){"1"==t.code&&e.get_dhcp_config()}),!0,this.$t("network.dhcp.resultMap"))',
+             'if(e._dhcpBusy||!/^[0-9a-f]{64}$/.test(e._dhcpRevision||"")||!window.confirm("Apply DHCP pool settings? Client service may briefly restart."))return;e._dhcpBusy=true;Object.assign(s,{revision:e._dhcpRevision,confirmation:"SAVE_DHCP_POOL"});e._dhcpRevision="";e.$req.post("/webapi?op=set_dhcp_config",s).then(function(r){if(!r||r.code!=="1")throw Error("DHCP rejected");return e.get_dhcp_config()}).catch(function(){e.$message.error("DHCP save not confirmed; refresh.")}).finally(function(){e._dhcpBusy=false})'),
+            ('"SL"==t.corporation&&e.arp_mac_list.forEach','if(!e||e.code!=="1"||!Array.isArray(e.data))throw Error("Reservation list unavailable");t._reservationRevision=e.revision;"SL"==t.corporation&&e.arp_mac_list.forEach'),
+            ('console.log(e),this.proxy_req("post","/webapi?op=delete_static_dhcp",e,(function(t){"1"==t.code&&a.get_static_dhcp()}),!0)',
+             'if(e.maclist.length!==1){a.$message.error("Select one reservation at a time.");return}if(!/^[0-9a-f]{64}$/.test(a._reservationRevision||"")){a.$message.error("Refresh reservation list.");return}window.confirm("Delete selected DHCP reservation?")&&(e.revision=a._reservationRevision,e.confirmation="DELETE_RESERVATION",a._reservationRevision="",a.$req.post("/webapi?op=delete_static_dhcp",e).then(function(r){if(!r||r.code!=="1")throw Error("Delete rejected");return a.get_static_dhcp()}).catch(function(){a.$message.error("Delete not confirmed; refresh. Select one reservation at a time.")}))'),
+        ))
         routed = route_oem_cgi(files / "www")
         if routed < 100:
             raise ValueError("incomplete OEM CGI route inventory")
