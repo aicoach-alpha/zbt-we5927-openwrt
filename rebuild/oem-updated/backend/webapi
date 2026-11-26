@@ -18,6 +18,8 @@ op=
 op_seen=0
 module_section=
 module_seen=0
+sim_seen=0
+sim_preview=
 oldifs=$IFS; IFS='&'; set -f
 for arg in $QUERY_STRING; do
     case "$arg" in
@@ -28,6 +30,10 @@ for arg in $QUERY_STRING; do
             module_seen=1
             module_section="${arg#module_section=}"
             case "$module_section" in lte|4gwan|4gwan1) ;; *) err -4 "unknown modem";; esac;;
+        SIMX=*)
+            [ "$sim_seen" = 0 ] || err -4 "duplicate SIM preview"
+            sim_seen=1; sim_preview="${arg#SIMX=}"
+            case "$sim_preview" in SIM1|SIM2) ;; *) err -4 "invalid SIM preview";; esac;;
         t=*) ;;
         *) err -4 "unexpected parameter";;
     esac
@@ -35,8 +41,9 @@ done
 IFS=$oldifs
 case "$op" in ''|*[!a-zA-Z0-9_]*) err -4 "invalid operation";; esac
 if [ "$module_seen" = 1 ]; then
-    case "$op" in get_module_status|get_module_signal) ;; *) err -4 "unexpected module parameter";; esac
+    case "$op" in get_module_status|get_module_signal|get_4g|get_4g_log) ;; *) err -4 "unexpected module parameter";; esac
 fi
+[ "$sim_seen" = 0 ] || [ "$op" = get_4g ] || err -4 "unexpected SIM parameter"
 case "$op" in
     language_get)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
@@ -56,9 +63,13 @@ case "$op" in
     long_link)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         reply '{"code":"1","reason":"success"}' ;;
-    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status|get_ntp|get_static_dhcp|get_dmz|get_module_signal|get_arp|get_dhcp_allocation|get_wan_config|getWiFi2|get_pppoe_status)
+    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status|get_ntp|get_static_dhcp|get_dmz|get_module_signal|get_arp|get_dhcp_allocation|get_wan_config|getWiFi2|get_pppoe_status|get_4g|get_4g_log)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
-        data="$(/usr/libexec/oem-updated/read-only-adapter "$op")" || err -4 "backend unavailable"
+        if [ "$sim_seen" = 1 ]; then
+            data="$(/usr/libexec/oem-updated/read-only-adapter "$op" "$sim_preview")" || err -4 "backend unavailable"
+        else
+            data="$(/usr/libexec/oem-updated/read-only-adapter "$op")" || err -4 "backend unavailable"
+        fi
         [ -n "$data" ] || err -4 "backend unavailable"
         reply "$data" ;;
     *) err -4 "operation not implemented" ;;

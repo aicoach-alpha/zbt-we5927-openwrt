@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -33,7 +33,9 @@ field() { printf '%s' "$native" | jsonfilter -e "$1"; }
 lan_neighbours() {
     awk 'NR>1 && $3=="0x2" && $6=="br-lan" && $4!="00:00:00:00:00:00" {print toupper($4) "(" $1 ")"}' /proc/net/arp
 }
-[ "$#" -eq 1 ] || error "operation required"
+[ "$#" -ge 1 ] && [ "$#" -le 2 ] || error "operation required"
+preview="${2:-}"
+[ -z "$preview" ] || [ "$1" = get_4g ] || error "unexpected SIM preview"
 case "$1" in
     get_sys_version)
         version="$(ubus call system board | jsonfilter -e '@.release.version')" || error "version unavailable"
@@ -378,18 +380,67 @@ case "$1" in
         success "get_pppoe_status success"
         json_add_string pppoe_status "$status"
         ;;
+    get_4g)
+        native="$(native_read veci.v2.lte status)" || error "LTE policy unavailable"
+        apn="$(field '@.configured_apn')" || error "APN unavailable"
+        [ -n "$apn" ] && [ "$apn" != null ] || error "APN unavailable"
+        slot="$(field '@.configured_slot')" || error "configured SIM unavailable"
+        case "$slot" in 1|2) ;; *) error "configured SIM invalid";; esac
+        failover="$(field '@.auto_failover')" || error "failover state unavailable"
+        case "$failover" in true) failover=1;; false) failover=0;; *) error "failover state invalid";; esac
+        # Native policy is global, not a pair of vendor APN profiles.
+        # Expose canonical slot labels instead of assuming GPIO polarity.
+        case "$preview" in '' ) preview="SIM$slot";; SIM1|SIM2) ;; *) error "invalid SIM preview";; esac
+        success "get 4g config success"
+        json_add_object data
+        json_add_string apn "$apn"
+        json_add_string SIMX "$preview"
+        json_add_string sim_set "SIM$slot"
+        json_add_string switch_sim_enabled "$failover"
+        json_add_string apn_scope "shared"
+        json_add_string pin ""
+        json_add_string dialnumber ""
+        json_add_string username ""
+        json_add_string password ""
+        json_add_string mobile_priority ""
+        json_add_string module_first ""
+        json_add_string auth_apn "0"
+        json_add_string band ""
+        json_add_array band_list
+        json_close_array
+        json_add_array select_band_list
+        json_close_array
+        json_close_object
+        json_add_array module_section_list
+        json_add_string "" "4gwan"
+        json_close_array
+        json_add_array sim_list
+        json_add_string "" "SIM1"
+        json_add_string "" "SIM2"
+        json_close_array
+        ;;
+    get_4g_log)
+        native="$(native_read veci.v2.system logs)" || error "native log service unavailable"
+        logs="$(field '@.logs')" || error "native logs unavailable"
+        content="$(printf '%s\n' "$logs" | grep -Ei 'we5927-lte|veci2-lte|usb0|rndis_host' | tail -n 30 || true)"
+        success "get 4g log success"
+        json_add_string content "$content"
+        ;;
     get_netwatchdog)
-        # Do not claim legacy settings are active before native policy migration.
-        host1="$(get oem_updated.watchdog.detect_host1)" || error "OEM policy not configured"
-        host2="$(get oem_updated.watchdog.detect_host2)" || error "OEM policy not configured"
-        interval="$(get oem_updated.watchdog.detect_itv)" || error "OEM policy not configured"
+        native="$(native_read veci.v2.lte status)" || error "LTE monitor unavailable"
+        interval="$(field '@.monitor_interval')" || error "monitor interval unavailable"
+        case "$interval" in [5-9]|[1-9][0-9]|1[01][0-9]|120) ;; *) error "monitor interval invalid";; esac
+        host1="$(get we5927_lte.main.ping_host)" || error "monitor host unavailable"
+        threshold="$(get we5927_lte.main.fail_threshold)" || error "monitor threshold unavailable"
+        case "$threshold" in [2-9]|1[0-9]|20) ;; *) error "monitor threshold invalid";; esac
         success "get anyos netwatchdog success"
         json_add_object data
         json_add_string detect_host1 "$host1"
-        json_add_string detect_host2 "$host2"
+        json_add_string detect_host2 ""
         json_add_string detect_itv "$interval"
-        json_add_string mobile_priority "1"
-        json_add_string action "netrestart"
+        json_add_string fail_threshold "$threshold"
+        # Do not represent native recovery as vendor global network restart.
+        json_add_string action "lte_recovery"
         json_close_object
         ;;
     get_nat_acceleration)

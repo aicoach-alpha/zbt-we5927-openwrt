@@ -48,10 +48,16 @@
       "state": "UNIMPLEMENTED"
     },
     "get_4g": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.lte:status",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Native global APN and canonical SIM labels; OEM form integration, SIM selection write and unsupported fields need review."
     },
     "get_4g_log": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.system:logs",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Filtered native recent logs; OEM UI integration and redaction review pending."
     },
     "get_ac_info": {
       "state": "UNIMPLEMENTED"
@@ -159,7 +165,10 @@
       "state": "PROTOTYPE"
     },
     "get_netwatchdog": {
-      "state": "PROTOTYPE"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.lte:status + we5927_lte.main",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Native recovery policy exposed; OEM legacy action picker, writes and V3 parity pending."
     },
     "get_network_topology": {
       "state": "UNIMPLEMENTED"

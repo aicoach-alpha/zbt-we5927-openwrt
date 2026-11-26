@@ -1,0 +1,79 @@
+#!/bin/sh
+# Prepare WPA2 AP safely: UCI ONLY, activation requires a separately approved
+# physical reboot. The previous global "network reload" triggered MT76 MCU
+# stalls and interrupted LTE on the only owner's router. Never perform it here.
+set -eu
+umask 077
+STATE=/tmp/veci2-wifi-activate.state
+TAG=veci2-wifi-prepare
+record() { printf '%s\n' "$1" > "$STATE"; }
+fail() { record "failed:$1"; logger -t "$TAG" "WiFi preparation refused: $1" 2>/dev/null || :; exit 1; }
+get() { uci -q get "$1" 2>/dev/null || :; }
+exec 9>/tmp/veci2-wifi-activation.lock
+flock -n 9 || exit 1
+record preflight
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null)" = zbtlink,zbt-we5927 ] || fail wrong_board
+[ "$(get wireless.radio0)" = wifi-device ] &&
+  [ "$(get wireless.radio0.band)" = 2g ] || fail wrong_radio
+[ "$(get wireless.default_radio0)" = wifi-iface ] &&
+  [ "$(get wireless.default_radio0.device)" = radio0 ] &&
+  [ "$(get wireless.default_radio0.mode)" = ap ] &&
+  [ "$(get wireless.default_radio0.network)" = lan ] || fail wrong_ap_binding
+[ -e /sys/class/ieee80211/phy0 ] || fail phy_missing
+[ -d /sys/class/net/br-lan ] || fail lan_bridge_missing
+[ -f /etc/config/wireless ] && [ ! -L /etc/config/wireless ] || fail config_missing
+changes="$(uci -q changes wireless 2>/dev/null)" || fail config_unavailable
+[ -z "$changes" ] || fail pending_wireless_changes
+[ "$(get wireless.default_radio0.disabled)" = 1 ] || fail ap_not_disabled
+case "$(get wireless.radio0.disabled)" in ''|0|1) ;; *) fail radio_state_invalid ;; esac
+[ "$(get wireless.default_radio0.encryption)" = psk2 ] || fail wpa2_required
+key="$(get wireless.default_radio0.key)"
+len="$(printf %s "$key" | wc -c | tr -d ' ')"
+[ "$len" -ge 8 ] && [ "$len" -le 63 ] || fail key_length_invalid
+[ "$(printf %s "$key" | LC_ALL=C tr -cd ' -~' | wc -c | tr -d ' ')" = "$len" ] || fail invalid_key_bytes
+unset key
+[ -n "$(get wireless.default_radio0.ssid)" ] || fail empty_ssid
+# Do not stage radio changes while MT76 is in a known bad kernel state.
+if dmesg 2>/dev/null | grep -Eiq 'mt76.*(mcu.*timeout|reset failed|timed out)|mt7603.*(timeout|failed)'; then
+  fail mt76_prior_error
+fi
+snapshot="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null)" || fail wireless_status_timeout
+[ -n "$snapshot" ] || fail wireless_status_empty
+root="$(mktemp -d /tmp/veci2-wifi-prepare.XXXXXX)" || fail backup_dir_unavailable
+chmod 700 "$root"
+backup="$root/wireless.before"
+cp -p /etc/config/wireless "$backup" || fail backup_failed
+chmod 600 "$backup"
+cmp -s "$backup" /etc/config/wireless || fail backup_verify_failed
+committed=no
+cleanup() {
+  result=$?
+  if [ "$committed" != yes ]; then
+    uci -q revert wireless >/dev/null 2>&1 || :
+    if cp -p "$backup" /etc/config/wireless 2>/dev/null &&
+       cmp -s "$backup" /etc/config/wireless; then
+      logger -t "$TAG" 'Failed staging; original UCI restored, runtime unchanged' 2>/dev/null || :
+    else
+      record failed:config_restore_unverified
+      logger -t "$TAG" 'ALERT: config restore unverified' 2>/dev/null || :
+    fi
+  fi
+  rm -rf "$root"
+  exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 130' HUP INT TERM
+record saving
+uci -q set wireless.radio0.disabled=0 || fail set_radio_failed
+uci -q set wireless.default_radio0.disabled=0 || fail set_ap_failed
+uci -q commit wireless || fail commit_failed
+[ "$(get wireless.radio0.disabled)" = 0 ] &&
+  [ "$(get wireless.default_radio0.disabled)" = 0 ] &&
+  [ "$(get wireless.default_radio0.encryption)" = psk2 ] ||
+  fail config_verify_failed
+# This helper NEVER calls netifd reload, wifi up, router reboot or modem AT.
+# The user decides when to perform a manual reboot over wired LAN.
+committed=yes
+record prepared_next_reboot
+logger -t "$TAG" 'Secure AP prepared in UCI; separate manual reboot required; no live service or internet claim' 2>/dev/null || :
+exit 0
