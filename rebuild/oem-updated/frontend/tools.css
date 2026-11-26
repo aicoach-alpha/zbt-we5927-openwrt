@@ -1,0 +1,11 @@
+:root{font-family:Arial,sans-serif;color:#26374a;background:#f3f5f8}
+body{margin:0 auto;max-width:960px;padding:20px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+h1{font-size:22px} h2{font-size:18px;margin-top:0}
+article,#login{background:#fff;border:1px solid #d9e0e8;border-radius:6px;padding:18px;margin:15px 0}
+button{background:#2468a5;color:white;border:0;border-radius:4px;padding:9px 13px;margin:5px 4px 5px 0;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}button.quiet{background:#607d93}
+input,textarea,select{display:block;box-sizing:border-box;width:100%;max-width:480px;padding:8px;border:1px solid #bccbd8;border-radius:4px;margin:6px 0 12px}
+label{display:block;font-size:14px}.notice{color:#54677b;font-size:13px}.result{white-space:pre-wrap;overflow-wrap:anywhere}
+.sms-card{border:1px solid #e0e5eb;padding:12px;margin:8px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.sms-card small{display:block}[hidden]{display:none!important}

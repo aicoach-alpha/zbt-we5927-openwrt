@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "state": "STAGED_NOT_RUNTIME_VERIFIED",
+  "entry": "/oem-tools/",
+  "auth": "independent HTTPS rpcd session, memory only",
+  "services": {
+    "sms": {
+      "provider": "veci.sms",
+      "methods": [
+        "getConfig",
+        "setEnabled",
+        "listMessages",
+        "sendMessage",
+        "deleteMessage",
+        "getSent",
+        "getDrafts",
+        "saveDraft",
+        "deleteDraft"
+      ]
+    },
+    "dns": {
+      "provider": "veci.v2.dns",
+      "methods": [
+        "status",
+        "set"
+      ]
+    },
+    "configuration_backup": {
+      "provider": "native veci2-backup",
+      "route": "POST /cgi-bin/veci2-backup"
+    },
+    "configuration_restore": {
+      "provider": "native veci2-restore",
+      "phases": [
+        "inspect",
+        "apply"
+      ]
+    },
+    "firmware_verification": {
+      "provider": "native veci2-verify",
+      "route": "POST /cgi-bin/oem-verify",
+      "install_allowed": false
+    }
+  },
+  "remaining": [
+    "integrate OEM navigation and legacy forms",
+    "DHCP pool configuration",
+    "traffic history and data meter",
+    "hardware and browser acceptance"
+  ]
+}

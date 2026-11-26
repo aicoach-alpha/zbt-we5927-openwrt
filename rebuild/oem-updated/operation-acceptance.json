@@ -577,16 +577,28 @@
       "limitations": "Authenticated POST streams private archive; OEM download button transport not yet adapted, actual backup pending."
     },
     "sysupgrade_backup_execute": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "Existing VeCI native authenticated CGI",
+      "replacement_route": "POST /cgi-bin/veci2-restore?apply",
+      "evidence": "rebuild/oem-updated/stage_variant.py; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Replacement route staged; requires native expiring ticket and explicit UI confirmation. Actual restore and connectivity UAT pending."
     },
     "sysupgrade_backup_upload": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "Existing VeCI native authenticated CGI",
+      "replacement_route": "POST /cgi-bin/veci2-restore?inspect",
+      "evidence": "rebuild/oem-updated/stage_variant.py; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Replacement route staged; original OEM form still needs replacement. Native inspection checks digest and board. Runtime acceptance pending."
     },
     "sysupgrade_execute": {
       "state": "UNIMPLEMENTED"
     },
     "sysupgrade_upload_file": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "Existing VeCI native authenticated CGI",
+      "replacement_route": "POST /cgi-bin/oem-verify",
+      "evidence": "rebuild/oem-updated/stage_variant.py; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Replacement route staged, verify-only; original vendor upload route is not exposed. Signature/board checks and physical verification pending."
     },
     "test_nslookup": {
       "state": "PROTOTYPE",

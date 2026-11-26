@@ -29,7 +29,7 @@ REPLACEMENTS = (
 MAKEFILE = """include $(TOPDIR)/rules.mk
 PKG_NAME:=oem-updated-ui-dev
 PKG_VERSION:=0.1
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 include $(INCLUDE_DIR)/package.mk
 define Package/oem-updated-ui-dev
   SECTION:=admin
@@ -47,6 +47,7 @@ define Package/oem-updated-ui-dev/install
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/write-adapter $(1)/usr/libexec/oem-updated/write-adapter
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/diagnostics-adapter $(1)/usr/libexec/oem-updated/diagnostics-adapter
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/shared-backup $(1)/usr/libexec/oem-updated/shared-backup
+	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/shared-verify $(1)/usr/libexec/oem-updated/shared-verify
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/oem-updated.json $(1)/usr/share/rpcd/acl.d/oem-updated.json
 	$(INSTALL_BIN) ./files/www/cgi-bin/webapi $(1)/www/cgi-bin/webapi
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
@@ -133,7 +134,68 @@ def stage(image, out):
         backup = adapter.parent / "shared-backup"
         shutil.copyfile(HERE.parent / "veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-backup", backup)
         backup.chmod(0o755)
-        for script in (cgi, adapter, writer, diagnostics, backup):
+        shared = HERE.parent / "veci-v2/packages/veci-v2-ui/files/www"
+        # Reuse native controls, not the complete VeCI frontend or a second backend.
+        tools = files / "www/oem-tools"
+        tools.mkdir()
+        for name in ("sms-codec.js", "sms-center.js", "backup.js", "dns-settings.js"):
+            shutil.copyfile(shared / "veci2" / name, tools / name)
+        # Existing client module has three comma-expression loops; use arrays.
+        sms = tools / "sms-center.js"
+        sms_code = sms.read_text()
+        old = "of ('sms-inbox-open','sms-sent-open','sms-drafts-open','sms-compose-open')"
+        if sms_code.count(old) != 2:
+            raise ValueError("SMS frontend loop anchor changed")
+        short = "of ('sms-sent-open','sms-drafts-open','sms-compose-open')"
+        if sms_code.count(short) != 1:
+            raise ValueError("SMS frontend actions anchor changed")
+        sms.write_text(sms_code.replace(old, "of ['sms-inbox-open','sms-sent-open','sms-drafts-open','sms-compose-open']")
+                                .replace(short, "of ['sms-sent-open','sms-drafts-open','sms-compose-open']"))
+        for name in ("tools.js", "tools.css"):
+            shutil.copyfile(HERE / "frontend" / name, tools / name)
+        # Extract only the reviewed panels and keep the OEM root landing intact.
+        native_html = (shared / "veci2/index.html").read_text()
+        def panel(marker):
+            start = native_html.index(marker)
+            begin = native_html.rindex("<article ", 0, start)
+            end = native_html.index("</article>", start) + len("</article>")
+            return native_html[begin:end]
+        sms_panel = panel('id="sms-status"')
+        backup_panel = panel('id="backup-export"')
+        dns_panel = panel('id="dns-form"')
+        (tools / "index.html").write_text(
+            '<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<title>OEM Updated — Services</title><link rel="stylesheet" href="tools.css"><body>'
+            '<header><h1>OEM Updated — Services</h1><a href="/">Kembali ke OEM</a></header>'
+            '<form id="login"><h2>Login router</h2><p>Login ulang untuk kontrol privat.</p>'
+            '<label>Username<input id="username" autocomplete="username" required></label>'
+            '<label>Password<input id="password" type="password" autocomplete="current-password" required></label>'
+            '<button id="login-button">Login</button><p id="login-result" role="status"></p></form>'
+            '<main id="tools" hidden><button id="logout">Logout</button>'
+            '<button id="sms-refresh">Refresh SMS status</button><button id="dns-refresh">Refresh DNS</button>'
+            + sms_panel + dns_panel + backup_panel +
+            '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
+            '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'
+            '<label>Expected SHA-256<input id="firmware-sha" maxlength="64" required></label>'
+            '<button id="firmware-submit">Verify only</button></form><p id="firmware-result" role="status"></p></article></main>'
+            '<script src="sms-codec.js"></script><script src="sms-center.js"></script>'
+            '<script src="dns-settings.js"></script><script src="tools.js"></script><script src="backup.js"></script></body></html>')
+        landing = files / "www/index.html"
+        html = landing.read_text()
+        if html.count("</body>") != 1:
+            raise ValueError("OEM landing link anchor changed")
+        landing.write_text(html.replace("</body>", '<a href="/oem-tools/" style="position:fixed;right:12px;bottom:12px;z-index:9999;background:#2468a5;color:white;padding:8px;border-radius:4px">SMS / DNS / Backup</a></body>'))
+        (cgi.parent / "veci2-backup").write_text("#!/bin/sh\nexec /usr/libexec/oem-updated/shared-backup\n")
+        (cgi.parent / "veci2-backup").chmod(0o755)
+        shutil.copyfile(shared / "cgi-bin/veci2-restore", cgi.parent / "veci2-restore")
+        (cgi.parent / "veci2-restore").chmod(0o755)
+        verify = adapter.parent / "shared-verify"
+        shutil.copyfile(shared / "cgi-bin/veci2-verify", verify)
+        verify.chmod(0o755)
+        verify_gate = cgi.parent / "oem-verify"
+        shutil.copyfile(HERE / "backend/verify-only.sh", verify_gate)
+        verify_gate.chmod(0o755)
+        for script in (cgi, adapter, writer, diagnostics, backup, verify, verify_gate, cgi.parent / "veci2-backup", cgi.parent / "veci2-restore"):
             subprocess.run(["sh", "-n", str(script)], check=True)
         acl = files / "usr/share/rpcd/acl.d/oem-updated.json"
         acl.parent.mkdir(parents=True)
