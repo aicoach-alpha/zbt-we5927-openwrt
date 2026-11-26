@@ -71,7 +71,8 @@
       ],
       "regression_test_files": [
         "test_wifi_guardian_observe_only.py",
-        "test_owner_wifi_readonly_triage_20261124.py"
+        "test_owner_wifi_readonly_triage_20261124.py",
+        "test_mt76_client_evidence_readonly_20261126.py"
       ],
       "protection": "Source mitigates trigger: AP activation is UCI-only with no global network reload, wifi down/up, modem power-cycle or automatic restart; mt76 MCU timeout/root cause is NOT proven fixed. LAB compilation permitted after real source tests, but firmware release/physical flash needs driver UAT and recovery proof.",
       "live_production_passive_evidence": {
@@ -633,6 +634,24 @@
         "test_veci_ui_sessions.py"
       ],
       "protection": "Verify exactly one session destroy and no unauthorized writes, rather than forbidding additional safe read-only telemetry"
+    },
+    {
+      "id": "TOOL-005",
+      "kind": "confirmed_bug",
+      "area": "diagnostics",
+      "severity": "medium",
+      "summary": "Earlier MT76 production station counter swallowed iw errors and could incorrectly report zero clients",
+      "root_cause": "Pipeline iw station dump stderr to /dev/null plus grep -c lost the iw exit code; hostapd JSON wildcard output returned UNKNOWN",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g",
+        "firmware_24x7_observability"
+      ],
+      "regression_test_files": [
+        "test_mt76_client_evidence_readonly_20261126.py"
+      ],
+      "protection": "Separate read-only iw exit/hostapd ubus result, parse client map with native jshn, return UNKNOWN on parser failure and never claim active-client PASS from an empty station list. Keep physical MT76 driver UAT pending."
     }
   ]
 }

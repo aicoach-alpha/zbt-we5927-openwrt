@@ -137,3 +137,9 @@ Uncertainties are never converted into PASS on the strength of source code.
 - Owner read-only script checked every two seconds over five samples: iw exit 0, IW_CLIENTS=0; hostapd get_clients exit 0, HOSTAPD_CLIENTS=0 on all samples.
 - Phone connection, airplane mode, and successful Wi-Fi internet during the exact sampling window were not explicitly confirmed in this message.
 - No observed association under load, no demonstrated driver failure. WIFI-003 stays pending active-client testing; no router changes.
+
+## Read-only client association counter correction
+- Added scripts/router/veci-mt76-client-evidence-readonly.sh: discovers primary AP from netifd, checks real iw AP mode, and compares iw station dump with hostapd clients parsed by libubox jshn. No MACs or credentials are displayed.
+- Counts are UNKNOWN rather than fabricated 0 when either API or parser fails; five 2-second spaced samples distinguish empty, positive and inconsistent associations.
+- Regression tests simulate empty map, one station, disagreement and wrong-board denial; no radio, network, SIM, modem or firmware mutations.
+- A positive association is still NOT equivalent to traffic/stress stability. WIFI-003 remains a physical UAT blocker for the new firmware.
