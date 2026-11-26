@@ -167,3 +167,9 @@ Uncertainties are never converted into PASS on the strength of source code.
 - GUI distinguishes zero clients detected AT SAMPLE TIME (not proof of disconnect), disagreement, unavailable and positively observed clients. Client display is not a driver-level stress PASS.
 - Native UCI fixture exercises real libubox parse; Node VM executes actual render function with five cases; three Wi-Fi core modules require NEW exact-source acceptance receipts before next image compilation.
 - This source edit has NOT been flashed, deployed or hardware-tested. Current production LTE and Wi-Fi unchanged. WIFI-003 remains under physical verification.
+
+## Next operation: read-only primary Wi-Fi AP identity and byte counter
+- The existing veci.v2.wifi info RPC now returns an optional ap_snapshot containing the netifd-selected primary interface, validated AP BSSID, rx_bytes, tx_bytes, and explicit attribution marker.
+- The existing native GUI Wi-Fi panel shows that AP identity and cumulative bytes on user refresh; it labels interface byte counters as inclusive of broadcast, **not proof of active clients or Internet traffic**.
+- Reads sysfs and does not scan, reset, restart, reload, change SIM, or modify UCI; no new provider, router, control path or authorization scope.
+- Native UCI/libubox host fixture and Node render regressions cover real payload shape. Physical/router production remains unchanged and WIFI-003 not resolved.

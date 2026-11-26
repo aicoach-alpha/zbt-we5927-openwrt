@@ -35,6 +35,15 @@ check('observed',['02:aa:bb:cc:dd:ee'],'02:aa:bb:cc:dd:ee');
 check('mismatch',[],'jumlah klien berbeda');
 check('unavailable',undefined,'belum dapat diverifikasi');
 check(undefined,undefined,'belum dapat diverifikasi');
+render({access:'disable',encryption:'psk2',channels:[],addresses:[],clients:[],
+  client_observation:{state:'zero_observed'},
+  ap_snapshot:{interface:'phy0-ap0',bssid:'02:fe:dc:ba:98:76',
+    rx_bytes:'123456789',tx_bytes:'987654321'}});
+assert(station.textContent.includes('BSSID: 02:fe:dc:ba:98:76'));
+assert(station.textContent.includes('123456789 / 987654321 byte'));
+assert(station.textContent.includes('bukan bukti klien aktif'));
+assert(station.textContent.includes('\\nBSSID:')===false);
+
 console.log('UI_CLIENT_OBSERVATION_FIVE_CASES_PASS');
 """
         result=subprocess.run(['node','-e',js,str(UI)],capture_output=True,text=True,timeout=8)

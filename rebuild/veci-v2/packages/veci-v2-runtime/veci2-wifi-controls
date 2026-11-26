@@ -80,7 +80,7 @@ hostapd_station_count() (
   printf '%s\n' "$#"
 )
 advanced_info() {
-  local mode mac list enc channel chans stations iw_count hp_count hp_data client_state
+  local mode mac list enc channel chans stations iw_count hp_count hp_data client_state ap_mac field count
   iw_count=unknown; hp_count=unknown; client_state=unavailable
   set +u # jshn reads unset dynamic JSON variables.
   . /usr/share/libubox/jshn.sh
@@ -132,6 +132,19 @@ advanced_info() {
   case "$iw_count" in unknown) ;; *) json_add_int iw_count "$iw_count" ;; esac
   case "$hp_count" in unknown) ;; *) json_add_int hostapd_count "$hp_count" ;; esac
   json_close_object
+  # Operational snapshot: read-only sysfs counters, NOT a client-traffic test.
+  if [ -n "$wlan" ]; then
+    json_add_object ap_snapshot
+    json_add_string interface "$wlan"
+    ap_mac=$(cat "/sys/class/net/$wlan/address" 2>/dev/null || :)
+    if valid_mac "$ap_mac"; then json_add_string bssid "$ap_mac"; fi
+    for field in rx_bytes tx_bytes; do
+      count=$(cat "/sys/class/net/$wlan/statistics/$field" 2>/dev/null || :)
+      case "$count" in ''|*[!0-9]*) ;; *) json_add_string "$field" "$count" ;; esac
+    done
+    json_add_string attribution "interface_totals_not_proof_of_associated_client"
+    json_close_object
+  fi
   json_dump
 }
 survey() {

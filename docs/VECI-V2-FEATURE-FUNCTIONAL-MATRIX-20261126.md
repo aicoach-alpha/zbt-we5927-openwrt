@@ -60,3 +60,8 @@ No physical testing of the next image has been performed; no signed image or sys
 - Endurance: real 72-hour LTE and Wi-Fi measurement only AFTER approved candidate is safely flashed
 
 **Release policy:** a source-only PASS never authorizes a flash. The owner has one physical router; preserve the currently working connection until independently approved hardware UAT.
+
+### Wi-Fi AP operational snapshot (source development only)
+- **Implemented:** primary AP BSSID/interface and cumulative RX/TX from read-only sysfs in the existing Wi-Fi info API and GUI. Station reconciliation remains iw/hostapd-based.
+- **Source verification:** pinned UCI/libubox fixture and JS render regression. Source acceptance receipts are refreshed when implementation hashes change.
+- **Physical acceptance:** NOT RUN on the new firmware; zero-station observations do not prove driver failure or fix. No production router changes.

@@ -23,6 +23,10 @@ with tempfile.TemporaryDirectory() as temp:
     phy = root / 'sys/wlan0/phy80211/name'
     phy.parent.mkdir(parents=True)
     phy.write_text('phy0\n')
+    (root/'sys/wlan0/address').write_text('02:fe:dc:ba:98:76\n')
+    (root/'sys/wlan0/statistics').mkdir()
+    (root/'sys/wlan0/statistics/rx_bytes').write_text('123456789\n')
+    (root/'sys/wlan0/statistics/tx_bytes').write_text('987654321\n')
     helper = root / 'controls'
     helper.write_text((pkg / 'veci2-wifi-controls').read_text()
                       .replace('/sys/class/net/', str(root / 'sys') + '/')
@@ -79,6 +83,11 @@ esac
     info = call('info')
     assert info['channels'] == [1, 6] and info['clients'] == ['02:12:34:56:78:9a'], info
     assert info['client_observation'] == {'state':'observed','iw_count':1,'hostapd_count':1}, info
+    assert info['ap_snapshot'] == {
+        'interface':'wlan0','bssid':'02:fe:dc:ba:98:76',
+        'rx_bytes':'123456789','tx_bytes':'987654321',
+        'attribution':'interface_totals_not_proof_of_associated_client',
+    }, info
     env['EMPTY_HOSTAPD'] = '1'
     mismatch = call('info')
     assert mismatch['client_observation'] == {'state':'mismatch','iw_count':1,'hostapd_count':0}, mismatch

@@ -28,6 +28,15 @@
       default:
         stationList.textContent = 'Status asosiasi belum dapat diverifikasi (iw/hostapd).';
     }
+    const snapshot = data.ap_snapshot || {};
+    const details = [];
+    if (snapshot.interface) details.push('AP: ' + snapshot.interface);
+    if (snapshot.bssid) details.push('BSSID: ' + snapshot.bssid);
+    if (/^[0-9]+$/.test(snapshot.rx_bytes || '') && /^[0-9]+$/.test(snapshot.tx_bytes || '')) {
+      details.push('RX/TX kumulatif: ' + snapshot.rx_bytes + ' / ' + snapshot.tx_bytes + ' byte');
+    }
+    if (details.length) stationList.textContent += '\n' + details.join(' · ') +
+      '\nCounter RX/TX mencakup broadcast; bukan bukti klien aktif atau internet berhasil.';
   }
   async function run(method = 'info', args = {}) {
     const session = sid;
