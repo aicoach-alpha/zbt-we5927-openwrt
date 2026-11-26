@@ -3,8 +3,8 @@ set -e
 umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 case "$1:${2:-}" in
-  list:*) echo '{"status":{},"save":{"row":"String","schedule":"String","enabled":"String","revision":"String"},"add":{"task":"String","schedule":"String","enabled":"String","revision":"String"},"remove":{"row":"String","revision":"String"}}'; exit 0 ;;
-  call:status|call:save|call:add|call:remove) ;;
+  list:*) echo '{"status":{},"save":{"row":"String","schedule":"String","enabled":"String","revision":"String"},"add":{"task":"String","schedule":"String","enabled":"String","revision":"String"},"remove":{"row":"String","revision":"String"},"rebootStatus":{},"setReboot":{"enabled":"String","hour":"String","minute":"String","weekdays":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
+  call:status|call:save|call:add|call:remove|call:rebootStatus|call:setReboot) ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
@@ -32,6 +32,16 @@ else
   : > "$tmp/current"
 fi
 . /usr/share/libubox/jshn.sh
+reboot_state() {
+  awk -v mode=rebootstate -f "$parser" "$tmp/current" > "$tmp/reboot" || fail ambiguous_reboot_schedule
+  IFS="$(printf '\t')" read -r enabled minute hour weekdays < "$tmp/reboot" || fail unreadable
+  json_init; json_add_boolean ok 1
+  json_add_string revision "$revision"; json_add_string enabled "$enabled"
+  json_add_string hour "$hour"; json_add_string minute "$minute"; json_add_string weekdays "$weekdays"
+  json_add_string scope managed_schedule_only
+  json_dump
+}
+if [ "$2" = rebootStatus ]; then reboot_state; exit 0; fi
 if [ "$2" != status ]; then
   request=$(head -c 513)
   [ "${#request}" -le 512 ] || fail invalid_request
@@ -42,11 +52,26 @@ if [ "$2" != status ]; then
   [ "$revision" = "$expected" ] || fail stale_configuration
   mode=$2
   row= schedule= active= command=
-  if [ "$mode" != add ]; then
+  if [ "$mode" = setReboot ]; then
+    json_get_var active enabled || fail invalid_mode
+    json_get_var hour hour || fail invalid_hour
+    json_get_var minute minute || fail invalid_minute
+    json_get_var weekdays weekdays || fail invalid_weekdays
+    json_get_var confirm confirmation || fail confirmation_required
+    case "$active:$confirm" in 0:DISABLE_SCHEDULED_REBOOT|1:ENABLE_SCHEDULED_REBOOT) ;; *) fail confirmation_required;; esac
+    case "$hour" in [0-9]|1[0-9]|2[0-3]) ;; *) fail invalid_hour;; esac
+    case "$minute" in [0-9]|[1-5][0-9]) ;; *) fail invalid_minute;; esac
+    case "$weekdays" in ''|*[!0-6,]*) fail invalid_weekdays;; esac
+    printf '%s\n' "$weekdays" | awk -F, '{if(NF>7)exit 1;for(i=1;i<=NF;i++)if($i!~/^[0-6]$/||seen[$i]++)exit 1}' || fail invalid_weekdays
+    if [ "$active" = 1 ]; then
+      [ -x /sbin/reboot ] && /etc/init.d/cron enabled && pidof crond >/dev/null 2>&1 || fail cron_not_running
+    fi
+    schedule="$minute $hour * * $weekdays"
+  elif [ "$mode" != add ]; then
     json_get_var row row || fail invalid_row
     case "$row" in ''|0*|*[!0-9]*) fail invalid_row ;; esac
   fi
-  if [ "$mode" != remove ]; then
+  if [ "$mode" != remove ] && [ "$mode" != setReboot ]; then
     json_get_var schedule schedule || fail invalid_schedule
     json_get_var active enabled || fail invalid_mode
     case "$active" in 0|1) ;; *) fail invalid_mode ;; esac
@@ -77,6 +102,7 @@ if [ "$2" != status ]; then
   observed=$(live_revision) && [ "$observed" = "$wanted" ] || fail concurrent_update
   revision=$wanted
   mv "$tmp/next" "$tmp/current"
+  if [ "$mode" = setReboot ]; then reboot_state; exit 0; fi
 fi
 awk -v mode=list -f "$parser" "$tmp/current" > "$tmp/jobs" || fail unreadable
 json_init; json_add_boolean ok 1; json_add_string revision "$revision"; json_add_array jobs

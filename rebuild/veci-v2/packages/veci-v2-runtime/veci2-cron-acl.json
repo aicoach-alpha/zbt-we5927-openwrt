@@ -1,7 +1,7 @@
 {
   "veci-v2-cron": {
     "description": "Manage schedules with predefined jobs and preserve private command arguments",
-    "read": {"ubus": {"veci.v2.cron": ["status"]}},
-    "write": {"ubus": {"veci.v2.cron": ["save","add","remove"]}}
+    "read": {"ubus": {"veci.v2.cron": ["status","rebootStatus"]}},
+    "write": {"ubus": {"veci.v2.cron": ["save","add","remove","setReboot"]}}
   }
 }
