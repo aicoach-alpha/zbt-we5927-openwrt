@@ -110,7 +110,10 @@
       "state": "PROTOTYPE"
     },
     "get_disk": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "OpenWrt df and procfs",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Overlay and tmpfs inventory only; no external storage provisioning or public mounts. OEM legacy UI mapping pending."
     },
     "get_dmz": {
       "state": "FIXTURE_PASS",
@@ -128,7 +131,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_imei": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "we5927-lte status-fast",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Masked cached identifier only; no raw AT, identifier modification or hardware acceptance claim."
     },
     "get_l2tp_msg": {
       "state": "UNIMPLEMENTED"
@@ -328,7 +334,10 @@
       "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "get_wifi_power": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "OpenWrt wireless UCI",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Configured dBm or regulatory auto; OEM legacy low/medium/high UI mapping pending, no invented percentage conversion."
     },
     "guide_commit": {
       "state": "UNIMPLEMENTED"
@@ -385,7 +394,10 @@
       "state": "UNIMPLEMENTED"
     },
     "search_ctcode_and_channals": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.wifi:info",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Current regulatory domain permitted channels only, no country changes; legacy POST form transport pending."
     },
     "send_at": {
       "state": "UNIMPLEMENTED"
@@ -458,7 +470,10 @@
       "limitations": "Explicit confirmation required; full-port canonical DMZ only; OEM confirmation UI pending."
     },
     "set_fw_setting": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:setDefaults",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Drop-invalid and SYN flood settings only; WAN input remains REJECT, IPv6 and redirect policy unchanged. Browser and live reload acceptance pending."
     },
     "set_imei": {
       "state": "UNIMPLEMENTED"
@@ -479,7 +494,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_nat_acceleration": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:setOffload",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Software only; hardware acceleration disabled. Native revision guard, fw4 check and rollback; actual performance and runtime pending."
     },
     "set_netwatchdog": {
       "state": "PROTOTYPE",

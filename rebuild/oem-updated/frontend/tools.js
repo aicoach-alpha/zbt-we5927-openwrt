@@ -33,6 +33,7 @@ function clearSession() {
   el('backup-message').textContent = '';
   dhcpRevision = ''; el('dhcp-form').reset(); el('dhcp-save').disabled = true;
   el('dhcp-result').textContent = ''; el('traffic-result').textContent = '';
+  fwRevision=''; el('fw-save').disabled=true; el('offload-save').disabled=true; el('fw-form').reset(); el('offload-form').reset(); el('fw-result').textContent='';
   guestState=''; el('guest-enable').disabled=true; el('guest-disable').disabled=true; el('guest-result').textContent='';
 }
 globalThis.VeciSmsCenter.init((object,method,args) => rpc(object,method,args));
@@ -177,3 +178,36 @@ async function changeGuest(enable){
 }
 el('guest-enable').onclick=()=>changeGuest(true);
 el('guest-disable').onclick=()=>changeGuest(false);
+
+let fwRevision='';
+function clearFirewall(){fwRevision='';el('fw-save').disabled=true;el('offload-save').disabled=true;}
+el('fw-refresh').onclick=async()=>{
+  const token=sid,button=el('fw-refresh');if(!token||button.disabled)return;
+  button.disabled=true;clearFirewall();
+  try{
+    const f=await oem('get_fw_setting',undefined,token);
+    const n=await oem('get_nat_acceleration',undefined,token);
+    if(!/^[0-9a-f]{64}$/.test(f.revision||'')||f.revision!==n.revision||!f.data||!n.data)throw Error('Firewall changed; refresh');
+    if(f.data.wan_input!=='REJECT')throw Error('Unexpected WAN policy');
+    el('fw-drop').checked=f.data.drop_invalid==='1';
+    el('fw-syn').checked=f.data.syn_flood==='1';
+    el('fw-offload').checked=n.data.status==='1';
+    fwRevision=f.revision;el('fw-save').disabled=false;el('offload-save').disabled=false;
+    el('fw-result').textContent='Konfigurasi dibaca. WAN input tetap REJECT.';
+  }catch(err){if(sid===token)el('fw-result').textContent=err.message;}
+  finally{button.disabled=false;}
+};
+async function saveFirewall(e,offload){
+  e.preventDefault();const token=sid,revision=fwRevision;
+  if(!token||!revision)return;
+  if(!window.confirm('Terapkan pengaturan firewall? Koneksi aktif dapat terganggu sementara.'))return;
+  clearFirewall();
+  try{
+    const body=offload?{status:el('fw-offload').checked?'1':'0',confirmation:'SAVE_SOFTWARE_OFFLOAD',revision}:
+      {drop_invalid:el('fw-drop').checked?'1':'0',syn_flood:el('fw-syn').checked?'1':'0',prohibit_wan_ping:'0',confirmation:'SAVE_FIREWALL_DEFAULTS',revision};
+    await oem(offload?'set_nat_acceleration':'set_fw_setting',body,token);
+    if(sid===token)el('fw-result').textContent='Disimpan. Baca ulang konfigurasi dan periksa koneksi.';
+  }catch(err){if(sid===token)el('fw-result').textContent=err.message;}
+}
+el('fw-form').onsubmit=e=>saveFirewall(e,false);
+el('offload-form').onsubmit=e=>saveFirewall(e,true);

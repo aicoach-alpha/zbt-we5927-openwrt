@@ -67,6 +67,15 @@
       "activation": "explicit manual configuration, subsequent manual reboot",
       "state": "SOURCE_INTEGRATED_FOR_PREPROVISIONED_PROFILE",
       "limitations": "safe first-time provisioning pending"
+    },
+    "firewall_defaults": {
+      "provider": "veci.v2.firewall",
+      "methods": [
+        "status",
+        "setDefaults",
+        "setOffload"
+      ],
+      "state": "SOURCE_INTEGRATED_NOT_UAT"
     }
   },
   "remaining": [

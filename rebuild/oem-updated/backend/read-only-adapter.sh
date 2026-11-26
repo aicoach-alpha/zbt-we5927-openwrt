@@ -620,10 +620,12 @@ case "$1" in
         native="$(native_read veci.v2.firewall status)" || error "firewall unavailable"
         wan="$(field '@.wan_input')" || error "WAN policy unavailable"
         case "$wan" in ACCEPT) input=1;; REJECT|DROP) input=0;; *) error "invalid WAN policy";; esac
+        revision="$(field '@.revision')" || error "firewall revision unavailable"
         success "get fw setting success"
+        json_add_string revision "$revision"
         json_add_object data
         for option in drop_invalid disable_ipv6 syn_flood accept_redirects; do
-            value="$(get "firewall.@defaults[0].$option" || true)"
+            case "$option" in syn_flood) value="$(get firewall.@defaults[0].synflood_protect || true)";; *) value="$(get "firewall.@defaults[0].$option" || true)";; esac
             case "$value" in 0|1|'') ;; *) error "invalid firewall option";; esac
             json_add_string "$option" "$value"
         done
@@ -702,6 +704,61 @@ case "$1" in
             case "$value" in ''|null) json_add_string "$key" "";; *[!0-9]*) error "invalid traffic value";; *) json_add_string "$key" "$value";; esac
         done
         ;;
+    get_disk)
+        # Native storage inventory, not the legacy public /www/usb mount.
+        success "get storage inventory success"
+        json_add_array data
+        for mount in /overlay /tmp; do
+            stats="$(df -Pk "$mount" | awk 'NR==2{print $2,$3,$4,$5}')" || error "storage unavailable"
+            set -- $stats
+            [ "$#" = 4 ] || error "invalid storage counters"
+            case "$1:$2:$3" in *[!0-9:]*|:*|*:) error "invalid storage counters";; esac
+            json_add_object ""
+            json_add_string disk_type "$(awk -v m="$mount" '$2==m{print $3;exit}' /proc/mounts)"
+            json_add_string disk_size "${1} KiB"
+            json_add_string disk_used "${2} KiB"
+            json_add_string disk_available "${3} KiB"
+            json_add_string disk_use_percent "$4"
+            json_add_string disk_mounted "$mount"
+            json_close_object
+        done
+        json_close_array
+        ;;
+    get_wifi_power)
+        # OpenWrt txpower is dBm, not legacy percentage. Never invent a conversion.
+        power="$(get wireless.radio0.txpower || true)"
+        case "$power" in ''|*[!0-9]*) power="";; esac
+        success "get native Wi-Fi power success"
+        json_add_string wifi_power "native"
+        json_add_string txpower_dbm "$power"
+        json_add_string power_mode "$(if [ -n "$power" ]; then printf configured; else printf regulatory_auto; fi)"
+        ;;
+    search_ctcode_and_channals)
+        native="$(native_read veci.v2.wifi info)" || error "Wi-Fi capabilities unavailable"
+        country="$(get wireless.radio0.country || true)"
+        channel="$(get wireless.radio0.channel || true)"
+        (json_load "$native" && json_get_type typ channels && [ "$typ" = array ]) || error "live regulatory channels unavailable"
+        success "get regulatory channels success"
+        json_add_string country "$country"; json_add_string channel "$channel"
+        json_add_array country_list
+        [ -z "$country" ] || json_add_string "" "$country"
+        json_close_array
+        json_add_array channel_list
+        for ch in $(field '@.channels[*]'); do
+            case "$ch" in [1-9]|1[0-4]) json_add_string "" "$ch";; *) error "invalid native channel";; esac
+        done
+        json_close_array
+        ;;
+    get_imei)
+        # Cached read only, never raw AT or hardware identifier modification.
+        native="$(/usr/sbin/we5927-lte status-fast)" || error "modem status unavailable"
+        imei="$(field '@.imei' || true)"
+        case "$imei" in *[!0-9]*|'') imei="";; *) [ "${#imei}" = 15 ] || imei="";; esac
+        success "get modem identity success"
+        # Keep raw identifiers out of legacy OEM JSON; expose last four only.
+        if [ -n "$imei" ]; then json_add_string imei "***********${imei#???????????}"; else json_add_string imei "NOT GET"; fi
+        json_add_string set_imei "NOT SUPPORTED"
+        ;;
     get_netwatchdog)
         native="$(native_read veci.v2.lte status)" || error "LTE monitor unavailable"
         interval="$(field '@.monitor_interval')" || error "monitor interval unavailable"
@@ -723,7 +780,10 @@ case "$1" in
         # Use the actual modern firewall option; this is not a hardware claim.
         offload="$(get firewall.@defaults[0].flow_offloading || true)"
         case "$offload" in 1) enabled=1;; ''|0) enabled=0;; *) error "invalid flow offload setting";; esac
+        native="$(native_read veci.v2.firewall status)" || error "firewall revision unavailable"
+        revision="$(field '@.revision')" || error "firewall revision unavailable"
         success "get net acceleration success"
+        json_add_string revision "$revision"
         json_add_object data
         json_add_string status "$enabled"
         json_close_object
