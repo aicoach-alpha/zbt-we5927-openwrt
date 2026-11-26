@@ -334,3 +334,12 @@ main{padding:20px 15px 35px}
 }
 @media(max-width:360px){#workspace .tabs .tab::before{display:none}.grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+
+/* LTE controls: keep primary mobile connection actions visible in the LTE tab. */
+.lte-control-heading{display:flex;gap:16px;align-items:flex-start;justify-content:space-between}
+.lte-control-heading p{color:var(--muted,#66758b);margin-top:5px}
+.lte-action-buttons{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.lte-action-buttons button{min-width:160px}
+.lte-control-panel form{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
+.lte-control-panel form label{flex:1 1 220px}
+@media(max-width:560px){.lte-control-heading{flex-direction:column}.lte-action-buttons button{width:100%}}

@@ -237,6 +237,10 @@ function showLogin() {
   el('lte-apn').value = '';
   el('lte-apn').disabled = true;
   el('lte-apn-save').disabled = true;
+  el('lte-connection-enable').disabled = true;
+  el('lte-reconnect').disabled = true;
+  el('lte-connection-status').textContent = '';
+  el('lte-action-result').textContent = '';
   el('firmware-install-result').textContent = '';
   stableRelease = null;
   verifyRelease.hidden = true;
@@ -332,6 +336,7 @@ function showPage(id) {
     refreshEthernet();
     refreshVisibility();
     refreshLtePolicy();
+    refreshLtePathStatus();
   }
   if (id === 'sms') refreshSMS();
   if (id === 'settings') { refreshIPv6(); globalThis.VeciDnsSettings?.refresh?.(); globalThis.VeciOwnerControls?.refreshSettings?.(); }
@@ -660,6 +665,35 @@ async function refreshVisibility(method = 'status', params = {}) {
     if (sequence === visibilityRequest) savingVisibility = false;
   }
 }
+async function refreshLtePathStatus() {
+  if (!sid) return;
+  const session=sid, output=el('lte-connection-status'), button=el('lte-reconnect');
+  button.disabled=true;
+  output.textContent='Memeriksa registrasi dan sesi data seluler…';
+  try {
+    const [router, modem]=await Promise.all([
+      rpc('veci.v2','status',{},session,8500),
+      rpc('veci.v2.lte','status',{},session,8500)
+    ]);
+    if (sid!==session) return;
+    if (modem.ok===false) throw Error(modem.error||'Status modem tidak tersedia');
+    const describe=v=>v===true?'tersedia':v===false?'tidak tersedia':'belum diketahui';
+    const packet=modem.packet_status || 'belum terverifikasi';
+    const registration=modem.registration_status || 'belum terverifikasi';
+    const phase=modem.modem_phase || 'belum terverifikasi';
+    const usb=router.lte_usb_state || 'belum terverifikasi';
+    output.textContent='RNDIS: '+usb+
+      ' · IPv4: '+describe(router.lte_ipv4)+
+      ' · Gateway: '+describe(router.lte_default_route)+
+      ' · Registrasi: '+registration+
+      ' · Sesi paket data: '+packet+
+      ' · Modem: '+phase+
+      ' · Internet: perlu uji HTTPS terpisah';
+    button.disabled=false;
+  }catch(error) {
+    if(sid===session) output.textContent='Status modem belum terbaca: '+String(error.message||'unknown');
+  }
+}
 let ltePolicyRequest = 0;
 let lteSaving = false;
 async function refreshLtePolicy(action, apn) {
@@ -671,15 +705,22 @@ async function refreshLtePolicy(action, apn) {
   button.disabled = true;
   el('lte-apn').disabled = true;
   el('lte-apn-save').disabled = true;
+  el('lte-connection-enable').disabled = true;
   lteSaving = Boolean(action);
   status.textContent = action ? 'Menyimpan pilihan…' : 'Membaca pilihan…';
   try {
-    const method = action === 'setApn' ? 'setApn' : action ? 'setFailover' : 'status';
+    const method = action === 'setApn' ? 'setApn' :
+      action === 'ENABLE_CONNECTION' ? 'enableConnection' :
+      action ? 'setFailover' : 'status';
     const args = method === 'setApn' ? {apn} : action ? {action} : {};
     const data = await rpc('veci.v2.lte', method, args, session);
     if (sequence !== ltePolicyRequest || sid !== session) return;
     if (data.ok !== true || typeof data.auto_failover !== 'boolean')
       throw Error(data.error || 'Pilihan failover tidak tersedia.');
+    const configured=data.connection_enabled;
+    el('lte-connection-enable').disabled = configured !== false;
+    if (data.activation_requested === true)
+      el('lte-action-result').textContent='Pengelola LTE mulai diaktifkan. Status paket data dan internet harus dicek ulang.';
     const slot = [1, 2].includes(data.configured_slot) ? 'SIM ' + data.configured_slot : 'belum diketahui';
     status.textContent = 'Slot tersimpan: ' + slot + '. Failover otomatis ' + (data.auto_failover ? 'aktif.' : 'nonaktif.');
     const selector = [1, 2].includes(data.selector_slot) ? 'SIM ' + data.selector_slot : 'belum terbaca';
@@ -931,6 +972,10 @@ document.addEventListener('DOMContentLoaded', () => {
         void refreshHealth();
       else if (scope === 'overview' && groupButton.dataset.group === 'dashboard')
         void sampleTraffic();
+      else if (scope === 'network' && groupButton.dataset.group === 'sim') {
+        void refreshLtePolicy();
+        void refreshLtePathStatus();
+      }
     });
   el('sms-retry').addEventListener('click', () => {
     if (!sid) return;
@@ -990,6 +1035,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (window.confirm('Simpan APN ' + input.value + ' untuk konfigurasi modem berikutnya?'))
       refreshLtePolicy('setApn', input.value);
+  });
+  el('lte-open-controls').addEventListener('click', () => {
+    if(!sid) return;
+    showPage('network');
+    setSubgroup('network','sim');
+  });
+  el('lte-status-refresh').addEventListener('click', () => {
+    if(!sid) return;
+    void refreshLtePolicy();
+    void refreshLtePathStatus();
+  });
+  el('lte-connection-enable').addEventListener('click', () => {
+    if(!sid || lteSaving || el('lte-connection-enable').disabled) return;
+    if(window.confirm('Aktifkan pengelola LTE yang nonaktif? Ini belum menjamin data seluler terhubung. LAN dan SSH tidak akan diubah.'))
+      void refreshLtePolicy('ENABLE_CONNECTION');
+  });
+  el('lte-reconnect').addEventListener('click', async () => {
+    const button=el('lte-reconnect');
+    if(!sid || button.disabled) return;
+    if(!window.confirm('Coba reconnect LTE? Ini bisa memutus internet seluler sementara; LAN dan SSH tetap berjalan.')) return;
+    const session=sid, resultText=el('lte-action-result');
+    button.disabled=true;
+    resultText.textContent='Mengirim perintah pemulihan LTE bertahap…';
+    try {
+      const result=await rpc('veci.v2.lte','reconnect',{},session,8500);
+      if(sid!==session) return;
+      if(result.ok!==true || result.queued!==true) throw Error(result.error||'Permintaan tidak diterima');
+      resultText.textContent='Permintaan reconnect diterima, belum berarti data seluler sudah aktif. Periksa kembali status setelah proses selesai.';
+    } catch(error) {
+      if(sid===session) resultText.textContent='Reconnect tidak diterima: '+String(error.message||'unknown');
+    } finally {
+      if(sid===session) button.disabled=false;
+    }
   });
   el('lte-policy-change').addEventListener('click', event => {
     const button = event.currentTarget;

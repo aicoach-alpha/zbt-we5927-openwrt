@@ -3,12 +3,12 @@ set -eu
 umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 case "${1:-}:${2:-}" in
-  list:*) echo '{"status":{},"setFailover":{"action":"String"},"setApn":{"apn":"String"},"setMonitor":{"interval":"String","expected":"String"}}'; exit 0 ;;
-  call:status|call:setFailover|call:setApn|call:setMonitor) ;;
+  list:*) echo '{"status":{},"setFailover":{"action":"String"},"setApn":{"apn":"String"},"setMonitor":{"interval":"String","expected":"String"},"enableConnection":{"action":"String"},"reconnect":{}}'; exit 0 ;;
+  call:status|call:setFailover|call:setApn|call:setMonitor|call:enableConnection|call:reconnect) ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
-if [ "$2" != status ]; then
+if [ "$2" != status ] && [ "$2" != reconnect ]; then
   request=$(head -c 257)
   [ "${#request}" -le 256 ] || fail invalid_request
   if [ "$2" = setMonitor ]; then
@@ -16,6 +16,12 @@ if [ "$2" != status ]; then
     desired=$(jsonfilter -s "$request" -e '@.interval') || fail invalid_interval
     expected=$(jsonfilter -s "$request" -e '@.expected') || fail invalid_interval
     case "$desired" in [5-9]|[1-9][0-9]|1[01][0-9]|120) ;; *) fail invalid_interval ;; esac
+  elif [ "$2" = enableConnection ]; then
+    # Explicit owner action; never restart LAN, Wi-Fi, swap SIM or power-cycle here.
+    option=enabled
+    action=$(jsonfilter -s "$request" -e '@.action') || fail invalid_request
+    [ "$action" = ENABLE_CONNECTION ] || fail invalid_action
+    desired=1
   elif [ "$2" = setApn ]; then
     option=apn
     desired=$(jsonfilter -s "$request" -e '@.apn') || fail invalid_request
@@ -30,6 +36,15 @@ if [ "$2" != status ]; then
 fi
 cfg=we5927_lte.main
 [ "$(uci -q get "$cfg")" = modem ] || fail no_modem_configuration
+if [ "$2" = reconnect ]; then
+  # Reuse the sole existing LTE manager; do not add a second RPC provider.
+  # Manager safely refuses disruptive escalation when the gateway is present.
+  [ -x /usr/sbin/we5927-lte ] || fail lte_manager_missing
+  [ "$(uci -q get "$cfg.enabled" || :)" = 1 ] || fail lte_manager_disabled
+  ( /usr/sbin/we5927-lte reconnect >/dev/null 2>&1 ) </dev/null >/dev/null 2>&1 &
+  printf '{"ok":true,"queued":true,"internet_verified":false}\n'
+  exit 0
+fi
 pending=$(uci -q changes we5927_lte) || fail config_unavailable
 [ -z "$pending" ] || fail pending_lte_changes
 stored=$(uci -q get "$cfg.ping_interval" || :)
@@ -53,6 +68,17 @@ if [ "$2" != status ] && [ "$(uci -q get "$cfg.$option" || :)" != "$desired" ]; 
   [ "$option" != ping_interval ] || interval=$desired
   [ "$option" != auto_failover ] || value=$desired
 fi
+activation_requested=false
+if [ "$2" = enableConnection ]; then
+  # Start only after the explicit user request. Existing online sessions remain
+  # untouched by the manager's own ready-path check.
+  [ -x /etc/init.d/we5927-lte ] || fail missing_lte_manager
+  /etc/init.d/we5927-lte enable >/dev/null 2>&1 || fail manager_enable_failed
+  /etc/init.d/we5927-lte start >/dev/null 2>&1 || fail manager_start_failed
+  activation_requested=true
+fi
+service_enabled=$(uci -q get "$cfg.enabled" || :)
+case "$service_enabled" in 1|'') service_enabled=true ;; 0) service_enabled=false ;; *) fail invalid_connection_policy ;; esac
 slot=$(uci -q get "$cfg.sim" || :)
 case "$slot" in 1|2) ;; *) slot=null ;; esac
 selected=$(/usr/sbin/we5927-lte selector-slot 2>/dev/null) || selected=
@@ -65,4 +91,18 @@ if /usr/sbin/we5927-lte validate-apn "$apn"; then
 else
   apn_json=null
 fi
-printf '{"ok":true,"monitor_interval":%s,"auto_failover":%s,"configured_slot":%s,"selector_slot":%s,"configured_apn":%s}\n' "$interval" "$enabled" "$slot" "$selected" "$apn_json"
+# Existing cached status only: no AT queries, power cycle, SIM change or
+# background network changes on UI status polling.
+modem_raw=$(/usr/sbin/we5927-lte status-fast 2>/dev/null) || modem_raw=
+safe_state() {
+  local value
+  value=$(jsonfilter -s "$modem_raw" -e "@.$1" 2>/dev/null) || value=
+  case "$value" in
+    ''|*[!A-Za-z0-9_.-]*) printf null ;;
+    *) printf '"%s"' "$value" ;;
+  esac
+}
+modem_phase=$(safe_state modem_phase)
+registration_status=$(safe_state registration_status)
+packet_status=$(safe_state packet_status)
+printf '{"ok":true,"monitor_interval":%s,"auto_failover":%s,"configured_slot":%s,"selector_slot":%s,"configured_apn":%s,"connection_enabled":%s,"activation_requested":%s,"modem_phase":%s,"registration_status":%s,"packet_status":%s}\n' "$interval" "$enabled" "$slot" "$selected" "$apn_json" "$service_enabled" "$activation_requested" "$modem_phase" "$registration_status" "$packet_status"
