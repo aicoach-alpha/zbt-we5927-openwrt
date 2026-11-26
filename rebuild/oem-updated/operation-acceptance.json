@@ -30,7 +30,10 @@
       "state": "UNIMPLEMENTED"
     },
     "ddns_detection": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:ddnsLookup",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Bounded lookup of configured hostname; no provider update or daemon restart; supplemental OEM control, runtime pending."
     },
     "delete_static_dhcp": {
       "state": "PROTOTYPE",
@@ -104,13 +107,19 @@
       "limitations": "Local trailing 24-hour sampled byte totals and gaps only; RAM history lost on reboot; original seven-day chart not adapted, runtime pending."
     },
     "get_ddns": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:ddnsStatus",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Read existing optional native profile, no credentials returned; addon absent on default image, profile editor and UAT pending."
     },
     "get_ddns_log": {
       "state": "UNIMPLEMENTED"
     },
     "get_ddns_stat": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:ddnsStatus",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Configuration/startup state only; provider update success unknown, actual update verification pending."
     },
     "get_dhcp_allocation": {
       "state": "FIXTURE_PASS",
@@ -254,10 +263,16 @@
       "state": "UNIMPLEMENTED"
     },
     "get_qos": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:sqmStatus",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Native interface SQM profile, not legacy per-IP bandwidth rules; runtime and original menu mapping pending."
     },
     "get_qos_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:sqmStatus",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Profile and boot state, actual queue enforcement unverified."
     },
     "get_redirect_dnat": {
       "state": "PROTOTYPE",
@@ -491,7 +506,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_ddns": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:setOptionalStartup",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Enable/disable existing compatible DDNS profile only; full provider configuration and actual update verification pending."
     },
     "set_dhcp_config": {
       "state": "PROTOTYPE",
@@ -572,7 +590,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_qos_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:setOptionalStartup",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Explicit enable/disable existing SQM profile, offload must be disabled; no immediate restart. Provisioning and live queue verification pending."
     },
     "set_redirect_dnat": {
       "state": "PROTOTYPE",

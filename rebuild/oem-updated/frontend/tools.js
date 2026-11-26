@@ -34,6 +34,7 @@ function clearSession() {
   dhcpRevision = ''; el('dhcp-form').reset(); el('dhcp-save').disabled = true;
   el('dhcp-result').textContent = ''; el('traffic-result').textContent = '';
   powerExpected=null; scheduleRevision=null; el('power-form').reset(); el('schedule-form').reset(); el('power-save').disabled=true; el('schedule-save').disabled=true; el('power-result').textContent=''; el('schedule-result').textContent='';
+  resetOptional();
   macRevision=''; el('mac-form').reset(); el('mac-save').disabled=true; el('mac-result').textContent='';
   fwRevision=''; el('fw-save').disabled=true; el('offload-save').disabled=true; el('fw-form').reset(); el('offload-form').reset(); el('fw-result').textContent='';
   guestState=''; el('guest-enable').disabled=true; el('guest-disable').disabled=true; el('guest-result').textContent='';
@@ -284,4 +285,53 @@ el('schedule-form').onsubmit=async e=>{
   try{await oem('setAutoreboot',{enabled:enabled?'1':'0',hour,minute,weekdays,revision,confirmation:enabled?'ENABLE_SCHEDULED_REBOOT':'DISABLE_SCHEDULED_REBOOT'},token);
     if(sid===token)el('schedule-result').textContent='Jadwal disimpan. Baca ulang status.';
   }catch(err){if(sid===token)el('schedule-result').textContent=err.message;}
+};
+
+let optionalProfiles={ddns:null,sqm:null};
+function resetOptional(){
+  optionalProfiles={ddns:null,sqm:null};
+  for(const k of ['ddns','sqm']){
+    el(k+'-toggle').disabled=true;el(k+'-result').textContent='';
+  }
+  el('ddns-check').disabled=true;el('ddns-lookup-result').textContent='';
+}
+el('optional-refresh').onclick=async()=>{
+  const token=sid,b=el('optional-refresh');if(!token||b.disabled)return;
+  b.disabled=true;resetOptional();
+  try{
+    for(const [key,op] of [['ddns','get_ddns'],['sqm','get_qos']]){
+      const x=await oem(op,undefined,token);
+      if(!['absent','unconfigured','enabled','disabled'].includes(x.state))throw Error('Invalid addon state');
+      const ready=['enabled','disabled'].includes(x.state)&&/^[0-9a-f]{64}$/.test(x.revision||'');
+      optionalProfiles[key]=ready?x:null;
+      el(key+'-toggle').disabled=!ready;
+      el(key+'-toggle').textContent=x.state==='enabled'?'Disable '+key+' at next boot':'Enable '+key+' at next boot';
+      el(key+'-result').textContent='Configuration: '+x.state+'; service startup: '+(x.service_startup||'unknown')+'; runtime unverified.';
+      if(key==='ddns')el('ddns-check').disabled=!ready;
+    }
+  }catch(e){if(sid===token){resetOptional();el('ddns-result').textContent=e.message;}}
+  finally{b.disabled=false;}
+};
+async function toggleOptional(key){
+  const token=sid,x=optionalProfiles[key];if(!token||!x)return;
+  const enable=x.state==='disabled',action=(enable?'ENABLE_':'DISABLE_')+key.toUpperCase()+'_NEXT_BOOT';
+  if(!window.confirm((enable?'Enable ':'Disable ')+key+' at next manual boot?'))return;
+  optionalProfiles[key]=null;el(key+'-toggle').disabled=true;
+  try{
+    const body={revision:x.revision,confirmation:action};
+    body[key==='ddns'?'enabled':'qos_enabled']=enable?'1':'0';
+    await oem(key==='ddns'?'set_ddns':'set_qos_status',body,token);
+    if(sid===token)el(key+'-result').textContent='Saved. Refresh profile state; manual activation required.';
+  }catch(e){if(sid===token)el(key+'-result').textContent=e.message;}
+}
+el('ddns-toggle').onclick=()=>toggleOptional('ddns');
+el('sqm-toggle').onclick=()=>toggleOptional('sqm');
+el('ddns-check').onclick=async()=>{
+  const token=sid,b=el('ddns-check');if(!token||b.disabled)return;
+  b.disabled=true;
+  try{
+    const x=await oem('ddns_detection',{confirmation:'CHECK_DDNS_LOOKUP'},token);
+    if(sid===token)el('ddns-lookup-result').textContent='DNS lookup exit: '+x.exit_code+' (provider update unverified)\n'+x.detection_ret;
+  }catch(e){if(sid===token)el('ddns-lookup-result').textContent=e.message;}
+  finally{if(sid===token&&optionalProfiles.ddns)b.disabled=false;}
 };

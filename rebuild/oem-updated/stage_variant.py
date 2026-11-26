@@ -271,6 +271,11 @@ def stage(image, out):
             '<label>Minute<input id="schedule-minute" type="number" min="0" max="59" required></label>'
             '<label>Days (0 Sunday to 6 Saturday, comma separated)<input id="schedule-days" required maxlength="13"></label>'
             '<button id="schedule-save" disabled>Simpan jadwal</button></form><p id="schedule-result" role="status"></p></article>'
+            '<article><h2>Optional services: DDNS / SQM</h2><p>Requires an installed compatible addon and configured profile. Settings are saved for next boot; no automatic restart. SQM requires offload disabled.</p>'
+            '<button id="optional-refresh" type="button">Baca status addon</button>'
+            '<p id="ddns-result" role="status"></p><button id="ddns-toggle" disabled>Toggle DDNS</button>'
+            '<button id="ddns-check" disabled>Check DNS lookup</button><pre id="ddns-lookup-result" class="result"></pre>'
+            '<p id="sqm-result" role="status"></p><button id="sqm-toggle" disabled>Toggle SQM</button></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

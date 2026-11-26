@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -879,6 +879,43 @@ case "$1" in
         done
         json_close_array
         json_add_int rule_count "$count"
+        ;;
+    get_ddns|get_ddns_stat)
+        native="$(native_read veci.v2.addon ddnsStatus)" || error "DDNS profile unavailable"
+        state="$(field '@.state')" || error "DDNS state unavailable"
+        case "$state" in absent|unconfigured|enabled|disabled) ;; *) error "invalid DDNS state";; esac
+        success "native DDNS profile inventory"
+        json_add_string state "$state"
+        json_add_string revision "$(field '@.revision' || true)"
+        json_add_string enabled "$(field '@.enabled')"
+        json_add_string services "$(field '@.service_name' || true)"
+        json_add_string domain "$(field '@.domain' || true)"
+        json_add_string lookup_host "$(field '@.lookup_host' || true)"
+        json_add_string network "$(field '@.ip_network' || true)"
+        json_add_string service_startup "$(field '@.service_startup' || true)"
+        json_add_string update_success unknown
+        json_add_string password ""
+        json_add_string username ""
+        json_add_string credential_set "$(field '@.credential_set' || true)"
+        ;;
+    get_qos|get_qos_status)
+        native="$(native_read veci.v2.addon sqmStatus)" || error "SQM profile unavailable"
+        state="$(field '@.state')" || error "SQM state unavailable"
+        case "$state" in absent|unconfigured|enabled|disabled) ;; *) error "invalid SQM state";; esac
+        success "native SQM profile inventory"
+        json_add_string state "$state"
+        json_add_string revision "$(field '@.revision' || true)"
+        json_add_string qos_enabled "$(field '@.enabled')"
+        json_add_string scope interface_sqm
+        json_add_string service_startup "$(field '@.service_startup' || true)"
+        json_add_string runtime unknown
+        json_add_array data
+        if [ "$state" = enabled ] || [ "$state" = disabled ]; then
+            json_add_object ""
+            for key in interface download upload qdisc script; do json_add_string "$key" "$(field "@.$key" || true)"; done
+            json_close_object
+        fi
+        json_close_array
         ;;
     get_mac_blacklist)
         native="$(native_read veci.v2.firewall status)" || error "firewall unavailable"

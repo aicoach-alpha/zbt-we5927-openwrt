@@ -130,6 +130,27 @@
       "original_oem_buttons": "source patched and syntax checked",
       "state": "SOURCE_INTEGRATED_NOT_UAT",
       "limitations": "profile creation, physical device mapping, discovery and reconnect not verified"
+    },
+    "ddns": {
+      "provider": "veci.v2.addon",
+      "methods": [
+        "ddnsStatus",
+        "ddnsLookup",
+        "setOptionalStartup"
+      ],
+      "default": "optional absent",
+      "scope": "preconfigured profile status and startup toggle; DNS lookup is not proof of provider update",
+      "state": "SOURCE_INTEGRATED_NOT_UAT"
+    },
+    "sqm": {
+      "provider": "veci.v2.addon",
+      "methods": [
+        "sqmStatus",
+        "setOptionalStartup"
+      ],
+      "default": "optional absent",
+      "scope": "preconfigured interface queue; software and hardware offload conflict guard",
+      "state": "SOURCE_INTEGRATED_NOT_UAT"
     }
   },
   "remaining": [
