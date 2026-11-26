@@ -2,7 +2,13 @@ name: OEM Updated isolated source gate
 on:
   push:
     branches: [build/oem-updated-we5927-2sim]
-    paths: ['rebuild/oem-updated/**', 'scripts/tests/test_oem_*.py', '.github/workflows/oem-updated-source.yml']
+    paths:
+      - 'rebuild/oem-updated/**'
+      - 'source/we5927-lte/**'
+      - 'files/usr/sbin/we5927-lte'
+      - 'scripts/tests/test_lte_*.py'
+      - 'scripts/tests/test_oem_*.py'
+      - '.github/workflows/oem-updated-source.yml'
   workflow_dispatch:
 permissions:
   contents: read
