@@ -87,4 +87,16 @@ class FirmwareDefectGate(unittest.TestCase):
   lab=(ROOT/".github/workflows/veci-v2-lab-image.yml").read_text()
   self.assertLess(lab.index("source-completion-gate.py"),
                   lab.index("Install OpenWrt host dependencies"))
+ def test_every_firmware_compile_workflow_carries_source_bug_gate(self):
+  workflows=ROOT/".github/workflows"
+  checked=[]
+  for workflow in workflows.glob("*.yml"):
+   source=workflow.read_text()
+   if "make -j2 V=s" not in source and "make -j2 V=sc" not in source:
+    continue
+   checked.append(workflow.name)
+   self.assertIn("source-completion-gate.py",source,workflow.name)
+   self.assertLess(source.index("source-completion-gate.py"),
+                   source.index("make -j2 "),workflow.name)
+  self.assertGreaterEqual(len(checked),3,checked)
 if __name__=="__main__":unittest.main()
