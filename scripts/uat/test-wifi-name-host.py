@@ -39,7 +39,9 @@ with tempfile.TemporaryDirectory() as tmp:
 
     def call(method, **params):
         p = subprocess.run([provider, "call", method], input=json.dumps(params), text=True,
-                           env=env, capture_output=True, check=True)
+                           env=env, capture_output=True, check=False, timeout=8)
+        if p.returncode:
+            raise AssertionError(f"WiFi RPC {method} exit={p.returncode}; stderr={p.stderr!r}; stdout={p.stdout!r}")
         return json.loads(p.stdout)
 
     def config_value(key):

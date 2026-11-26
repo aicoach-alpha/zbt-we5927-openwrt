@@ -95,7 +95,8 @@ print(data[field])
     def test_rollback_pending_and_wrong_board_fail_closed(self):
         before=self.config.read_bytes()
         self.fail_sim.touch()
-        self.assertEqual(self.call("switchSim",slot=2,confirmation="SWITCH_SIM_2")["error"],"sim_switch_failed")
+        self.assertEqual(self.call("switchSim",slot=2,confirmation="SWITCH_SIM_2")["error"],
+                         "sim_switch_failed_previous_slot_restored")
         self.assertEqual(self.config.read_bytes(),before)
         self.assertEqual(self.slot.read_text(),"1\n")
         self.fail_sim.unlink()
