@@ -710,6 +710,25 @@
         "test_owner_addon_profiles_source.py"
       ],
       "protection": "Reuse existing guest inspector and addon toggle, no parallel control or radio reload. Read-only netifd guest interface discovery, iw AP mode and hostapd ENABLED check; report ap_running_unverified, not_observed or unavailable independently from configured startup flag, and never imply firewall/client isolation has been tested."
+    },
+    {
+      "id": "UPGRADE-PIPE-001",
+      "kind": "confirmed_bug",
+      "area": "firmware_upgrade",
+      "severity": "high",
+      "summary": "BusyBox manual upload and OTA verify lost request bytes or held the verifier lock after the CGI completed",
+      "root_cause": "BusyBox head buffered beyond the fixed stdin headers, and timeout subprocesses inherited the shared verifier lock.",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "system_manual_sysupgrade",
+        "system_signed_github_ota"
+      ],
+      "regression_test_files": [
+        "test_veci_upgrade_receipt.py",
+        "test_veci_manual_upload_timeout.py"
+      ],
+      "protection": "Use exact-length dd reads, close the lock descriptor in timed transfers and bind receipt to tag, asset, size and digest. Verified on BusyBox pipes with inert artifacts and installer."
     }
   ]
 }

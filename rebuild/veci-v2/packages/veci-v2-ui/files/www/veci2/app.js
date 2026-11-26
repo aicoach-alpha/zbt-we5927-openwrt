@@ -481,7 +481,7 @@ async function verifyInternetLive() {
   badge.textContent = 'Memeriksa koneksi...';
   detail.textContent = 'Memeriksa HTTPS dan DNS melalui LTE';
   try {
-    const result = await rpc('veci.v2','internetCheck',{},session,10000);
+    const result = await rpc('veci.v2','internetCheck',{},session,18000);
     if (sid !== session) return;
     const verified = result.verified === true && result.https_code === 200 &&
       result.dns_verified === true && result.source === 'usb0_https';

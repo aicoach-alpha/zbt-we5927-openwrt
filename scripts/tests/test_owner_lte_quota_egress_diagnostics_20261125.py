@@ -5,6 +5,7 @@ All probes are read-only, bounded and do not assert that quota is exhausted.
 import json
 from pathlib import Path
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -100,6 +101,9 @@ esac
 
     def test_gui_distinguishes_modem_registration_from_data_plan(self):
         s=FRONTEND.read_text()
+        probe_seconds = sum(map(int, re.findall(r"--max-time (\d+)", self.source_case())))
+        budget = int(re.search(r"'internetCheck',\{\},session,(\d+)", s)[1])
+        self.assertGreaterEqual(budget, 1000 * (probe_seconds + 2))
         subprocess.run(["node","--check",str(FRONTEND)],check=True)
         for expected in ("modem_connected_public_unavailable_check_quota",
                          "hostname_dns_or_endpoint_unavailable",
