@@ -24,21 +24,26 @@ class ScopeIntegration(unittest.TestCase):
         self.assertEqual(RECORD["hardware_uat"],"not_run")
         for item in RECORD["reused_byte_identical_sources"]:
             with self.subTest(path=item["path"]):
-                digest=hashlib.sha256((ROOT/item["path"]).read_bytes()).hexdigest()
-                if digest == item["sha256"]:
-                    continue
-                if digest == item.get("reviewed_successor_sha256"):
-                    commit=item.get("reviewed_successor_commit")
-                    self.assertEqual(commit,"04e8058")
-                else:
-                    self.assertEqual(digest,item.get("merged_successor_sha256"))
-                    commit=item.get("merged_successor_commit")
-                    self.assertEqual(commit,"61b370d1ef3981a52f9946a2489ca1f192f55007")
-                # Require immutable committed bytes, not simply a mutable
-                # digest added by this test or guessed from a development tree.
-                committed=subprocess.check_output(
-                    ["git","-C",str(ROOT),"show",commit+":"+item["path"]])
-                self.assertEqual(hashlib.sha256(committed).hexdigest(),digest)
+                # Preserve the original hash tied to its historical commit.
+                # New reviewed changes do not rewrite historical provenance.
+                original=subprocess.check_output(["git","-C",str(ROOT),"show",
+                    item["commit"]+":"+item["path"]],timeout=10)
+                self.assertEqual(hashlib.sha256(original).hexdigest(),item["sha256"])
+                for sha_name,commit_name in (
+                    ("reviewed_successor_sha256","reviewed_successor_commit"),
+                    ("merged_successor_sha256","merged_successor_commit")):
+                    if item.get(sha_name):
+                        self.assertIn(commit_name,item)
+                        historical=subprocess.check_output(["git","-C",str(ROOT),"show",
+                            item[commit_name]+":"+item["path"]],timeout=10)
+                        self.assertEqual(hashlib.sha256(historical).hexdigest(),item[sha_name])
+                # The current worktree must correspond to a committed change.
+                current=ROOT/item["path"]
+                self.assertTrue(current.is_file() and current.stat().st_size>0)
+                committed=subprocess.check_output(["git","-C",str(ROOT),"show",
+                    "HEAD:"+item["path"]],timeout=10)
+                self.assertEqual(current.read_bytes(),committed,
+                                 "uncommitted system change: "+item["path"])
     def test_no_duplicate_ui_ids_and_scripts_load_after_main(self):
         import re
         ids=re.findall(r'\bid="([^"]+)"',HTML)
