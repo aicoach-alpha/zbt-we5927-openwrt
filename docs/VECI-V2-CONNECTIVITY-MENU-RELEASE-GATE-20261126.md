@@ -126,3 +126,9 @@ Uncertainties are never converted into PASS on the strength of source code.
 - This proves the station dump returned 0 associations at that instant, not that the phone was connected or MT76 failed.
 - Use native libubox jshn json_load, json_select clients, json_get_keys to distinguish empty hostapd client map from JSON parse failure. Keep MACs hidden.
 - WIFI-003 remains requires_hardware_verification, root cause unresolved and next-image hardware not tested.
+
+## MT76 station diagnostic with native JSON parser (26 Nov 2026)
+- Owner read-only command confirmed iw dev has phy0-ap0 of type AP.
+- iw station dump: exit 0, stations 0; hostapd.phy0-ap0 get_clients: exit 0, native jshn client map count 0.
+- Both sources show zero associated stations at this sampling instant; prior JSON-filter UNKNOWN is resolved.
+- Still not evidence of MT76 fault or stability under actual client load. Next safe step is phone airplane mode plus manually enabled Wi-Fi, confirmed SSID and a brief read-only association check.

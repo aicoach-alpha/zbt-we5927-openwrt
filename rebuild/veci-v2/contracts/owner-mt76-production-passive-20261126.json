@@ -77,11 +77,13 @@
     "iw_exit_code": 0,
     "iw_station_count": 0,
     "hostapd_get_clients_exit_code": 0,
-    "hostapd_authorized_count": "UNKNOWN",
-    "reason_for_unknown": "jsonfilter wildcard lookup did not provide a usable authorized-entry count; raw get_clients body not inspected",
-    "interpretation": "Kernel station-dump command succeeded and reported zero associated stations at this instant; hostapd RPC reachable but client count remains unverified",
+    "hostapd_authorized_count": 0,
+    "interpretation": "At this instant both successful iw station dump and hostapd get_clients parsing returned zero associated clients; cannot infer that phone was connected or driver is faulty.",
     "client_traffic_test_proven": false,
     "driver_fault_proven": false,
-    "configuration_modified": false
-  }
+    "configuration_modified": false,
+    "hostapd_client_count": 0,
+    "count_parser": "native_libubox_jshn.json_get_keys"
+  },
+  "active_station_test_status": "NOT_PROVEN_NO_ASSOCIATED_CLIENT_IN_DIAGNOSTIC"
 }
