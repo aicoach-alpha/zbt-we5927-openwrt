@@ -6,6 +6,6 @@ test_read_and_write_acl_exact_and_guarded (test_owner_addon_profiles_source.Addo
 test_both_existing_menus_have_single_live_handler_path (test_veci_v2_services_addon_dom_20261126.ServicesAddonDom.test_both_existing_menus_have_single_live_handler_path) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 0.692s
+Ran 6 tests in 6.439s
 
 OK

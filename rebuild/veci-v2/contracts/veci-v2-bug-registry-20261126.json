@@ -691,6 +691,25 @@
         "test_owner_wifi_acceptance.py"
       ],
       "protection": "New read-only source counts iw and native jshn hostapd in separate subshell, exposes observed/zero_observed/mismatch/unavailable and renders non-definitive client status. Native UCI and Node UI tests cover each case. No radio or modem mutators; physical correctness remains pending."
+    },
+    {
+      "id": "GUEST-001",
+      "kind": "confirmed_bug",
+      "area": "guest_wifi",
+      "severity": "medium",
+      "summary": "Guest Wi-Fi UI reported enabled from saved UCI alone without proving live AP status",
+      "root_cause": "Guest configuration inventory and addon status had no separate on-air hostapd/iw observation; applying next-boot configuration looked like an immediate runtime activation",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "guest_wifi_isolation",
+        "addon_enable_disable"
+      ],
+      "regression_test_files": [
+        "test_guest_isolation_readonly.py",
+        "test_owner_addon_profiles_source.py"
+      ],
+      "protection": "Reuse existing guest inspector and addon toggle, no parallel control or radio reload. Read-only netifd guest interface discovery, iw AP mode and hostapd ENABLED check; report ap_running_unverified, not_observed or unavailable independently from configured startup flag, and never imply firewall/client isolation has been tested."
     }
   ]
 }

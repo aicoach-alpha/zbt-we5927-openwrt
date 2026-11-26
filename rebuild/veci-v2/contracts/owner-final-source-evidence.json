@@ -16,7 +16,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/addon_enable_disable.txt",
-        "log_sha256": "e2a2bd7733f37e1487d85b3b47e93ecafc19641546b664f9fc3f3a1f8411203d"
+        "log_sha256": "fb0d0904cf9099a164283294503274dc60e193cc43bc7590a52f4a5ec43c04b4"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -25,11 +25,11 @@
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-addon-acl.json": "103231537cd3a66f384cf1dbae3ec84883bbfb0e8ca32d8652ec3348b5a687e3",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services": "147f548b37c3fd33b40abc22c9ca5d3c297a4df69ef0348f0d7c1f7a6f47ab28",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services-acl.json": "f7152b5a56e12ba5fa6f2ac6cde0c2a3484d5fdf1edb20b3cd1a96cf848af42b",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/addon-profiles.js": "86b7665430879d7394585326bfbfc188cc8a5d8ab1e35b0bd2a09ba8e34df202",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/addon-profiles.js": "599c616aef052040778e648f1005e8904ca28b34ac0d3cd638b170f63bd1803b",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js": "55c2351d49679db1ac110752042b02e1007929cc414ae662c25028e50f989b03",
         "rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk": "240e4043e57e7c5853b767dc26e01ccfcd88fc116eefde3892846c6c947aa2fc",
         "scripts/tests/test_owner_addon_lifecycle_native.py": "acb1810f08c94a4b061dbbc50b38ef1cf8da004fdaaa60e133cd601b3225d7d3",
-        "scripts/tests/test_owner_addon_profiles_source.py": "dda0d700bf971ddda07f8dc64bfd9dd631e698b569e78f78b30c95f39d5c3660",
+        "scripts/tests/test_owner_addon_profiles_source.py": "5150bf8faad75986adeafa6d9a5690bd9c670fc4b35a4114bcf1f850ffc5040a",
         "scripts/uat/test-owner-addon-services-host.py": "6681d72b81152b1ff778fcf524f9fc00410ddf25c206461ab88cd7c8fee5b461",
         "scripts/uat/test-addon-profiles-host.py": "a0b6348c2459da13dc6e937479796c04875ba06862ddc35e18977e285162a46d",
         "scripts/tests/test_veci_v2_services_addon_dom_20261126.py": "63bb655b6b4e8550a9a407808e2d3d1fab845c6fcb813d73a2e1ef374fee38ca"
@@ -393,17 +393,17 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/guest_wifi_isolation.txt",
-        "log_sha256": "b3ebd4f369a0a4eaceb1a70b10c9f918acd68047f5501173e49e4695cc3439fa"
+        "log_sha256": "caed4c1e728e70f71cb16b2345565a2774f19d9a35ff01bdbe2b4a453b9af70d"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "source/veci-app-guest/Makefile": "dd96980a987d8dd27b81dd3be964c7a950ceb05238d3dfed908702357384a0fa",
         "source/veci-app-guest/files/usr/libexec/rpcd/veci.app.guest": "8675ec104d36cda743b12851306b7a7a5b68b899927a66aab753676c6df87679",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-check": "e118d4c03804513bd1998c4e8dde0323811362239075dc309c63648e342868a9",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-check": "7e20c0826cc7e65ae54ded29fe3486977a263a98ead4e85e7deeabd1739a84d1",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-acl.json": "11a3da690607e9d87b7c7c99ad9b54e1941d1308b206250fc081b1c6e103a189",
         "source/veci-app-guest/files/www/veci-apps/guest.js": "6d0965f809d67c3cf9e2bd07dcbdbc99c0275e220d4c4ad0a2e5d64fef86b126",
         "scripts/tests/test_owner_guest_native_acceptance.py": "78630ec009bd5bd5ae06870263b116a1620cf095afa62368b681006a2874f93c",
-        "scripts/tests/test_guest_isolation_readonly.py": "37415fe7076a9c52496eec6c8660dcaa905bb5de23517835e0205e15f5034ce5",
+        "scripts/tests/test_guest_isolation_readonly.py": "064d6a761112851b2905b59beb185af6f3493cf117d29e13461239a3f0a55733",
         "scripts/tests/test_guest_startup_guard.py": "a541802b0a65a4103b70480f685b223a3011630077c439a869c9b11f96b2f89b"
       },
       "status": "pass",
@@ -413,7 +413,8 @@
         "test_configuration_states_using_fake_uci",
         "test_provision_does_not_restart_wifi_network",
         "test_failed_provision_rolls_back_without_wifi_reload",
-        "test_inactive_guest_cleanup_does_not_restart_network"
+        "test_inactive_guest_cleanup_does_not_restart_network",
+        "test_guest_gui_does_not_claim_staged_ap_is_live"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_guest_native_acceptance.py",

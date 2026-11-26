@@ -250,7 +250,8 @@
       "test_configuration_states_using_fake_uci",
       "test_provision_does_not_restart_wifi_network",
       "test_failed_provision_rolls_back_without_wifi_reload",
-      "test_inactive_guest_cleanup_does_not_restart_network"
+      "test_inactive_guest_cleanup_does_not_restart_network",
+      "test_guest_gui_does_not_claim_staged_ap_is_live"
     ],
     "test_source_files": [
       "scripts/tests/test_owner_guest_native_acceptance.py",

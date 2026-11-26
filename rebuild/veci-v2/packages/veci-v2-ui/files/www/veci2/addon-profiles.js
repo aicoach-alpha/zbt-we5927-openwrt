@@ -21,7 +21,9 @@
       if (!result.ok) throw Error(result.error || 'Status addon tidak tersedia');
       for (const [key,name] of [['wireguard','WireGuard'],['guest','Guest Portal'],['voucher','Voucher']]) {
         const row = document.createElement('li');
-        row.textContent = name + ': ' + (result[key] || 'unknown');
+        row.textContent = name + ': ' + (result[key] || 'unknown') +
+          (key === 'guest' && ['enabled','disabled'].includes(result[key]) ?
+            ' (konfigurasi startup, bukan status AP live)' : '');
         if (['guest','voucher'].includes(key) && ['enabled','disabled'].includes(result[key])) {
           const control = document.createElement('button');
           control.type = 'button';
@@ -47,7 +49,8 @@
         }
         list.append(row);
       }
-      output.textContent = 'Status berdasarkan konfigurasi, bukan uji koneksi addon.';
+      output.textContent = 'Perubahan startup tersimpan tanpa restart radio/network. ' +
+        'Guest AP dan isolasi memerlukan verifikasi runtime setelah aktivasi terpisah.';
     } catch (error) {
       if (session === sid) output.textContent = error.message;
     } finally { busy = false; button.disabled = !sid; }

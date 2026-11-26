@@ -173,3 +173,9 @@ Uncertainties are never converted into PASS on the strength of source code.
 - The existing native GUI Wi-Fi panel shows that AP identity and cumulative bytes on user refresh; it labels interface byte counters as inclusive of broadcast, **not proof of active clients or Internet traffic**.
 - Reads sysfs and does not scan, reset, restart, reload, change SIM, or modify UCI; no new provider, router, control path or authorization scope.
 - Native UCI/libubox host fixture and Node render regressions cover real payload shape. Physical/router production remains unchanged and WIFI-003 not resolved.
+
+## Guest optional OFF default and actual runtime visibility — source update
+- Reused existing veci.v2.guest status and veci.v2.addon setPortalStartup; no duplicate endpoint or manager.
+- Guest inspector now separates saved UCI enabled_configured from guest_ap_runtime: unavailable, not_observed, ap_running_unverified, based on selected netifd guest interface + iw type AP + hostapd ENABLED, read-only.
+- Guest and addon UI now clearly label startup configuration vs observed live AP. Guest isolation verification remains null until real firewall/guest-client UAT; enabling guest still requires separate manual restart/boot.
+- Original guest provisioning default disabled remains unchanged. No Wi-Fi, LTE, modem, SIM, firewall or router mutation was executed.

@@ -33,5 +33,25 @@ if [ -x /usr/libexec/rpcd/veci.app.guest ]; then
     fi
   fi
 fi
+# Observe radio state only. This endpoint never changes radio/network settings.
+# A staged UCI enable does not prove the guest AP has actually been started.
+ap_state=unavailable
+if [ "$installed" = true ] && [ "$configured" = true ]; then
+  ap_state=not_observed
+  if command -v ubus >/dev/null 2>&1 && command -v jsonfilter >/dev/null 2>&1 &&
+     command -v iw >/dev/null 2>&1; then
+    wireless_state=$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null || :)
+    guest_if=$(printf '%s' "$wireless_state" | jsonfilter -e '@.radio0.interfaces[@.section="veci_guest"].ifname' 2>/dev/null || :)
+    case "$guest_if" in
+      ''|*[!A-Za-z0-9_.-]*) ;;
+      *)
+        if iw dev "$guest_if" info 2>/dev/null | grep -Eq '^[[:space:]]*type AP$'; then
+          hostapd_state=$(ubus -S -t 3 call "hostapd.$guest_if" get_status '{}' 2>/dev/null |
+                          jsonfilter -e '@.status' 2>/dev/null || :)
+          if [ "$hostapd_state" = ENABLED ]; then ap_state=ap_running_unverified; fi
+        fi ;;
+    esac
+  fi
+fi
 # Isolasi runtime tidak dapat diklaim tanpa nft + actual guest/client UAT.
-printf '{"ok":true,"installed":%s,"configured":%s,"enabled_configured":%s,"configuration_state":"%s","guest_isolation_verified":null}\n' "$installed" "$configured" "$enabled" "$mode"
+printf '{"ok":true,"installed":%s,"configured":%s,"enabled_configured":%s,"configuration_state":"%s","guest_ap_runtime":"%s","guest_isolation_verified":null}\n' "$installed" "$configured" "$enabled" "$mode" "$ap_state"

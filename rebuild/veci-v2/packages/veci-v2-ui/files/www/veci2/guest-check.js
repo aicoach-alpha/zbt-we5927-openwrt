@@ -19,9 +19,15 @@
         configuration_needs_audit: 'Konfigurasi guest memerlukan audit',
         configuration_separation_present: 'Pemisahan konfigurasi ada, runtime belum diuji'
       };
+      const runtime = {
+        unavailable: 'Tidak dapat diperiksa',
+        not_observed: 'AP belum teramati aktif',
+        ap_running_unverified: 'Hostapd dan radio AP aktif (koneksi klien belum diuji)'
+      };
       status.textContent = (labels[result.configuration_state] || 'Status tidak diketahui') +
-        ' · Guest aktif di konfigurasi: ' + (result.enabled_configured ? 'ya' : 'tidak') +
-        ' · Isolasi runtime: belum terverifikasi';
+        ' · Konfigurasi startup guest: ' + (result.enabled_configured ? 'aktif' : 'nonaktif') +
+        ' · Status AP: ' + (runtime[result.guest_ap_runtime] || 'Belum dapat diverifikasi') +
+        ' · Isolasi klien: belum diuji';
     } catch (error) {
       if (session === sid) status.textContent = error.message;
     } finally { loading = false; button.disabled = !sid; }
