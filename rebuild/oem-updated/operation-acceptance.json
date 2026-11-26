@@ -113,7 +113,10 @@
       "limitations": "Read existing optional native profile, no credentials returned; addon absent on default image, profile editor and UAT pending."
     },
     "get_ddns_log": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.system:logs",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Bounded redacted recent event classes. Integrated OEM screen and actual ddns-scripts on target pending."
     },
     "get_ddns_stat": {
       "state": "PROTOTYPE",

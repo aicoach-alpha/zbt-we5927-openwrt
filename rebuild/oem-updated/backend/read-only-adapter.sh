@@ -895,6 +895,25 @@ case "$1" in
         json_add_string local_ipv4_default_ttl "$local_ttl"
         json_add_string packet_verified false
         ;;
+    get_ddns_log)
+        native="$(native_read veci.v2.system logs)" || error "native log service unavailable"
+        logs="$(field '@.logs')" || error "native log data unavailable"
+        # Emit only known event classes. DDNS messages may contain credentials in URLs.
+        events="$(printf '%s\n' "$logs" | awk '
+            {
+                tag=($5 ~ /^[0-9][0-9][0-9][0-9]$/ ? $7 : $6)
+                if (tag !~ /^(ddns-scripts|ddns)(\[[0-9]+\])?:$/) next
+                msg=tolower($0)
+                if (msg ~ /fail|error|fatal/) event="error"
+                else if (msg ~ /warn|retry/) event="warning"
+                else if (msg ~ /start/) event="start"
+                else if (msg ~ /stop/) event="stop"
+                else event="activity"
+                print "DDNS " event
+            }' | tail -n 30)"
+        success "recent DDNS events"
+        json_add_string ddns_log "${events:-No DDNS events in recent system log}"
+        ;;
     get_ddns|get_ddns_stat)
         native="$(native_read veci.v2.addon ddnsStatus)" || error "DDNS profile unavailable"
         state="$(field '@.state')" || error "DDNS state unavailable"

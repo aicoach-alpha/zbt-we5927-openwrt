@@ -179,6 +179,10 @@ def stage(image, out):
                 value=value.replace(old,new)
             path.write_text(value)
             subprocess.run(["node","--check",str(path)],check=True)
+        edit_chunk("chunk-2d224d12.c4bda38e.js", [
+            ('this.proxy_req("post","/webapi?op=get_ddns_log"',
+             'this.proxy_req("get","/webapi?op=get_ddns_log"'),
+        ])
         lan_name="chunk-2d22c110.8a7728fb.js"
         lan_source=(files / "www/assets/js" / lan_name).read_text()
         lan_start=lan_source.index("set_lan_config:function()")

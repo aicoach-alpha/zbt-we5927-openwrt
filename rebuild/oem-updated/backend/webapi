@@ -83,6 +83,12 @@ case "$op" in
         data="$(/usr/libexec/oem-updated/diagnostics-adapter "$op" "$host" "$version" "$session")" || err -4 "diagnostic unavailable"
         [ -n "$data" ] || err -4 "diagnostic unavailable"
         reply "$data" ;;
+    get_ddns_log)
+        [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
+        permit="$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"ubus\",\"object\":\"veci.v2.system\",\"function\":\"logs\"}" | jsonfilter -e '@.access')" || err -1 "native log permission unavailable"
+        [ "$permit" = true ] || err -1 "native log permission denied"
+        data="$(/usr/libexec/oem-updated/read-only-adapter "$op")" || err -4 "DDNS log unavailable"
+        reply "$data" ;;
     sysupgrade_backup)
         # Stream the existing native authenticated backup; never publish a
         # private archive in the document root or use a token in its URL.

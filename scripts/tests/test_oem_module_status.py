@@ -82,6 +82,26 @@ esac
                     denied = self.run_script("gateway", QUERY_STRING="op="+op, PERMIT="false", REQUEST_METHOD=method)
                     self.assertIn("access denied", denied.stdout)
 
+    def test_ddns_events_hide_credentials_and_unrelated_messages(self):
+        self.command("jsonfilter", """case "$2" in
+          '@.ok') echo true;;
+          '@.logs') printf '%s\n' 'Thu Nov 26 12:00:01 2026 user.err ddns-scripts[2]: failed url?secret=sensitive' 'Thu Nov 26 12:00:02 2026 user.info other: ddns start';;
+          *) exit 1;;
+        esac""")
+        result = self.run_script("adapter", "get_ddns_log")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("string:ddns_log=DDNS error", result.stdout)
+        self.assertNotIn("sensitive", result.stdout)
+        self.assertNotIn("DDNS start", result.stdout)
+
+    def test_ddns_log_requires_native_log_scope(self):
+        self.command("ubus", """case "$*" in *veci.v2.system*) echo false;; *) echo true;; esac""")
+        self.command("jsonfilter", "cat")
+        self.command("cat", "/bin/cat")
+        result = self.run_script("gateway", QUERY_STRING="op=get_ddns_log")
+        self.assertIn("native log permission denied", result.stdout)
+        self.assertNotIn("ADAPTER_CALLED", result.stdout)
+
     def test_down_link_does_not_return_stale_ip(self):
         r = self.run_script("adapter", "get_module_status", LINK_UP="false")
         self.assertEqual(r.returncode, 0, r.stderr)
