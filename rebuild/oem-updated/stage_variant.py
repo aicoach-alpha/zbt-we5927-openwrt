@@ -29,7 +29,7 @@ REPLACEMENTS = (
 MAKEFILE = """include $(TOPDIR)/rules.mk
 PKG_NAME:=oem-updated-ui-dev
 PKG_VERSION:=0.1
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 include $(INCLUDE_DIR)/package.mk
 define Package/oem-updated-ui-dev
   SECTION:=admin
@@ -46,6 +46,7 @@ define Package/oem-updated-ui-dev/install
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/read-only-adapter $(1)/usr/libexec/oem-updated/read-only-adapter
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/write-adapter $(1)/usr/libexec/oem-updated/write-adapter
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/diagnostics-adapter $(1)/usr/libexec/oem-updated/diagnostics-adapter
+	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/home-adapter $(1)/usr/libexec/oem-updated/home-adapter
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/shared-backup $(1)/usr/libexec/oem-updated/shared-backup
 	$(INSTALL_BIN) ./files/usr/libexec/oem-updated/shared-verify $(1)/usr/libexec/oem-updated/shared-verify
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/oem-updated.json $(1)/usr/share/rpcd/acl.d/oem-updated.json
@@ -111,6 +112,27 @@ def stage(image, out):
                 raise ValueError("unexpected frontend transport anchor")
             code = code.replace(old, new)
         app.write_text(code)
+        # Fix the vendor dashboard's random suppression of high CPU usage,
+        # disable overlapping polls, and preserve unknown samples as gaps.
+        home = files / "www/assets/js/home.5db31f8c.js"
+        dashboard = home.read_text()
+        edits = (
+            ('if(console.log("拓扑",r),console.log("wan",s),console.log("lan",o),e.topology=r,t&&t(r),e.wan_conf=s,e.lan_conf=o,a.cpu_usage>80){var u=Math.random(100);u<80&&(a.cpu_usage=Math.floor(a.cpu_usage/(1.5+Math.random())))}',
+             'e.topology=r,t&&t(r),e.wan_conf=s,e.lan_conf=o;'),
+            ('get_home_info:function(t){var e=this;this.$req.get',
+             'get_home_info:function(t){var e=this;if(e._oemPolling)return;e._oemPolling=true;this.$req.get'),
+            ('console.log("获取wifi2",e.wifi2),e.wifi5=c,console.log("获取wifi5",e.wifi5)}))}',
+             'e.wifi5=c})).catch(function(){e.resp.device="";e.traffic={rx:"",tx:""};e.topology={port:[],internet:"unknown"};e.status4g=""}).finally(function(){e._oemPolling=false})}'),
+            ('t.get_home_info()}),3e3)', 't.get_home_info()}),1e4)'),
+            ('n=Number(t.traffic.tx),o=Number(t.traffic.rx)', 'n=t.traffic.tx===""||t.traffic.tx==null?null:Number(t.traffic.tx),o=t.traffic.rx===""||t.traffic.rx==null?null:Number(t.traffic.rx)'),
+            ('console.log("shirt",i);',''),
+        )
+        for old,new in edits:
+            if dashboard.count(old) != 1:
+                raise ValueError("OEM dashboard patch anchor changed: " + old[:80])
+            dashboard = dashboard.replace(old,new)
+        home.write_text(dashboard)
+        subprocess.run(["node","--check",str(home)],check=True)
         routed = route_oem_cgi(files / "www")
         if routed < 100:
             raise ValueError("incomplete OEM CGI route inventory")
@@ -131,6 +153,9 @@ def stage(image, out):
         diagnostics = adapter.parent / "diagnostics-adapter"
         shutil.copyfile(HERE / "backend/diagnostics-adapter.sh", diagnostics)
         diagnostics.chmod(0o755)
+        home_adapter = adapter.parent / "home-adapter"
+        shutil.copyfile(HERE / "backend/home-adapter.sh", home_adapter)
+        home_adapter.chmod(0o755)
         backup = adapter.parent / "shared-backup"
         shutil.copyfile(HERE.parent / "veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-backup", backup)
         backup.chmod(0o755)
@@ -196,6 +221,10 @@ def stage(image, out):
             '<form id="offload-form"><label><input id="fw-offload" type="checkbox">Software flow offload</label>'
             '<button id="offload-save" disabled>Simpan NAT offload</button></form>'
             '<p id="fw-result" role="status"></p></article>'
+            '<article><h2>MAC access control (LAN to WAN)</h2><p>Blocks forwarded LAN traffic to WAN; router management remains available. Software offload is disabled when a block list is configured.</p>'
+            '<button id="mac-refresh" type="button">Baca daftar</button><form id="mac-form">'
+            '<label>MAC address, satu per baris<textarea id="mac-list" rows="5" maxlength="288"></textarea></label>'
+            '<button id="mac-save" disabled>Simpan daftar</button></form><p id="mac-result" role="status"></p></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'
@@ -218,7 +247,7 @@ def stage(image, out):
         verify_gate = cgi.parent / "oem-verify"
         shutil.copyfile(HERE / "backend/verify-only.sh", verify_gate)
         verify_gate.chmod(0o755)
-        for script in (cgi, adapter, writer, diagnostics, backup, verify, verify_gate, cgi.parent / "veci2-backup", cgi.parent / "veci2-restore"):
+        for script in (cgi, adapter, writer, diagnostics, home_adapter, backup, verify, verify_gate, cgi.parent / "veci2-backup", cgi.parent / "veci2-restore"):
             subprocess.run(["sh", "-n", str(script)], check=True)
         acl = files / "usr/share/rpcd/acl.d/oem-updated.json"
         acl.parent.mkdir(parents=True)

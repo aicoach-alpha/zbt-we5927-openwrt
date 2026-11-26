@@ -358,6 +358,7 @@ case "$1" in
         fi
         success "getWiFi2 success"
         json_add_string enabled "$enabled"
+        json_add_string wifi2_enabled "$enabled"
         json_add_string country "$(get wireless.radio0.country || true)"
         json_add_string channel "$channel"
         json_add_string htmode "$ht"
@@ -758,6 +759,82 @@ case "$1" in
         # Keep raw identifiers out of legacy OEM JSON; expose last four only.
         if [ -n "$imei" ]; then json_add_string imei "***********${imei#???????????}"; else json_add_string imei "NOT GET"; fi
         json_add_string set_imei "NOT SUPPORTED"
+        ;;
+    get_wifi_apclient_config|get_wifi_apclient_status)
+        # The legacy apcli0 driver is not present. Inventory native STA
+        # sections without returning credentials or creating a second WAN.
+        sections="$(uci -q show wireless | sed -nE "s/^wireless\.([a-zA-Z0-9_]+)\.mode='sta'$/\1/p")"
+        set -- $sections
+        [ "$#" -le 1 ] || error "multiple Wi-Fi uplinks unsupported"
+        sta="${1:-}"
+        enabled=0; ssid=""; bssid=""; address=""; rx=""; tx=""; uptime=""
+        if [ -n "$sta" ]; then
+            [ "$(get "wireless.$sta.device")" = radio0 ] || error "unsupported STA radio"
+            [ "$(get "wireless.$sta.network")" = wwan ] || error "unsupported STA network binding"
+            disabled="$(get "wireless.$sta.disabled" || true)"
+            case "$disabled" in ''|0) enabled=1;; 1) ;; *) error "invalid STA state";; esac
+            ssid="$(get "wireless.$sta.ssid" || true)"
+            bssid="$(get "wireless.$sta.bssid" || true)"
+            state="$(ubus -t 3 call network.interface.wwan status '{}' || true)"
+            if [ "$enabled" = 1 ] && [ "$(printf '%s' "$state" | jsonfilter -e '@.up' || true)" = true ]; then
+                address="$(printf '%s' "$state" | jsonfilter -e '@["ipv4-address"][0].address' || true)"
+                uptime="$(printf '%s' "$state" | jsonfilter -e '@.uptime' || true)"
+                dev="$(printf '%s' "$state" | jsonfilter -e '@.l3_device' || true)"
+                case "$dev" in ''|.|..|-*|*[!a-zA-Z0-9_.-]*) ;; *)
+                    rx="$(cat "/sys/class/net/$dev/statistics/rx_bytes" 2>/dev/null || true)"
+                    tx="$(cat "/sys/class/net/$dev/statistics/tx_bytes" 2>/dev/null || true)";;
+                esac
+            fi
+        fi
+        success "native Wi-Fi uplink inventory"
+        json_add_string enabled "$enabled"; json_add_string ssid "$ssid"
+        json_add_string apclient_wifiname "$ssid"; json_add_string bssid "$bssid"
+        json_add_string key ""; json_add_string encryption "$(if [ -n "$sta" ]; then get "wireless.$sta.encryption" || true; fi)"
+        json_add_string apclient_ip "$address"; json_add_string apclient_rx "$rx"
+        json_add_string apclient_tx "$tx"; json_add_string apclient_uptime "$uptime"
+        json_add_string configuration_supported 0
+        ;;
+    app_home)
+        # Measure the current default IPv4 egress, not estimated link speed.
+        route_dev() { ip -4 route show default | awk 'NR==1{for(i=1;i<NF;i++)if($i=="dev"){print $(i+1);exit}}'; }
+        dev="$(route_dev)"
+        rx=""; tx=""; selected=none
+        case "$dev" in ''|.|..|-*|*[!a-zA-Z0-9_.-]*) ;;
+            *)
+                selected=local_route
+                # Exact interface only. No modem AT or active Internet probe.
+                counter() { cat "/sys/class/net/$dev/statistics/$1" 2>/dev/null; }
+                a="$(counter rx_bytes || true)"; b="$(counter tx_bytes || true)"
+                t1="$(cut -d' ' -f1 /proc/uptime)"
+                sleep 1
+                c="$(counter rx_bytes || true)"; d="$(counter tx_bytes || true)"
+                t2="$(cut -d' ' -f1 /proc/uptime)"
+                if [ "$(route_dev)" = "$dev" ]; then
+                    rate() { awk -v a="$1" -v b="$2" -v t="$t1" -v u="$t2" 'BEGIN{if(a~/^[0-9]+$/&&b~/^[0-9]+$/&&length(a)<=15&&length(b)<=15&&b>=a&&u>t&&u-t<=5)printf "%.0f",(b-a)/(u-t)}'; }
+                    rx="$(rate "$a" "$c")"; tx="$(rate "$b" "$d")"
+                fi;;
+        esac
+        success "local egress sample"
+        json_add_string interface "$dev"; json_add_string route_state "$selected"
+        json_add_string internet_status unknown
+        json_add_string rx "$rx"; json_add_string tx "$tx"
+        ;;
+    get_mac_blacklist)
+        native="$(native_read veci.v2.firewall status)" || error "firewall unavailable"
+        revision="$(field '@.revision')" || error "firewall revision unavailable"
+        (json_load "$native" && json_get_type typ blocked_macs && [ "$typ" = array ]) || error "MAC rule inventory unavailable"
+        success "get native MAC block list success"
+        json_add_string revision "$revision"
+        json_add_string scope lan_to_wan
+        json_add_array arp_mac_list
+        for neighbour in $(lan_neighbours); do json_add_string "" "$neighbour"; done
+        json_close_array
+        json_add_array mac_blacklist
+        for mac in $(field '@.blocked_macs[*]' || true); do
+            printf '%s\n' "$mac" | grep -Eiq '^[0-9a-f]{2}(:[0-9a-f]{2}){5}$' || error "invalid MAC rule"
+            json_add_string "" "$mac"
+        done
+        json_close_array
         ;;
     get_netwatchdog)
         native="$(native_read veci.v2.lte status)" || error "LTE monitor unavailable"

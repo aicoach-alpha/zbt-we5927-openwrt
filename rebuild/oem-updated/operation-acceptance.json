@@ -6,7 +6,10 @@
       "state": "UNIMPLEMENTED"
     },
     "app_home": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "Native Linux interface counters and default route",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Measured byte rates on current default IPv4 interface, unknown Internet reachability; counter reset and route changes produce gaps. Browser/runtime acceptance pending."
     },
     "bootflag": {
       "state": "UNIMPLEMENTED"
@@ -161,7 +164,10 @@
       "limitations": "Native redacted logs translated to OEM format; browser and redaction validation pending."
     },
     "get_mac_blacklist": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:status",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Native owned LAN-to-WAN MAC rule, LAN neighbour picker; old OEM form not yet adapted."
     },
     "get_mesh_topology": {
       "state": "UNIMPLEMENTED"
@@ -311,10 +317,16 @@
       "state": "PROTOTYPE"
     },
     "get_wifi_apclient_config": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "OpenWrt wireless UCI and netifd",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Read-only single native STA profile, no key disclosure; STA setup not implemented. Runtime acceptance pending."
     },
     "get_wifi_apclient_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "OpenWrt netifd and native counters",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Actual WWAN address and counters when available; association status and live BSSID not verified; no Wi-Fi uplink write."
     },
     "get_wifi_client": {
       "state": "PROTOTYPE",
@@ -343,7 +355,10 @@
       "state": "UNIMPLEMENTED"
     },
     "home_json": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "Existing native OEM read adapters",
+      "evidence": "rebuild/oem-updated/backend/home-adapter.sh",
+      "limitations": "Aggregate original dashboard, bounded single-flight polling, remove vendor random CPU suppression; runtime and all original dashboard data bindings pending."
     },
     "language_get": {
       "state": "PROTOTYPE"
@@ -488,7 +503,10 @@
       "limitations": "Explicit confirmation and revision; OEM form adaptation and manual network activation pending."
     },
     "set_mac_blacklist": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:setMacBlock",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Explicit revision and confirmation; owned LAN-to-WAN rule, disables flow offload when list configured; existing connections, actual nft enforcement and OEM original form pending."
     },
     "set_n2n": {
       "state": "UNIMPLEMENTED"

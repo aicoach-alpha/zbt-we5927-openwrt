@@ -89,6 +89,11 @@ case "$op" in
         [ "${REQUEST_METHOD:-}" = POST ] || err -4 "POST required for private backup"
         printf '%s' "$session" | REQUEST_METHOD=POST CONTENT_TYPE=application/octet-stream CONTENT_LENGTH=32 QUERY_STRING= /usr/libexec/oem-updated/shared-backup
         exit 0 ;;
+    home_json)
+        [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
+        data="$(timeout 24 /usr/libexec/oem-updated/home-adapter)" || err -4 "dashboard unavailable or busy"
+        [ -n "$data" ] || err -4 "dashboard unavailable"
+        reply "$data" ;;
     logout)
         [ "${REQUEST_METHOD:-}" = POST ] || err -4 "method refused"
         ubus -t 3 call session destroy "{\"ubus_rpc_session\":\"$session\"}" >/dev/null || err -4 "logout failed"
@@ -96,7 +101,7 @@ case "$op" in
     long_link)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         reply '{"code":"1","reason":"success"}' ;;
-    set_fw_setting|set_nat_acceleration|set_wifi_guest|set_dhcp_config|set_static_dhcp|delete_static_dhcp|set_ntp|set_dmz|set_lan_config|set_wan_config|set_4g|set_4g_sim|set_netwatchdog|setWiFi2|set_static_route|set_redirect_dnat)
+    set_mac_blacklist|set_fw_setting|set_nat_acceleration|set_wifi_guest|set_dhcp_config|set_static_dhcp|delete_static_dhcp|set_ntp|set_dmz|set_lan_config|set_wan_config|set_4g|set_4g_sim|set_netwatchdog|setWiFi2|set_static_route|set_redirect_dnat)
         [ "${REQUEST_METHOD:-}" = POST ] || err -4 "method refused"
         case "${CONTENT_TYPE:-}" in application/json|application/json\;*) ;; *) err -4 "JSON required";; esac
         case "${CONTENT_LENGTH:-}" in ''|*[!0-9]*) err -4 "invalid body length";; esac
@@ -108,7 +113,7 @@ case "$op" in
         data="$(printf '%s' "$body" | /usr/libexec/oem-updated/write-adapter "$op" "$session")" || err -4 "native write failed"
         [ -n "$data" ] || err -4 "native write unavailable"
         reply "$data" ;;
-    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status|get_ntp|get_static_dhcp|get_dmz|get_module_signal|get_arp|get_dhcp_allocation|get_wan_config|getWiFi2|get_pppoe_status|get_4g|get_4g_log|get_wifi_guest|get_static_route|get_redirect_dnat|get_log_list|get_lan_status|get_wan_status|get_system_status|get_wifi_client|get_fw_setting|get_port|get_network_topology|get_wan_traffic|online_upgrade_check|get_days_traffic|refresh_days_traffic|get_disk|get_wifi_power|get_imei|search_ctcode_and_channals)
+    get_sys_version|get_lan_config|get_dhcp_config|get_netwatchdog|get_nat_acceleration|get_web_msg|get_module_status|get_ntp|get_static_dhcp|get_dmz|get_module_signal|get_arp|get_dhcp_allocation|get_wan_config|getWiFi2|get_pppoe_status|get_4g|get_4g_log|get_wifi_guest|get_static_route|get_redirect_dnat|get_log_list|get_lan_status|get_wan_status|get_system_status|get_wifi_client|get_fw_setting|get_port|get_network_topology|get_wan_traffic|online_upgrade_check|get_days_traffic|refresh_days_traffic|get_disk|get_wifi_power|get_imei|search_ctcode_and_channals|get_wifi_apclient_config|get_wifi_apclient_status|app_home|get_mac_blacklist)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         if [ "$sim_seen" = 1 ]; then
             data="$(/usr/libexec/oem-updated/read-only-adapter "$op" "$sim_preview")" || err -4 "backend unavailable"

@@ -76,6 +76,21 @@
         "setOffload"
       ],
       "state": "SOURCE_INTEGRATED_NOT_UAT"
+    },
+    "native_dashboard": {
+      "provider": "OEM read adapters + shared OpenWrt runtime",
+      "state": "SOURCE_STAGED_NOT_RUNTIME_VERIFIED",
+      "polling": "10s single-flight",
+      "cpu": "measured, vendor random reduction removed"
+    },
+    "mac_access_control": {
+      "provider": "veci.v2.firewall",
+      "methods": [
+        "status",
+        "setMacBlock"
+      ],
+      "scope": "LAN to WAN, not router management",
+      "state": "SOURCE_STAGED_NOT_RUNTIME_VERIFIED"
     }
   },
   "remaining": [

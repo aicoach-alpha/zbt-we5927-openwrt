@@ -33,6 +33,7 @@ function clearSession() {
   el('backup-message').textContent = '';
   dhcpRevision = ''; el('dhcp-form').reset(); el('dhcp-save').disabled = true;
   el('dhcp-result').textContent = ''; el('traffic-result').textContent = '';
+  macRevision=''; el('mac-form').reset(); el('mac-save').disabled=true; el('mac-result').textContent='';
   fwRevision=''; el('fw-save').disabled=true; el('offload-save').disabled=true; el('fw-form').reset(); el('offload-form').reset(); el('fw-result').textContent='';
   guestState=''; el('guest-enable').disabled=true; el('guest-disable').disabled=true; el('guest-result').textContent='';
 }
@@ -211,3 +212,29 @@ async function saveFirewall(e,offload){
 }
 el('fw-form').onsubmit=e=>saveFirewall(e,false);
 el('offload-form').onsubmit=e=>saveFirewall(e,true);
+
+let macRevision='';
+el('mac-refresh').onclick=async()=>{
+  const token=sid,button=el('mac-refresh');if(!token||button.disabled)return;
+  button.disabled=true;macRevision='';el('mac-save').disabled=true;
+  try{
+    const result=await oem('get_mac_blacklist',undefined,token);
+    if(!/^[0-9a-f]{64}$/.test(result.revision||'')||!Array.isArray(result.mac_blacklist))throw Error('MAC rule inventory unavailable');
+    el('mac-list').value=result.mac_blacklist.join('\n');
+    macRevision=result.revision;el('mac-save').disabled=false;
+    el('mac-result').textContent='Daftar dibaca. Cakupan LAN ke WAN.';
+  }catch(err){if(sid===token)el('mac-result').textContent=err.message;}
+  finally{button.disabled=false;}
+};
+el('mac-form').onsubmit=async e=>{
+  e.preventDefault();const token=sid,revision=macRevision;
+  if(!token||!revision)return;
+  const list=el('mac-list').value.split(/\s+/).filter(Boolean);
+  if(list.length>16||list.some(x=>!/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i.test(x))){el('mac-result').textContent='Maksimal 16 MAC valid.';return;}
+  if(!window.confirm('Terapkan blokir LAN ke WAN? Flow offload dinonaktifkan ketika daftar berisi MAC.'))return;
+  macRevision='';el('mac-save').disabled=true;clearFirewall();
+  try{
+    await oem('set_mac_blacklist',{mac_blacklist:list,revision,confirmation:'SAVE_MAC_BLOCK'},token);
+    if(sid===token)el('mac-result').textContent='Konfigurasi diterima. Baca ulang dan uji konektivitas klien.';
+  }catch(err){if(sid===token)el('mac-result').textContent=err.message;}
+};
