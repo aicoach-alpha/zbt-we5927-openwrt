@@ -517,8 +517,15 @@ modem_readiness_phase() {
  ip link show "$dev" >/dev/null 2>&1 || { echo usb_missing; return 0; }
  p="$(at_port 2>/dev/null)" || { echo at_unavailable; return 0; }
  [ -c "$p" ] || { echo at_unavailable; return 0; }
- response="$(at 'AT+CPIN?' 1500 2>/dev/null)" ||
-   { echo at_busy_or_unavailable; return 0; }
+ response="$(at 'AT+CPIN?' 1500 2>/dev/null)" || {
+   # The AT transport returns nonzero on CME ERROR. Preserve a concrete SIM
+   # absence instead of misclassifying it as an unavailable/busy AT port.
+   case "$response" in
+     *'+CME ERROR: SIM not inserted'*) echo sim_missing ;;
+     *) echo at_busy_or_unavailable ;;
+   esac
+   return 0
+ }
  case "$response" in
    *'+CPIN: READY'*) ;;
    *'+CPIN: SIM PIN'*) echo sim_pin_required; return 0 ;;
