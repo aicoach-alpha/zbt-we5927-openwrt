@@ -199,11 +199,11 @@
             <p id="wifi-visibility-status" role="status"></p>
             <button id="wifi-visibility-change" type="button" disabled>Ubah visibilitas</button>
             <section class="wifi-activation-action" aria-label="Aktivasi Access Point">
-              <h3>Aktivasi Wi-Fi yang aman</h3>
-              <p>Setelah SSID dan WPA2 tersimpan, aktivasi satu kali menerapkan AP melalui netifd. Langkah ini dapat memutus LAN/LTE sebentar dan berisiko hang MT76. Gunakan kabel LAN; jangan ulangi jika gagal.</p>
-              <button id="wifi-activate-ap" type="button" disabled>Aktifkan Access Point WPA2</button>
+              <h3>Persiapan aktivasi Wi-Fi WPA2</h3>
+              <p>Setelah SSID dan WPA2 tersimpan, langkah ini hanya menyimpan status AP untuk boot berikutnya. Tidak menjalankan network reload, restart radio, atau modem. Aktivasi membutuhkan reboot manual terpisah melalui koneksi LAN kabel.</p>
+              <button id="wifi-activate-ap" type="button" disabled>Siapkan AP untuk reboot manual</button>
               <p id="wifi-activate-status" role="status">Memeriksa kesiapan Wi-Fi...</p>
-              <p class="notice">PASS dari hostapd bukan bukti SSID terlihat, klien terhubung, atau internet dari HP. Tetap perlu UAT eksternal.</p>
+              <p class="notice">Konfigurasi tersimpan bukan bukti AP menyala. Setelah reboot manual, wajib uji beacon SSID, autentikasi WPA2, DHCP, DNS, dan internet dari perangkat klien.</p>
             </section>
           </article>
           <article class="panel" data-group="wifi">

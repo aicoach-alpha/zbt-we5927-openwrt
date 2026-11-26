@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-ui
 PKG_VERSION:=0.1
-PKG_RELEASE:=27
+PKG_RELEASE:=28
 
 include $(INCLUDE_DIR)/package.mk
 

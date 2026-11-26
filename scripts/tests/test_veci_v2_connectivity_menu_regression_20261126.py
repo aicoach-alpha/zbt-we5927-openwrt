@@ -54,8 +54,11 @@ class ConnectivityMenuRegressions(unittest.TestCase):
     self.assertIn(method,methods[obj],file.name+":"+obj+"."+method)
   # Dynamic method routing (not visible to regex) must use correct provider.
   service=(UI/"services.js").read_text()
-  self.assertIn("isProfileAction ? 'veci.v2.addon' : 'veci.v2.services'",service)
-  self.assertIn("rpc('veci.v2.addon', 'status'",service)
+  self.assertIn("rpc('veci.v2.services', change ? 'save' : 'status'",service)
+  self.assertNotIn("getElementById('addon-read')",service)
+  self.assertNotIn("veci.v2.addon",service.replace("veci.v2.addon;",""))
+  addon=(UI/"addon-profiles.js").read_text()
+  self.assertIn("rpc('veci.v2.addon','status'",addon)
   self.assertTrue({"status","setVpnStartup","setPortalStartup"}<=methods["veci.v2.addon"])
  def test_activation_has_acl_and_one_shot_fail_closed(self):
   rpc=(RUNTIME/"veci2-wifi").read_text()
@@ -63,17 +66,22 @@ class ConnectivityMenuRegressions(unittest.TestCase):
   acl=json.loads((RUNTIME/"veci2-status-acl.json").read_text())["veci-v2-wifi"]
   self.assertIn("activationStatus",acl["read"]["ubus"]["veci.v2.wifi"])
   self.assertIn("activateAp",acl["write"]["ubus"]["veci.v2.wifi"])
-  self.assertIn("ACTIVATE_WPA2_AP_ONCE",rpc)
+  self.assertIn("PREPARE_WPA2_AP_NEXT_BOOT",rpc)
   self.assertIn("previous_activation_failed_manual_review_required",rpc)
   self.assertIn('wireless.default_radio0.encryption',helper)
   self.assertIn('wpa2_required',helper)
   self.assertIn('mt76_prior_error',helper)
-  self.assertIn('sleep 75',helper)
-  self.assertIn('hostapd_not_enabled',helper)
-  self.assertIn('failed:timeout_config_restored_runtime_unknown',helper)
-  self.assertEqual(helper.count("call network reload '{}'"),1)
+  self.assertIn('record prepared_next_reboot',helper)
+  self.assertIn('cp -p "$backup" /etc/config/wireless',helper)
+  self.assertIn("config_restore_unverified",helper)
+  self.assertNotIn("call network reload",helper.split("# This helper NEVER",1)[0])
+  self.assertNotIn("ubus -S -t 12 call network reload",helper)
+  self.assertNotIn("wifi up",helper.split("# This helper NEVER",1)[0])
+  self.assertNotIn("sleep 75",helper)
+  self.assertIn("enabled_unverified",rpc)
+  self.assertIn("prepared_next_reboot",rpc)
   for forbidden in ("ifdown lte","ifup lte","AT+CFUN","sim 2","sysupgrade -",
-                    "mtd write","/sbin/wifi up","reboot"):
+                    "mtd write","/sbin/wifi up","/sbin/reboot"):
    self.assertNotIn(forbidden,"\n".join(x for x in helper.splitlines() if not x.strip().startswith("#")))
   with tempfile.TemporaryDirectory() as temp:
    root=Path(temp)

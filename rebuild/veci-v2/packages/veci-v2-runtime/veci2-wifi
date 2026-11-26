@@ -48,7 +48,7 @@ case "${1:-}:${2:-}" in
       if [ -r /tmp/veci2-wifi-activate.state ]; then
         raw=$(cat /tmp/veci2-wifi-activate.state 2>/dev/null) || raw=
         case "$raw" in
-          preflight|saving|reloading|verifying|ready) phase=$raw ;;
+          preflight|saving|prepared_next_reboot) phase=$raw ;;
           failed:*)
             reason=$(printf %s "$raw" | sed 's/^failed://')
             case "$reason" in ''|*[!a-z0-9_]*) phase=failed ;; *) phase="failed:$reason" ;; esac ;;
@@ -62,17 +62,22 @@ case "${1:-}:${2:-}" in
          [ "$(uci -q get "$ap.encryption" 2>/dev/null || :)" = psk2 ] &&
          [ "$key_length" -ge 8 ] && [ "$key_length" -le 63 ] &&
          [ -n "$(ssid_value)" ]; then eligible=true; fi
-      case "$phase" in failed:*|preflight|saving|reloading|verifying) eligible=false ;; esac
+      case "$phase" in failed:*|preflight|saving|prepared_next_reboot) eligible=false ;; esac
+      # After the separately approved manual reboot, /tmp phase disappears.
+      # A persisted AP config alone is NOT proof that the radio or client works.
+      if [ "$(uci -q get "$ap.disabled" 2>/dev/null || :)" = 0 ] &&
+         [ "$phase" = idle ]; then phase=enabled_unverified; fi
       printf '{"ok":true,"phase":"%s","eligible":%s,"beacon_verified":false}\n' "$phase" "$eligible"
     else
       request=$(head -c 257)
       [ "$(printf %s "$request" | wc -c | tr -d ' ')" -le 256 ] || fail invalid_request
       action=$(jsonfilter -s "$request" -e '@.confirmation' 2>/dev/null) || fail invalid_request
-      [ "$action" = ACTIVATE_WPA2_AP_ONCE ] || fail explicit_confirmation_required
+      [ "$action" = PREPARE_WPA2_AP_NEXT_BOOT ] || fail explicit_confirmation_required
       [ -x /usr/libexec/veci2-wifi-activate ] || fail activation_helper_missing
       [ "$(uci -q get "$ap.disabled" 2>/dev/null || :)" = 1 ] || fail ap_already_enabled
       case "$(cat /tmp/veci2-wifi-activate.state 2>/dev/null)" in
-        preflight|saving|reloading|verifying) fail activation_already_running ;;
+        preflight|saving) fail activation_already_running ;;
+        prepared_next_reboot) fail manual_reboot_required_before_retry ;;
         failed:*) fail previous_activation_failed_manual_review_required ;;
       esac
       ( /usr/libexec/veci2-wifi-activate ) </dev/null >/dev/null 2>&1 &

@@ -12,9 +12,10 @@ One ZBT-WE5927-DSIM router, OpenWrt 25.12.6 custom v2, connected to office Windo
 
 ## Source defects and fixes
 1. Factory-safe AP off with no working native activation wizard. One opt-in,
-   guarded WPA2 activation path is now in the v2 Wi-Fi RPC. Explicit consent,
-   clean UCI, exact board, PHY, hostapd verification, one bounded netifd reload,
-   backup and fail-closed watchdog. Never auto-retry a failed attempt.
+   guarded WPA2 preparation path now exists in the v2 Wi-Fi RPC. Exact-board,
+   clean UCI, PHY and credential checks, backup and rollback. It SAVES UCI only;
+   there is NO network reload or radio restart. A separately authorized manual
+   reboot is required to apply the AP; then external client UAT is mandatory.
 2. Wi-Fi v2 required optional hexdump for SSID/status. Use existing libubox JSON
    encoder instead and preserve the prior hex response as an accepted UI input.
 3. Wi-Fi SSID/security/visibility controls were located in Network Overview,
@@ -62,3 +63,31 @@ The current owner router remains untouched. All changes are source-only.
   libjson-c-dev before provisioning. Native full-suite result: PENDING CI.
 - No GUI/browser full E2E, real new-binary LTE/Wi-Fi UAT, signing or 72h
   acceptance has been completed.
+
+## Follow-up whole-firmware bug audit, 26 November 2026
+Machine register: rebuild/veci-v2/contracts/veci-v2-bug-registry-20261126.json
+Audit runner: rebuild/veci-v2/ci/bug-regression-gate.py
+The register covers all 39 mandatory active modules and distinguishes:
+- confirmed bugs repaired in source, NOT confirmed on a newly built image;
+- known unresolved defects and driver/kernel risks;
+- cases that can only be accepted on physical hardware or in native CI.
+A known unresolved source defect now blocks the source-completion gate.
+An incomplete bug record, missing test mapping, or missing module coverage
+also blocks the gate. A signed firmware is still prohibited until the
+existing independent physical acceptance gates are passed.
+Uncertainties are never converted into PASS on the strength of source code.
+
+## Whole-suite test evidence before this audit commit
+- 517 source tests executed on andre-nas using repository suite.
+- 15 failures recorded: 14 required pinned native UCI/libubox unavailable
+  on the development host, plus 1 provenance test that intentionally
+  rejects the uncommitted edited services.js. The latter is to be rerun
+  after committing its exact reviewed source.
+- Native UCI host provisioning cannot complete locally without json-c
+  development headers. The source-only CI workflow installs that dependency.
+- Focused regression tests for complete UI module startup, actual Addon/
+  Services DOM bindings, canonical RPC discovery, bug-registry coverage,
+  and exact ROM helper inclusion passed separately.
+- The firmware build/source-completion gate is BLOCKED and will stay
+  blocked until actual source acceptance and risk closure; the one physical
+  router is untouched.

@@ -695,18 +695,20 @@ async function refreshWifiActivation() {
     if (sid !== current) return;
     if (data.ok !== true) throw Error(data.error || 'Status aktivasi tidak tersedia');
     const phase = String(data.phase || 'idle');
-    if (phase === 'ready') {
-      status.textContent = 'AP berhasil dijalankan oleh hostapd. Uji SSID, IP klien, dan internet pada HP.';
+    if (phase === 'prepared_next_reboot') {
+      status.textContent = 'WPA2 AP tersimpan untuk boot berikutnya. Reboot MANUAL lewat LAN diperlukan; belum ada bukti AP berfungsi.';
+    } else if (phase === 'enabled_unverified') {
+      status.textContent = 'Konfigurasi AP aktif. Periksa hostapd, SSID dari HP, DHCP, dan internet; status belum terverifikasi.';
     } else if (phase.startsWith('failed:')) {
       status.textContent = 'Aktivasi gagal: ' + phase.slice(7).replace(/_/g, ' ') +
         '. Konfigurasi dipulihkan; jangan mengulangi tanpa pemeriksaan driver.';
-    } else if (['preflight','saving','reloading','verifying'].includes(phase)) {
+    } else if (['preflight','saving'].includes(phase)) {
       status.textContent = 'Aktivasi masih diperiksa: ' + phase +
         '. Jangan reload radio atau jaringan.';
     } else if (data.eligible === true) {
-      status.textContent = 'SSID dan WPA2 sudah siap. Aktivasi satu kali memerlukan persetujuan eksplisit.';
+      status.textContent = 'SSID dan WPA2 siap. Menyimpan konfigurasi untuk reboot manual memerlukan konfirmasi.';
     } else {
-      status.textContent = 'AP sudah aktif atau WPA2 belum siap. Simpan keamanan terlebih dahulu, lalu perbarui status.';
+      status.textContent = 'AP sudah disiapkan atau WPA2 belum siap. Simpan keamanan lalu periksa status; jangan memaksa reload.';
     }
     button.disabled = data.eligible !== true;
   } catch (error) {
@@ -720,24 +722,24 @@ async function requestWifiActivation() {
   const button = el('wifi-activate-ap');
   if (button.disabled) return;
   if (!window.confirm(
-    'Aktifkan AP WPA2 satu kali? Router akan melakukan reload konfigurasi netifd. ' +
-    'LAN dan LTE bisa terputus sesaat dan driver MT76 berisiko macet. ' +
-    'Pastikan menggunakan kabel LAN dan siap melakukan pemulihan manual bila diperlukan.'
+    'Siapkan WPA2 AP untuk boot berikutnya? Tidak ada network reload, ' +
+    'radio restart atau reboot otomatis. ' +
+    'Reboot manual terpisah lewat kabel LAN diperlukan sesudahnya.'
   )) return;
   wifiActivationBusy = true;
   button.disabled = true;
   const current = sid;
   const status = el('wifi-activate-status');
-  status.textContent = 'Mengirim satu permintaan aktivasi...';
+  status.textContent = 'Menyimpan konfigurasi AP untuk reboot manual...';
   try {
     const response = await rpc('veci.v2.wifi','activateAp',
-      {confirmation:'ACTIVATE_WPA2_AP_ONCE'},current,10000);
+      {confirmation:'PREPARE_WPA2_AP_NEXT_BOOT'},current,10000);
     if (sid !== current) return;
     if (response.ok !== true || response.queued !== true)
       throw Error(response.error || 'Permintaan ditolak');
-    status.textContent = 'Permintaan diterima, belum membuktikan AP berjalan. Memeriksa hasil...';
-    for (let attempt = 0; attempt < 28; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 3000));
+    status.textContent = 'Permintaan diterima. Tidak ada aktivasi radio otomatis; memeriksa hasil simpan...';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
       if (sid !== current) return;
       let outcome;
       try { outcome = await rpc('veci.v2.wifi','activationStatus',{},current,8500); }
@@ -748,9 +750,8 @@ async function requestWifiActivation() {
       if (sid !== current) return;
       if (outcome.ok !== true) throw Error(outcome.error || 'Status tidak tersedia');
       const phase = String(outcome.phase || 'idle');
-      if (phase === 'ready') {
-        status.textContent = 'AP hostapd siap. Uji SSID dan internet dari HP; hasil eksternal belum terverifikasi.';
-        void refreshNetwork();
+      if (phase === 'prepared_next_reboot') {
+        status.textContent = 'Konfigurasi AP tersimpan. Reboot MANUAL diperlukan. Setelah itu uji SSID, WPA2, DHCP, DNS dan internet.';
         return;
       }
       if (phase.startsWith('failed:')) {
@@ -758,9 +759,9 @@ async function requestWifiActivation() {
           '. Jangan coba ulang; periksa driver dan koneksi LAN secara manual.';
         return;
       }
-      status.textContent = 'Aktivasi: ' + phase + ' — satu kali, tanpa percobaan ulang otomatis.';
+      status.textContent = 'Persiapan: ' + phase + ' — tidak ada reload atau reboot otomatis.';
     }
-    status.textContent = 'Status akhir belum terkonfirmasi. Jangan kirim permintaan kedua.';
+    status.textContent = 'Hasil penyimpanan belum terkonfirmasi. Jangan kirim permintaan kedua.';
   } catch (error) {
     if (sid === current) status.textContent = 'Aktivasi tidak terkonfirmasi: ' +
       String(error.message || 'unknown') + '. Periksa status sebelum bertindak lagi.';
