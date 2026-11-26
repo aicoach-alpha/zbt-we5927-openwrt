@@ -192,7 +192,8 @@
         "veci.v2.wifi": [
           "status",
           "info",
-          "activationStatus"
+          "activationStatus",
+          "power"
         ]
       }
     },
@@ -206,7 +207,8 @@
           "setChannel",
           "setAccess",
           "setAuth",
-          "activateAp"
+          "activateAp",
+          "setPower"
         ]
       }
     }
