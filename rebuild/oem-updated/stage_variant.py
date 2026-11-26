@@ -152,6 +152,22 @@ def stage(image, out):
             raise ValueError("OEM client policy anchor changed")
         client.write_text(client_code.replace(old,new))
         subprocess.run(["node","--check",str(client)],check=True)
+        # Replace the vendor's state-changing GET calls with authenticated
+        # POST, confirmation, and the current native network revision.
+        wan = files / "www/assets/js/chunk-4f3e33ae.e79f6535.js"
+        wan_code = wan.read_text()
+        for op,action,label in (("pppoe_disconnect","DISCONNECT_ETHERNET_PPPOE","disconnect"),("pppoe_reconnect","RECONNECT_ETHERNET_PPPOE","reconnect")):
+            old = 'this.proxy_req("get","/webapi?op='+op+'",{'+label+':"'+label+'"},(function('+("e" if label=="disconnect" else "t")+'){console.log('+("e,t._throttle" if label=="disconnect" else "t")+')}),!0)'
+            new = 'if(!window.confirm("'+label.capitalize()+' Ethernet WAN PPPoE?"))return;this.$req.get("/webapi?op=get_pppoe_status").then(function(x){if(!x||x.code!=="1"||!/^[0-9a-f]{64}$/.test(x.revision||""))throw Error("PPPoE state unavailable");return t.$req.post("/webapi?op='+op+'",{revision:x.revision,confirmation:"'+action+'"})}).then(function(x){if(!x||x.code!=="1")throw Error("PPPoE request rejected");t.$message.success("Requested; check connection status.")}).catch(function(){t.$message.error("PPPoE request failed; refresh status.")})'
+            if wan_code.count(old)!=1:
+                raise ValueError("OEM PPPoE action anchor changed: "+op)
+            wan_code=wan_code.replace(old,new)
+        old=r'this.proxy_req("get","/webapi?op=pppoe_detection",{pppoe_detection:"pppoe_detection"},(function(e){console.log(e),t.detectionList=e.data.pppoe_detection.split("\n")}),!0)'
+        new=r'if(!window.confirm("Discover Ethernet PPPoE access concentrators?"))return;this.$req.post("/webapi?op=pppoe_detection",{confirmation:"DISCOVER_ETHERNET_PPPOE"}).then(function(x){if(!x||x.code!=="1"||!x.data)throw Error("Discovery unavailable");t.detectionList=["Exit code: "+x.data.exit_code].concat(x.data.pppoe_detection.split("\n"))}).catch(function(){t.$message.error("Ethernet discovery unavailable.")})'
+        if wan_code.count(old)!=1:
+            raise ValueError("OEM PPPoE discovery anchor changed")
+        wan.write_text(wan_code.replace(old,new))
+        subprocess.run(["node","--check",str(wan)],check=True)
         routed = route_oem_cgi(files / "www")
         if routed < 100:
             raise ValueError("incomplete OEM CGI route inventory")

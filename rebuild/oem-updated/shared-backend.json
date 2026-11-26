@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "upstream_commit": "9203cc7f559e8a1695aa9c530a34bd3357d8e93e",
+  "upstream_commit": "e6ef5d691ccfe8d51ce3aed5f6f3997ec2d111da",
   "upstream_branch": "feat/shared-dhcp-pool-traffic-20261126",
   "status": "source_synced_not_runtime_accepted",
   "files": {
@@ -11,7 +11,7 @@
     "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6": "038862684426c507120a1e40b22d2f7016fcc57da08ce542c53bd73667c7329b",
     "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra": "0c1797aabfd2c7e343e42afe5d96dae74e418bc2d3a637e1b010be264369c273",
     "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json": "eb74a43c6b3cb8364ee7ada9c910c7840f5b6d08314b1821020ea7158c89a455",
-    "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "6c3833c2977d3df0b85f997a5db3196e39d8c752f2427f400177ce8bdf0e761f",
+    "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4c0b0bc59a3eb37069be96b9d561d1b88ba2641c39f5f94b47474b90f58aaac8",
     "rebuild/veci-v2/packages/veci-v2-runtime/files/etc/init.d/veci2-observe": "3d692a3f4ecad588732a61543ece7aba1becb98c35ced541145ef001e008e4be",
     "rebuild/veci-v2/packages/veci-v2-runtime/update-policy.default": "5cbd4963ad40386508a15657dc46eca771d7d830cc90b8833adf0453020c247c",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-access": "39151ca7f60d0ecf54d63180a3b2f0973e96c2064f3f6626ee652e9e96e6c7e6",
@@ -27,8 +27,8 @@
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-gpio-watchdog": "2c90358adf9d9f932f7c9e2df0eb76236c5803012ee277a7d7054722af7813f4",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-acl.json": "11a3da690607e9d87b7c7c99ad9b54e1941d1308b206250fc081b1c6e103a189",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-check": "e118d4c03804513bd1998c4e8dde0323811362239075dc309c63648e342868a9",
-    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-interfaces": "7670dd1f87114c6ed7e14923571661e3ef66905d8a633120a29f34779466905e",
-    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-interfaces-acl.json": "8fee0e3f099ff74cc8184c2033edb8cffcc4731a69eb869ce57cc5c5878ac45d",
+    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-interfaces": "8c7f5ebb2f0959cd8dc8b24429506b5fd167981b5332539682a602a16b4d578a",
+    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-interfaces-acl.json": "013967a4921b7996751e353b5283d6d7ae7015a5e211a82607060ea701ca62fa",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lan-bounds": "df8c812e57e3e1c9243e591df61cdc7b683570ecca76d13bbcf0632c85e9d88f",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lte-policy": "f5f608760fae69f93327e81f08ab1216065c82dc156efb761286312d6bd8ed8b",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-observe": "fa02fa9e64533d0750006fbdbf38eb7df56d7d519605e47e52f7dfbcdabfe67a",

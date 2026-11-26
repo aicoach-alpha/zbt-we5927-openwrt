@@ -118,6 +118,18 @@
       "provider": "OpenWrt firewall UCI + native status",
       "scope": "read-only; no global ACL switch",
       "state": "SOURCE_INTEGRATED_NOT_UAT"
+    },
+    "pppoe": {
+      "provider": "veci.v2.interfaces",
+      "methods": [
+        "pppoeStatus",
+        "pppoeDiscovery",
+        "pppoeAction"
+      ],
+      "scope": "existing Ethernet WAN profile; no LTE reset",
+      "original_oem_buttons": "source patched and syntax checked",
+      "state": "SOURCE_INTEGRATED_NOT_UAT",
+      "limitations": "profile creation, physical device mapping, discovery and reconnect not verified"
     }
   },
   "remaining": [

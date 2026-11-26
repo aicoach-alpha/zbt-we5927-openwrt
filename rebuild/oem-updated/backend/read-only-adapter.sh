@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -274,15 +274,16 @@ case "$1" in
     get_wan_config)
         native="$(native_read veci.v2.interfaces status)" || error "native WAN unavailable"
         mode="$(field '@.wan_mode')" || error "WAN mode unavailable"
-        case "$mode" in dhcp|static) ;; *) error "WAN mode unsupported";; esac
+        case "$mode" in dhcp|static|pppoe) ;; *) error "WAN mode unsupported";; esac
         state="$(ubus -t 3 call network.interface.wan status)" || error "WAN state unavailable"
         live() { printf '%s' "$state" | jsonfilter -e "$1"; }
         up="$(live '@.up')" || error "WAN link state unavailable"
         case "$up" in true|false) ;; *) error "WAN link state invalid";; esac
         dev="$(live '@.device' || true)"
-        case "$dev" in ''|*[!a-zA-Z0-9_.-]*) error "WAN device unavailable";; esac
-        mac="$(cat "/sys/class/net/$dev/address" 2>/dev/null)" || error "WAN MAC unavailable"
-        [ -n "$mac" ] || error "WAN MAC unavailable"
+        if [ "$mode" = pppoe ] && [ -z "$dev" ]; then dev="$(get network.wan.device || true)"; fi
+        case "$dev" in ''|.|..|-*|*[!a-zA-Z0-9_.-]*) error "WAN device unavailable";; esac
+        mac="$(cat "/sys/class/net/$dev/address" 2>/dev/null || true)"
+        [ -n "$mac" ] || [ "$up" = false ] || error "WAN MAC unavailable"
         if [ "$mode" = static ]; then
             address="$(field '@.wan')" || error "WAN address unavailable"
             mask="$(field '@.wan_mask')" || error "WAN mask unavailable"
@@ -290,7 +291,18 @@ case "$1" in
         else
             address="$(live '@["ipv4-address"][0].address' || true)"
             mask="$(live '@["ipv4-address"][0].mask' || true)"
-            gateway="$(live "@.route[@.target='0.0.0.0' && !@.table].nexthop" | head -n 1)"
+            gateway=""
+            idx=0
+            while [ "$idx" -lt 64 ]; do
+                target="$(live "@.route[$idx].target" || true)"
+                [ -n "$target" ] || break
+                table="$(live "@.route[$idx].table" || true)"
+                if [ "$target" = 0.0.0.0 ] && [ "$(live "@.route[$idx].mask" || true)" = 0 ]; then
+                    case "$table" in ''|main|254)
+                        gateway="$(live "@.route[$idx].nexthop" || true)"; break;; esac
+                fi
+                idx=$((idx+1))
+            done
             [ "$up" = true ] || { address=""; mask=""; gateway=""; }
         fi
         case "$mask" in
@@ -380,17 +392,15 @@ case "$1" in
         json_close_array
         ;;
     get_pppoe_status)
-        proto="$(get network.wan.proto)" || error "WAN protocol unavailable"
-        status=0
-        if [ "$proto" = pppoe ]; then
-            state="$(ubus -t 3 call network.interface.wan status)" || error "PPPoE status unavailable"
-            up="$(printf '%s' "$state" | jsonfilter -e '@.up')" || error "PPPoE link unavailable"
-            case "$up" in true|false) ;; *) error "PPPoE link invalid";; esac
-            addr="$(printf '%s' "$state" | jsonfilter -e '@["ipv4-address"][0].address' || true)"
-            if [ "$up" = true ] && [ -n "$addr" ] && [ "$addr" != 0.0.0.0 ]; then status=1; fi
-        fi
-        success "get_pppoe_status success"
+        native="$(native_read veci.v2.interfaces pppoeStatus)" || error "PPPoE state unavailable"
+        state="$(field '@.state')" || error "PPPoE state invalid"
+        case "$state" in connected) status=1;; disconnected|connecting|not_configured|pending_activation|link_up_no_ipv4) status=0;; *) error "PPPoE state invalid";; esac
+        success "native PPPoE status"
         json_add_string pppoe_status "$status"
+        json_add_string state "$state"
+        json_add_string revision "$(field '@.revision')"
+        json_add_string ipv4 "$(field '@.ipv4' || true)"
+        json_add_string internet_verified false
         ;;
     get_4g)
         native="$(native_read veci.v2.lte status)" || error "LTE policy unavailable"

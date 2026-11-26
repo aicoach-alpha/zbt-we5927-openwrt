@@ -240,9 +240,9 @@
     },
     "get_pppoe_status": {
       "state": "PROTOTYPE",
-      "provider": "OpenWrt netifd + UCI",
+      "provider": "veci.v2.interfaces:pppoeStatus",
       "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Read adapter only; PPPoE configuration and physical WAN validation pending."
+      "limitations": "Distinguishes configured protocol, pending activation, connecting, disconnected and assigned IPv4. Public Internet not verified; physical acceptance pending."
     },
     "get_pptp_msg": {
       "state": "UNIMPLEMENTED"
@@ -308,7 +308,7 @@
       "state": "FIXTURE_PASS",
       "provider": "veci.v2.interfaces:status + netifd",
       "evidence": "scripts/tests/test_oem_network_reads.py; scripts/tests/test_oem_module_status.py",
-      "limitations": "DHCP/static WAN supported by shared provider; PPPoE and write integration pending."
+      "limitations": "Native DHCP/static/PPPoE read status and bounded default-route selection; no PPPoE secret returned. PPPoE profile creation and physical WAN acceptance pending."
     },
     "get_wan_status": {
       "state": "PROTOTYPE",
@@ -400,13 +400,22 @@
       "limitations": "Fail-closed no verified OEM release catalog; does not implement actual OTA discovery."
     },
     "pppoe_detection": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.interfaces:pppoeDiscovery",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/stage_variant.py",
+      "limitations": "Bounded Ethernet-only discovery via native pppoe-discovery. Original OEM button adapted to authenticated POST. Actual device mapping and access concentrator discovery pending."
     },
     "pppoe_disconnect": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.interfaces:pppoeAction",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/stage_variant.py",
+      "limitations": "Explicit confirmation and network revision; scoped to existing PPPoE Ethernet WAN. No LTE reset. Physical disconnect and browser acceptance pending."
     },
     "pppoe_reconnect": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.interfaces:pppoeAction",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/stage_variant.py",
+      "limitations": "Scoped Ethernet down/up request, not proof of session establishment. Device mapping, disconnected netifd layout, and live reconnection acceptance pending."
     },
     "reboot": {
       "state": "UNIMPLEMENTED"
