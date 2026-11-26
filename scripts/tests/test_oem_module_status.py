@@ -98,9 +98,11 @@ esac
         self.command("ubus", """case "$*" in *veci.v2.system*) echo false;; *) echo true;; esac""")
         self.command("jsonfilter", "cat")
         self.command("cat", "/bin/cat")
-        result = self.run_script("gateway", QUERY_STRING="op=get_ddns_log")
-        self.assertIn("native log permission denied", result.stdout)
-        self.assertNotIn("ADAPTER_CALLED", result.stdout)
+        for op in ("get_ddns_log", "get_log_list", "get_4g_log"):
+            with self.subTest(op=op):
+                result = self.run_script("gateway", QUERY_STRING="op="+op)
+                self.assertIn("native log permission denied", result.stdout)
+                self.assertNotIn("ADAPTER_CALLED", result.stdout)
 
     def test_down_link_does_not_return_stale_ip(self):
         r = self.run_script("adapter", "get_module_status", LINK_UP="false")
