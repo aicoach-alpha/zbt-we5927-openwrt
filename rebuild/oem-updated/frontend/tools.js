@@ -33,6 +33,7 @@ function clearSession() {
   el('backup-message').textContent = '';
   dhcpRevision = ''; el('dhcp-form').reset(); el('dhcp-save').disabled = true;
   el('dhcp-result').textContent = ''; el('traffic-result').textContent = '';
+  guestState=''; el('guest-enable').disabled=true; el('guest-disable').disabled=true; el('guest-result').textContent='';
 }
 globalThis.VeciSmsCenter.init((object,method,args) => rpc(object,method,args));
 globalThis.VeciDnsSettings.init((object,method,args) => rpc(object,method,args), () => Boolean(sid));
@@ -144,3 +145,35 @@ el('traffic-refresh').onclick=async ()=>{
   }catch(err){if(sid===token)el('traffic-result').textContent=err.message;}
   finally{button.disabled=false;}
 };
+
+let guestState='';
+function guestButtons(){
+  el('guest-enable').disabled=!sid||guestState!=='disabled';
+  el('guest-disable').disabled=!sid||guestState!=='enabled';
+}
+el('guest-refresh').onclick=async()=>{
+  const token=sid; if(!token)return;
+  guestState=''; guestButtons();
+  try{
+    const result=await rpc('veci.v2.addon','status',{},token);
+    if(result.ok!==true || !['absent','unconfigured','enabled','disabled'].includes(result.guest))throw Error('Status guest unavailable');
+    guestState=result.guest; guestButtons();
+    const labels={absent:'Addon opsional belum terpasang. Guest tidak aktif.',
+      unconfigured:'Profil guest belum siap. Provisioning aman diperlukan.',
+      enabled:'Dikonfigurasi aktif. Isolasi runtime belum terverifikasi.',
+      disabled:'Dikonfigurasi nonaktif.'};
+    el('guest-result').textContent=labels[guestState];
+  }catch(err){if(sid===token)el('guest-result').textContent=err.message;}
+};
+async function changeGuest(enable){
+  const token=sid, expected=guestState;
+  if(!token || expected!==(enable?'disabled':'enabled'))return;
+  if(!window.confirm((enable?'Aktifkan':'Nonaktifkan')+' Guest Wi-Fi pada reboot manual berikutnya? Tidak ada reboot otomatis.'))return;
+  guestState=''; guestButtons();
+  try{
+    await oem('set_wifi_guest',{guest_enabled:enable?'1':'0',expected,confirmation:enable?'ENABLE_PORTAL_AP':'DISABLE_PORTAL_AP'},token);
+    if(sid===token)el('guest-result').textContent='Konfigurasi disimpan. Reboot manual diperlukan. Status runtime belum terverifikasi.';
+  }catch(err){if(sid===token)el('guest-result').textContent=err.message;}
+}
+el('guest-enable').onclick=()=>changeGuest(true);
+el('guest-disable').onclick=()=>changeGuest(false);

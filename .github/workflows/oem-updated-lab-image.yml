@@ -77,6 +77,10 @@ jobs:
           if grep -E '^CONFIG_PACKAGE_(veci-v2-ui|veci-default-ui|veci-cellular-we5927|luci([-A-Za-z0-9_]*)?)=y$' .config; then
             echo conflicting_frontend_or_dialer; exit 1
           fi
+          # Owner policy: guest portal is optional, never part of the default image.
+          if grep -E '^CONFIG_PACKAGE_(veci-app-guest|veci-app-voucher|uspot|uspot-www)=y$' .config; then
+            echo optional_guest_must_not_be_preinstalled; exit 1
+          fi
           make -j2 V=s tools/install
           make -j2 V=s toolchain/install
           make -j2 V=s

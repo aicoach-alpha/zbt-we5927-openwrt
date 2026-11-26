@@ -56,6 +56,17 @@
       ],
       "scope": "local trailing 24 hours, RAM only, not quota",
       "state": "SOURCE_INTEGRATED_NOT_UAT"
+    },
+    "guest_wifi": {
+      "provider": "veci.v2.addon",
+      "methods": [
+        "status",
+        "setPortalStartup"
+      ],
+      "default": "absent_disabled",
+      "activation": "explicit manual configuration, subsequent manual reboot",
+      "state": "SOURCE_INTEGRATED_FOR_PREPROVISIONED_PROFILE",
+      "limitations": "safe first-time provisioning pending"
     }
   },
   "remaining": [

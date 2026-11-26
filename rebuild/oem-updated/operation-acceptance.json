@@ -560,7 +560,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_wifi_guest": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:setPortalStartup",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Optional addon absent on clean image. Manual toggle supported for pre-provisioned compatible profile, config-only; safe first-time provisioning and runtime isolation acceptance pending."
     },
     "set_wifi_guest5": {
       "state": "SOURCE_DISABLED_REVIEWED",

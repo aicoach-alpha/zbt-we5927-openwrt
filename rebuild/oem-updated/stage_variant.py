@@ -183,6 +183,11 @@ def stage(image, out):
             '<button id="dhcp-save" disabled>Simpan dan terapkan</button></form><p id="dhcp-result" role="status"></p></article>'
             '<article><h2>Traffic lokal — 24 jam terakhir</h2><p>Hanya interval yang terukur, data di RAM; reset saat reboot. Bukan kuota operator.</p>'
             '<button id="traffic-refresh" type="button">Baca traffic terukur</button><pre id="traffic-result" class="result" role="status"></pre></article>'
+            '<article><h2>Guest Wi-Fi (opsional)</h2><p>Nonaktif secara default. Hanya diaktifkan manual setelah addon dan profil terisolasi siap. Perubahan berlaku pada reboot manual; tidak ada restart otomatis.</p>'
+            '<button id="guest-refresh" type="button">Baca status</button>'
+            '<button id="guest-enable" type="button" disabled>Aktifkan saat boot berikutnya</button>'
+            '<button id="guest-disable" type="button" disabled>Nonaktifkan saat boot berikutnya</button>'
+            '<p id="guest-result" role="status"></p></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

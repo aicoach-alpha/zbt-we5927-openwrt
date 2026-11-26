@@ -30,3 +30,7 @@ This produces static assets and an operation inventory, not a bootable image. Do
 - Dispatch the full-image workflow only after the pre-build acceptance review passes. Require actual downloadable BIN, manifest, SHA256, round-trip verification and post-build checks. This lab workflow remains explicitly not flash-approved.
 - If post-build inspection fails, aggregate findings, fix all known defects, rerun affected offline tests, then dispatch one new full build. Do not rerun unchanged failing builds.
 - Physical boot, modem, actual Wi-Fi and 72-hour stability remain separate hardware gates; never claim these passed based on a source test.
+
+## Owner policy: optional guest Wi-Fi (2026-11-26)
+
+Guest Wi-Fi is optional, absent/disabled on clean firmware, never automatically provisioned or enabled. Reuse native VeCI addon profile controls, require explicit user enable/disable and a separately chosen manual reboot; no global live reload. Existing compatible provisioned profile can be toggled; safe first-time provisioning and physical isolation remain separate acceptance requirements. Do not market an untested guest activation as complete. The base router must work without the addon.

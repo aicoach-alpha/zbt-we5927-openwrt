@@ -8,7 +8,7 @@ fail() { json_init; json_add_string code -4; json_add_string reason "$1"; json_d
 read_field() { printf '%s' "$body" | jsonfilter -e "$1"; }
 native_field() { printf '%s' "$native" | jsonfilter -e "$1"; }
 rpc() {
-    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.dhcp:setPool|veci.v2.system:setNtp|veci.v2.firewall:setDmz|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
+    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.dhcp:setPool|veci.v2.addon:setPortalStartup|veci.v2.system:setNtp|veci.v2.firewall:setDmz|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
     # Do not bypass the session's permission on the actual backend method.
     json_init; json_add_string ubus_rpc_session "$session"; json_add_string scope ubus
     json_add_string object "$1"; json_add_string function "$2"
@@ -25,6 +25,22 @@ body="$(head -c 2049)"
 [ "$(printf '%s' "$body" | wc -c)" -le 2048 ] || fail "request too large"
 json_load "$body" || fail "invalid JSON"
 case "$op" in
+    set_wifi_guest)
+        enabled="$(read_field '@.guest_enabled')" || fail "guest enable flag required"
+        expected="$(read_field '@.expected')" || fail "previous guest state required"
+        confirmation="$(read_field '@.confirmation')" || fail "explicit confirmation required"
+        case "$expected" in enabled|disabled) ;; *) fail "guest addon requires safe provisioning first";; esac
+        case "$enabled:$confirmation" in
+            1:ENABLE_PORTAL_AP) action=ENABLE_PORTAL_AP;;
+            0:DISABLE_PORTAL_AP) action=DISABLE_PORTAL_AP;;
+            *) fail "confirmation mismatch";;
+        esac
+        # The native startup provider saves only the guest AP flag.
+        # Do not use the legacy live enable path, network restart or wifi reload.
+        json_init; json_add_string action "$action"; json_add_string expected "$expected"
+        rpc veci.v2.addon setPortalStartup "$(json_dump)"
+        case "$enabled:$(native_field '@.guest')" in 1:enabled|0:disabled) ;; *) fail "guest setting not confirmed";; esac
+        ;;
     set_dhcp_config)
         start="$(read_field '@.dhcp_start')" || fail "DHCP start required"
         end="$(read_field '@.dhcp_end')" || fail "DHCP end required"
@@ -262,5 +278,5 @@ case "$op" in
     *) fail "operation not implemented";;
 esac
 json_init; json_add_string code 1; json_add_string reason "native operation accepted"
-case "$op" in set_lan_config|set_wan_config|setWiFi2|set_static_route) json_add_string apply_state pending_manual_activation;; esac
+case "$op" in set_lan_config|set_wan_config|setWiFi2|set_static_route|set_wifi_guest) json_add_string apply_state pending_manual_activation;; esac
 json_dump
