@@ -72,6 +72,16 @@ esac
                   "string:txall=987", "string:uptime=23", "string:=2001:db8::2"):
             self.assertIn(x, r.stdout)
 
+    def test_5ghz_board_policy_refuses_all_vendor_forms(self):
+        for op in ("getWiFi5", "setWiFi5", "setWiFi5_nocommit", "get_wifi_guest5", "set_wifi_guest5"):
+            for method in ("GET", "POST"):
+                with self.subTest(operation=op, method=method):
+                    result = self.run_script("gateway", QUERY_STRING="op="+op, REQUEST_METHOD=method)
+                    self.assertIn("5 GHz radio unavailable", result.stdout)
+                    self.assertNotIn("ADAPTER_CALLED", result.stdout)
+                    denied = self.run_script("gateway", QUERY_STRING="op="+op, PERMIT="false", REQUEST_METHOD=method)
+                    self.assertIn("access denied", denied.stdout)
+
     def test_down_link_does_not_return_stale_ip(self):
         r = self.run_script("adapter", "get_module_status", LINK_UP="false")
         self.assertEqual(r.returncode, 0, r.stderr)

@@ -97,6 +97,11 @@ def stage(image, out):
         pkg = tmp / "oem-updated-ui-dev"
         files = pkg / "files"
         shutil.copytree(tmp / "preview/preview/www", files / "www")
+        # Both OEM menu profiles and the login response constrain the UI to radio0.
+        for profile in ("menu_conf.json", "menu_conf1.json"):
+            wifi = json.loads((files / "www" / profile).read_text())["wifi"]
+            if (wifi["wifi_2"], wifi["wifi_5"], wifi["wifi_60"]) != (1, 0, 0):
+                raise ValueError("unexpected radio capabilities in " + profile)
         app = files / APP
         original = app.read_text()
         code = original

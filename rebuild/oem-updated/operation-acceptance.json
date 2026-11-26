@@ -48,7 +48,9 @@
       "limitations": "Primary AP read adapter; Wi-Fi key intentionally omitted; OEM UI mapping and write integration pending."
     },
     "getWiFi5": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "WE5927-2SIM board capability: primary and guest 2.4 GHz only",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "get_4g": {
       "state": "PROTOTYPE",
@@ -318,7 +320,9 @@
       "limitations": "Guest package selection, UI and actual isolation pending."
     },
     "get_wifi_guest5": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "WE5927-2SIM board capability: primary and guest 2.4 GHz only",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "get_wifi_power": {
       "state": "UNIMPLEMENTED"
@@ -393,10 +397,14 @@
       "state": "UNIMPLEMENTED"
     },
     "setWiFi5": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "WE5927-2SIM board capability: primary and guest 2.4 GHz only",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "setWiFi5_nocommit": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "WE5927-2SIM board capability: primary and guest 2.4 GHz only",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "set_4g": {
       "state": "PROTOTYPE",
@@ -546,7 +554,9 @@
       "state": "UNIMPLEMENTED"
     },
     "set_wifi_guest5": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "WE5927-2SIM board capability: primary and guest 2.4 GHz only",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "set_wifi_power": {
       "state": "UNIMPLEMENTED"

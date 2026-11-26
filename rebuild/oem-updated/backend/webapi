@@ -76,6 +76,8 @@ case "$session" in ''|*[!0-9a-f]*|00000000000000000000000000000000) err -1 "acce
 permit="$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"ubus\",\"object\":\"oem.updated\",\"function\":\"read\"}" | jsonfilter -e '@.access')" || err -1 "session unavailable"
 [ "$permit" = true ] || err -1 "access denied"
 case "$op" in
+    getWiFi5|setWiFi5|setWiFi5_nocommit|get_wifi_guest5|set_wifi_guest5)
+        err -4 "5 GHz radio unavailable on WE5927-2SIM" ;;
     test_ping|test_nslookup|test_traceroute|site_survey)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         data="$(/usr/libexec/oem-updated/diagnostics-adapter "$op" "$host" "$version" "$session")" || err -4 "diagnostic unavailable"
