@@ -40,7 +40,7 @@ save_option() {
   trap - EXIT HUP INT TERM
 }
 case "${1:-}:${2:-}" in
-  list:*) echo '{"status":{},"info":{},"survey":{},"setChannel":{"channel":"String"},"setAuth":{"mode":"String","key_hex":"String"},"setAccess":{"mode":"String","addresses":"String"},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"},"activationStatus":{},"activateAp":{"confirmation":"String"}}'; exit 0 ;;
+  list:*) echo '{"status":{},"info":{},"survey":{},"setChannel":{"channel":"String"},"power":{},"setPower":{"dbm":"String","expected":"String","confirmation":"String"},"setAuth":{"mode":"String","key_hex":"String"},"setAccess":{"mode":"String","addresses":"String"},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"},"activationStatus":{},"activateAp":{"confirmation":"String"}}'; exit 0 ;;
   call:activationStatus|call:activateAp)
     check_ap
     if [ "$2" = activationStatus ]; then
@@ -84,11 +84,12 @@ case "${1:-}:${2:-}" in
       printf '{"ok":true,"queued":true,"internet_verified":false,"beacon_verified":false}\n'
     fi
     exit 0 ;;
-  call:info|call:survey|call:setChannel|call:setAuth|call:setAccess)
+  call:info|call:survey|call:setChannel|call:setAuth|call:setAccess|call:power|call:setPower)
     . /usr/libexec/veci2-wifi-controls
     check_ap
     case "$2" in
       info) advanced_info ;;
+      power) power_status ;;
       survey) exec 9<"$0"; flock -n 9 || fail busy; survey ;;
       *)
         request=$(head -c 1025)

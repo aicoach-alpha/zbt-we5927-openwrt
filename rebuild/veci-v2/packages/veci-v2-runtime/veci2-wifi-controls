@@ -14,6 +14,31 @@ permitted_channels() {
   info=$(timeout 4 iw phy "$phy" info 9<&-) || return 1
   printf '%s\n' "$info" | awk '$1=="*" && $2>=2412 && $2<=2484 && $3=="MHz" && $4 ~ /^\[[0-9]+\]$/ && $0 !~ /disabled|no IR|radar detection/ { n=substr($4,2,length($4)-2)+0; if(n>=1 && n<=14) print n }'
 }
+# Use the most restrictive permitted 2.4 GHz channel, even for auto channel.
+# The kernel/driver remains responsible for actual regulatory enforcement.
+power_cap() {
+  local raw
+  radio_paths || return 1
+  raw=$(LC_ALL=C timeout 4 iw phy "$phy" info 9<&-) || return 1
+  printf '%s\n' "$raw" | awk '
+    $1=="*" && $2>=2412 && $2<=2484 && $3=="MHz" && $4~/^\[[0-9]+\]$/ && $0!~/disabled|no IR|radar detection/ {
+      if($5!~/^\([0-9]+(\.[0-9]+)?$/ || $6!="dBm)") {bad=1;next}
+      v=substr($5,2)+0; if(!n++||v<min)min=v
+    }
+    END{if(!bad&&n&&min>=1){if(min>20)min=20;printf "%d",int(min)}else exit 1}'
+}
+power_status() {
+  local value cap
+  value=$(uci -q get wireless.radio0.txpower || :)
+  case "$value" in '') value=auto;; *[!0-9]*) fail invalid_configured_power;; esac
+  cap=$(power_cap || :)
+  set +u
+  . /usr/share/libubox/jshn.sh
+  json_init; json_add_boolean ok 1
+  json_add_string configured "$value"; json_add_string safe_max_dbm "$cap"
+  json_add_boolean live_power_verified 0
+  json_dump
+}
 valid_mac() {
   case "$1" in 00:00:00:00:00:00) return 1 ;; esac
   printf '%s\n' "$1" | grep -Eq '^[0-9a-fA-F][02468aAcCeE](:[0-9a-fA-F]{2}){5}$'
@@ -25,6 +50,29 @@ advanced_write() (
   trap 'exit 1' HUP INT TERM
   change() { uci -q -t "$tmp" "$@"; }
   case "$2" in
+    setPower)
+      local expected current cap dbm confirm
+      dbm=$(jsonfilter -s "$request" -e '@.dbm') || fail invalid_power
+      expected=$(jsonfilter -s "$request" -e '@.expected') || fail stale_configuration
+      confirm=$(jsonfilter -s "$request" -e '@.confirmation') || fail confirmation_required
+      [ "$confirm" = SAVE_TXPOWER_NEXT_BOOT ] || fail confirmation_required
+      current=$(uci -q get wireless.radio0.txpower || :)
+      [ -n "$current" ] || current=auto
+      [ "$current" = "$expected" ] || fail stale_configuration
+      if [ "$dbm" = auto ]; then
+        if change get wireless.radio0.txpower >/dev/null; then change delete wireless.radio0.txpower || fail save_failed; fi
+      else
+        case "$dbm" in [1-9]|1[0-9]|20) ;; *) fail invalid_power;; esac
+        cap=$(power_cap) || fail regulatory_cap_unavailable
+        [ "$dbm" -le "$cap" ] || fail regulatory_limit
+        change set "wireless.radio0.txpower=$dbm" || fail save_failed
+      fi
+      change commit wireless || fail save_failed
+      current=$(uci -q get wireless.radio0.txpower || :)
+      [ -n "$current" ] || current=auto
+      [ "$current" = "$dbm" ] || fail save_failed
+      printf '{"ok":true,"saved":true,"reboot_required":true,"live_power_verified":false}\n'
+      exit 0 ;;
     setChannel)
       channel=$(jsonfilter -s "$request" -e '@.channel') || fail invalid_channel
       case "$channel" in [1-9]|1[0-4]) ;; *) fail invalid_channel ;; esac
