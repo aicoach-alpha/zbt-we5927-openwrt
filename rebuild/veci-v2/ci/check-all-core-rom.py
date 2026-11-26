@@ -133,6 +133,7 @@ def check(rom:Path, verified=None)->list[str]:
         return ["FEATURE_MAP_NOT_EXACTLY_39_ACTIVE"]
     if not rom.is_dir() or rom.is_symlink():
         return ["INVALID_IMAGE_ROOT"]
+    root = rom.resolve()
     checked=0
     for name in ids:
         entries=FEATURES.get(name,[])
@@ -144,6 +145,13 @@ def check(rom:Path, verified=None)->list[str]:
             checked+=1
             if not src.is_file() or src.is_symlink():
                 errors.append("MISSING_SOURCE:"+name+":"+relative_source)
+                continue
+            try:
+                inside_rom = dst.resolve().is_relative_to(root)
+            except (OSError, RuntimeError):
+                inside_rom = False
+            if not inside_rom:
+                errors.append("ROM_PATH_ESCAPES_ROOT:"+name+":"+relative_rom)
                 continue
             if not dst.is_file() or dst.is_symlink() or dst.stat().st_size!=src.stat().st_size:
                 errors.append("ROM_MISSING_OR_WRONG_SIZE:"+name+":"+relative_rom)
