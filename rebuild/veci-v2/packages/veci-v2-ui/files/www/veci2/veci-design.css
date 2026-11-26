@@ -90,7 +90,7 @@ main {max-width:1500px;padding:26px 24px 48px}
 #workspace .subtab{font-size:12px;font-weight:660;border-radius:9px}
 #workspace .subtab.active {background:#e6f2fd;color:#126aa5;border:1px solid #c6dfef}
 .connectivity-summary {
-  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 17px
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 17px
 }
 .connectivity-summary-item {
   border:1px solid #dfeaf3;border-radius:13px;background:#fff;padding:14px 17px;
@@ -177,7 +177,7 @@ main {max-width:1500px;padding:26px 24px 48px}
   body.veci-nav-open #workspace>.tabs{transform:translateX(0);visibility:visible;pointer-events:auto}
   body.veci-nav-open .mobile-nav-backdrop{display:block;position:fixed;z-index:1001;inset:0;background:rgba(5,23,43,.6);border:0;border-radius:0;width:100%;height:100%;padding:0}
   body.veci-nav-open{overflow:hidden}
-  .connectivity-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .connectivity-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
   .quick-navigation{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:640px){
@@ -208,3 +208,14 @@ main {max-width:1500px;padding:26px 24px 48px}
 .wifi-activation-action h3{margin:2px 0 8px;color:#1b5174}
 .wifi-activation-action p{font-size:12px;line-height:1.65;color:#57728b}
 .wifi-activation-action #wifi-activate-status{font-weight:650;color:#315e80;overflow-wrap:anywhere}
+
+/* Four independent, source-backed readiness tiles. SMS is never labeled
+ * "verified" based only on provider registration or a modem AT device. */
+.connectivity-summary-item{position:relative;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.connectivity-summary-item::after{content:"";position:absolute;inset:auto 15px 0;height:2px;background:#e4edf4}
+.connectivity-summary-item:has(.state-good)::after{background:#24ad87}
+.connectivity-summary-item:has(.state-warn)::after{background:#e9af65}
+.connectivity-summary-item:has(.state-bad)::after{background:#d77878}
+.connectivity-summary-item .summary-key{font-size:10px}
+.connectivity-summary-item strong{font-size:12px;letter-spacing:-.01em}
+@media(max-width:640px){.connectivity-summary{grid-template-columns:1fr}}

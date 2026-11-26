@@ -542,6 +542,62 @@
         "test_veci_v2_all_native_scripts_bootstrap_20261126.py"
       ],
       "protection": "Single services owner binds startup-read; addon-profiles.js binds addon-profiles-read; actual DOM mock loads both modules and clicks buttons"
+    },
+    {
+      "id": "UI-006",
+      "kind": "confirmed_bug",
+      "area": "device_identity",
+      "severity": "medium",
+      "summary": "Release contract labeled WE2825-2SIM despite physical router being ZBT-WE5927-DSIM",
+      "root_cause": "Legacy board_display survived migration to WE5927; board_id and target remained correct",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "dashboard_status",
+        "ui_four_group_navigation"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_contract.py"
+      ],
+      "protection": "Board display WE5927-2SIM while canonical supported device stays zbtlink,zbt-we5927; no device-tree changes"
+    },
+    {
+      "id": "TOOL-003",
+      "kind": "confirmed_bug",
+      "area": "test_tool",
+      "severity": "medium",
+      "summary": "CI SSID test invoked Ubuntu dash even though libubox jshn requires BusyBox ash features",
+      "root_cause": "Host fixture executed provider shebang using /bin/sh (dash); real router uses BusyBox ash, so host test falsely failed with exit 2",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g",
+        "wifi_survey_channel"
+      ],
+      "regression_test_files": [
+        "test_owner_wifi_acceptance.py",
+        "test_veci_v2_connectivity_menu_regression_20261126.py"
+      ],
+      "protection": "Always invoke exact BusyBox ash in native host tests; CI latest run passed actual SSID and Wi-Fi UCI test"
+    },
+    {
+      "id": "TOOL-004",
+      "kind": "confirmed_bug",
+      "area": "test_tool",
+      "severity": "low",
+      "summary": "Login/logout GUI regression fixture hardcoded RPC count and broke with new read-only SMS health check",
+      "root_cause": "Test expected exactly six calls; new permitted read-only diagnostic introduced another before logout",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "router_login_and_permissions",
+        "dashboard_status",
+        "ui_four_group_navigation"
+      ],
+      "regression_test_files": [
+        "test_veci_ui_sessions.py"
+      ],
+      "protection": "Verify exactly one session destroy and no unauthorized writes, rather than forbidding additional safe read-only telemetry"
     }
   ]
 }

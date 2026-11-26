@@ -79,8 +79,13 @@ async function exercise(destroyCode) {
   assert.equal(element('workspace').hidden, true);
   await submit();
   await logout;
-  assert.equal(calls.length, 6);
-  assert.deepEqual(calls[5], [user, 'session', 'destroy', {}]);
+  // A new read-only health widget may add RPC calls after status.
+  // Never hardcode the call count; require exactly one logout and no
+  // unsafe status action on behalf of the read-only account.
+  const destroys = calls.filter(call => call[1] === 'session' && call[2] === 'destroy');
+  assert.equal(destroys.length, 1);
+  assert.deepEqual(destroys[0], [user, 'session', 'destroy', {}]);
+  assert.equal(calls.some(call => ['sendMessage','switchSim','install'].includes(call[2])), false);
   assert.equal(element('session-account').textContent, '');
   assert.equal(element('session-permissions').textContent, '');
   assert.equal(reloads, 1);

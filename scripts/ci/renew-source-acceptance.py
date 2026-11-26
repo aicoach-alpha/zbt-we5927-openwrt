@@ -96,6 +96,8 @@ def main():
         log_file=logs/(name+".txt")
         log_file.write_text(log)
         item=json.loads(json.dumps(original))
+        # Set PASS only after all exact scoped tests actually ran cleanly.
+        item["status"]="pass"
         item["source_sha256"]={}
         for rel in item["implementation_files"]+item["test_source_files"]:
             path=(ROOT/rel).resolve()

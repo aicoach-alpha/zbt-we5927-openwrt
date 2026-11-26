@@ -442,7 +442,29 @@ async function refreshOverview() {
   el('path-clients').textContent = data.wifi_ap_enabled === true ?
     'Wi-Fi aktif, koneksi klien belum diuji' : 'Wi-Fi dan klien belum terverifikasi';
   void verifyInternetLive();
+  void refreshSmsReadiness();
   void sampleTraffic();
+}
+
+// SMS readiness is about declared dependencies, NOT successful delivery.
+// No modem AT commands, no sending and no private message contents here.
+async function refreshSmsReadiness() {
+  const session = sid;
+  if (!session) return;
+  updateShellStatus('shell-sms-status','Memeriksa layanan…','warn');
+  try {
+    const result = await rpc('veci.v2','smsDiagnostics',{},session,8500);
+    if (sid !== session) return;
+    if (result.source !== 'live_read_only') throw Error('Untrusted readiness source');
+    const available = result.provider_registered === true &&
+      result.modem_at_port_present === true && result.config_present === true;
+    updateShellStatus('shell-sms-status', available ?
+      'Layanan tersedia · kirim/terima belum diuji' :
+      'Layanan belum lengkap · perlu diperiksa',
+      available ? 'warn' : 'bad');
+  } catch (error) {
+    if (sid === session) updateShellStatus('shell-sms-status','Status SMS tidak terbaca','warn');
+  }
 }
 
 // The live Internet probe confirms the exact USB0 HTTPS and DNS path rather

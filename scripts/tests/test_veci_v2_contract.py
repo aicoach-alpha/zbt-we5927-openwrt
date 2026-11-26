@@ -34,6 +34,7 @@ class FeatureContract(unittest.TestCase):
 
     def test_exact_oem_luci_openwrt_pins_and_counts(self):
         self.assertEqual(CONTRACT["board_id"], "ZBT-WE5927-DSIM")
+        self.assertEqual(CONTRACT["board_display"], "WE5927-2SIM")
         self.assertEqual(CONTRACT["openwrt_version"], "25.12.6")
         self.assertEqual(CONTRACT["kernel_version"], "6.12.112")
         self.assertEqual(CONTRACT["firmware_slots"], 1)

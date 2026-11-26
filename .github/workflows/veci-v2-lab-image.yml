@@ -7,6 +7,9 @@ on:
     paths:
       - '.github/workflows/veci-v2-lab-image.yml'
       - 'rebuild/veci-v2/packages/**'
+      - 'rebuild/veci-v2/contracts/**'
+      - 'rebuild/veci-v2/ci/source-completion-gate.py'
+      - 'rebuild/veci-v2/ci/bug-regression-gate.py'
       - 'rebuild/veci-v2/ci/stage-v2-source.sh'
       - 'rebuild/veci-v2/trust/**'
       - 'source/veci-cellular-we5927/**'
@@ -308,7 +311,7 @@ jobs:
       # Deliberately restricted to an explicitly requested, reviewed build
       # branch. Only manual explicit export or a marked build commit exports; ordinary pushes/PR runs cannot.
       - name: Prepare verified unsigned VeCI v2 image for offline signing
-        if: ${{ (github.ref == 'refs/heads/feat/we5927-39module-reconcile-20261124' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.ref == 'refs/heads/development/we2825-all13-integration-20261123' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (((github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))) || (github.ref == 'refs/heads/build/zbt-we2825-oem-veci-20261119' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))))) }}
+        if: ${{ (github.ref == 'refs/heads/feat/we5927-39module-reconcile-20261124' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.ref == 'refs/heads/development/we2825-all13-integration-20261123' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (((github.ref == 'refs/heads/build/veci-v2-we5927-2sim-rc-20261117' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))) || (github.ref == 'refs/heads/build/zbt-we2825-oem-veci-20261119' && ((github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[export-unsigned-veci-v2]')))))) || (github.ref == 'refs/heads/feat/veci-v2-native-gui-refresh-20261126' && github.event_name == 'workflow_dispatch' && inputs.export_unsigned_candidate == true) }}
         shell: bash
         run: |
           set -euo pipefail

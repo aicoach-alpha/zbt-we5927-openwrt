@@ -39,13 +39,15 @@
         "test_existing_wireguard_guest_voucher_native_uci_switches",
         "test_acl_ui_and_no_duplicate_modem_control",
         "test_existing_daemon_reused",
-        "test_read_and_write_acl_exact_and_guarded"
+        "test_read_and_write_acl_exact_and_guarded",
+        "test_both_existing_menus_have_single_live_handler_path"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_addon_lifecycle_native.py",
         "scripts/tests/test_owner_addon_profiles_source.py",
         "scripts/uat/test-owner-addon-services-host.py",
-        "scripts/uat/test-addon-profiles-host.py"
+        "scripts/uat/test-addon-profiles-host.py",
+        "scripts/tests/test_veci_v2_services_addon_dom_20261126.py"
       ]
     },
     "addon_signed_package_manager": {
@@ -91,7 +93,8 @@
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
         "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html"
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/veci-design.css"
       ],
       "receipt": {
         "kind": "executed_source_tests",
@@ -119,12 +122,14 @@
         "test_lte_default_device_route_and_failed_queries",
         "test_lte_monitor_only_reports_recent_known_stages",
         "test_provider_exposes_independent_link_and_verification",
-        "test_ui_requires_explicit_auth_no_persistent_session"
+        "test_ui_requires_explicit_auth_no_persistent_session",
+        "test_lte_wifi_network_sms_are_separate_and_not_fake_pass"
       ],
       "test_source_files": [
         "scripts/tests/test_veci_v2_rebuild.py",
         "scripts/tests/test_cellular_link_status_truth.py",
-        "scripts/tests/test_veci_v2_contract.py"
+        "scripts/tests/test_veci_v2_contract.py",
+        "scripts/tests/test_veci_v2_dashboard_readiness_20261126.py"
       ]
     },
     "dhcp_dns_static_leases": {
@@ -1290,10 +1295,12 @@
       "status": "pass",
       "test_ids": [
         "test_real_provider_lifecycle_in_sandbox",
-        "test_no_unrestricted_lte_network_or_ssh_boot_changes"
+        "test_no_unrestricted_lte_network_or_ssh_boot_changes",
+        "test_both_existing_menus_have_single_live_handler_path"
       ],
       "test_source_files": [
-        "scripts/tests/test_owner_services_acceptance.py"
+        "scripts/tests/test_owner_services_acceptance.py",
+        "scripts/tests/test_veci_v2_services_addon_dom_20261126.py"
       ]
     },
     "system_signed_github_ota": {
@@ -1410,7 +1417,8 @@
       "implementation_files": [
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile"
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/veci-design.css"
       ],
       "receipt": {
         "kind": "executed_source_tests",
@@ -1433,12 +1441,16 @@
         "test_ui_requires_explicit_auth_no_persistent_session",
         "test_login_permissions_and_logout",
         "test_gui_hooks_valid_and_authenticated",
-        "test_group_navigation_remains_simple"
+        "test_group_navigation_remains_simple",
+        "test_actual_script_order_loads_without_missing_dom_controls",
+        "test_every_direct_rpc_has_method_and_permission"
       ],
       "test_source_files": [
         "scripts/tests/test_veci_v2_contract.py",
         "scripts/tests/test_veci_ui_sessions.py",
-        "scripts/tests/test_owner_controls_native_integration.py"
+        "scripts/tests/test_owner_controls_native_integration.py",
+        "scripts/tests/test_veci_v2_all_native_scripts_bootstrap_20261126.py",
+        "scripts/tests/test_veci_v2_gui_all_acl_20261126.py"
       ]
     },
     "wifi_ap_2g": {
@@ -1450,7 +1462,8 @@
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js"
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-activate"
       ],
       "receipt": {
         "kind": "executed_source_tests",
@@ -1478,12 +1491,14 @@
         "test_primary_ap_native_uci",
         "test_channel_survey_acl_and_auth_native_uci",
         "test_incompatible_band_and_failed_commit_preserve_configuration",
-        "test_privileged_actions_have_write_acl"
+        "test_privileged_actions_have_write_acl",
+        "test_activation_has_acl_and_one_shot_fail_closed"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_wifi_acceptance.py",
         "scripts/uat/test-wifi-name-host.py",
-        "scripts/uat/test-wifi-controls-host.py"
+        "scripts/uat/test-wifi-controls-host.py",
+        "scripts/tests/test_veci_v2_connectivity_menu_regression_20261126.py"
       ]
     },
     "wifi_clients_access_control": {
