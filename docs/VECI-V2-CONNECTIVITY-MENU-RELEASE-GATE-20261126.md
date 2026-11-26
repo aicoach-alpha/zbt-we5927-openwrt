@@ -149,3 +149,8 @@ Uncertainties are never converted into PASS on the strength of source code.
 - Five read-only samples: WIFI and LTE HTTPS 204 PASS 5/5; baseline and new MT76 errors zero; IW and hostapd APIs exit 0, station counters match 5/5, both 0 clients throughout.
 - Across monitored Wi-Fi/LTE sets, 35/35 samples passed control-plane health (10 + 20 + 5). The earlier five-sample association-only probe is tracked separately.
 - Client presence with live Wi-Fi Internet remains unconfirmed; no stress test or proof the driver root cause is resolved. Candidate hardware UAT remains NOT RUN.
+
+## Owner clarification: Wi-Fi association and Internet are functional
+- Owner explicitly confirms Wi-Fi can connect and internet works (26 Nov 2026). This statement does not establish that a client was connected during the five V2 diagnostic samples.
+- The zero-client counts from kernel station table and hostapd remain unexplained, not a proven driver failure. Check the serving AP BSSID/interface and count during the same active-traffic interval.
+- Preserve read-only production state. WIFI-003 remains unverified until actual on-air association/traffic and stability are observed.

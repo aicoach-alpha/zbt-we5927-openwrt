@@ -132,5 +132,14 @@
     "new_candidate_test": "NOT_RUN",
     "no_configuration_changed": true,
     "log_not_uploaded": true
+  },
+  "owner_wifi_internet_confirmation": {
+    "reported_date_local": "2026-11-26",
+    "statement": "Wi-Fi can connect and internet works",
+    "source": "Owner follow-up message in ChatGPT",
+    "ssid_confirmed_in_message": false,
+    "phone_connected_during_exact_five_samples_confirmed": false,
+    "reconciliation": "Functional Wi-Fi connectivity confirmed by owner separately; zero-client API samples remain unexplained until concurrent same-AP BSSID/association check",
+    "mt76_driver_root_cause_resolved": false
   }
 }
