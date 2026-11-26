@@ -4,6 +4,7 @@ on:
   push:
     branches-ignore:
       - build/zbt-we2825-oem-veci-20261119
+      - build/oem-updated-we5927-2sim
     paths:
       - '.github/workflows/veci-v2-lab-image.yml'
       - 'rebuild/veci-v2/packages/**'
@@ -29,6 +30,10 @@ permissions:
 
 jobs:
   full-laboratory-image:
+    if: >-
+      github.ref_name != 'build/oem-updated-we5927-2sim' &&
+      github.head_ref != 'build/oem-updated-we5927-2sim' &&
+      github.base_ref != 'build/oem-updated-we5927-2sim'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
