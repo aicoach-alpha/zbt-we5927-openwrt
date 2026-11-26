@@ -38,7 +38,10 @@ with tempfile.TemporaryDirectory() as tmp:
     env = dict(os.environ, PATH=f"{root}:" + os.environ["PATH"])
 
     def call(method, **params):
-        p = subprocess.run([provider, "call", method], input=json.dumps(params), text=True,
+        # OpenWrt runs /bin/sh via BusyBox ash. libubox jshn.sh uses
+        # ash-specific [[ ]], let and parameter replacement; Ubuntu /bin/sh
+        # is dash, which fails with exit=2 even though router behavior is valid.
+        p = subprocess.run(["busybox", "ash", str(provider), "call", method], input=json.dumps(params), text=True,
                            env=env, capture_output=True, check=False, timeout=8)
         if p.returncode:
             raise AssertionError(f"WiFi RPC {method} exit={p.returncode}; stderr={p.stderr!r}; stdout={p.stdout!r}")
