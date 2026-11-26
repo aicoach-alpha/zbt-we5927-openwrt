@@ -1,0 +1,48 @@
+{
+  "schema": "owner_mt76_production_passive_v1",
+  "date_local": "2026-11-26",
+  "source": "Owner-supplied PowerShell console output from existing WPA2/LTE production router",
+  "router": {
+    "board": "zbtlink,zbt-we5927",
+    "production_ssid": "VeCI-WE5927"
+  },
+  "method": {
+    "read_only": true,
+    "samples": 10,
+    "interval_seconds": 30,
+    "duration_seconds_minimum": 270,
+    "wpa2_key_length_only_logged": 9,
+    "router_config_modified": false,
+    "reboot": false,
+    "wifi_reload": false,
+    "network_reload": false,
+    "flash": false,
+    "sim_switch": false
+  },
+  "observations": {
+    "radio_up_all_samples": true,
+    "hostapd_enabled_all_samples": true,
+    "wifi_control_plane_pass_samples": 10,
+    "lte_https_pass_samples": 10,
+    "lte_https_http_code": 204,
+    "mt76_error_count_baseline": 0,
+    "new_mt76_error_events": 0,
+    "wifi_client_count_every_sample": 0,
+    "wifi_client_assoc_tested": false,
+    "wifi_client_traffic_tested": false
+  },
+  "test_result": "PASS_PASSIVE_OBSERVATION_ONLY",
+  "not_proven": [
+    "mt76_kernel_root_cause_resolved",
+    "wifi_connected_client_stability",
+    "mt76_driver_stress",
+    "72h_continuous_stability",
+    "new_firmware_candidate_hardware_acceptance"
+  ],
+  "hardware_state": "current_already_installed_production_firmware_not_new_candidate",
+  "logging": {
+    "owner_reported_local_log": "VeCI-WE5927-MT76-Production-ReadOnly-20261126_123635.log",
+    "local_log_not_uploaded": true,
+    "evidence_available": "console_output_pasted_into_current_chat"
+  }
+}

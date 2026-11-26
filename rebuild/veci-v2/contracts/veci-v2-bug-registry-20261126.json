@@ -73,7 +73,15 @@
         "test_wifi_guardian_observe_only.py",
         "test_owner_wifi_readonly_triage_20261124.py"
       ],
-      "protection": "Source mitigates trigger: AP activation is UCI-only with no global network reload, wifi down/up, modem power-cycle or automatic restart; mt76 MCU timeout/root cause is NOT proven fixed. LAB compilation permitted after real source tests, but firmware release/physical flash needs driver UAT and recovery proof."
+      "protection": "Source mitigates trigger: AP activation is UCI-only with no global network reload, wifi down/up, modem power-cycle or automatic restart; mt76 MCU timeout/root cause is NOT proven fixed. LAB compilation permitted after real source tests, but firmware release/physical flash needs driver UAT and recovery proof.",
+      "live_production_passive_evidence": {
+        "evidence_path": "rebuild/veci-v2/contracts/owner-mt76-production-passive-20261126.json",
+        "status": "PASS_READ_ONLY_IDLE_10_OF_10",
+        "new_mt76_errors": 0,
+        "connected_clients_observed": 0,
+        "driver_root_cause_resolved": false,
+        "new_candidate_verified": false
+      }
     },
     {
       "id": "WIFI-004",

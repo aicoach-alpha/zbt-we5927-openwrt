@@ -104,3 +104,12 @@ Uncertainties are never converted into PASS on the strength of source code.
   relax the flash gate or the 39 physical acceptance requirements.
 - REL-001 source receipts renewed based on actual CI evidence. A lab build
   remains UNSIGNED and cannot be used as an owner flash image.
+
+## Actual owner MT76 production observation, 26 November 2026
+- Owner ran read-only script via Windows PowerShell and SSH to the sole existing router.
+- 10/10 samples: radio0.up=true, hostapd ENABLED; LTE HTTPS via usb0 HTTP 204.
+- WPA2 configuration valid, 0 baseline mt76 errors and 0 new errors during approximately 4.5 minutes sampling.
+- CLIENT_COUNT=0 in every sample. No associated-client MT76 test was performed in this run.
+- No network reload, Wi-Fi restart, reboot, SIM change or flash performed.
+- WIFI-003 remains awaiting true MT76 fault-condition testing and new candidate hardware acceptance; passive idle PASS does not prove root cause fixed.
+- Machine evidence: rebuild/veci-v2/contracts/owner-mt76-production-passive-20261126.json.
