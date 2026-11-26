@@ -86,7 +86,10 @@
       "state": "UNIMPLEMENTED"
     },
     "get_days_traffic": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.observability:trafficHistory",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Local trailing 24-hour sampled byte totals and gaps only; RAM history lost on reboot; original seven-day chart not adapted, runtime pending."
     },
     "get_ddns": {
       "state": "UNIMPLEMENTED"
@@ -373,7 +376,10 @@
       "state": "UNIMPLEMENTED"
     },
     "refresh_days_traffic": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.observability:trafficHistory",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Read-only refresh of existing sampled history; no forced sample or vendor legacy POST transport. Supplemental OEM interface uses native RPC."
     },
     "reset": {
       "state": "UNIMPLEMENTED"
@@ -437,7 +443,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_dhcp_config": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.dhcp:setPool",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
+      "limitations": "Shared native DHCP pool write with revision, subnet and lease validation. Custom DHCP options not changed; supplemental OEM form staged in source, runtime validation pending."
     },
     "set_disk": {
       "state": "UNIMPLEMENTED"

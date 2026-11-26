@@ -173,7 +173,17 @@ def stage(image, out):
             '<button id="login-button">Login</button><p id="login-result" role="status"></p></form>'
             '<main id="tools" hidden><button id="logout">Logout</button>'
             '<button id="sms-refresh">Refresh SMS status</button><button id="dns-refresh">Refresh DNS</button>'
-            + sms_panel + dns_panel + backup_panel +
+            + sms_panel + dns_panel +
+            '<article><h2>DHCP LAN</h2><p>Rentang menggunakan offset alamat dari subnet LAN, akhir eksklusif.</p>'
+            '<button id="dhcp-refresh" type="button">Baca konfigurasi</button><form id="dhcp-form">'
+            '<label>DHCP<select id="dhcp-enabled"><option value="1">Aktif</option><option value="0">Nonaktif</option></select></label>'
+            '<label>Offset awal<input id="dhcp-start" type="number" min="1" max="99999" required></label>'
+            '<label>Offset akhir eksklusif<input id="dhcp-end" type="number" min="2" max="99999" required></label>'
+            '<label>Masa sewa<input id="dhcp-lease" maxlength="12" placeholder="12h" required></label>'
+            '<button id="dhcp-save" disabled>Simpan dan terapkan</button></form><p id="dhcp-result" role="status"></p></article>'
+            '<article><h2>Traffic lokal — 24 jam terakhir</h2><p>Hanya interval yang terukur, data di RAM; reset saat reboot. Bukan kuota operator.</p>'
+            '<button id="traffic-refresh" type="button">Baca traffic terukur</button><pre id="traffic-result" class="result" role="status"></pre></article>'
+            + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'
             '<label>Expected SHA-256<input id="firmware-sha" maxlength="64" required></label>'

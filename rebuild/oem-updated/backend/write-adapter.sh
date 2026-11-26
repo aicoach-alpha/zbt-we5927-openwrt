@@ -8,7 +8,7 @@ fail() { json_init; json_add_string code -4; json_add_string reason "$1"; json_d
 read_field() { printf '%s' "$body" | jsonfilter -e "$1"; }
 native_field() { printf '%s' "$native" | jsonfilter -e "$1"; }
 rpc() {
-    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.system:setNtp|veci.v2.firewall:setDmz|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
+    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.dhcp:setPool|veci.v2.system:setNtp|veci.v2.firewall:setDmz|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
     # Do not bypass the session's permission on the actual backend method.
     json_init; json_add_string ubus_rpc_session "$session"; json_add_string scope ubus
     json_add_string object "$1"; json_add_string function "$2"
@@ -25,6 +25,28 @@ body="$(head -c 2049)"
 [ "$(printf '%s' "$body" | wc -c)" -le 2048 ] || fail "request too large"
 json_load "$body" || fail "invalid JSON"
 case "$op" in
+    set_dhcp_config)
+        start="$(read_field '@.dhcp_start')" || fail "DHCP start required"
+        end="$(read_field '@.dhcp_end')" || fail "DHCP end required"
+        lease="$(read_field '@.dhcp_lease')" || fail "DHCP lease required"
+        enabled="$(read_field '@.dhcp_enabled')" || fail "DHCP enable flag required"
+        revision="$(read_field '@.revision')" || fail "DHCP revision required"
+        confirm="$(read_field '@.confirmation')" || fail "explicit DHCP confirmation required"
+        [ "$confirm" = SAVE_DHCP_POOL ] || fail "confirmation mismatch"
+        # OEM's end is exclusive, native limit is the number of addresses.
+        for n in "$start" "$end"; do
+            case "$n" in ''|0*|*[!0-9]*) fail "invalid pool";; esac
+            [ "${#n}" -le 5 ] || fail "invalid pool"
+        done
+        [ "$end" -gt "$start" ] || fail "invalid pool"
+        # Do not change DHCP options via this endpoint.
+        options="$(read_field '@.dhcp_option' || true)"
+        [ -z "$options" ] || [ "$options" = "$(uci -q get dhcp.lan.dhcp_option || true)" ] || fail "custom DHCP options unsupported"
+        json_init; json_add_string start "$start"; json_add_string limit "$((end-start))"
+        json_add_string lease "$lease"; json_add_string enabled "$enabled"
+        json_add_string revision "$revision"; json_add_string confirmation "$confirm"
+        rpc veci.v2.dhcp setPool "$(json_dump)"
+        ;;
     set_static_dhcp)
         mac="$(read_field '@.mac')" || fail "MAC required"
         ip="$(read_field '@.ip')" || fail "IP required"

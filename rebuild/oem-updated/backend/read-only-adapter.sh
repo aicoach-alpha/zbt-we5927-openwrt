@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -71,6 +71,8 @@ case "$1" in
         json_close_object
         ;;
     get_dhcp_config)
+        native="$(native_read veci.v2.dhcp status)" || error "DHCP revision unavailable"
+        before="$(field '@.revision')" || error "DHCP revision unavailable"
         ignore="$(get dhcp.lan.ignore || true)"
         case "$ignore" in 1) enabled=0;; ''|0) enabled=1;; *) error "invalid DHCP flag";; esac
         start="$(get dhcp.lan.start)" || error "DHCP start unavailable"
@@ -81,7 +83,11 @@ case "$1" in
         address="${address%/*}"
         head="${address%.*}"
         options="$(get dhcp.lan.dhcp_option || true)"
+        native="$(native_read veci.v2.dhcp status)" || error "DHCP revision unavailable"
+        revision="$(field '@.revision')" || error "DHCP revision unavailable"
+        [ "$before" = "$revision" ] || error "DHCP configuration changed"
         success "get dhcp config success"
+        json_add_string revision "$revision"
         json_add_object data
         json_add_string dhcp_enabled "$enabled"
         json_add_string dhcp_start "$start"
@@ -681,6 +687,20 @@ case "$1" in
         json_add_string reason "No verified OEM release catalog available"
         json_add_string update_policy "$mode"
         json_add_string release_status unverified
+        ;;
+    get_days_traffic|refresh_days_traffic)
+        native="$(native_read veci.v2.observability trafficHistory)" || error "traffic history unavailable"
+        [ "$(field '@.source')" = kernel_sampled_bytes ] || error "unexpected traffic source"
+        # Return actual measured intervals and gaps, not invented seven-day
+        # totals. The legacy history chart must be adapted to this contract.
+        success "local traffic history"
+        json_add_string history_state "$(field '@.state')"
+        json_add_string persistent false
+        json_add_string window_seconds 86400
+        for key in samples first_epoch last_epoch lte_observed_seconds lan_observed_seconds lte_gaps lan_gaps lte_rx_bytes lte_tx_bytes lan_rx_bytes lan_tx_bytes; do
+            value="$(field "@.$key" || true)"
+            case "$value" in ''|null) json_add_string "$key" "";; *[!0-9]*) error "invalid traffic value";; *) json_add_string "$key" "$value";; esac
+        done
         ;;
     get_netwatchdog)
         native="$(native_read veci.v2.lte status)" || error "LTE monitor unavailable"

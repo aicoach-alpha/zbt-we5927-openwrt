@@ -31,6 +31,8 @@ function clearSession() {
   el('firmware-result').textContent = '';
   el('backup-restore-file').dispatchEvent(new Event('change'));
   el('backup-message').textContent = '';
+  dhcpRevision = ''; el('dhcp-form').reset(); el('dhcp-save').disabled = true;
+  el('dhcp-result').textContent = ''; el('traffic-result').textContent = '';
 }
 globalThis.VeciSmsCenter.init((object,method,args) => rpc(object,method,args));
 globalThis.VeciDnsSettings.init((object,method,args) => rpc(object,method,args), () => Boolean(sid));
@@ -76,4 +78,69 @@ el('firmware-form').onsubmit=async e=>{
     el('firmware-result').textContent='Signature and compatibility checks passed. Installation remains disabled on this OEM development interface.';
   } catch(err) { if(sid===token)el('firmware-result').textContent=err.message; }
   finally {button.disabled=false;}
+};
+
+// OEM DHCP form reuses the native setPool RPC via the authenticated adapter.
+let dhcpRevision = '';
+async function oem(op, body, token = sid) {
+  if (!token || token !== sid) throw Error('Login required');
+  const headers = {'X-OEM-Session':token};
+  if(body !== undefined) headers['Content-Type']='application/json';
+  const response = await fetch('/cgi-bin/webapi?op='+encodeURIComponent(op),{
+    method:body===undefined?'GET':'POST',credentials:'omit',cache:'no-store',
+    redirect:'error',headers,body:body===undefined?undefined:JSON.stringify(body)});
+  const result=await response.json();
+  if(token!==sid)throw Error('Session changed');
+  if(!response.ok || result.code!=='1')throw Error(result.reason || 'Router rejected request');
+  return result;
+}
+el('dhcp-refresh').onclick=async ()=>{
+  const token=sid, button=el('dhcp-refresh');
+  if(!token || button.disabled)return;
+  button.disabled=true; dhcpRevision=''; el('dhcp-save').disabled=true;
+  try{
+    const result=await oem('get_dhcp_config',undefined,token), d=result.data;
+    if(!/^[0-9a-f]{64}$/.test(result.revision || '') || !d)throw Error('Revision unavailable');
+    if(!['0','1'].includes(d.dhcp_enabled))throw Error('DHCP state invalid');
+    el('dhcp-enabled').value=d.dhcp_enabled; el('dhcp-start').value=d.dhcp_start;
+    el('dhcp-end').value=d.dhcp_end; el('dhcp-lease').value=d.dhcp_lease;
+    dhcpRevision=result.revision; el('dhcp-save').disabled=false;
+    el('dhcp-result').textContent='Konfigurasi dibaca dari router.';
+  }catch(err){if(sid===token)el('dhcp-result').textContent=err.message;}
+  finally{button.disabled=false;}
+};
+el('dhcp-form').onsubmit=async e=>{
+  e.preventDefault();
+  const token=sid, revision=dhcpRevision, button=el('dhcp-save');
+  if(!token || !revision || button.disabled)return;
+  const start=el('dhcp-start').value, end=el('dhcp-end').value, enabled=el('dhcp-enabled').value;
+  if(Number(end)<=Number(start)){el('dhcp-result').textContent='Rentang tidak valid.';return;}
+  if(!window.confirm('Ubah DHCP LAN? Restart dnsmasq dapat mengganggu klien sementara.'))return;
+  button.disabled=true; dhcpRevision='';
+  try{
+    await oem('set_dhcp_config',{dhcp_start:start,dhcp_end:end,dhcp_enabled:enabled,
+      dhcp_lease:el('dhcp-lease').value,revision,confirmation:'SAVE_DHCP_POOL'},token);
+    if(sid===token)el('dhcp-result').textContent='Konfigurasi diterima. Baca ulang dan periksa koneksi klien.';
+  }catch(err){if(sid===token)el('dhcp-result').textContent=err.message;}
+};
+el('traffic-refresh').onclick=async ()=>{
+  const token=sid, button=el('traffic-refresh');
+  if(!token || button.disabled)return;
+  button.disabled=true;
+  try{
+    const result=await rpc('veci.v2.observability','trafficHistory',{},token);
+    if(result.ok!==true || result.source!=='kernel_sampled_bytes')throw Error('Traffic history unavailable');
+    if(result.state!=='observed_partial'){
+      el('traffic-result').textContent='Belum cukup sampel traffic.';
+      return;
+    }
+    const bytes=x=>Number.isSafeInteger(x)&&x>=0?x.toLocaleString('id-ID')+' byte':'Tidak diketahui';
+    const line=(name,rx,tx,seconds,gaps)=>name+': RX '+bytes(rx)+' · TX '+bytes(tx)+
+      '\nInterval terukur: '+seconds+' detik · gap: '+gaps;
+    el('traffic-result').textContent=[
+      line('LTE',result.lte_rx_bytes,result.lte_tx_bytes,result.lte_observed_seconds,result.lte_gaps),
+      line('LAN',result.lan_rx_bytes,result.lan_tx_bytes,result.lan_observed_seconds,result.lan_gaps)
+    ].join('\n\n');
+  }catch(err){if(sid===token)el('traffic-result').textContent=err.message;}
+  finally{button.disabled=false;}
 };

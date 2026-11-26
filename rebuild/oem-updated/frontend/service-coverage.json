@@ -40,12 +40,28 @@
       "provider": "native veci2-verify",
       "route": "POST /cgi-bin/oem-verify",
       "install_allowed": false
+    },
+    "dhcp_pool": {
+      "provider": "veci.v2.dhcp",
+      "methods": [
+        "status",
+        "setPool"
+      ],
+      "state": "SOURCE_INTEGRATED_NOT_UAT"
+    },
+    "traffic_history": {
+      "provider": "veci.v2.observability",
+      "methods": [
+        "trafficHistory"
+      ],
+      "scope": "local trailing 24 hours, RAM only, not quota",
+      "state": "SOURCE_INTEGRATED_NOT_UAT"
     }
   },
   "remaining": [
     "integrate OEM navigation and legacy forms",
-    "DHCP pool configuration",
-    "traffic history and data meter",
-    "hardware and browser acceptance"
+    "hardware and browser acceptance",
+    "legacy seven-day chart adaptation / persistent history policy",
+    "guest Wi-Fi activation without legacy network reload"
   ]
 }
