@@ -222,9 +222,9 @@ jobs:
           # returns exit code 2 even when regular files are extracted.
           # Extract as root so device-node errors remain a hard gate.
           sudo unsquashfs -no-progress -d "$rom" "$squash"
-          # Verify all 40 required modules' exact reviewed source payloads
+          # Verify all 39 active modules' exact reviewed source payloads
           # in the FINAL extracted image, not merely package metadata.
-          python3 "$GITHUB_WORKSPACE/rebuild/veci-v2/ci/check-all-core-rom.py" "$rom"
+          python3 "$GITHUB_WORKSPACE/rebuild/veci-v2/ci/check-all-core-rom.py" "$rom" "$RUNNER_TEMP/ROM_PAYLOADS.json"
           test -s "$rom/usr/libexec/rpcd/veci.v2" || {
             echo 'FINAL_SQUASHFS_MISSING_RPCD_V2' >&2; exit 1;
           }
@@ -338,6 +338,7 @@ jobs:
           mkdir -p "$out"
           cp "$image" "$out/openwrt-25.12.6-veci-v2-WE5927-2SIM-UNSIGNED.bin"
           cp "$meta" "$out/OPENWRT_METADATA.json"
+          cp "$RUNNER_TEMP/ROM_PAYLOADS.json" "$out/ROM_PAYLOADS.json"
           cp source/openwrt-source-commit.txt "$out/OPENWRT_PIN.txt"
           # Exported checksum paths must be portable and verifiable off-runner.
           # Keep all release evidence explicitly UNSIGNED; no signing keys in CI.
@@ -380,6 +381,7 @@ jobs:
               "openwrt_version": "25.12.6",
               "image_filename": image_name,
               "image_sha256": image_sha256,
+              "rom_payload_manifest_sha256": hashlib.sha256((out / "ROM_PAYLOADS.json").read_bytes()).hexdigest(),
               "image_bytes": image_bytes,
               "firmware_partition_bytes": 7995392,
               "minimum_free_partition_reserve_bytes": 1048576,

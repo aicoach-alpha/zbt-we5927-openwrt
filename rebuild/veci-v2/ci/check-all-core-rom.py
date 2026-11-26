@@ -126,7 +126,7 @@ def _squashfs_digest(path: Path) -> str:
         return digest
 
 
-def check(rom:Path)->list[str]:
+def check(rom:Path, verified=None)->list[str]:
     errors=[]
     ids=[x["id"] for x in json.loads(CONTRACT.read_text())["required_core"]]
     if len(ids)!=39 or len(set(ids))!=39 or "lte_ussd" in ids or set(ids)!=set(FEATURES):
@@ -158,6 +158,9 @@ def check(rom:Path)->list[str]:
                 continue
             if expected_digest != image_digest:
                 errors.append("ROM_DIFFERENT_FROM_VERIFIED_SOURCE:"+name+":"+relative_rom)
+            elif verified is not None:
+                verified.append({"module":name, "source":relative_source,
+                                 "rom":relative_rom, "sha256":image_digest})
     for forbidden in ("www/cgi-bin/luci","www/luci-static","usr/share/luci"):
         if (rom/forbidden).exists():
             errors.append("LUCI_PRESENT:"+forbidden)
@@ -167,9 +170,14 @@ def check(rom:Path)->list[str]:
     return errors
 
 if __name__=="__main__":
-    if len(sys.argv)!=2:
-        raise SystemExit("usage: check-all-core-rom.py <extracted-final-squashfs>")
-    problems=check(Path(sys.argv[1]))
+    if len(sys.argv) not in (2, 3):
+        raise SystemExit("usage: check-all-core-rom.py <extracted-final-squashfs> [new-receipt.json]")
+    verified = []
+    problems=check(Path(sys.argv[1]), verified)
     if problems:
         print("\n".join(problems),file=sys.stderr)
         raise SystemExit(3)
+    if len(sys.argv)==3:
+        with Path(sys.argv[2]).open("x") as receipt:
+            json.dump({"schema": 1, "payloads": verified}, receipt, indent=2, sort_keys=True)
+            receipt.write("\n")
