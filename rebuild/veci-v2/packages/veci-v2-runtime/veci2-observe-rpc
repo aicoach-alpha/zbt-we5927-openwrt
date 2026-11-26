@@ -1,7 +1,7 @@
 #!/bin/sh
 # Authenticated rpcd read-only status; no control of daemon or modem.
 set -eu
-case "$1:$2" in
+case "${1:-}:${2:-}" in
   list:*) echo '{"status":{}}'; exit 0 ;;
   call:status) ;;
   *) echo '{"ok":false,"error":"unsupported_method"}'; exit 0 ;;
