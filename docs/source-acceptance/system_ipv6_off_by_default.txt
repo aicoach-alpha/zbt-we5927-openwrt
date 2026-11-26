@@ -1,8 +1,10 @@
+PASS RA/DHCPv6 profiles, master-off refusal, stale revision, invalid relay, explicit confirmation, profile roundtrip across master off/on
+PASS native UCI: initialization, retry, boot, confirmation, pending edits, rollback, enable/disable, IPv4 preservation
 test_native_ipv6_provision_toggle_rollback_and_ra_profiles (test_owner_ipv6_native_acceptance.NativeIpv6Acceptance.test_native_ipv6_provision_toggle_rollback_and_ra_profiles) ... ok
 test_default_is_ipv6_off_with_one_time_initializer (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_default_is_ipv6_off_with_one_time_initializer) ... ok
 test_boot_ipv6_mode_is_before_network_only (test_veci_v2_ipv6_simple_menu.V2Ipv6AndNavigation.test_boot_ipv6_mode_is_before_network_only) ... ok
 
 ----------------------------------------------------------------------
-Ran 3 tests in 1.367s
+Ran 3 tests in 5.700s
 
 OK

@@ -7,6 +7,6 @@ test_real_ui_render_handles_five_distinct_cases (test_veci_v2_wifi_client_observ
 test_dual_source_is_read_only_and_never_equates_zero_to_disconnected (test_veci_v2_wifi_client_observation_20261126.ClientObservationContract.test_dual_source_is_read_only_and_never_equates_zero_to_disconnected) ... ok
 
 ----------------------------------------------------------------------
-Ran 7 tests in 14.446s
+Ran 7 tests in 6.973s
 
 OK

@@ -6,6 +6,6 @@ test_wan_policy_and_rollback (test_owner_firewall_source.FirewallOwnerSource.tes
 test_never_loosens_wan_policy (test_owner_firewall_source.FirewallOwnerSource.test_never_loosens_wan_policy) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 1.361s
+Ran 6 tests in 7.559s
 
 OK

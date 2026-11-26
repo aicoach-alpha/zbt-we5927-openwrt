@@ -5,8 +5,9 @@ test_wrong_board_refused (test_verify_veci_image.FailClosedImageTests.test_wrong
 test_missing_trust_anchor_refused (test_verify_veci_image.FailClosedImageTests.test_missing_trust_anchor_refused) ... ok
 test_saved_policy_controls_both_apply_paths (test_veci_update_policy.PolicyTest.test_saved_policy_controls_both_apply_paths) ... ok
 test_updates_only_in_updates_page (test_veci_single_firmware_update_ui.NativeUXGate.test_updates_only_in_updates_page) ... ok
+test_manual_and_release_identity (test_veci_upgrade_receipt.UpgradeReceipt.test_manual_and_release_identity) ... ok
 
 ----------------------------------------------------------------------
-Ran 7 tests in 0.165s
+Ran 8 tests in 5.032s
 
 OK

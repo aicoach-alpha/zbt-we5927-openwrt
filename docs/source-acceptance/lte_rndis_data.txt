@@ -8,6 +8,6 @@ test_manual_reconnect_renews_missing_local_gateway_first (test_lte_recovery_guar
 test_detached_modem_allows_reset (test_lte_recovery_guard.TestLowDowntimeReconnect.test_detached_modem_allows_reset) ... ok
 
 ----------------------------------------------------------------------
-Ran 8 tests in 0.071s
+Ran 8 tests in 0.250s
 
 OK

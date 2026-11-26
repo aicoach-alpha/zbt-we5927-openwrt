@@ -7,6 +7,6 @@ test_inactive_guest_cleanup_does_not_restart_network (test_guest_startup_guard.G
 test_guest_gui_does_not_claim_staged_ap_is_live (test_guest_isolation_readonly.GuestIsolationReadonly.test_guest_gui_does_not_claim_staged_ap_is_live) ... ok
 
 ----------------------------------------------------------------------
-Ran 7 tests in 1.445s
+Ran 7 tests in 0.845s
 
 OK

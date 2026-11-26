@@ -3,6 +3,6 @@ test_no_unrestricted_lte_network_or_ssh_boot_changes (test_owner_services_accept
 test_both_existing_menus_have_single_live_handler_path (test_veci_v2_services_addon_dom_20261126.ServicesAddonDom.test_both_existing_menus_have_single_live_handler_path) ... ok
 
 ----------------------------------------------------------------------
-Ran 3 tests in 0.758s
+Ran 3 tests in 2.999s
 
 OK

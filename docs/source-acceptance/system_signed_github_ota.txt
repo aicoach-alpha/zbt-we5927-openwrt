@@ -3,8 +3,9 @@ test_wrong_release_refused (test_verify_veci_image.FailClosedImageTests.test_wro
 test_wrong_board_refused (test_verify_veci_image.FailClosedImageTests.test_wrong_board_refused) ... ok
 test_missing_verifier_refused_even_with_key_file (test_verify_veci_image.FailClosedImageTests.test_missing_verifier_refused_even_with_key_file) ... ok
 test_updates_failures_distinguish_no_network_from_bad_manifest (test_veci_single_firmware_update_ui.NativeUXGate.test_updates_failures_distinguish_no_network_from_bad_manifest) ... ok
+test_manual_and_release_identity (test_veci_upgrade_receipt.UpgradeReceipt.test_manual_and_release_identity) ... ok
 
 ----------------------------------------------------------------------
-Ran 5 tests in 0.033s
+Ran 6 tests in 4.747s
 
 OK

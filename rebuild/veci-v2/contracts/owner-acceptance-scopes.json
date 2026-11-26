@@ -781,7 +781,8 @@
     "suites": [
       "test_verify_veci_image.py",
       "test_veci_update_policy.py",
-      "test_veci_single_firmware_update_ui.py"
+      "test_veci_single_firmware_update_ui.py",
+      "test_veci_upgrade_receipt.py"
     ],
     "test_ids": [
       "test_wrong_hash_refused",
@@ -790,12 +791,14 @@
       "test_wrong_board_refused",
       "test_missing_trust_anchor_refused",
       "test_saved_policy_controls_both_apply_paths",
-      "test_updates_only_in_updates_page"
+      "test_updates_only_in_updates_page",
+      "test_manual_and_release_identity"
     ],
     "test_source_files": [
       "scripts/tests/test_verify_veci_image.py",
       "scripts/tests/test_veci_update_policy.py",
-      "scripts/tests/test_veci_single_firmware_update_ui.py"
+      "scripts/tests/test_veci_single_firmware_update_ui.py",
+      "scripts/tests/test_veci_upgrade_receipt.py"
     ]
   },
   "system_services_startup": {
@@ -826,19 +829,22 @@
     "suites": [
       "test_veci_v2_firmware_channel.py",
       "test_verify_veci_image.py",
-      "test_veci_single_firmware_update_ui.py"
+      "test_veci_single_firmware_update_ui.py",
+      "test_veci_upgrade_receipt.py"
     ],
     "test_ids": [
       "test_channel_manifest_and_request",
       "test_wrong_release_refused",
       "test_wrong_board_refused",
       "test_missing_verifier_refused_even_with_key_file",
-      "test_updates_failures_distinguish_no_network_from_bad_manifest"
+      "test_updates_failures_distinguish_no_network_from_bad_manifest",
+      "test_manual_and_release_identity"
     ],
     "test_source_files": [
       "scripts/tests/test_veci_v2_firmware_channel.py",
       "scripts/tests/test_verify_veci_image.py",
-      "scripts/tests/test_veci_single_firmware_update_ui.py"
+      "scripts/tests/test_veci_single_firmware_update_ui.py",
+      "scripts/tests/test_veci_upgrade_receipt.py"
     ]
   },
   "system_time_ntp": {
