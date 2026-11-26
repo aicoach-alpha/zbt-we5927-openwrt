@@ -83,6 +83,21 @@ FEATURES={
  "ui_four_group_navigation":[(UI+"veci2/index.html","www/veci2/index.html")]
 }
 
+# The live HTML is the authoritative list of native JS/CSS assets. A firmware
+# must include EVERY first-party file referenced by the GUI, not merely the
+# entrypoint. Missing CSS or one JS file caused silent broken menus previously.
+# This adds no dependencies and never claims an external browser UAT passed.
+INDEX=(ROOT/UI/"veci2/index.html")
+REFERENCED_ASSETS=re.findall(
+    r'(?:src|href)="/veci2/([a-zA-Z0-9_.-]+[.](?:js|css))"',
+    INDEX.read_text(),
+)
+if len(REFERENCED_ASSETS) != len(set(REFERENCED_ASSETS)) or len(REFERENCED_ASSETS)<20:
+    raise RuntimeError("VECI_GUI_ASSET_MANIFEST_INVALID")
+FEATURES["ui_four_group_navigation"].extend(
+    (UI+"veci2/"+asset,"www/veci2/"+asset) for asset in REFERENCED_ASSETS
+)
+
 def _squashfs_digest(path: Path) -> str:
     """Hash ROM bytes without changing the sensitive permissions in the image.
 
