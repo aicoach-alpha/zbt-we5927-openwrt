@@ -41,3 +41,24 @@ One ZBT-WE5927-DSIM router, OpenWrt 25.12.6 custom v2, connected to office Windo
   rebuild when the source package is still incomplete.
 
 The current owner router remains untouched. All changes are source-only.
+
+## Development / CI gate results at 26 November 2026
+- 54 focused source regression tests passed before additional GUI fixture repair.
+- Comprehensive local suite: 505 tests; 15 failures from missing native host
+  UCI/libubox fixture and 1 browser mock missing document.body.classList.
+  Browser session mock repaired and isolated test passed. Remaining native
+  tests have NOT been counted as passed.
+- Historical source-provenance tests now verify original bytes at their
+  original Git commits, plus exact current committed worktree, rather than
+  requiring modern fixes to keep obsolete hashes.
+- Source-completion gate remains BLOCKED on 31 source hash mismatches in
+  owner-final-source-evidence.json. Preserve this block; regenerate accurate
+  test receipts and manifest hashes only after new source testing.
+- The host-only native UCI provisioner is allowed to run ahead of source
+  completion so that stale source receipts can actually be renewed.
+  It does not build a firmware image or relax release-gate.py.
+- Native test tool provisioning on andre-nas attempted; missing json-c
+  development headers stopped cmake. The GitHub CI workflow already installs
+  libjson-c-dev before provisioning. Native full-suite result: PENDING CI.
+- No GUI/browser full E2E, real new-binary LTE/Wi-Fi UAT, signing or 72h
+  acceptance has been completed.
