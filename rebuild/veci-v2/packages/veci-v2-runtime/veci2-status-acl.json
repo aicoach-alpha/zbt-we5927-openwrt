@@ -63,7 +63,8 @@
           "deleteForward",
           "setDmz",
           "setDefaults",
-          "setOffload"
+          "setOffload",
+          "setMacBlock"
         ]
       }
     }
