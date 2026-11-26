@@ -242,10 +242,16 @@
       "limitations": "Configured timezone only; full picker mapping pending."
     },
     "get_openvpn_msg": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "UCI openvpn.sample_client (public settings)",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Optional add-on; runtime integration pending. Status indicates a running process only."
     },
     "get_openvpn_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "procd service list/openvpn instances",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Optional add-on; runtime integration pending. Status indicates a running process only."
     },
     "get_parents_ctrl_rule": {
       "state": "UNIMPLEMENTED"

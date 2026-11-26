@@ -557,6 +557,34 @@ case "$1" in
         formatted="$(printf '%s\n' "$logs" | awk 'NF>=5 {d=$2" "$3" "$4; sub(/^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +/,""); gsub(/"/,"\047"); printf "%s system: \"%s\"\n",d,$0}')"
         json_add_string data "$formatted"
         ;;
+    get_openvpn_msg)
+        [ "$(get openvpn.sample_client)" = openvpn ] || error "OpenVPN client profile unavailable"
+        [ -z "$(get openvpn.sample_client.config || true)" ] || error "external OpenVPN profile"
+        success "OpenVPN client settings"
+        for name in enabled remote port dev_type proto client nobind verb comp_lzo; do
+            value="$(get "openvpn.sample_client.$name" || true)"
+            case "$name:$value" in enabled:) value=0 ;; port:) value=1194 ;; dev_type:) value=tun ;; esac
+            json_add_string "$name" "$value"
+        done
+        # The original UI expects these three fields. Never read credential files.
+        for name in ca cert key; do json_add_string "$name" ""; done
+        ;;
+    get_openvpn_status)
+        inventory="$(ubus -t 3 call service list '{"name":"openvpn"}')" || error "service inventory unavailable"
+        json_load "$inventory" || error "invalid service inventory"
+        running=0
+        if json_select openvpn && json_select instances; then
+            json_get_keys instances
+            for instance in $instances; do
+                json_select "$instance" || error "invalid OpenVPN instance"
+                json_get_var live running
+                case "$live" in 1) running=1 ;; 0) ;; *) error "invalid OpenVPN process state" ;; esac
+                json_select ..
+            done
+        fi
+        success "OpenVPN service process status"
+        json_add_string openvpn_status "$running"
+        ;;
     get_pptp_msg|get_l2tp_msg|get_pptp_sl_status|get_l2tp_sl_status|get_pptp_status|get_l2tp_status)
         case "$1" in get_pptp_*) tunnel=pptp ;; *) tunnel=l2tp ;; esac
         if [ "$1" = "get_${tunnel}_msg" ]; then

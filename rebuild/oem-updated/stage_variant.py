@@ -183,6 +183,12 @@ def stage(image, out):
             ('this.proxy_req("post","/webapi?op=get_ddns_log"',
              'this.proxy_req("get","/webapi?op=get_ddns_log"'),
         ])
+        edit_chunk("chunk-2d225296.9ea3b9f6.js", [
+            ('console.log(t),e.values=e.obj_to_arr(t,["enabled","remote","port","ca","cert","key"]),console.log(e.values)',
+             'e.values=e.obj_to_arr(t,["enabled","remote","port","ca","cert","key"])'),
+            ('var e=this.arr_to_obj(this.values,["enabled","remote","port","ca","cert","key"]);console.log(e),this.proxy_req("post","/webapi?op=set_openvpn",e,this.get_openvpn,!0)',
+             'this.$message.warning("OpenVPN configuration is read-only in this version.")'),
+        ])
         lan_name="chunk-2d22c110.8a7728fb.js"
         lan_source=(files / "www/assets/js" / lan_name).read_text()
         lan_start=lan_source.index("set_lan_config:function()")
