@@ -21,7 +21,8 @@ class ExecutedSourceEvidence(unittest.TestCase):
    log=(result/"logs/ui_four_group_navigation.txt").read_text()
    self.assertIn("test_login_permissions_and_logout (",log)
    self.assertIn("test_group_navigation_remains_simple (",log)
-   self.assertIn("Ran 4 tests in ",log)
+   accepted=json.loads(CONTRACT.read_text())["modules"]["ui_four_group_navigation"]
+   self.assertIn("Ran "+str(len(accepted["test_ids"]))+" tests in ",log)
    self.assertTrue(log.rstrip().endswith("OK"))
    report=json.loads((result/"test-run-summary.json").read_text())
    self.assertEqual(report["accepted_modules"],1)

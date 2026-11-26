@@ -27,7 +27,8 @@ class OwnerLoginAcceptance(unittest.TestCase):
         source=FIXTURE.read_text()
         for guard in ("location.protocol = 'https:'", "for (const bad of",
                       "assert.equal(calls.length, 4)",
-                      "assert.deepEqual(calls[5]", "assert.equal(reloads, 1)",
+                      "assert.equal(destroys.length, 1)",
+                      "assert.deepEqual(destroys[0]", "assert.equal(reloads, 1)",
                       "assert.equal(element('password').value, '')"):
             self.assertIn(guard,source)
 
