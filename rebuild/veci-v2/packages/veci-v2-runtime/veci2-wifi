@@ -20,11 +20,9 @@ visibility() {
     *) fail invalid_visibility ;;
   esac
 }
-# UCI prints one terminating newline. Encode the stored bytes before removing it.
-ssid_hex() {
-  local encoded
-  encoded=$(uci -q get "$ap.ssid" | hexdump -v -e '1/1 "%02x"') || return 1
-  printf '%s' "${encoded%0a}"
+# Use UCI and libubox jshn; do not require optional hexdump, od or base64.
+ssid_value() {
+  uci -q get "$ap.ssid"
 }
 primary_channel() {
   [ "$(uci -q get wireless.radio0)" = wifi-device ] &&
@@ -42,7 +40,45 @@ save_option() {
   trap - EXIT HUP INT TERM
 }
 case "${1:-}:${2:-}" in
-  list:*) echo '{"status":{},"info":{},"survey":{},"setChannel":{"channel":"String"},"setAuth":{"mode":"String","key_hex":"String"},"setAccess":{"mode":"String","addresses":"String"},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"}}'; exit 0 ;;
+  list:*) echo '{"status":{},"info":{},"survey":{},"setChannel":{"channel":"String"},"setAuth":{"mode":"String","key_hex":"String"},"setAccess":{"mode":"String","addresses":"String"},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"},"activationStatus":{},"activateAp":{"confirmation":"String"}}'; exit 0 ;;
+  call:activationStatus|call:activateAp)
+    check_ap
+    if [ "$2" = activationStatus ]; then
+      phase=idle
+      if [ -r /tmp/veci2-wifi-activate.state ]; then
+        raw=$(cat /tmp/veci2-wifi-activate.state 2>/dev/null) || raw=
+        case "$raw" in
+          preflight|saving|reloading|verifying|ready) phase=$raw ;;
+          failed:*)
+            reason=$(printf %s "$raw" | sed 's/^failed://')
+            case "$reason" in ''|*[!a-z0-9_]*) phase=failed ;; *) phase="failed:$reason" ;; esac ;;
+        esac
+      fi
+      eligible=false
+      key=$(uci -q get "$ap.key" 2>/dev/null || :)
+      key_length=$(printf %s "$key" | wc -c | tr -d ' ')
+      unset key
+      if [ "$(uci -q get "$ap.disabled" 2>/dev/null || :)" = 1 ] &&
+         [ "$(uci -q get "$ap.encryption" 2>/dev/null || :)" = psk2 ] &&
+         [ "$key_length" -ge 8 ] && [ "$key_length" -le 63 ] &&
+         [ -n "$(ssid_value)" ]; then eligible=true; fi
+      case "$phase" in failed:*|preflight|saving|reloading|verifying) eligible=false ;; esac
+      printf '{"ok":true,"phase":"%s","eligible":%s,"beacon_verified":false}\n' "$phase" "$eligible"
+    else
+      request=$(head -c 257)
+      [ "$(printf %s "$request" | wc -c | tr -d ' ')" -le 256 ] || fail invalid_request
+      action=$(jsonfilter -s "$request" -e '@.confirmation' 2>/dev/null) || fail invalid_request
+      [ "$action" = ACTIVATE_WPA2_AP_ONCE ] || fail explicit_confirmation_required
+      [ -x /usr/libexec/veci2-wifi-activate ] || fail activation_helper_missing
+      [ "$(uci -q get "$ap.disabled" 2>/dev/null || :)" = 1 ] || fail ap_already_enabled
+      case "$(cat /tmp/veci2-wifi-activate.state 2>/dev/null)" in
+        preflight|saving|reloading|verifying) fail activation_already_running ;;
+        failed:*) fail previous_activation_failed_manual_review_required ;;
+      esac
+      ( /usr/libexec/veci2-wifi-activate ) </dev/null >/dev/null 2>&1 &
+      printf '{"ok":true,"queued":true,"internet_verified":false,"beacon_verified":false}\n'
+    fi
+    exit 0 ;;
   call:info|call:survey|call:setChannel|call:setAuth|call:setAccess)
     . /usr/libexec/veci2-wifi-controls
     check_ap
@@ -94,15 +130,24 @@ case "${1:-}:${2:-}" in
         name=$name$(printf '%b' "$(printf '\\%03o' "0x$pair")")
         remaining=$rest
       done
-      current=$(ssid_hex) || fail config_unavailable
-      if [ "$current" != "$desired" ]; then
+      current=$(ssid_value) || fail config_unavailable
+      if [ "$current" != "$name" ]; then
         save_option "$ap.ssid" "$name"
         check_ap
-        [ "$(ssid_hex)" = "$desired" ] || fail save_failed
+        [ "$(ssid_value)" = "$name" ] || fail save_failed
       fi
     fi ;;
   *) fail unsupported_method ;;
 esac
-configured=$(ssid_hex) || fail config_unavailable
+configured=$(ssid_value) || fail config_unavailable
 channel=$(primary_channel) || channel=
-printf '{"ok":true,"configured_visible":%s,"ssid_hex":"%s","configured_channel":"%s"}\n' "$visible" "$configured" "$channel"
+# libubox jshn uses intentionally unset dynamic JSON variables.
+set +u
+. /usr/share/libubox/jshn.sh || fail json_encoder_unavailable
+json_init
+json_add_boolean ok 1
+case "$visible" in true) json_add_boolean configured_visible 1 ;;
+  *) json_add_boolean configured_visible 0 ;; esac
+json_add_string ssid "$configured"
+json_add_string configured_channel "$channel"
+json_dump

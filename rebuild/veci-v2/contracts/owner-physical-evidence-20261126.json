@@ -1,0 +1,32 @@
+{
+  "schema": "owner_physical_evidence_v1",
+  "observed_date": "2026-11-26",
+  "board": "zbtlink,zbt-we5927",
+  "evidence": "owner_supplied_windows_powershell_and_phone_uat",
+  "live_hardware": {
+    "sim_selected": 1,
+    "gpio46": 1,
+    "sim_ready": true,
+    "lte_registered": true,
+    "packet_attached": true,
+    "pdp_cid1_active": true,
+    "lte_operator": "XL",
+    "https_code_bound_to_usb0": 204,
+    "wifi_security": "psk2",
+    "wifi_interface": "phy0-ap0",
+    "hostapd_enabled": true,
+    "mt76_error_seen_in_current_boot_log": false,
+    "ssid_visible_phone": true,
+    "phone_wifi_auth_success": true,
+    "phone_wifi_internet_success": true
+  },
+  "limits": {
+    "applies_to_new_binary": false,
+    "new_gui_browser_uat": "NOT_TESTED",
+    "all_menu_end_to_end": "NOT_TESTED",
+    "lte_coldboot": "NOT_TESTED",
+    "wifi_coldboot": "NOT_TESTED",
+    "soak_72h": "NOT_STARTED",
+    "new_signed_candidate": "NOT_BUILT"
+  }
+}

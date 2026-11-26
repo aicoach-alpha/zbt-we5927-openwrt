@@ -13,7 +13,11 @@
     list.replaceChildren();
     message.textContent = 'Memproses…';
     try {
-      let data = await rpc('veci.v2.services', args ? (args.action ? profileMethod : 'save') : 'status', args || {}, session);
+      // Add-on profile actions belong to veci.v2.addon, NOT veci.v2.services.
+      // Startup toggles continue using the sole service manager.
+      const isProfileAction = Boolean(args?.action);
+      let data = await rpc(isProfileAction ? 'veci.v2.addon' : 'veci.v2.services',
+        isProfileAction ? profileMethod : args ? 'save' : 'status', args || {}, session);
       if (session !== sid) return;
       if (!data.ok) throw Error(data.error || 'Permintaan gagal');
       if (args?.action) {
@@ -39,7 +43,7 @@
         list.append(row);
       }
       if (addons) {
-        const profiles = await rpc('veci.v2.services', 'addonProfiles', {}, session);
+        const profiles = await rpc('veci.v2.addon', 'status', {}, session);
         if (sid !== session) return;
         if (!profiles.ok) throw Error(profiles.error || 'Profil add-on tidak tersedia');
         const labels = {absent:'belum terpasang', unconfigured:'konfigurasi belum lengkap',

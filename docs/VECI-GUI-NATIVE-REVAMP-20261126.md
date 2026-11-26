@@ -32,3 +32,8 @@ VeCI code using existing RPC permissions. See upstream licenses before any reuse
 3. Browser UAT desktop/mobile, authenticated live status, real Wi-Fi/LTE/SMS.
 4. No firmware rebuild or flash solely to replace CSS/nav.
 5. Protect existing live LTE and Wi-Fi baseline and ongoing 72-hour UAT.
+
+## Follow-up connectivity and menu repairs
+
+See docs/VECI-V2-CONNECTIVITY-MENU-RELEASE-GATE-20261126.md.
+No offline source PASS is equivalent to browser or owner hardware UAT.

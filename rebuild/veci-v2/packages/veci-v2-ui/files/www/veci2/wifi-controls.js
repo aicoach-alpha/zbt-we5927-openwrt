@@ -36,6 +36,7 @@
         render(info);
       }
       status.textContent = method.startsWith('set') ? 'Tersimpan untuk Wi-Fi berikutnya dimulai.' : '';
+      if (method === 'setAuth') void globalThis.VeciWifiActivation?.refresh?.();
     } catch (error) {
       if (gen === generation && sid === session) status.textContent = error.message;
     } finally {

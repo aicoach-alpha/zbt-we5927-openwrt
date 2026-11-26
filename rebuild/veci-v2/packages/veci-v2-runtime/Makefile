@@ -35,6 +35,7 @@ define Package/veci-v2-runtime/install
 	$(INSTALL_BIN) ./veci2-restore-check $(1)/usr/libexec/veci2-restore-check
 	$(INSTALL_BIN) ./veci2-lte-policy $(1)/usr/libexec/rpcd/veci.v2.lte
 	$(INSTALL_BIN) ./veci2-wifi $(1)/usr/libexec/rpcd/veci.v2.wifi
+	$(INSTALL_BIN) ./veci2-wifi-activate $(1)/usr/libexec/veci2-wifi-activate
 	$(INSTALL_BIN) ./veci2-dns $(1)/usr/libexec/rpcd/veci.v2.dns
 	$(INSTALL_BIN) ./veci2-static-leases $(1)/usr/libexec/rpcd/veci.v2.dhcp
 	$(INSTALL_DATA) ./veci2-lan-bounds $(1)/usr/libexec/veci2-lan-bounds

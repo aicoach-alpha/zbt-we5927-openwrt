@@ -313,6 +313,9 @@ function showLogin() {
   globalThis.VeciAccess?.reset();
   globalThis.VeciRa?.reset?.();
   globalThis.VeciWifiControls?.reset?.();
+  wifiActivationBusy = false;
+  el('wifi-activate-ap').disabled = true;
+  el('wifi-activate-status').textContent = 'Login diperlukan.';
   globalThis.VeciCron?.reset?.();
   globalThis.VeciWatchdog?.reset?.();
   globalThis.VeciGuestCheck?.reset?.();
@@ -329,6 +332,7 @@ function showLogin() {
   globalThis.VeciSmsCenter.logout();
   globalThis.VeciDnsSettings?.logout?.();
   globalThis.VeciOwnerControls?.logout?.();
+  globalThis.VeciServices?.reset?.();
   sid = '';
   verifiedPackage = '';
   el('logout').hidden = true;
@@ -379,6 +383,7 @@ function showPage(id) {
   if (id === 'overview' && document.querySelector?.('#overview .subtab.active')?.dataset.group === 'health')
     void refreshHealth();
   if (id === 'network') {
+    void refreshWifiActivation();
     globalThis.VeciOwnerControls?.refreshNetwork?.();
     refreshNetwork();
     refreshEthernet();
@@ -676,6 +681,95 @@ async function refreshHealth() {
   } finally { healthBusy=false; }
 }
 
+// A single opt-in activation path. Credential saves never reload radio.
+// Source-only until on-router and browser UAT; never promise external beacon.
+let wifiActivationBusy = false;
+async function refreshWifiActivation() {
+  if (!sid || wifiActivationBusy) return;
+  const current = sid;
+  const button = el('wifi-activate-ap');
+  const status = el('wifi-activate-status');
+  button.disabled = true;
+  try {
+    const data = await rpc('veci.v2.wifi','activationStatus',{},current,8500);
+    if (sid !== current) return;
+    if (data.ok !== true) throw Error(data.error || 'Status aktivasi tidak tersedia');
+    const phase = String(data.phase || 'idle');
+    if (phase === 'ready') {
+      status.textContent = 'AP berhasil dijalankan oleh hostapd. Uji SSID, IP klien, dan internet pada HP.';
+    } else if (phase.startsWith('failed:')) {
+      status.textContent = 'Aktivasi gagal: ' + phase.slice(7).replace(/_/g, ' ') +
+        '. Konfigurasi dipulihkan; jangan mengulangi tanpa pemeriksaan driver.';
+    } else if (['preflight','saving','reloading','verifying'].includes(phase)) {
+      status.textContent = 'Aktivasi masih diperiksa: ' + phase +
+        '. Jangan reload radio atau jaringan.';
+    } else if (data.eligible === true) {
+      status.textContent = 'SSID dan WPA2 sudah siap. Aktivasi satu kali memerlukan persetujuan eksplisit.';
+    } else {
+      status.textContent = 'AP sudah aktif atau WPA2 belum siap. Simpan keamanan terlebih dahulu, lalu perbarui status.';
+    }
+    button.disabled = data.eligible !== true;
+  } catch (error) {
+    if (sid === current) status.textContent = 'Status aktivasi gagal dibaca: ' +
+      String(error.message || 'unknown') + '. Jangan jalankan ulang otomatis.';
+  }
+}
+globalThis.VeciWifiActivation = {refresh:refreshWifiActivation};
+async function requestWifiActivation() {
+  if (!sid || wifiActivationBusy) return;
+  const button = el('wifi-activate-ap');
+  if (button.disabled) return;
+  if (!window.confirm(
+    'Aktifkan AP WPA2 satu kali? Router akan melakukan reload konfigurasi netifd. ' +
+    'LAN dan LTE bisa terputus sesaat dan driver MT76 berisiko macet. ' +
+    'Pastikan menggunakan kabel LAN dan siap melakukan pemulihan manual bila diperlukan.'
+  )) return;
+  wifiActivationBusy = true;
+  button.disabled = true;
+  const current = sid;
+  const status = el('wifi-activate-status');
+  status.textContent = 'Mengirim satu permintaan aktivasi...';
+  try {
+    const response = await rpc('veci.v2.wifi','activateAp',
+      {confirmation:'ACTIVATE_WPA2_AP_ONCE'},current,10000);
+    if (sid !== current) return;
+    if (response.ok !== true || response.queued !== true)
+      throw Error(response.error || 'Permintaan ditolak');
+    status.textContent = 'Permintaan diterima, belum membuktikan AP berjalan. Memeriksa hasil...';
+    for (let attempt = 0; attempt < 28; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      if (sid !== current) return;
+      let outcome;
+      try { outcome = await rpc('veci.v2.wifi','activationStatus',{},current,8500); }
+      catch (error) {
+        status.textContent = 'Koneksi GUI terputus saat aktivasi. Jangan mengulangi perintah; periksa router lewat kabel LAN.';
+        return;
+      }
+      if (sid !== current) return;
+      if (outcome.ok !== true) throw Error(outcome.error || 'Status tidak tersedia');
+      const phase = String(outcome.phase || 'idle');
+      if (phase === 'ready') {
+        status.textContent = 'AP hostapd siap. Uji SSID dan internet dari HP; hasil eksternal belum terverifikasi.';
+        void refreshNetwork();
+        return;
+      }
+      if (phase.startsWith('failed:')) {
+        status.textContent = 'Aktivasi gagal: ' + phase.slice(7).replace(/_/g, ' ') +
+          '. Jangan coba ulang; periksa driver dan koneksi LAN secara manual.';
+        return;
+      }
+      status.textContent = 'Aktivasi: ' + phase + ' — satu kali, tanpa percobaan ulang otomatis.';
+    }
+    status.textContent = 'Status akhir belum terkonfirmasi. Jangan kirim permintaan kedua.';
+  } catch (error) {
+    if (sid === current) status.textContent = 'Aktivasi tidak terkonfirmasi: ' +
+      String(error.message || 'unknown') + '. Periksa status sebelum bertindak lagi.';
+  } finally {
+    wifiActivationBusy = false;
+    if (sid === current) void refreshWifiActivation();
+  }
+}
+
 let visibilityRequest = 0;
 let configuredVisible = null;
 let savingVisibility = false;
@@ -708,18 +802,24 @@ async function refreshVisibility(method = 'status', params = {}) {
       autoChannel.disabled = data.configured_channel === 'auto';
     }
     button.textContent = configuredVisible ? 'Sembunyikan SSID' : 'Tampilkan SSID';
-    if (typeof data.ssid_hex === 'string' && /^(?:[0-9a-f]{2}){0,32}$/.test(data.ssid_hex)) {
-      const bytes = Uint8Array.from(data.ssid_hex.match(/../g) || [], byte => parseInt(byte, 16));
+    // Prefer JSON-escaped SSID; no optional hexdump binary is needed.
+    // Accept legacy hex output from older images for rolling upgrades.
+    if (typeof data.ssid === 'string' ||
+        (typeof data.ssid_hex === 'string' && /^(?:[0-9a-f]{2}){0,32}$/.test(data.ssid_hex))) {
       try {
-        const stored = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(bytes);
-        if (/[\x00-\x1f\x7f]/.test(stored)) throw Error();
+        const stored = typeof data.ssid === 'string' ? data.ssid :
+          new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(
+            Uint8Array.from(data.ssid_hex.match(/../g) || [], byte => parseInt(byte, 16)));
+        const bytes = new TextEncoder().encode(stored);
+        if (!bytes.length || bytes.length > 32 ||
+            bytes.some(byte => byte < 32 || byte === 127)) throw Error();
         name.value = stored;
+        name.disabled = false;
+        saveName.disabled = false;
       } catch {
         name.value = '';
-        status.textContent += ' Nama saat ini tidak dapat ditampilkan sebagai teks.';
+        status.textContent += ' Nama Wi-Fi tidak valid untuk diedit.';
       }
-      name.disabled = false;
-      saveName.disabled = false;
     }
     button.disabled = false;
   } catch (error) {
@@ -1023,6 +1123,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await refreshOverview();
     } catch (error) { notify(error.message); }
   });
+  el('wifi-activate-ap').addEventListener('click', () => void requestWifiActivation());
   for (const tab of document.querySelectorAll('.tab'))
     tab.addEventListener('click', () => showPage(tab.dataset.page));
   for (const shortcut of document.querySelectorAll('[data-target-page][data-target-group]'))

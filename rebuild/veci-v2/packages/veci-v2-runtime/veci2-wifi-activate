@@ -1,0 +1,104 @@
+#!/bin/sh
+# One-shot opt-in Wi-Fi AP activation for ZBT-WE5927. No SIM, modem or LAN UCI.
+set -eu
+umask 077
+STATE=/tmp/veci2-wifi-activate.state
+ROOT=/tmp/veci2-wifi-activation
+BACKUP=$ROOT/wireless.before
+SUCCESS=$ROOT/success
+DONE=$ROOT/done
+TAG=veci2-wifi-activate
+record() { printf '%s\n' "$1" > "$STATE"; }
+abort() { record "failed:$1"; logger -t "$TAG" "Activation aborted: $1" 2>/dev/null || :; exit 1; }
+get() { uci -q get "$1" 2>/dev/null || :; }
+exec 9>/tmp/veci2-wifi-activation.lock
+flock -n 9 || exit 1
+record preflight
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null)" = zbtlink,zbt-we5927 ] || abort wrong_board
+[ "$(get wireless.radio0)" = wifi-device ] &&
+  [ "$(get wireless.radio0.band)" = 2g ] || abort wrong_radio
+[ "$(get wireless.default_radio0)" = wifi-iface ] &&
+  [ "$(get wireless.default_radio0.device)" = radio0 ] &&
+  [ "$(get wireless.default_radio0.mode)" = ap ] || abort wrong_ap
+[ -e /sys/class/ieee80211/phy0 ] || abort phy_missing
+[ -d /sys/class/net/br-lan ] || abort lan_bridge_missing
+[ -f /etc/config/wireless ] && [ ! -L /etc/config/wireless ] || abort config_missing
+[ -z "$(uci -q changes wireless 2>/dev/null)" ] || abort pending_wireless_changes
+[ "$(get wireless.default_radio0.disabled)" = 1 ] || abort ap_not_disabled
+case "$(get wireless.radio0.disabled)" in ''|0|1) ;; *) abort radio_state_invalid ;; esac
+[ "$(get wireless.default_radio0.encryption)" = psk2 ] || abort wpa2_required
+key="$(get wireless.default_radio0.key)"
+len="$(printf %s "$key" | wc -c | tr -d ' ')"
+[ "$len" -ge 8 ] && [ "$len" -le 63 ] || abort key_length_invalid
+[ "$(printf %s "$key" | LC_ALL=C tr -cd ' -~' | wc -c | tr -d ' ')" = "$len" ] || abort invalid_key_bytes
+unset key
+[ -n "$(get wireless.default_radio0.ssid)" ] || abort empty_ssid
+if dmesg 2>/dev/null | grep -Eiq 'mt76.*(mcu.*timeout|reset failed|timed out)|mt7603.*(timeout|failed)'; then
+  abort mt76_prior_error
+fi
+command -v ubus >/dev/null 2>&1 || abort missing_ubus
+command -v jsonfilter >/dev/null 2>&1 || abort missing_jsonfilter
+pre="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null)" || abort wireless_status_timeout
+up="$(printf '%s\n' "$pre" | jsonfilter -e '@.radio0.up' 2>/dev/null)" || abort radio_status_invalid
+case "$up" in true|false) ;; *) abort radio_status_invalid ;; esac
+old_route="$(ip -4 route show default dev usb0 2>/dev/null || :)"
+mkdir -p "$ROOT" || abort backup_dir_unavailable
+chmod 700 "$ROOT"
+cp -p /etc/config/wireless "$BACKUP" || abort backup_failed
+chmod 600 "$BACKUP"
+cmp -s "$BACKUP" /etc/config/wireless || abort backup_verify_failed
+rm -f "$SUCCESS" "$DONE" || abort stale_success_cleanup_failed
+# Volatile watchdog survives RPC worker exit. Restore UCI only, never reload twice.
+(
+  sleep 75
+  if [ ! -e "$DONE" ] && [ -r "$BACKUP" ]; then
+    cp -p "$BACKUP" /etc/config/wireless 2>/dev/null || :
+    echo 'failed:timeout_config_restored_runtime_unknown' > "$STATE"
+    logger -t "$TAG" 'Activation timeout, UCI restored; runtime not forcibly reset' 2>/dev/null || :
+  fi
+) </dev/null >/dev/null 2>&1 &
+revert_on_failure() {
+  outcome=$?
+  if [ "$outcome" -ne 0 ] && [ ! -e "$SUCCESS" ]; then
+    uci -q revert wireless >/dev/null 2>&1 || :
+    cp -p "$BACKUP" /etc/config/wireless 2>/dev/null || :
+    logger -t "$TAG" 'Activation failed, wireless config restored; no second reload' 2>/dev/null || :
+  fi
+  touch "$DONE" 2>/dev/null || :
+}
+trap revert_on_failure EXIT
+trap 'exit 130' HUP INT TERM
+record saving
+uci -q set wireless.radio0.disabled=0 || abort set_radio_failed
+uci -q set wireless.default_radio0.disabled=0 || abort set_ap_failed
+uci -q commit wireless || abort commit_failed
+[ "$(get wireless.default_radio0.disabled)" = 0 ] || abort config_verify_failed
+record reloading
+# Exactly one netifd config reload, not wifi up / reboot.
+ubus -S -t 12 call network reload '{}' >/dev/null 2>&1 || abort netifd_reload_failed
+record verifying
+attempt=0
+verified=no
+while [ "$attempt" -lt 10 ]; do
+  attempt=$((attempt + 1))
+  data="$(ubus -S -t 3 call network.wireless status '{}' 2>/dev/null || :)"
+  state="$(printf '%s' "$data" | jsonfilter -e '@.radio0.up' 2>/dev/null || :)"
+  iface="$(printf '%s' "$data" | jsonfilter -e '@.radio0.interfaces[@.section="default_radio0"].ifname' 2>/dev/null || :)"
+  case "$iface" in ''|*[!a-zA-Z0-9_.-]*) iface= ;; esac
+  if [ "$state" = true ] && [ -n "$iface" ] && [ -e "/sys/class/net/$iface/phy80211" ]; then
+    hostapd="$(ubus -S -t 3 call "hostapd.$iface" get_status '{}' 2>/dev/null |
+      jsonfilter -e '@.status' 2>/dev/null || :)"
+    if [ "$hostapd" = ENABLED ]; then verified=yes; break; fi
+  fi
+  sleep 2
+done
+[ "$verified" = yes ] || abort hostapd_not_enabled
+[ -d /sys/class/net/br-lan ] || abort lan_bridge_lost
+if [ -n "$old_route" ]; then
+  [ -n "$(ip -4 route show default dev usb0 2>/dev/null)" ] || abort lte_route_lost
+fi
+touch "$SUCCESS" || abort success_mark_failed
+record ready
+touch "$DONE"
+logger -t "$TAG" 'Hostapd/netdev verified; external beacon/client/DHCP untested' 2>/dev/null || :
+exit 0

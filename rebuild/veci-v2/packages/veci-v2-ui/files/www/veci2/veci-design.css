@@ -202,3 +202,9 @@ main {max-width:1500px;padding:26px 24px 48px}
   html{scroll-behavior:auto}
   #workspace>.tabs,.quick-link{transition:none}
 }
+
+/* Explicit, authenticated Wi-Fi provisioning. No implicit radio mutation. */
+.wifi-primary-panel .wifi-activation-action{margin-top:20px;padding:17px 19px;border:1px solid #cfe2ef;border-radius:13px;background:#f4f9fd}
+.wifi-activation-action h3{margin:2px 0 8px;color:#1b5174}
+.wifi-activation-action p{font-size:12px;line-height:1.65;color:#57728b}
+.wifi-activation-action #wifi-activate-status{font-weight:650;color:#315e80;overflow-wrap:anywhere}

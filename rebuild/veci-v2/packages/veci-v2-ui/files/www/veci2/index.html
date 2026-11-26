@@ -187,6 +187,25 @@
             <button id="monitor-save" type="button" disabled>Simpan interval</button>
             <p id="monitor-result" role="status"></p>
           </article>
+          <article class="panel wifi-primary-panel" data-group="wifi">
+            <div class="section-heading"><div><span class="eyebrow">WIRELESS 2.4 GHZ</span><h2>Wi-Fi utama</h2><p>Kelola SSID, keamanan WPA2 dan kanal. Pengaturan disimpan terpisah dari aktivasi radio.</p></div></div>
+            <p id="wifi-ap-live-status" class="notice" role="status">Status AP belum diperiksa.</p>
+            <h3>Wi-Fi utama</h3>
+            <form id="wifi-name-form">
+              <label>Nama jaringan (SSID, 1–32 byte) <input id="wifi-name" required maxlength="32" autocomplete="off" disabled></label>
+              <button id="wifi-name-save" type="submit" disabled>Simpan nama</button>
+            </form>
+            <button id="wifi-channel-auto" type="button" disabled>Gunakan kanal otomatis 2,4 GHz</button>
+            <p id="wifi-visibility-status" role="status"></p>
+            <button id="wifi-visibility-change" type="button" disabled>Ubah visibilitas</button>
+            <section class="wifi-activation-action" aria-label="Aktivasi Access Point">
+              <h3>Aktivasi Wi-Fi yang aman</h3>
+              <p>Setelah SSID dan WPA2 tersimpan, aktivasi satu kali menerapkan AP melalui netifd. Langkah ini dapat memutus LAN/LTE sebentar dan berisiko hang MT76. Gunakan kabel LAN; jangan ulangi jika gagal.</p>
+              <button id="wifi-activate-ap" type="button" disabled>Aktifkan Access Point WPA2</button>
+              <p id="wifi-activate-status" role="status">Memeriksa kesiapan Wi-Fi...</p>
+              <p class="notice">PASS dari hostapd bukan bukti SSID terlihat, klien terhubung, atau internet dari HP. Tetap perlu UAT eksternal.</p>
+            </section>
+          </article>
           <article class="panel" data-group="wifi">
             <h2>Guest Wi-Fi — Isolasi</h2>
             <button id="guest-status-read" type="button">Periksa konfigurasi guest</button>
@@ -239,14 +258,6 @@
             <div id="network-status" class="grid" aria-live="polite"></div>
             <p>Kontrol reconnect, APN dan SIM berada pada submenu LTE &amp; SIM.</p>
             <button id="lte-open-controls" class="quiet" type="button">Buka pengaturan LTE &amp; SIM</button>
-            <h3>Wi-Fi utama</h3>
-            <form id="wifi-name-form">
-              <label>Nama jaringan (SSID, 1–32 byte) <input id="wifi-name" required maxlength="32" autocomplete="off" disabled></label>
-              <button id="wifi-name-save" type="submit" disabled>Simpan nama</button>
-            </form>
-            <button id="wifi-channel-auto" type="button" disabled>Gunakan kanal otomatis 2,4 GHz</button>
-            <p id="wifi-visibility-status" role="status"></p>
-            <button id="wifi-visibility-change" type="button" disabled>Ubah visibilitas</button>
             <details><summary>Alamat IPv4 LAN dan WAN Ethernet</summary>
               <button type="button" id="interface-read">Baca konfigurasi</button>
               <form id="interface-form"><fieldset name="controls" disabled>

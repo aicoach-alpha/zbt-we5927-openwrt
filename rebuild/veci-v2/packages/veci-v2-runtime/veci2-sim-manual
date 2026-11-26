@@ -49,7 +49,12 @@ if [ "$2" = switchSim ]; then
         /usr/sbin/we5927-lte sim "$before" >/dev/null 2>&1 || :
         fail reconnect_failed_rollback_attempted
       fi
-      fail sim_switch_failed
+      if [ "$after" = "$before" ] &&
+         [ "$(uci -q get "$CFG.sim" || :)" = "$before" ]; then
+        # Manager already restored original SIM. Avoid a second hard cycle.
+        fail sim_switch_failed_previous_slot_restored
+      fi
+      fail sim_switch_failed_rollback_unverified
     fi
     after=$(/usr/sbin/we5927-lte selector-slot 2>/dev/null || :)
     [ "$after" = "$slot" ] || fail selector_not_confirmed

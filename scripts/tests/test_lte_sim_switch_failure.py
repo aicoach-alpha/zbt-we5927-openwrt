@@ -103,6 +103,7 @@ gpio_path() { echo unexpected >&2; return 1; }
 set_sim() { :; }
 cycle_modem_power() { echo power >&3; [ "$failed" != power ]; }
 wait_at() { [ "$failed" != at ]; }
+sim_ready_at_port() { :; }
 log() { :; }
 apply_apn_at_ready() { echo apn >&3; [ "$failed" != apn ]; }
 lte_netifd_call() { echo ifup >&3; [ "$failed" != ifup ]; }
@@ -177,6 +178,7 @@ exec 3>&1
 set_sim() { echo "select $1"; }
 cycle_modem_power() { echo power; }
 wait_at() { :; }
+sim_ready_at_port() { :; }
 apply_apn_at_ready() { echo apn; }
 lte_netifd_call() { :; }
 """
