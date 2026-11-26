@@ -29,15 +29,22 @@ lan_host() {
 }
 [ "$#" -ge 1 ] || fail unsupported_method
 case "$1" in
-  list) echo '{"status":{},"addForward":{"from_port":"Integer","to_port":"Integer","protocol":"String","destination":"String","confirmation":"String"},"deleteForward":{"name":"String","confirmation":"String"},"setDmz":{"destination":"String","confirmation":"String"},"setDefaults":{"drop_invalid":"String","syn_flood":"String","revision":"String","confirmation":"String"},"setOffload":{"enabled":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
+  list) echo '{"status":{},"addForward":{"from_port":"Integer","to_port":"Integer","protocol":"String","destination":"String","confirmation":"String"},"deleteForward":{"name":"String","confirmation":"String"},"setDmz":{"destination":"String","confirmation":"String"},"setDefaults":{"drop_invalid":"String","syn_flood":"String","revision":"String","confirmation":"String"},"setOffload":{"enabled":"String","revision":"String","confirmation":"String"},"setMacBlock":{"addresses":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
   call) [ "$#" -ge 2 ] || fail unsupported_method
-    case "$2" in status|addForward|deleteForward|setDmz|setDefaults|setOffload) ;; *) fail unsupported_method ;; esac ;;
+    case "$2" in status|addForward|deleteForward|setDmz|setDefaults|setOffload|setMacBlock) ;; *) fail unsupported_method ;; esac ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
 [ "$(uci -q get firewall.@zone[0].name)" = lan ] || fail lan_zone_mismatch
 [ "$(uci -q get firewall.@zone[1].name)" = wan ] || fail wan_zone_mismatch
 [ "$(uci -q get firewall.@zone[1].input)" = REJECT ] || fail unsafe_wan_policy
+mac_rule_owned() {
+  [ "$(uci -q get firewall.veci_owner_mac_block || :)" = rule ] &&
+  [ "$(uci -q get firewall.veci_owner_mac_block.name || :)" = VeCI_MAC_Block ] &&
+  [ "$(uci -q get firewall.veci_owner_mac_block.src || :)" = lan ] &&
+  [ "$(uci -q get firewall.veci_owner_mac_block.dest || :)" = wan ] &&
+  [ "$(uci -q get firewall.veci_owner_mac_block.target || :)" = REJECT ]
+}
 status() {
   # libubox jshn internally unsets JSON namespace variables during init.
   # Read-only JSON serialization must not abort when nounset is active.
@@ -72,6 +79,14 @@ status() {
     json_close_object
   done
   json_close_array
+  json_add_array blocked_macs
+  if mac_rule_owned; then
+    for mac in $(uci -q get firewall.veci_owner_mac_block.src_mac || :); do
+      printf '%s\n' "$mac" | grep -Eiq '^[0-9a-f]{2}(:[0-9a-f]{2}){5}$' || fail invalid_mac_rule
+      json_add_string "" "$mac"
+    done
+  fi
+  json_close_array
   json_add_string dmz_destination "$(uci -q get firewall.veci_owner_dmz.dest_ip || :)"
   json_dump; echo
 }
@@ -86,7 +101,7 @@ tmp=$(mktemp -d /tmp/veci2-firewall.XXXXXX) || fail tmp_failed
 trap 'rm -rf "$tmp"' EXIT
 trap 'exit 1' HUP INT TERM
 cp /etc/config/firewall "$tmp/previous" || fail backup_failed
-if [ "$2" = setDefaults ] || [ "$2" = setOffload ]; then
+if [ "$2" = setDefaults ] || [ "$2" = setOffload ] || [ "$2" = setMacBlock ]; then
   digest=$(sha256sum /etc/config/firewall) || fail config_unavailable
   expected=$(jsonfilter -s "$request" -e '@.revision') || fail invalid_request
   [ "$expected" = "${digest%% *}" ] || fail stale_configuration
@@ -99,10 +114,40 @@ if [ "$2" = setDefaults ] || [ "$2" = setOffload ]; then
     case "$drop:$syn" in 0:0|0:1|1:0|1:1) ;; *) fail invalid_flag;; esac
     uci -q -t "$tmp" set "firewall.@defaults[0].drop_invalid=$drop" &&
     uci -q -t "$tmp" set "firewall.@defaults[0].synflood_protect=$syn" || fail stage_failed
+  elif [ "$2" = setMacBlock ]; then
+    [ "$confirm" = SAVE_MAC_BLOCK ] || fail confirmation_required
+    list=$(jsonfilter -s "$request" -e '@.addresses') || fail invalid_request
+    case "$list" in *[!0-9a-fA-F:\ ]*) fail invalid_mac_list;; esac
+    existing=$(uci -q get firewall.veci_owner_mac_block || :)
+    [ -z "$existing" ] || mac_rule_owned || fail not_owner_rule
+    seen=" "; count=0
+    for mac in $list; do
+      printf '%s\n' "$mac" | grep -Eiq '^[0-9a-f][02468ace](:[0-9a-f]{2}){5}$' || fail invalid_mac
+      mac=$(printf '%s' "$mac" | tr A-F a-f)
+      [ "$mac" != 00:00:00:00:00:00 ] || fail invalid_mac
+      case "$seen" in *" $mac "*) continue;; esac
+      count=$((count+1)); [ "$count" -le 16 ] || fail too_many_macs
+      seen="$seen$mac "
+    done
+    if [ -n "$existing" ]; then uci -q -t "$tmp" delete firewall.veci_owner_mac_block || fail stage_failed; fi
+    if [ "$count" -gt 0 ]; then
+      # Native firewall4 rule only. Restrict forwarded LAN-to-WAN traffic,
+      # not access to the router itself. No iptables or custom executable.
+      for pair in rule name=VeCI_MAC_Block src=lan dest=wan proto=all family=any target=REJECT; do
+        case "$pair" in rule) uci -q -t "$tmp" set firewall.veci_owner_mac_block=rule || fail stage_failed;;
+          *) uci -q -t "$tmp" set "firewall.veci_owner_mac_block.$pair" || fail stage_failed;; esac
+      done
+      for mac in $seen; do uci -q -t "$tmp" add_list "firewall.veci_owner_mac_block.src_mac=$mac" || fail stage_failed; done
+      # Prevent a newly configured MAC deny rule from being bypassed by
+      # software/hardware flow offload. Explicitly disclose this policy.
+      uci -q -t "$tmp" set 'firewall.@defaults[0].flow_offloading=0' &&
+      uci -q -t "$tmp" set 'firewall.@defaults[0].flow_offloading_hw=0' || fail stage_failed
+    fi
   else
     [ "$confirm" = SAVE_SOFTWARE_OFFLOAD ] || fail confirmation_required
     enabled=$(jsonfilter -s "$request" -e '@.enabled') || fail invalid_request
     case "$enabled" in 0|1) ;; *) fail invalid_flag;; esac
+    if [ "$enabled" = 1 ] && mac_rule_owned; then fail mac_block_requires_offload_disabled; fi
     # Software offload only. Do not enable an unverified hardware path.
     uci -q -t "$tmp" set "firewall.@defaults[0].flow_offloading=$enabled" &&
     uci -q -t "$tmp" set "firewall.@defaults[0].flow_offloading_hw=0" || fail stage_failed
