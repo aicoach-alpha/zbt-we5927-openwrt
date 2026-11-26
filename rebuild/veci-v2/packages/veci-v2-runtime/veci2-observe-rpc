@@ -2,10 +2,11 @@
 # Authenticated rpcd read-only status; no control of daemon or modem.
 set -eu
 case "${1:-}:${2:-}" in
-  list:*) echo '{"status":{}}'; exit 0 ;;
-  call:status) ;;
+  list:*) echo '{"status":{},"trafficHistory":{}}'; exit 0 ;;
+  call:status) action=status ;;
+  call:trafficHistory) action=traffic-history ;;
   *) echo '{"ok":false,"error":"unsupported_method"}'; exit 0 ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name 2>/dev/null)" = zbtlink,zbt-we5927 ] ||
   { echo '{"ok":false,"error":"unsupported_board"}'; exit 0; }
-exec timeout 3 /usr/libexec/veci2-observe status
+exec timeout 3 /usr/libexec/veci2-observe "$action"
