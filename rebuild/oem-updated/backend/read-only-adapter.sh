@@ -557,6 +557,54 @@ case "$1" in
         formatted="$(printf '%s\n' "$logs" | awk 'NF>=5 {d=$2" "$3" "$4; sub(/^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +/,""); gsub(/"/,"\047"); printf "%s system: \"%s\"\n",d,$0}')"
         json_add_string data "$formatted"
         ;;
+    get_pptp_msg|get_l2tp_msg|get_pptp_sl_status|get_l2tp_sl_status|get_pptp_status|get_l2tp_status)
+        case "$1" in get_pptp_*) tunnel=pptp ;; *) tunnel=l2tp ;; esac
+        if [ "$1" = "get_${tunnel}_msg" ]; then
+            proto="$(get "network.$tunnel.proto")" || error "tunnel profile unavailable"
+            [ "$proto" = "$tunnel" ] || error "protocol mismatch"
+            auto="$(get "network.$tunnel.auto" || true)"
+            case "$auto" in 0) enabled=0 ;; 1|'') enabled=1 ;; *) error "invalid startup setting" ;; esac
+            route="$(get "network.$tunnel.defaultroute" || true)"
+            case "$route" in 0|1) ;; '') route=1 ;; *) error "invalid routing setting" ;; esac
+            success "configured tunnel profile"
+            json_add_string proto "$tunnel"
+            json_add_string enabled "$enabled"
+            json_add_string defaultroute "$route"
+            json_add_string server "$(get "network.$tunnel.server" || true)"
+            json_add_string username ""
+            json_add_string password ""
+        else
+            native="$(ubus -t 3 call "network.interface.$tunnel" status '{}')" || error "tunnel status unavailable"
+            [ "$(field '@.proto')" = "$tunnel" ] || error "unexpected tunnel protocol"
+            up="$(field '@.up')" || error "missing tunnel state"
+            addr=""; active=0; uptime=""; rx=""; tx=""
+            case "$up" in
+                true)
+                    addr="$(field '@["ipv4-address"][0].address' || true)"
+                    [ -z "$addr" ] || active=1
+                    if [ "$1" = "get_${tunnel}_status" ]; then
+                        dev="$(field '@.l3_device')" || error "tunnel device unavailable"
+                        [ "$dev" = "$tunnel-$tunnel" ] || error "unexpected tunnel device"
+                        uptime="$(field '@.uptime')" || error "uptime unavailable"
+                        rx="$(cat "/sys/class/net/$dev/statistics/rx_bytes")" || error "RX unavailable"
+                        tx="$(cat "/sys/class/net/$dev/statistics/tx_bytes")" || error "TX unavailable"
+                        for value in "$rx" "$tx" "$uptime"; do
+                            case "$value" in ''|*[!0-9]*) error "invalid tunnel statistics" ;; esac
+                        done
+                    fi ;;
+                false) ;;
+                *) error "invalid tunnel state" ;;
+            esac
+            success "tunnel link status"
+            json_add_string "${tunnel}_status" "$active"
+            if [ "$1" = "get_${tunnel}_status" ]; then
+                json_add_string "${tunnel}_ip" "$addr"
+                json_add_string "${tunnel}_uptime" "$uptime"
+                json_add_string "${tunnel}_rx" "$rx"
+                json_add_string "${tunnel}_tx" "$tx"
+            fi
+        fi
+        ;;
     get_lan_status|get_wan_status)
         case "$1" in get_lan_status) network=lan;; *) network=wan;; esac
         state="$(ubus -t 3 call "network.interface.$network" status '{}')" || error "interface state unavailable"

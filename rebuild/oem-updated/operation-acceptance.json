@@ -161,13 +161,22 @@
       "limitations": "Masked cached identifier only; no raw AT, identifier modification or hardware acceptance claim."
     },
     "get_l2tp_msg": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "netifd/UCI existing named tunnel profile",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_l2tp_sl_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "netifd/UCI existing named tunnel profile",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_l2tp_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "netifd/UCI existing named tunnel profile",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_lan_config": {
       "state": "PROTOTYPE"
@@ -257,13 +266,22 @@
       "limitations": "Distinguishes configured protocol, pending activation, connecting, disconnected and assigned IPv4. Public Internet not verified; physical acceptance pending."
     },
     "get_pptp_msg": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "netifd/UCI existing named tunnel profile",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_pptp_sl_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "netifd/UCI existing named tunnel profile",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_pptp_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "netifd/UCI existing named tunnel profile",
+      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_qos": {
       "state": "PROTOTYPE",

@@ -48,7 +48,7 @@ try:
  elif q=='@["ipv6-address"][*].address':
   print("\\n".join(r["address"] for r in x["ipv6-address"]));sys.exit()
  else:
-  for a,b,c in re.findall(r'\\.([A-Za-z_]+)|\\["([^"]+)"\\]|\\[(\\d+)\\]',q):
+  for a,b,c in re.findall(r'\\.([A-Za-z_][A-Za-z0-9_]*)|\\["([^"]+)"\\]|\\[(\\d+)\\]',q):
    x=x[a or b] if (a or b) else x[int(c)]
  if isinstance(x,bool): print(str(x).lower())
  elif isinstance(x,(str,int)): print(x)
@@ -80,6 +80,39 @@ except (KeyError,IndexError,TypeError,ValueError,StopIteration): sys.exit(1)
         self.assertNotIn("secret",r.stdout)
         r=self.invoke("get_module_signal",MODEM='{"sim":3}')
         self.assertNotEqual(r.returncode,0)
+
+    def test_optional_tunnel_profiles_and_live_counters(self):
+        self.cmd("ubus", '#!/bin/sh\nprintf "%s" "$LIVE"\n')
+        self.cmd("uci", """#!/bin/sh
+case "$3" in
+ network.pptp.proto) echo pptp;; network.l2tp.proto) echo l2tp;;
+ *.server) echo vpn.example;; *.auto) echo 0;; *.defaultroute) echo 1;;
+ *) exit 1;;
+esac
+""")
+        self.cmd("cat", """#!/bin/sh
+case "$1" in */statistics/rx_bytes) echo 17400;; */statistics/tx_bytes) echo 400;; *) exit 1;; esac
+""")
+        for proto in ("pptp", "l2tp"):
+            state = dict(up=True, proto=proto, l3_device=f"{proto}-{proto}",
+                         uptime=123, **{"ipv4-address": [{"address": "10.8.0.7"}]})
+            def invoke(suffix, **override):
+                return self.invoke(f"get_{proto}_{suffix}", LIVE=json.dumps(state | override))
+            with self.subTest(protocol=proto):
+                config = invoke("msg")
+                self.assertIn("server=vpn.example", config.stdout)
+                self.assertIn("enabled=0", config.stdout)
+                self.assertIn("password=\n", config.stdout)
+                live = invoke("status")
+                self.assertEqual(live.returncode, 0, live.stdout + live.stderr)
+                for key, val in (("ip","10.8.0.7"),("uptime","123"),("rx","17400"),("tx","400")):
+                    self.assertIn(f"{proto}_{key}={val}", live.stdout)
+                self.assertIn(f"{proto}_status=1", invoke("sl_status").stdout)
+                down = invoke("status", up=False)
+                self.assertIn(f"{proto}_status=0", down.stdout)
+                self.assertNotIn("10.8.0.7", down.stdout)
+                self.assertNotEqual(invoke("status", l3_device="br-lan").returncode, 0)
+                self.assertNotEqual(invoke("status", proto="dhcp").returncode, 0)
 
     def test_arp_lan_only(self):
         r=self.invoke("get_arp")
