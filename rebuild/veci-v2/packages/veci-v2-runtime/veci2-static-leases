@@ -64,6 +64,14 @@ pending=$(uci -q changes dhcp) || fail dhcp_changes_unknown
 digest=$(sha256sum /etc/config/dhcp) || fail config_unavailable
 revision=${digest%% *}
 if [ "$2" = status ]; then read_status; exit 0; fi
+# Reserve the network config for any DHCP mutation; never apply a lease
+# against a simultaneously edited LAN. All shared locks are nonblocking.
+exec 8>/var/lock/veci2-ipv6.lock
+flock -n 8 || fail network_busy
+network_digest=$(sha256sum /etc/config/network) || fail network_state_unknown
+changes=$(uci -q changes network) || fail network_state_unknown
+[ -z "$changes" ] || fail pending_network_changes
+
 tmp=$(mktemp -d /tmp/veci2-dhcp.XXXXXX) || fail cannot_prepare
 trap 'rm -rf "$tmp"' EXIT
 trap 'exit 1' HUP INT TERM
@@ -84,9 +92,6 @@ if [ "$2" = setPool ]; then
   done
   # Restrict lease to a simple positive duration, 2 minutes to 7 days.
   printf '%s\n' "$lease" | awk '/^[1-9][0-9]*[smhd]$/{n=substr($0,1,length($0)-1)+0;u=substr($0,length($0));t=n*(u=="s"?1:u=="m"?60:u=="h"?3600:86400);if(t>=120&&t<=604800)ok=1}END{exit !ok}' || fail invalid_lease
-  exec 8>/var/lock/veci2-ipv6.lock
-  flock -n 8 || fail network_busy
-  network_digest=$(sha256sum /etc/config/network) || fail network_state_unknown
   . /usr/libexec/veci2-lan-bounds
   bounds=$(lan_bounds) || fail invalid_lan
   set -- "$1" "$2" $bounds
@@ -140,10 +145,8 @@ fi
 current=$(sha256sum /etc/config/dhcp) || fail config_unavailable
 pending=$(uci -q changes dhcp) || fail dhcp_changes_unknown
 [ "${current%% *}" = "$revision" ] && [ -z "$pending" ] || fail stale_configuration
-if [ "$2" = setPool ]; then
-  pending_network=$(uci -q changes network) || fail network_state_unknown
-  [ -z "$pending_network" ] && [ "$(sha256sum /etc/config/network)" = "$network_digest" ] || fail stale_network
-fi
+pending_network=$(uci -q changes network) || fail network_state_unknown
+[ -z "$pending_network" ] && [ "$(sha256sum /etc/config/network)" = "$network_digest" ] || fail stale_network
 if ! uci -q -t "$tmp" commit dhcp ||
    ! /etc/init.d/dnsmasq restart >/dev/null 2>&1 ||
    ! pidof dnsmasq >/dev/null 2>&1; then

@@ -151,6 +151,7 @@ current=$(revision) || fail config_unavailable
 if [ "$2" = save ]; then
   # Explicit Ethernet protocol retirement; ordinary saves cannot remove PPPoE.
   old_mode="$mode"
+  old_lan="$lan"; old_lan_mask="$lan_mask"
   input=$(head -c 1025)
   [ "${#input}" -le 1024 ] && json_load "$input" || fail invalid_request
   json_get_var token revision ''; json_get_var confirm confirm ''
@@ -190,6 +191,51 @@ if [ "$2" = save ]; then
       print p,q+0
     }') || fail invalid_subnet_or_gateway
   set -- $masks
+  # Preserve existing DHCP reservations; refuse incompatible subnet changes.
+  # Lock DHCP only after the network lock, nonblocking to avoid lock inversion.
+  dhcp_cfg=/etc/config/dhcp
+  [ -f "$dhcp_cfg" ] && [ ! -L "$dhcp_cfg" ] || fail dhcp_config_unavailable
+  exec 8>>/var/lock/veci2-dhcp.lock
+  flock -n 8 || fail dhcp_busy
+  dhcp_pending=$(uci -q changes dhcp) || fail dhcp_config_unavailable
+  [ -z "$dhcp_pending" ] || fail pending_dhcp_changes
+  dhcp_digest=$(sha256sum "$dhcp_cfg") || fail dhcp_config_unavailable
+  if [ "$old_lan:$old_lan_mask" != "$lan:$lan_mask" ]; then
+    [ "$(uci -q get dhcp.lan || :)" = dhcp ] &&
+    [ "$(uci -q get dhcp.lan.interface || :)" = lan ] || fail unsupported_dhcp_layout
+    pool_start=$(uci -q get dhcp.lan.start || :)
+    pool_limit=$(uci -q get dhcp.lan.limit || :)
+    pool_ignore=$(uci -q get dhcp.lan.ignore || :)
+    case "$pool_ignore" in ''|0|1) ;; *) fail unsupported_dhcp_layout;; esac
+    # Validate even a disabled pool so subsequent enable cannot use invalid bounds.
+    awk -v ip="$lan" -v p="$1" -v a="$pool_start" -v n="$pool_limit" '
+      BEGIN {
+        if(a !~ /^[1-9][0-9]*$/ || n !~ /^[1-9][0-9]*$/ || length(a)>5 || length(n)>5)exit 1
+        size=1;for(i=p;i<32;i++)size*=2;split(ip,x,".");router=((x[1]*256+x[2])*256+x[3])*256+x[4]
+        off=router%size;end=a+n-1
+        if(end>size-2 || (off>=a && off<=end))exit 1
+      }' || fail dhcp_pool_conflicts_with_lan
+    inventory=$(uci -q show dhcp) || fail dhcp_config_unavailable
+    hosts=$(printf '%s\n' "$inventory" | awk -F= 'BEGIN{q=sprintf("%c",39)} $2=="host" || $2==q "host" q {print $1}')
+    count=0
+    for host in $hosts; do
+      count=$((count+1)); [ "$count" -le 256 ] || fail reservation_limit
+      ip=$(uci -q get "$host.ip" || :)
+      [ -n "$ip" ] || fail unsupported_reservation
+      awk -v router="$lan" -v p="$1" -v address="$ip" '
+        function num(s,a,n,i,v){n=split(s,a,".");if(n!=4)return -1;for(i=1;i<=4;i++){if(a[i]!~/^(0|[1-9][0-9]?[0-9]?)$/||a[i]>255)return -1;v=v*256+a[i]}return v}
+        BEGIN{r=num(router);v=num(address);size=1;for(i=p;i<32;i++)size*=2
+          if(v<0 || v==r || int(r/size)!=int(v/size) || v%size==0 || v%size==size-1)exit 1}' || fail reservation_conflicts_with_lan
+    done
+  fi
+  # Native Guest profile is intentionally supported only with standard LAN.
+  if [ "$(get veci_guest)" = interface ]; then
+    [ "$lan:$1" = 192.168.1.1:24 ] || fail guest_requires_standard_lan
+    if [ "$mode" = static ]; then
+      awk -v ip="$wan" -v p="$2" '
+        BEGIN{split(ip,a,".");v=((a[1]*256+a[2])*256+a[3])*256+a[4];s=1;for(i=p;i<32;i++)s*=2;base=int(v/s)*s;g=10*16777216+20*65536;if(base<=g+255 && base+s-1>=g)exit 1}' || fail wan_overlaps_guest
+    fi
+  fi
   tmp=$(mktemp -d /tmp/veci2-interfaces.XXXXXX) || fail stage_failed
   trap 'rm -rf "$tmp"' EXIT
   cp -p "$cfg" "$tmp/network.original" || fail backup_failed
@@ -210,6 +256,8 @@ if [ "$2" = save ]; then
   fi
   pending=$(uci -q changes network) || fail config_unavailable
   [ "$(revision)" = "$current" ] && [ -z "$pending" ] || fail stale_configuration
+  dhcp_pending=$(uci -q changes dhcp) || fail dhcp_config_unavailable
+  [ -z "$dhcp_pending" ] && [ "$(sha256sum "$dhcp_cfg")" = "$dhcp_digest" ] || fail stale_dhcp_configuration
   if ! change commit network || [ "$(get wan.proto)" != "$mode" ] || [ "$(get lan.ipaddr)" != "$lan/$1" ]; then
     cp -p "$tmp/network.original" "$cfg" || fail rollback_failed
     fail commit_failed_rollback

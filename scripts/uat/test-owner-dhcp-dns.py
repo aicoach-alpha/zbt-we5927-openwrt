@@ -20,6 +20,7 @@ with TemporaryDirectory() as tmp:
     dhcp.write_text("config dnsmasq\nconfig dhcp 'lan'\n option interface 'lan'\n")
     (config/'network').write_text("config interface 'lan'\n option ipaddr '192.168.5.1/27'\n")
     lock = root/'shared.lock'
+    network_lock = root/'network.lock'
     init = root/'dnsmasq'
     for name, code in {
         'uci': f'#!/bin/sh\nexec "{uci}" -c "{config}" -t "{delta}" "$@"',
@@ -34,7 +35,7 @@ with TemporaryDirectory() as tmp:
         code = (runtime/name).read_text()
         for original, target in {
             '/tmp/sysinfo/board_name':board, '/etc/config/dhcp':dhcp,
-            '/var/lock/veci2-dhcp.lock':lock, '/etc/init.d/dnsmasq':init, 'pidof dnsmasq':str(root/'pidof')+' dnsmasq',
+            '/var/lock/veci2-dhcp.lock':lock, '/var/lock/veci2-ipv6.lock':network_lock, '/etc/config/network':config/'network', '/etc/init.d/dnsmasq':init, 'pidof dnsmasq':str(root/'pidof')+' dnsmasq',
             '/usr/libexec/veci2-lan-bounds':runtime/'veci2-lan-bounds',
             '/usr/share/libubox/jshn.sh':prefix/'share/libubox/jshn.sh',
         }.items():
@@ -63,6 +64,26 @@ with TemporaryDirectory() as tmp:
         fcntl.flock(handle,fcntl.LOCK_EX)
         assert lease('add',**args)['error'] == 'busy'
         assert dns('set',mode='AUTO')['error'] == 'busy'
+    pool=dict(start="10",limit="15",lease="1h",enabled="1",confirmation="SAVE_DHCP_POOL",revision=first["revision"])
+    with network_lock.open("a") as handle:
+        fcntl.flock(handle,fcntl.LOCK_EX)
+        assert lease("add",**args)["error"]=="network_busy"
+        assert lease("setPool",**pool)["error"]=="network_busy"
+    subprocess.run([root/"uci","set","network.lan.ipaddr=192.168.6.1/27"],check=True)
+    assert lease("add",**args)["error"]=="pending_network_changes"
+    subprocess.run([root/"uci","revert","network"],check=True)
+    for patch in (dict(start="1"),dict(limit="30"),dict(lease="1s"),dict(revision="stale")):
+        assert not lease("setPool",**(pool|patch))["ok"]
+        assert dhcp.read_bytes()==before
+    (root/"fail_once").touch()
+    assert lease("setPool",**pool)["error"]=="dhcp_apply_failed_rollback_attempted"
+    assert dhcp.read_bytes()==before
+    pool_saved=lease("setPool",**pool)
+    assert pool_saved["ok"],pool_saved
+    for key,value in (("start","10"),("limit","15"),("leasetime","1h"),("ignore","0")):
+        assert subprocess.check_output([root/"uci","get","dhcp.lan."+key],text=True).strip()==value
+    first=pool_saved
+    print("PASS native DHCP pool lifecycle and cross-service network locking")
     current = lease('add',**args)
     assert current.get('ok'), current
     assert current['leases'][0]['mac'] == args['mac'].lower(), current
