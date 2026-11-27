@@ -776,16 +776,16 @@
       "limitations": "Add a new reservation only; existing reservation editing and custom lease duration not supported. Native UCI config mutation, shared network locking and byte-exact rollback passed; dnsmasq restart and ubus adapter simulated. Browser and physical DHCP runtime pending."
     },
     "set_static_route": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.routes:save/remove",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Explicit revision and confirmation, managed IPv4 routes only; custom metric and OEM form pending."
+      "evidence": "scripts/tests/test_owner_routes_acceptance.py; scripts/uat/test-routes-host.py; scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_oem_route_ttl_writes.py",
+      "limitations": "Owned IPv4 route CRUD, canonical mask conversion, manual activation; custom metric unsupported. Native UCI and isolated adapter/rollback fixtures passed. Real netifd routes, nft/fw4 and packet enforcement, original OEM form and physical UAT pending."
     },
     "set_ttl": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:setTtl",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Opt-in scoped IPv4 forwarding rule, requires flow offload disabled; fw4 validation, reload and rollback implemented in source. Kernel expression support, rule activation and actual packet TTL not runtime verified; original OEM TTL form not mapped."
+      "evidence": "scripts/tests/test_owner_routes_acceptance.py; scripts/uat/test-routes-host.py; scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_oem_route_ttl_writes.py",
+      "limitations": "Explicit IPv4 forwarding TTL setting and observable rule state; offload guard. Native UCI and isolated adapter/rollback fixtures passed. Real netifd routes, nft/fw4 and packet enforcement, original OEM form and physical UAT pending."
     },
     "set_voice": {
       "state": "SOURCE_DISABLED_REVIEWED",

@@ -16,7 +16,15 @@
         "getDrafts",
         "saveDraft",
         "deleteDraft"
-      ]
+      ],
+      "state": "CONFIG_AND_TRANSPORT_FIXTURE_PASS_NOT_UAT",
+      "evidence": [
+        "scripts/tests/test_sms_config_transaction.py",
+        "scripts/tests/test_sms_port_transaction.py",
+        "scripts/tests/test_veci_sms_cmgs_result.py",
+        "scripts/tests/test_veci_v2_sms_ui.py"
+      ],
+      "limitations": "Native UCI enable/disable rollback and shared inbox/operation lock, PTY transport and codec regression. Actual modem, live SMS delivery and browser UAT pending."
     },
     "dns": {
       "provider": "veci.v2.dns",
