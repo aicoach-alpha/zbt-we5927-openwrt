@@ -30,6 +30,8 @@ class ManualSimNativeAcceptance(unittest.TestCase):
         manager.write_text("""#!/bin/sh
 case "$1" in
  selector-slot) cat "$TEST_SLOT" ;;
+ validate-apn) case "$2" in ""|*[!A-Za-z0-9._-]*) exit 1;; esac ;;
+ status-fast) echo '{"modem_phase":"ready","registration_status":"registered","packet_status":"attached"}' ;;
  sim)
   case "$2" in 1|2) ;; *) exit 7 ;; esac
   if [ -e "$TEST_FAIL_SIM" ]; then exit 8; fi
@@ -57,7 +59,16 @@ print(data[field])
         uci.chmod(0o755)
         program=root/"provider"
         program.write_text(PROVIDER.read_text().replace("/tmp/sysinfo/board_name",str(board))
-                .replace("/usr/sbin/we5927-lte",str(manager)))
+                .replace("/usr/sbin/we5927-lte",str(manager))
+                .replace("/var/lock/veci2-lte-policy.lock",str(root/"policy.lock"))
+                .replace("/var/run/veci2-reboot-requested",str(root/"reboot-pending")))
+        self.policy=root/"policy"
+        self.policy.write_text((RUNTIME/"veci2-lte-policy").read_text()
+          .replace("/tmp/sysinfo/board_name",str(board))
+          .replace("/usr/sbin/we5927-lte",str(manager))
+          .replace("/etc/config/we5927_lte",str(self.config))
+          .replace("/var/lock/veci2-lte-policy.lock",str(root/"policy.lock"))
+          .replace("/var/run/veci2-reboot-requested",str(root/"reboot-pending")))
         self.program=program
         self.board=board
         self.fail_sim=root/"fail-sim"
@@ -82,6 +93,12 @@ print(data[field])
             with self.subTest(request=req):
                 self.assertFalse(self.call("switchSim",**req)["ok"])
                 self.assertEqual(self.slot.read_text(),"1\n")
+        with (self.root/"policy.lock").open("w") as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            self.assertEqual(self.call("switchSim",slot=2,confirmation="SWITCH_SIM_2")["error"],"busy")
+        (self.root/"reboot-pending").touch()
+        self.assertEqual(self.call("switchSim",slot=2,confirmation="SWITCH_SIM_2")["error"],"reboot_pending")
+        (self.root/"reboot-pending").unlink()
         changed=self.call("switchSim",slot=2,confirmation="SWITCH_SIM_2")
         self.assertTrue(changed["ok"],changed)
         self.assertEqual(changed["selector_slot"],2)
@@ -95,7 +112,7 @@ print(data[field])
     def test_rollback_pending_and_wrong_board_fail_closed(self):
         before=self.config.read_bytes()
         self.fail_sim.touch()
-        self.assertEqual(self.call("switchSim",slot=2,confirmation="SWITCH_SIM_2")["error"],"sim_switch_failed")
+        self.assertEqual(self.call("switchSim",slot=2,confirmation="SWITCH_SIM_2")["error"],"sim_switch_failed_previous_slot_restored")
         self.assertEqual(self.config.read_bytes(),before)
         self.assertEqual(self.slot.read_text(),"1\n")
         self.fail_sim.unlink()
@@ -105,6 +122,33 @@ print(data[field])
         self.uci("-q","revert","we5927_lte.main.apn")
         self.board.write_text("other-router\n")
         self.assertEqual(self.call("status")["error"],"unsupported_board")
+
+    def test_native_policy_lifecycle_and_shared_lock(self):
+        def policy(method,**payload):
+            p=subprocess.run(["busybox","ash",str(self.policy),"call",method],input=json.dumps(payload),env=self.env,text=True,capture_output=True,timeout=8)
+            self.assertEqual(p.returncode,0,p.stderr)
+            return json.loads(p.stdout)
+        with (self.root/"policy.lock").open("w") as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            self.assertEqual(policy("setApn",apn="lab.example")["error"],"busy")
+        before=self.config.read_bytes()
+        for method,payload in (("setApn",{"apn":"bad apn"}),("setMonitor",{"interval":"60","expected":"99"}),("setFailover",{"action":"invalid"})):
+            self.assertFalse(policy(method,**payload)["ok"])
+            self.assertEqual(self.config.read_bytes(),before)
+        self.assertEqual(policy("setApn",apn="lab.example")["configured_apn"],"lab.example")
+        self.assertEqual(policy("setMonitor",interval="60",expected="10")["monitor_interval"],60)
+        self.assertTrue(policy("setFailover",action="ENABLE_FAILOVER")["auto_failover"])
+        self.assertEqual(self.call("switchSim",slot=2,confirmation="SWITCH_SIM_2")["error"],"disable_auto_failover_first")
+        self.assertFalse(policy("setFailover",action="DISABLE_FAILOVER")["auto_failover"])
+        self.assertEqual(self.slot.read_text(),"1\n")
+        # A commit that writes then reports failure must restore original bytes.
+        wrapper=self.root/"uci"; original=wrapper.read_text()
+        wrapper.write_text(original.replace('exec "$HOST_UCI"','"$HOST_UCI"',1)+ 'rc=$?'+chr(10)+'case "$*" in *"commit we5927_lte") exit 1;; esac'+chr(10)+'exit "$rc"'+chr(10))
+        before=self.config.read_bytes()
+        self.assertEqual(policy("setApn",apn="rollback.example")["error"],"save_failed_rollback")
+        self.assertEqual(self.config.read_bytes(),before)
+        wrapper.write_text(original)
+        self.assertEqual(policy("status")["configured_apn"],"lab.example")
 
     def test_acl_scoping_and_derived_modem_config_guards(self):
         acl=json.loads((RUNTIME/"veci2-status-acl.json").read_text())

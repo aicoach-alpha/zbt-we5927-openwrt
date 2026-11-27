@@ -57,7 +57,8 @@ p=os.environ["FAKE_UCI_STATE"]
 data=json.load(open(p))
 args=sys.argv[1:]
 if args and args[0]=='-q':args.pop(0)
-if args and args[0]=='-t': args=args[2:]
+stage=None
+if args and args[0]=='-t': stage=args[1]+'/delta'; args=args[2:]
 if not args:sys.exit(2)
 op=args.pop(0)
 if op=='get':
@@ -68,9 +69,9 @@ elif op=='changes':
  pass
 elif op=='set':
  key,value=args[0].split('=',1)
- data[key]=value;open(p,'w').write(json.dumps(data))
+ assert stage;open(stage,'w').write(json.dumps({key:value}))
 elif op=='commit':
- pass
+ data.update(json.load(open(stage)));open(p,'w').write(json.dumps(data))
 else:
  print('unsupported-uci:',op,file=sys.stderr);sys.exit(2)
 """)
@@ -87,7 +88,7 @@ print(val)
 """)
             filt.chmod(0o700)
             provider = POLICY.read_text().replace("/tmp/sysinfo/board_name", str(board))
-            provider = provider.replace("/usr/sbin/we5927-lte",str(manager))
+            provider = provider.replace("/usr/sbin/we5927-lte",str(manager)).replace("/etc/config/we5927_lte",str(state)).replace("/var/lock/veci2-lte-policy.lock",str(root/"policy.lock")).replace("/var/run/veci2-reboot-requested",str(root/"reboot-pending"))
             provider_file = root / "veci-lte-policy"
             provider_file.write_text(provider)
             env = dict(os.environ, FAKE_UCI_STATE=str(state),PATH=str(root)+":"+os.environ["PATH"])
@@ -124,7 +125,7 @@ print(val)
         self.assertIn("retry_protection",sim)
         self.assertIn('we5927-lte validate-apn',policy)
         for prohibited in ("reboot", "ifdown", "ifup", "AT+CFUN", "gpioctl"):
-            self.assertNotIn(prohibited,policy)
+            self.assertNotIn(prohibited,policy.replace("/var/run/veci2-reboot-requested","").replace("reboot_pending",""))
 
 
 if __name__ == "__main__":

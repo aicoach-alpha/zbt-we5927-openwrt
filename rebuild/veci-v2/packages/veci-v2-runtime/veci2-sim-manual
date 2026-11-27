@@ -12,6 +12,12 @@ case "$1" in
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+# Serialize administrative SIM selection against APN and failover policy edits.
+if [ "$2" = switchSim ]; then
+  exec 9>/var/lock/veci2-lte-policy.lock
+  flock -n 9 || fail busy
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
+fi
 CFG=we5927_lte.main
 [ "$(uci -q get "$CFG")" = modem ] || fail modem_config_missing
 [ "$(uci -q get "$CFG.sim_gpio")" = 46 ] || fail wrong_sim_selector
@@ -37,11 +43,12 @@ if [ "$2" = switchSim ]; then
     1:SWITCH_SIM_1|2:SWITCH_SIM_2) ;;
     *) fail explicit_confirmation_required ;;
   esac
-  exec 9<"$0"
-  flock -n 9 || fail busy
-  [ -z "$(uci -q changes we5927_lte)" ] || fail pending_lte_changes
+  changes=$(uci -q changes we5927_lte) || fail pending_config_unknown
+  [ -z "$changes" ] || fail pending_lte_changes
+  case "$(uci -q get "$CFG.auto_failover" || :)" in 0|'') ;; *) fail disable_auto_failover_first;; esac
   before=$(/usr/sbin/we5927-lte selector-slot 2>/dev/null) || fail selector_unreadable
   case "$before" in 1|2) ;; *) fail selector_unknown ;; esac
+  [ "$before" = "$(uci -q get "$CFG.sim" || :)" ] || fail selector_config_mismatch
   if [ "$slot" != "$before" ]; then
     if ! /usr/sbin/we5927-lte sim "$slot" >/dev/null 2>&1; then
       after=$(/usr/sbin/we5927-lte selector-slot 2>/dev/null || :)
