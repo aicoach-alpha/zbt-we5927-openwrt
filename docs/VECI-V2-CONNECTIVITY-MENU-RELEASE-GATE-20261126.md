@@ -323,3 +323,9 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - Independently on NAS, offline vendor research reference WE2825-2SIM 7,471,108 B, SHA256 80529b8e9c31d686eb7f63a1517d6dbcf781f26cb4aceb7b8b1ff27c2d51d1f9, and the exact VeCI signed f87e7ec5 5,899,090 B SHA256 3adc815e77a7c9b0e25f742601eb2dc94423aad540b26efa86423821a667abb1 have uImage Linux/MIPS/kernel compressed-header metadata and both header/data CRC32 PASS, with SquashFS markers present. Their kernel payload sizes differ (1,184,708 vs 1,959,204 bytes).
 - These are *format observations*, **NOT** compatibility proof with an actual bootloader HTTP rescue endpoint or actual vendor UI, and not proof the WE2825 vendor reference can safely restore this WE5927. There is still no verified physical U-Boot recovery entry/upload procedure or accepted rescue-image format, even though device signed sysupgrade -T preflight passed.
 - release_permitted=false, flash_authorized=false; existing signed firmware image is unchanged.
+
+### U-Boot Windows offline scan CI, run 45948209204 — 27 Nov 2026
+
+- CI https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/45948209204 on commit b59ad5683525e43f9d00ee7a44f84d5ab4c69035: SUCCESS for Windows PowerShell 5.1 parsing, synthetic 196,608-byte U-Boot marker fixture with 9 different markers, mixed-case lookup and absent-string negative control.
+- Exact source audit script SHA256 2f01ca583c90bdb932487002193522cc98bfd0c0b75b7f9affa6f9698d0448b3, with read-only local file hash verification for both owner Nov23 and Nov25 MTD0 backups, and no router command.
+- **Owner's actual raw mtd0 marker scan remains NOT_RUN** for this new script. CI is not a physical recovery test and does not authorize HTTP firmware upload or flashing.
