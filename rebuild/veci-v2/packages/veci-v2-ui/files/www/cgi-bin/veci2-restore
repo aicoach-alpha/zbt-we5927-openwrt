@@ -41,6 +41,7 @@ authorized
 lock=/var/run/veci2-restore.action.lock
 exec 9>"$lock"
 flock -n 9 || reply '409 Conflict' restore_busy
+[ ! -e /var/run/veci2-reboot-requested ] && [ ! -L /var/run/veci2-reboot-requested ] || reply '409 Conflict' reboot_pending
 size=$((length-header))
 free=$(df -Pk /tmp | awk 'NR==2{print $4}')
 [ "$free" -ge $((size / 1024 + 5120)) ] || reply '507 Insufficient Storage' insufficient_tmp_space
