@@ -405,6 +405,12 @@ def stage(image, out):
             '<label>Client MAC<input id="acl-mac" maxlength="17" placeholder="aa:bb:cc:dd:ee:ff"></label>'
             '<label><input id="acl-enabled" type="checkbox">Enable block</label>'
             '<button id="acl-save" disabled>Save slot</button><button id="acl-toggle" type="button" disabled>Change enabled state</button><button id="acl-delete" type="button" disabled>Delete slot</button></form></article>'
+            '<article><h2>Wi-Fi uplink (optional)</h2><p>Requires preconfigured WWAN DHCP in the WAN zone. New profile is disabled. Single radio: enabling STA may affect primary AP channel or availability. No automatic reload.</p>'
+            '<button id="uplink-refresh" type="button">Read uplink profile</button><p id="uplink-result" role="status"></p>'
+            '<form id="uplink-form" autocomplete="off"><label>SSID<input id="uplink-ssid" maxlength="32" required></label>'
+            '<label>WPA2 password<input id="uplink-secret" type="password" minlength="8" maxlength="63" required autocomplete="new-password"></label>'
+            '<button id="uplink-save" disabled>Save disabled profile</button></form>'
+            '<button id="uplink-toggle" type="button" disabled>Toggle uplink startup</button></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

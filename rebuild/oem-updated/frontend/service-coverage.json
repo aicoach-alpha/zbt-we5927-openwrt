@@ -187,6 +187,16 @@
       "scope": "Eight owned LAN-to-WAN deny slots; create/edit/toggle/delete; no global switch",
       "state": "SOURCE_INTEGRATED_NOT_UAT",
       "limitations": "Native read and invalid write fixture passed; live rule application and original OEM form pending"
+    },
+    "wifi_uplink": {
+      "provider": "veci.v2.wifi",
+      "methods": [
+        "uplinkStatus",
+        "saveUplink"
+      ],
+      "scope": "Optional WPA2 STA profile on existing compatible WWAN DHCP, save disabled and separately enable at manual activation",
+      "state": "SOURCE_INTEGRATED_NOT_UAT",
+      "limitations": "Topology fixture passed; native write, WWAN provisioning, actual connectivity and AP coexistence pending"
     }
   },
   "remaining": [

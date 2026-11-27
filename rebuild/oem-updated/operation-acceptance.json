@@ -717,7 +717,10 @@
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_wizard_staging_refused"
     },
     "set_wifi_apclient": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.wifi:saveUplink",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_uplink.py",
+      "limitations": "Startup toggle through CGI; credential editor through direct authenticated HTTPS RPC. Requires preprovisioned WAN-zoned WWAN DHCP and one owned STA profile. No automatic radio reload. Negative native fixture passed; successful write, first-time WWAN provisioning, original form, and single-radio AP/STA coexistence UAT pending."
     },
     "set_wifi_client": {
       "state": "PROTOTYPE",
