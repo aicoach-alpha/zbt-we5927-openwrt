@@ -264,6 +264,15 @@
       "scope": "Optional existing native SMB service startup disable only",
       "state": "SOURCE_INTEGRATED_NOT_UAT",
       "limitations": "Mocked init service only; no share provisioning, activation or actual service validation"
+    },
+    "factory_reset_readiness": {
+      "provider": "veci.v2.system",
+      "methods": [
+        "resetReadiness"
+      ],
+      "scope": "Read-only observation of utility, overlay, partition and maintenance locks",
+      "state": "FIXTURE_PASS_NOT_UAT",
+      "limitations": "Recovery and defaults not verified; reset execution locked"
     }
   },
   "remaining": [

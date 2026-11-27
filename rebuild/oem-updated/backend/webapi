@@ -84,6 +84,7 @@ case "$op" in
         err -4 "Legacy Shadowsocks configuration not supported; native addon provisioning required" ;;
     mesh_botton) err -4 "Legacy vendor mesh script not supported; native mesh configuration not provisioned" ;;
     set_samba_info) err -4 "Legacy plaintext SMB account and share editing not supported; native provisioning required" ;;
+    reset) err -4 "Factory reset locked; recovery and initial configuration acceptance required" ;;
     online_upgrade_apply|sysupgrade_execute)
         err -4 "Installation locked; use signed firmware verification. Release acceptance pending" ;;
     url_upgrade) err -4 "Arbitrary URL upgrade not supported; use pinned signed firmware verification" ;;

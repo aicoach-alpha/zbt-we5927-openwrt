@@ -455,6 +455,8 @@ def stage(image, out):
             '<button id="legacy-vpn-disable" type="button" disabled>Disable at next boot</button><p id="legacy-vpn-result" role="status"></p></article>'
             '<article><h2>Optional SMB startup</h2><p>Disable an existing Samba4 or ksmbd service at next boot. No share creation, credential changes or live restart.</p>'
             '<button id="smb-startup-refresh" type="button">Read startup state</button><button id="smb-startup-disable" type="button" disabled>Disable startup</button><p id="smb-startup-result" role="status"></p></article>'
+            '<article><h2>Factory reset readiness</h2><p>Read-only preflight. Factory reset remains locked until recovery and initial configuration are verified.</p>'
+            '<button id="reset-check" type="button">Check readiness</button><pre id="reset-result" role="status"></pre></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

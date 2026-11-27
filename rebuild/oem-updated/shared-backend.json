@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "upstream_commit": "ac5b2dd73e4f4693202c1e848988167433d5bbac",
+  "upstream_commit": "9cc3f4c91e65952d24519265adcee8250cb23022",
   "upstream_branch": "feat/shared-dhcp-pool-traffic-20261126",
   "status": "source_synced_not_runtime_accepted",
   "files": {
@@ -11,7 +11,7 @@
     "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6": "038862684426c507120a1e40b22d2f7016fcc57da08ce542c53bd73667c7329b",
     "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra": "0c1797aabfd2c7e343e42afe5d96dae74e418bc2d3a637e1b010be264369c273",
     "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json": "eb74a43c6b3cb8364ee7ada9c910c7840f5b6d08314b1821020ea7158c89a455",
-    "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "dac0519960ae9d1c780843d24fe727d25f66e8381cc1d01fab638118a723a30a",
+    "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4628907ba611e0f89f5c9c49a60b1f0a62a1d7dfebeb431fa98eba3f79c28e1f",
     "rebuild/veci-v2/packages/veci-v2-runtime/files/etc/init.d/veci2-observe": "3d692a3f4ecad588732a61543ece7aba1becb98c35ced541145ef001e008e4be",
     "rebuild/veci-v2/packages/veci-v2-runtime/update-policy.default": "5cbd4963ad40386508a15657dc46eca771d7d830cc90b8833adf0453020c247c",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-access": "39151ca7f60d0ecf54d63180a3b2f0973e96c2064f3f6626ee652e9e96e6c7e6",
@@ -43,8 +43,8 @@
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-sim-manual": "0f096a5806ea0d59fafe2f453f83dd39a7c31ab8cce9ceadb8fa91099d91b7a4",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-static-leases": "803403375b725eda35e5d9bf35d2ca12af91e5f2c0a19c876807702a5ffad902",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status": "546c97c5d89f2cb02c36fc7c8d45a2a95a5bf72080942cd2d0adfe4317ef74d8",
-    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "c834cd08c0a6e7619dabfa209e28a6a15b693cb5aabc24d0cf96cf35221420da",
-    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin": "0764a393be22432a2d7c78914d17ccd9cabeda28610071a61ade902f462f788f",
+    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "bff33131c181fc42bb61e3b57d59383cc5de3942b7ba86fbde492350cdae8602",
+    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin": "6362a686447fd976594ea32e4503fc97c3809ed34821375772bb91987bc6593a",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-update-policy": "90eb2f545a7c2377e48365bb5bfe046b1eb104476d4d49e08f53598136f1218e",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-verify-image": "4c674c92aba523f35af0501315fb7e817a0039c0b0bc30305525736732bff19d",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-watchdog-acl.json": "160bd2f1bae39c1faa3a8bd818ba51bb981834a887d9227140931be213cdf9f4",
@@ -79,9 +79,8 @@
     "source/we5927-lte/files/usr/sbin/we5927-lte": "bcca58415d00777d3f15a5ecf18426777d126e3ec7e891b447e890f7d7c611b4",
     "source/we5927-lte/src/veci-sms-cmgs.c": "8c07b048602904291d15d77c4089c977b9c976c8edb982278ce4cf1cf3ffda1d",
     "source/we5927-lte/src/we5927-at.c": "9b8c075c7f68a160eccf70ff7b3c7aff3f4a4f1f21917dcd01472c2ca990c469",
-    "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "dcebdf3557a76d75b2427c0cd73bb90f1d62250335a54cd72b855fae71372344"
+    "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "be05901801526bfad32d439bd748343ab7d589f03c5c8c8f93499644257adab7",
+    "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-restore": "9901ebe565a6943ea51f42ac1dd49b8081620fed717272a4b5496c4d5e3f4c32"
   },
-  "file_upstream_commits": {
-    "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "f3dd4247fadf76055c766e4fe7484dd1adb7d006"
-  }
+  "file_upstream_commits": {}
 }

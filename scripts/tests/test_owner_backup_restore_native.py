@@ -61,7 +61,8 @@ esac
              .replace("/usr/libexec/veci2-restore-check",str(self.check))
              .replace("/tmp/sysinfo/board_name",str(self.board))
              .replace("/var/run/veci2-restore.receipt",str(self.receipt))
-             .replace("/var/run/veci2-restore.action.lock",str(t/"restore.lock")))
+             .replace("/var/run/veci2-restore.action.lock",str(t/"restore.lock"))
+             .replace("/var/run/veci2-reboot-requested",str(t/"reboot-pending")))
         self.cgi.chmod(0o755)
         self.env={**os.environ,"PATH":str(t)+":"+os.environ.get("PATH",""),
             "TEST_AUTH":str(self.authfile),"TEST_RESTORES":str(self.restored)}
@@ -128,6 +129,11 @@ esac
         self.assertFalse(self.restored.exists())
     def test_https_admin_digest_and_two_phase_receipt(self):
         archive=self.valid()
+        (self.t/"reboot-pending").touch()
+        _,blocked=self.cgi_call("inspect",archive)
+        self.assertEqual(blocked["error"],"reboot_pending")
+        self.assertFalse(self.restored.exists())
+        (self.t/"reboot-pending").unlink()
         head,response=self.cgi_call("inspect",archive)
         if not response["ok"]:
             _ = (head,response,len(archive))

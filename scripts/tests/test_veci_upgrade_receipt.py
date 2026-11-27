@@ -17,7 +17,7 @@ class UpgradeReceipt(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             sub = {"/sbin/sysupgrade": "installer", "/usr/libexec/veci2-verify-image": "verify",
-                   "/etc/veci2-update-policy": "policy", "/var/run/veci2-upgrade.receipt": "receipt"}
+                   "/etc/veci2-update-policy": "policy", "/var/run/veci2-upgrade.receipt": "receipt", "/var/run/veci2-reboot-requested": "reboot-pending"}
             code = CGI.read_text()
             for real, fake in sub.items():
                 code = code.replace(real, str(root / fake))
@@ -44,6 +44,10 @@ class UpgradeReceipt(unittest.TestCase):
                 response = subprocess.check_output(["busybox", "ash", "-c", code], input=body, timeout=8,
                     env=dict(env, QUERY_STRING=query, CONTENT_LENGTH=str(len(body))))
                 return json.loads(response.split(b"\r\n\r\n")[1])
+            (root / "reboot-pending").touch()
+            self.assertEqual(request("")["error"],"reboot_pending")
+            self.assertFalse(marker.exists())
+            (root / "reboot-pending").unlink()
             for verify, apply in (("", "apply"), ("stable", "stable-apply")):
                 ticket = request(verify)["ticket"]
                 rejected = "verification_expired_or_replaced"

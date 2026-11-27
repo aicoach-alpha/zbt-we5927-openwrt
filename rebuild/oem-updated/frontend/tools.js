@@ -41,6 +41,7 @@ function clearSession() {
   resetSmbStartup();
   resetLegacyVpn();
   resetManualReboot();
+  el("reset-result").textContent="";
   el("tunnel-result").textContent="";
   el("mesh-result").textContent="";
   resetUplink();
@@ -725,4 +726,21 @@ el('smb-startup-disable').onclick=async()=>{
     await oem('set_samba_status',{service:x.service,revision:x.revision,enabled:'0',confirmation:'DISABLE_SMB_NEXT_BOOT'},token);
     if(sid===token)el('smb-startup-result').textContent='Startup disabled. Refresh before further changes.';
   }catch(e){if(sid===token)el('smb-startup-result').textContent=e.message;}
+};
+
+el('reset-check').onclick=async()=>{
+  const token=sid,b=el('reset-check');if(!token||b.disabled)return;
+  b.disabled=true;el('reset-result').textContent='';
+  try{
+    const x=await rpc('veci.v2.system','resetReadiness',{},token);
+    if(!x.ok||x.reset_allowed!==false)throw Error('Unexpected reset policy');
+    if(sid===token)el('reset-result').textContent=[
+      'Factory reset utility: '+(x.factoryreset_available?'present':'unavailable'),
+      'Writable JFFS2 overlay: '+(x.writable_jffs2_overlay?'observed':'not verified'),
+      'Expected firmware partition: '+(x.expected_firmware_size?'observed':'not verified'),
+      'Maintenance: '+(x.maintenance_idle?'idle':'busy or unavailable'),
+      'Reset locked: recovery and initial configuration acceptance required.'
+    ].join('\n');
+  }catch(e){if(sid===token)el('reset-result').textContent=e.message;}
+  finally{b.disabled=false;}
 };

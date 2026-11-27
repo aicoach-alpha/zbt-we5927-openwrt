@@ -16,6 +16,10 @@ class ManualReboot(unittest.TestCase):
         self.d=Path(t.name)
         (self.d/"board").write_text("zbtlink,zbt-we5927\n")
         (self.d/"boot").write_text(BOOT+"\n")
+        (self.d/"mounts").write_text("/dev/mtdblock4 /overlay jffs2 rw,noatime 0 0\n")
+        (self.d/"mtd").write_text('mtd3: 007a0000 00010000 "firmware"\n')
+        (self.d/"factoryreset").touch()
+        (self.d/"factoryreset").chmod(0o700)
         (self.d/"verify").touch()
         (self.d/"verify").chmod(0o700)
         (self.d/"jshn").write_text("""
@@ -30,7 +34,7 @@ json_add_string() { printf '%s=%s\\n' "$1" "$2"; }
 json_dump() { :; }
 """)
         s=SOURCE.read_text()
-        for old,new in (("/tmp/sysinfo/board_name","board"),("/proc/sys/kernel/random/boot_id","boot"),("/usr/libexec/veci2-verify-image","verify"),("/var/run/veci2-restore.action.lock","restore.lock"),("/var/run/veci2-reboot-requested","requested"),("/usr/share/libubox/jshn.sh","jshn")):
+        for old,new in (("/proc/mounts","mounts"),("/proc/mtd","mtd"),("/sbin/factoryreset","factoryreset"),("/tmp/sysinfo/board_name","board"),("/proc/sys/kernel/random/boot_id","boot"),("/usr/libexec/veci2-verify-image","verify"),("/var/run/veci2-restore.action.lock","restore.lock"),("/var/run/veci2-reboot-requested","requested"),("/usr/share/libubox/jshn.sh","jshn")):
             s=s.replace(old,str(self.d/new))
         (self.d/"rpc").write_text(s)
         u=self.d/"ubus"
@@ -60,3 +64,17 @@ json_dump() { :; }
         self.assertIn("reboot_request_unconfirmed",self.run_rpc("rebootNow",MOCK_RC="1").stdout)
         self.assertIn("reboot_already_requested",self.run_rpc("rebootNow").stdout)
         self.assertEqual((self.d/"calls").read_text().splitlines(),["mock request"])
+
+    def test_factory_reset_readiness_never_authorizes_reset(self):
+        r=self.run_rpc("resetReadiness")
+        for field in ("factoryreset_available=1","writable_jffs2_overlay=1","expected_firmware_size=1","maintenance_idle=1","recovery_verified=0","defaults_verified=0","reset_allowed=0"):
+            self.assertIn(field,r.stdout,r.stderr)
+        self.assertFalse((self.d/"calls").exists())
+        (self.d/"mounts").write_text("tmpfs /overlay tmpfs rw 0 0\n")
+        (self.d/"mtd").write_text('mtd3: 00010000 00010000 "firmware"\n')
+        (self.d/"requested").touch()
+        r=self.run_rpc("resetReadiness")
+        for field in ("writable_jffs2_overlay=0","expected_firmware_size=0","maintenance_idle=0","reset_allowed=0"):
+            self.assertIn(field,r.stdout)
+        self.assertIn("eligible=0",self.run_rpc("rebootStatus").stdout)
+        self.assertFalse((self.d/"calls").exists())

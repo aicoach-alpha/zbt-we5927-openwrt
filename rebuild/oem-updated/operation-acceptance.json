@@ -510,7 +510,7 @@
     "online_upgrade_apply": {
       "state": "UNIMPLEMENTED",
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_smb_legacy_editor_and_firmware_apply_locked",
-      "limitations": "Explicit locked response fixture passes; signed apply path and release acceptance remain UNIMPLEMENTED. Do not promote on refusal."
+      "limitations": "Installation locked. Shared manual/OTA receipt and pending-reboot interlock fixtures passed with mock installer. Actual signed apply and release acceptance remain UNIMPLEMENTED."
     },
     "online_upgrade_check": {
       "state": "PROTOTYPE",
@@ -540,7 +540,7 @@
       "state": "PROTOTYPE",
       "provider": "veci.v2.system:rebootStatus/rebootNow",
       "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_manual_reboot.py",
-      "limitations": "Explicit HTTPS authenticated POST with native boot ID and maintenance interlocks; mocked native request, stale/duplicate/locked cases passed. Actual procd reboot, post-reboot recovery, concurrent maintenance after accepted request and OEM original form pending."
+      "limitations": "Native mocked request, stale/duplicate/locked cases and pending-reboot verify/restore interlocks passed. Actual reboot, post-reboot recovery and original OEM form pending."
     },
     "refresh_days_traffic": {
       "state": "PROTOTYPE",
@@ -549,7 +549,9 @@
       "limitations": "Read-only refresh of existing sampled history; no forced sample or vendor legacy POST transport. Supplemental OEM interface uses native RPC."
     },
     "reset": {
-      "state": "UNIMPLEMENTED"
+      "state": "UNIMPLEMENTED",
+      "evidence": "veci.v2.system:resetReadiness; scripts/tests/test_oem_manual_reboot.py#ManualReboot.test_factory_reset_readiness_never_authorizes_reset",
+      "limitations": "Read-only readiness implemented; actual factory reset remains locked and UNIMPLEMENTED until defaults/recovery acceptance."
     },
     "search_ctcode_and_channals": {
       "state": "PROTOTYPE",
@@ -862,7 +864,7 @@
     "sysupgrade_execute": {
       "state": "UNIMPLEMENTED",
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_smb_legacy_editor_and_firmware_apply_locked",
-      "limitations": "Explicit locked response fixture passes; signed apply path and release acceptance remain UNIMPLEMENTED. Do not promote on refusal."
+      "limitations": "Installation locked. Shared manual/OTA receipt and pending-reboot interlock fixtures passed with mock installer. Actual signed apply and release acceptance remain UNIMPLEMENTED."
     },
     "sysupgrade_upload_file": {
       "state": "PROTOTYPE",
