@@ -1,0 +1,74 @@
+{
+  "schema": "veci-we5927-offline-uboot-recovery-structure.v1",
+  "date_local": "2026-11-27",
+  "basis": {
+    "owner_mtd0_string_indicators": "Owner-pasted static Windows ASCII scan preserved in existing owner signing-and-verification report; actual raw MTD0 not uploaded to NAS",
+    "owner_mtd0_sha256": "b2acbf1e762e310d467cfcbae853257a9f63ce311511134bc9d0d5953f835330",
+    "owner_mtd0_size_bytes": 196608,
+    "historical_backup_comparison": "Nov23 = Nov25 = live router MTD0 SHA256",
+    "current_user_mtd3": "owner-pasted exact current mtd3 raw backup SHA matching router before and after, uImage CRCs PASS",
+    "vendor_image": "on-NAS vendor research reference, not proven physical router's current OEM image",
+    "veci_candidate": "exact source f87e7ec5 signed candidate in NAS artifacts"
+  },
+  "owner_uboot_static_indicators": {
+    "http_server_update_message": true,
+    "web_failsafe_menu_message": true,
+    "reset_enters_update_message": true,
+    "html_firmware_upload_input": true,
+    "http_upload_upgrading_message": true,
+    "tftp_boot_command": true,
+    "warning": "HTTP upload is done! Upgrading... means upload may immediately flash; never upload for a read-only test",
+    "observed_only_static_strings": true
+  },
+  "offline_image_structure": {
+    "vendor_reference": {
+      "name": "WE2825-2SIM_V26.03.04_V26.08.09-OEM-REFERENCE-DO-NOT-FLASH.bin",
+      "size_bytes": 7471108,
+      "sha256": "80529b8e9c31d686eb7f63a1517d6dbcf781f26cb4aceb7b8b1ff27c2d51d1f9",
+      "uimage_magic": "27051956",
+      "uimage_payload_bytes": 1184708,
+      "legacy_header_crc32": "PASS",
+      "legacy_payload_crc32": "PASS",
+      "os_arch_type_comp": [
+        5,
+        5,
+        2,
+        3
+      ],
+      "squashfs_magic_offset": 1184772
+    },
+    "veci_signed_candidate": {
+      "name": "VeCI-v2-WE5927-2SIM-f87e7ec5-SIGNED-CANDIDATE-DO-NOT-FLASH.bin",
+      "size_bytes": 5899090,
+      "sha256": "3adc815e77a7c9b0e25f742601eb2dc94423aad540b26efa86423821a667abb1",
+      "uimage_magic": "27051956",
+      "uimage_payload_bytes": 1959204,
+      "legacy_header_crc32": "PASS",
+      "legacy_payload_crc32": "PASS",
+      "os_arch_type_comp": [
+        5,
+        5,
+        2,
+        3
+      ],
+      "squashfs_magic_offset": 1959268
+    },
+    "current_live_mtd3_kernel": {
+      "size_of_mtd3_bytes": 7995392,
+      "uimage_payload_bytes": 1959054,
+      "legacy_header_crc32": "PASS_OWNER_CONSOLE",
+      "legacy_payload_crc32": "PASS_OWNER_CONSOLE"
+    }
+  },
+  "conclusions": {
+    "shared_outer_format": "legacy U-Boot uImage kernel header and SquashFS magic exist in both offline-image references",
+    "restoration_acceptance": "NOT_VERIFIED",
+    "bootloader_http_upload_safe_to_test": "NO",
+    "vendor_reference_may_be_wrong_board": "YES_EXACT_BOARD_COMPATIBILITY_NOT_VERIFIED",
+    "full_binary_MTD0_inspected_by_assistant": "NO",
+    "actual_physical_web_failsafe_reached": "NOT_TESTED",
+    "rescue_upload_performed": "NO",
+    "flash_authorized": false,
+    "release_permitted": false
+  }
+}
