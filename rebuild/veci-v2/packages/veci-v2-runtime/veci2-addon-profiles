@@ -372,3 +372,50 @@ legacy_tunnel_disable() {
   fi
   legacy_tunnel_status
 }
+
+# Existing optional SMB service: observe and disable startup only.
+# Do not create shares, change credentials or restart running services.
+smb_profile() {
+  smb_state=absent; smb_service=""; smb_revision=""
+  for name in samba4 ksmbd; do
+    [ -x "/etc/init.d/$name" ] || continue
+    [ -z "$smb_service" ] || { smb_state=ambiguous; smb_service=""; return 0; }
+    smb_service="$name"
+  done
+  [ -n "$smb_service" ] || return 0
+  smb_init="/etc/init.d/$smb_service"
+  [ -f "$smb_init" ] && [ ! -L "$smb_init" ] || fail invalid_service
+  if "$smb_init" enabled >/dev/null 2>&1; then smb_state=enabled
+  else
+    rc=$?
+    [ "$rc" = 1 ] || fail startup_state_unavailable
+    smb_state=disabled
+  fi
+  digest=$(sha256sum "$smb_init") || fail service_unavailable
+  digest=$(printf '%s\n' "$digest:$smb_state" | sha256sum) || fail service_unavailable
+  smb_revision=${digest%% *}
+}
+smb_status() {
+  smb_profile
+  json_init; json_add_boolean ok 1
+  json_add_string state "$smb_state"; json_add_string service "$smb_service"
+  json_add_string revision "$smb_revision"
+  json_add_boolean activation_supported 0; json_add_boolean share_verified 0
+  json_dump
+}
+smb_disable() {
+  exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation; json_get_var service service
+  [ "$confirm" = DISABLE_SMB_NEXT_BOOT ] || fail confirmation_required
+  smb_profile
+  case "$smb_state" in enabled|disabled) ;; *) fail service_unavailable;; esac
+  [ "$service" = "$smb_service" ] && [ "$expected" = "$smb_revision" ] || fail stale_configuration
+  if [ "$smb_state" = enabled ]; then
+    "$smb_init" disable >/dev/null 2>&1 || fail startup_disable_failed
+    smb_profile
+    [ "$smb_state" = disabled ] && [ "$smb_service" = "$service" ] || fail startup_disable_unconfirmed
+  fi
+  smb_status
+}
