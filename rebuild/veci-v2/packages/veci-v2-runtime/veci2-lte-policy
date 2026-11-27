@@ -31,8 +31,9 @@ if [ "$2" != status ] && [ "$2" != reconnect ]; then
     action=$(jsonfilter -s "$request" -e '@.action') || fail invalid_request
     case "$action" in ENABLE_FAILOVER) desired=1 ;; DISABLE_FAILOVER) desired=0 ;; *) fail invalid_action ;; esac
   fi
-  exec 9<"$0"
+  exec 9>/var/lock/veci2-lte-policy.lock
   flock -n 9 || fail busy
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
 fi
 cfg=we5927_lte.main
 [ "$(uci -q get "$cfg")" = modem ] || fail no_modem_configuration
@@ -59,12 +60,20 @@ fi
 value=$(uci -q get "$cfg.auto_failover" || :)
 case "$value" in ''|0) value=0 ;; 1) ;; *) fail invalid_policy ;; esac
 if [ "$2" != status ] && [ "$(uci -q get "$cfg.$option" || :)" != "$desired" ]; then
-  tmp=$(mktemp -d /tmp/veci2-lte-policy.XXXXXX)
+  config=/etc/config/we5927_lte
+  [ -f "$config" ] && [ ! -L "$config" ] || fail config_unavailable
+  digest=$(sha256sum "$config") || fail config_unavailable
+  tmp=$(mktemp -d /tmp/veci2-lte-policy.XXXXXX) || fail stage_failed
   trap 'rm -rf "$tmp"' EXIT
   trap 'exit 1' HUP INT TERM
-  uci -q -t "$tmp" set "$cfg.$option=$desired" &&
-    uci -q -t "$tmp" commit we5927_lte || fail save_failed
-  [ "$(uci -q get "$cfg.$option")" = "$desired" ] || fail save_failed
+  cp -p "$config" "$tmp/original" || fail backup_failed
+  uci -q -t "$tmp" set "$cfg.$option=$desired" || fail stage_failed
+  pending=$(uci -q changes we5927_lte) || fail config_unavailable
+  [ -z "$pending" ] && [ "$(sha256sum "$config")" = "$digest" ] || fail stale_configuration
+  if ! uci -q -t "$tmp" commit we5927_lte || [ "$(uci -q get "$cfg.$option" || :)" != "$desired" ]; then
+    cp -p "$tmp/original" "$config" || fail rollback_failed
+    fail save_failed_rollback
+  fi
   [ "$option" != ping_interval ] || interval=$desired
   [ "$option" != auto_failover ] || value=$desired
 fi
