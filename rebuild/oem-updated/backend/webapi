@@ -89,6 +89,7 @@ case "$op" in
     enable_mptcp_set) err -4 "MPTCP configuration not supported by this target build" ;;
     bootflag|setbootflag)
         err -4 "Legacy boot flag is not supported; use verified firmware recovery" ;;
+    get_gps|get_voice|set_voice) err -4 "Service not supported by this WE5927 profile" ;;
     send_at) err -4 "Raw modem commands disabled on WE5927-2SIM" ;;
     set_imei) err -4 "Modem identity is read-only on WE5927-2SIM" ;;
     getWiFi5|setWiFi5|setWiFi5_nocommit|get_wifi_guest5|set_wifi_guest5)

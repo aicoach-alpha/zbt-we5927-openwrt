@@ -177,7 +177,9 @@
       "limitations": "Legacy flags mapped to native configuration, browser semantics and write integration pending."
     },
     "get_gps": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "GPS disabled in the WE5927 factory profiles. No location provider or external map viewer.",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_gps_and_voice_require_session_and_refuse_hardware_calls"
     },
     "get_imei": {
       "state": "PROTOTYPE",
@@ -410,7 +412,9 @@
       "limitations": "Separates configured forwarding policy, live rule observation and local stack TTL; packet verification pending."
     },
     "get_voice": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Speech service disabled in the WE5927 factory profiles. Direct route explains unavailability.",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_gps_and_voice_require_session_and_refuse_hardware_calls"
     },
     "get_wan_config": {
       "state": "FIXTURE_PASS",
@@ -760,7 +764,9 @@
       "limitations": "Opt-in scoped IPv4 forwarding rule, requires flow offload disabled; fw4 validation, reload and rollback implemented in source. Kernel expression support, rule activation and actual packet TTL not runtime verified; original OEM TTL form not mapped."
     },
     "set_voice": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Speech service disabled in the WE5927 factory profiles. Direct route explains unavailability.",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_gps_and_voice_require_session_and_refuse_hardware_calls"
     },
     "set_wan_config": {
       "state": "PROTOTYPE",

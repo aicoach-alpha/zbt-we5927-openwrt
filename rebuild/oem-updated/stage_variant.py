@@ -34,7 +34,7 @@ REPLACEMENTS = (
 MAKEFILE = """include $(TOPDIR)/rules.mk
 PKG_NAME:=oem-updated-ui-dev
 PKG_VERSION:=0.1
-PKG_RELEASE:=6
+PKG_RELEASE:=7
 include $(INCLUDE_DIR)/package.mk
 define Package/oem-updated-ui-dev
   SECTION:=admin
@@ -112,6 +112,11 @@ def stage(image, out):
                 if key not in menu["srv"]:
                     raise ValueError("OEM cloud menu anchor missing: "+key)
                 menu["srv"][key]=0
+            # Both options are absent or off in the verified WE5927 profiles.
+            for group, key in (("config", "isGps"), ("srv", "speech")):
+                if menu[group].get(key, 0) != 0:
+                    raise ValueError("Unexpected OEM capability: " + key)
+                menu[group][key] = 0
             profile_path.write_text(json.dumps(menu,indent=2)+"\n")
             wifi = menu["wifi"]
             if (wifi["wifi_2"], wifi["wifi_5"], wifi["wifi_60"]) != (1, 0, 0):
@@ -152,6 +157,15 @@ def stage(image, out):
             if dashboard.count(old) != 1:
                 raise ValueError("OEM dashboard patch anchor changed: " + old[:80])
             dashboard = dashboard.replace(old,new)
+        # Remove the disabled location dialog handler and its external map request.
+        gps_start = dashboard.index("dialogGps:function()")
+        gps_end = dashboard.index("format_value:function", gps_start)
+        if sha(dashboard[gps_start:gps_end].encode()) != "4023ef753cc614deff1f7622d6cd309366a8eabd0df40c2e4292d0a5cf739bb4":
+            raise ValueError("OEM GPS handler changed")
+        gps_button = '1==t.$config.isGps?i("span",{on:{click:t.dialogGps}},[t._v("GPS")]):t._e()'
+        if dashboard.count(gps_button) != 1:
+            raise ValueError("OEM GPS button changed")
+        dashboard = (dashboard[:gps_start] + dashboard[gps_end:]).replace(gps_button, "t._e()")
         home.write_text(dashboard)
         subprocess.run(["node","--check",str(home)],check=True)
         # Wire the original OEM connected-client action to the same native MAC
@@ -213,6 +227,15 @@ def stage(image, out):
             ('var e=this.arr_to_obj(this.values,["enabled","remote","port","ca","cert","key"]);console.log(e),this.proxy_req("post","/webapi?op=set_openvpn",e,this.get_openvpn,!0)',
              'this.$message.warning("OpenVPN configuration is read-only in this version.")'),
         ])
+        voice_name = "chunk-2d0d6200.6fca3f4f.js"
+        voice = (files / "www/assets/js" / voice_name).read_text()
+        start = voice.index("var i=function")
+        end = voice.index(",s=c,a=n(", start)
+        original_component = voice[start:end]
+        if sha(original_component.encode()) != "582fce02d37e159f71d6ce9458af04a7ea6de6b171b382cb9578ce520dbb89d7":
+            raise ValueError("OEM voice component changed")
+        edit_chunk(voice_name, [(original_component,
+            'var i=function(){return this.$createElement("p","Voice service unavailable on this profile.")},o=[],c={}')])
         # Strip privileged controls from the two OEM LTE views. Preserve their
         # existing modem configuration forms and the separate identity read.
         for name in ("chunk-bcfb963a.0b89faf7.js", "chunk-1ef12905.aa3de63a.js"):
