@@ -263,3 +263,10 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - For each Nov23 and Nov25 backup, the tool computes local-only kernel and pre-overlay SHA256 on the corresponding original MTD3 image with streaming .NET hashing. It compares these independently with live hashes, emits only semantic MATCH/DIFFERENT and saves a local evidence JSON; it does not upload raw MTD bytes or any backup.
 - Synthetic, executable BusyBox ash checks cover valid layout, exact prefix/overlay hashes, changed overlay hashes, malformed partition map and a safety contract. Five tests PASSED on development NAS. Windows PowerShell 5.1 syntax and pure local segment-hash correctness are now checked by a targeted offline GitHub Actions job; any CI result must be confirmed separately, not inferred from source tests.
 - The tool has not yet accessed production hardware. No flash, bootloader recovery, backup restoration, power-cycle, network reload, or post-flash UAT was performed; signed candidate f87e7ec5 remains exactly unchanged and release_permitted=false.
+
+### Offline PS5.1 CI evidence run 45944971177 — 27 Nov 2026
+
+- GitHub Actions https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/45944971177 at commit 5e921af41e2b5865a8c55b5b6cc8ea72d85b2d33: SUCCESS for both windows-ps51-stream-sha and real-busybox-mtd-layout.
+- Windows PowerShell 5.1 parsing and real .NET SHA256 range hashing passed using local synthetic data only. BusyBox ash real command execution on generated fake MTD partitions passed, including malformed-layout and wrong-tail alias cases. Source test suite 5/5 PASS.
+- Earlier duplicate run 45944736686 failed during apt-get update due to a third-party Microsoft source returning HTTP 403, NOT due to MTD logic. CI commit 5e921af restricts fallback apt update to official Ubuntu sources and suppresses duplicate push+PR runs; the corrected workflow was run to SUCCESS.
+- No live physical MTD4/5/6 values have been collected by this operation. No firmware build or signed binary changed. Historical firmware candidate f87e7ec5 remains only device-preflight-verified, not release approved.
