@@ -53,6 +53,9 @@ def analyze_image(path, expected_sha):
         raise FormatGateError("SQUASHFS_NOT_IMMEDIATELY_AFTER_UIMAGE")
     sq_major, sq_minor = struct.unpack_from("<HH", binary, sq_offset+28)
     sq_block_size = struct.unpack_from("<I", binary, sq_offset+12)[0]
+    sq_block_log = struct.unpack_from("<H", binary, sq_offset+22)[0]
+    if not (12 <= sq_block_log <= 20 and sq_block_size == 1 << sq_block_log):
+        raise FormatGateError("SQUASHFS_INVALID_BLOCK_GEOMETRY")
     sq_bytes_used = struct.unpack_from("<Q", binary, sq_offset+40)[0]
     if (sq_major,sq_minor) != (4,0):
         raise FormatGateError("SQUASHFS_VERSION_NOT_4_0")

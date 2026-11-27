@@ -26,6 +26,7 @@ def image_bytes(trailer="vendor"):
     sq=bytearray(96)
     struct.pack_into("<I",sq,0,0x73717368)
     struct.pack_into("<I",sq,12,1048576)
+    struct.pack_into("<H",sq,22,20)
     struct.pack_into("<HH",sq,28,4,0)
     struct.pack_into("<Q",sq,40,96)
     footer=(
@@ -87,6 +88,22 @@ class OfflineUbootFormat(unittest.TestCase):
                                      "UNRECOGNIZED_OR_MIXED_TRAILER")
                     self.assertFalse(result["rescue_image_approved"])
                     self.assertEqual(result["bootloader_http_acceptance"], "NOT_VERIFIED")
+
+    def test_squashfs_block_geometry(self):
+        image = bytearray(image_bytes())
+        offset = 64 + 0x17000
+        with tempfile.TemporaryDirectory() as tmp:
+            for block_log in (12, 18, 20):
+                struct.pack_into("<I", image, offset+12, 1 << block_log)
+                struct.pack_into("<H", image, offset+22, block_log)
+                result = inspect_buffer(image, tmp)
+                self.assertEqual(result["squashfs"]["block_size"], 1 << block_log)
+            for size, log in ((0, 0), (2048, 11), (4097, 12), (65536, 20), (2097152, 21)):
+                with self.subTest(size=size, log=log):
+                    struct.pack_into("<I", image, offset+12, size)
+                    struct.pack_into("<H", image, offset+22, log)
+                    with self.assertRaisesRegex(FormatGateError, "SQUASHFS_INVALID_BLOCK_GEOMETRY"):
+                        inspect_buffer(image, tmp)
 
     def test_squashfs_bytes_used_boundary_not_arbitrary_byte_mutation(self):
         source = bytearray(image_bytes("vendor"))
