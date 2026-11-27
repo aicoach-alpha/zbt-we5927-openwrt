@@ -38,6 +38,7 @@ function clearSession() {
   resetAcl();
   resetParent();
   resetVpn();
+  resetSmbStartup();
   resetLegacyVpn();
   resetManualReboot();
   el("tunnel-result").textContent="";
@@ -696,4 +697,32 @@ el('legacy-vpn-disable').onclick=async()=>{
     await oem('set_'+row.protocol,{name:row.name,revision,enabled:'0',confirmation:'DISABLE_LEGACY_TUNNEL_NEXT_BOOT'},token);
     if(sid===token)el('legacy-vpn-result').textContent='Startup disabled. Refresh inventory.';
   }catch(e){if(sid===token)el('legacy-vpn-result').textContent=e.message;}
+};
+
+let smbStartup=null;
+function resetSmbStartup(){
+  smbStartup=null;el('smb-startup-disable').disabled=true;el('smb-startup-result').textContent='';
+}
+el('smb-startup-refresh').onclick=async()=>{
+  const token=sid,b=el('smb-startup-refresh');if(!token||b.disabled)return;
+  b.disabled=true;resetSmbStartup();
+  try{
+    const x=await rpc('veci.v2.addon','smbStatus',{},token);
+    if(!x.ok||!['absent','ambiguous','enabled','disabled'].includes(x.state))throw Error('SMB startup unavailable');
+    if(sid!==token)return;
+    el('smb-startup-result').textContent='Service: '+(x.service||'none')+'; startup: '+x.state+'; shares not verified.';
+    if(x.state==='enabled'&&['samba4','ksmbd'].includes(x.service)&&/^[0-9a-f]{64}$/.test(x.revision||'')){
+      smbStartup=x;el('smb-startup-disable').disabled=false;
+    }
+  }catch(e){if(sid===token)el('smb-startup-result').textContent=e.message;}
+  finally{b.disabled=false;}
+};
+el('smb-startup-disable').onclick=async()=>{
+  const token=sid,x=smbStartup;if(!token||!x)return;
+  if(!window.confirm('Disable SMB startup at next boot? Current file-sharing connections are unchanged.'))return;
+  resetSmbStartup();
+  try{
+    await oem('set_samba_status',{service:x.service,revision:x.revision,enabled:'0',confirmation:'DISABLE_SMB_NEXT_BOOT'},token);
+    if(sid===token)el('smb-startup-result').textContent='Startup disabled. Refresh before further changes.';
+  }catch(e){if(sid===token)el('smb-startup-result').textContent=e.message;}
 };

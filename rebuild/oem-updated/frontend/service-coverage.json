@@ -254,6 +254,16 @@
       "scope": "Disable startup of existing named PPTP/L2TP/N2N only; no provisioning, enabling, live reload or credential editing",
       "state": "FIXTURE_PASS_NOT_UAT",
       "limitations": "Isolated mutation and rollback fixtures; actual UCI/browser/runtime pending"
+    },
+    "smb_startup": {
+      "provider": "veci.v2.addon",
+      "methods": [
+        "smbStatus",
+        "disableSmbStartup"
+      ],
+      "scope": "Optional existing native SMB service startup disable only",
+      "state": "SOURCE_INTEGRATED_NOT_UAT",
+      "limitations": "Mocked init service only; no share provisioning, activation or actual service validation"
     }
   },
   "remaining": [

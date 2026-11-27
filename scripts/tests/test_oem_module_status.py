@@ -107,6 +107,16 @@ esac
                     denied = self.run_script("gateway", PERMIT="false", **args)
                     self.assertIn("access denied", denied.stdout)
 
+    def test_smb_legacy_editor_and_firmware_apply_locked(self):
+        for op,reason in (("set_samba_info","not supported"),("online_upgrade_apply","Installation locked"),("sysupgrade_execute","Installation locked")):
+            for method in ("GET","POST"):
+                with self.subTest(op=op,method=method):
+                    args=dict(QUERY_STRING="op="+op,REQUEST_METHOD=method)
+                    result=self.run_script("gateway",**args)
+                    self.assertIn(reason,result.stdout)
+                    self.assertNotIn("ADAPTER_CALLED",result.stdout)
+                    self.assertIn("access denied",self.run_script("gateway",HTTP_X_OEM_SESSION="",**args).stdout)
+
     def test_legacy_tunnel_mesh_and_arbitrary_url_upgrade_refused(self):
         for op in ("config_ss_redir","config_ss_tunnel_dns","config_ss_tunnel_server","mesh_botton","url_upgrade"):
             for method in ("GET","POST"):

@@ -508,7 +508,9 @@
       "limitations": "Explicit refusal fixture passed; original UI handling and release review pending. Not a functional implementation."
     },
     "online_upgrade_apply": {
-      "state": "UNIMPLEMENTED"
+      "state": "UNIMPLEMENTED",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_smb_legacy_editor_and_firmware_apply_locked",
+      "limitations": "Explicit locked response fixture passes; signed apply path and release acceptance remain UNIMPLEMENTED. Do not promote on refusal."
     },
     "online_upgrade_check": {
       "state": "PROTOTYPE",
@@ -752,10 +754,16 @@
       "limitations": "Single-port WAN-to-LAN native rules, explicit confirmation; ranges/edit and OEM form pending."
     },
     "set_samba_info": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Legacy vendor plaintext SMB account and share editor refused",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_smb_legacy_editor_and_firmware_apply_locked",
+      "limitations": "Legacy refusal only; native authenticated SMB share provisioning remains unavailable. Package not selected by default."
     },
     "set_samba_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:disableSmbStartup",
+      "evidence": "scripts/tests/test_oem_smb_startup.py; rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Disable startup of an installed single Samba4 or ksmbd service only. Native mocked init service status and mutation fixtures passed. No activation, share configuration or live restart; adapter write fixture and runtime pending."
     },
     "set_static_dhcp": {
       "state": "PROTOTYPE",
@@ -852,7 +860,9 @@
       "limitations": "Replacement route staged; original OEM form still needs replacement. Native inspection checks digest and board. Runtime acceptance pending."
     },
     "sysupgrade_execute": {
-      "state": "UNIMPLEMENTED"
+      "state": "UNIMPLEMENTED",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_smb_legacy_editor_and_firmware_apply_locked",
+      "limitations": "Explicit locked response fixture passes; signed apply path and release acceptance remain UNIMPLEMENTED. Do not promote on refusal."
     },
     "sysupgrade_upload_file": {
       "state": "PROTOTYPE",

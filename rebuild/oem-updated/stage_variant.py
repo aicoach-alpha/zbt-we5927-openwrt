@@ -453,6 +453,8 @@ def stage(image, out):
             '<article><h2>Legacy VPN startup retirement</h2><p>Existing named PPTP, L2TP and N2N profiles only. Disable startup without altering credentials or live connections. Enabling and provisioning are not supported.</p>'
             '<button id="legacy-vpn-refresh" type="button">Read profiles</button><label>Profile<select id="legacy-vpn-profile"></select></label>'
             '<button id="legacy-vpn-disable" type="button" disabled>Disable at next boot</button><p id="legacy-vpn-result" role="status"></p></article>'
+            '<article><h2>Optional SMB startup</h2><p>Disable an existing Samba4 or ksmbd service at next boot. No share creation, credential changes or live restart.</p>'
+            '<button id="smb-startup-refresh" type="button">Read startup state</button><button id="smb-startup-disable" type="button" disabled>Disable startup</button><p id="smb-startup-result" role="status"></p></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'
