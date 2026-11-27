@@ -144,7 +144,7 @@ topology_ok() {
     function ipnum(s, a,n,i,v){n=split(s,a,".");if(n!=4)return -1;v=0;for(i=1;i<=4;i++){if(a[i]!~/^[0-9]+$/||a[i]>255)return -1;v=v*256+a[i]}return v}
     {t=$1;if(t=="default")next;if(t=="local"||t=="broadcast"||t=="unreachable"||t=="blackhole"||t=="prohibit")t=$2;
      if(t=="default")next;n=split(t,a,"/");v=ipnum(a[1]);if(v<0)next;p=(n==1?32:a[2]+0);if(p<0||p>32){bad=1;next}
-     size=2^(32-p);start=int(v/size)*size;guest=ipnum("10.20.0.0");
+     size=1;for(i=p;i<32;i++)size*=2;start=int(v/size)*size;guest=ipnum("10.20.0.0");
      if(start<=guest+255 && start+size-1>=guest)bad=1}
     END{exit bad+0}' || return 1
 }

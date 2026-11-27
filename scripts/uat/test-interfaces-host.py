@@ -31,6 +31,9 @@ config interface 'lte'
  option device 'usb0'
  option proto 'dhcp'
 """)
+    dhcp = config / "dhcp"
+    dhcp.write_text("config dhcp 'lan'\n option interface 'lan'\n option start '100'\n option limit '100'\n")
+    dhcp_lock = root / "dhcp.lock"
     lock = root / "lock"
     board = root / "board"
     board.write_text("zbtlink,zbt-we5927\n")
@@ -42,6 +45,7 @@ config interface 'lte'
     script.write_text((pkg / "veci2-interfaces").read_text().replace(
         "/etc/config/network", str(network)).replace("/tmp/sysinfo/board_name", str(board))
         .replace("/etc/board.json", str(board_json)).replace("/sys/class/net/",str(fake_dev)+"/")
+        .replace("/etc/config/dhcp",str(dhcp)).replace("/var/lock/veci2-dhcp.lock",str(dhcp_lock))
         .replace("/var/lock/veci2-ipv6.lock", str(lock)).replace("/usr/share/libubox/jshn.sh", str(jshn)))
     uci = root / "uci"
     uci.write_text(f'#!/bin/sh\nexec "{binary}" -c "{config}" -t "{delta}" "$@"\n')
@@ -78,7 +82,35 @@ print(json.load(open(sys.argv[2]))["network"]["wan"]["device"])
     assert call("save", args)["error"] == "pending_network_changes"
     assert get("lte.metric") == "3" and network.read_bytes() == before
     subprocess.run([uci, "revert", "network"], check=True)
+    # An incompatible pool, static lease, or pending DHCP writer must not
+    # mutate network or DHCP. Compatible change preserves DHCP bytes.
+    base_dhcp=dhcp.read_bytes()
+    with dhcp_lock.open("w") as handle:
+        fcntl.flock(handle,fcntl.LOCK_EX)
+        assert call("save",args)["error"]=="dhcp_busy"
+    for extra,expected in (("config host\n option ip '192.168.1.12'\n","reservation_conflicts_with_lan"),("config host\n option ip '192.168.2.1'\n","reservation_conflicts_with_lan")):
+        dhcp.write_bytes(base_dhcp+extra.encode())
+        snapshot=dhcp.read_bytes()
+        assert call("save",args)["error"]==expected
+        assert network.read_bytes()==before and dhcp.read_bytes()==snapshot
+    dhcp.write_bytes(base_dhcp)
+    assert call("save",args|dict(lan_mask="25"))["error"]=="dhcp_pool_conflicts_with_lan"
+    subprocess.run([uci,"set","dhcp.lan.start=20"],check=True)
+    assert call("save",args)["error"]=="pending_dhcp_changes"
+    subprocess.run([uci,"revert","dhcp"],check=True)
+    # Native guest's fixed subnet must not be accidentally invalidated.
+    subprocess.run([uci,"set","network.veci_guest=interface"],check=True)
+    subprocess.run([uci,"commit","network"],check=True)
+    guest_args=args|dict(revision=call("status")["revision"])
+    assert call("save",guest_args)["error"]=="guest_requires_standard_lan"
+    subprocess.run([uci,"delete","network.veci_guest"],check=True)
+    subprocess.run([uci,"commit","network"],check=True)
+    args["revision"]=call("status")["revision"]
+    dhcp.write_bytes(base_dhcp+b"config host\n option ip '192.168.2.12'\n")
+    preserved=dhcp.read_bytes()
     saved = call("save", args)
+    assert dhcp.read_bytes()==preserved
+    print("PASS DHCP pool and reservation compatibility, pending DHCP and guest conflict guards")
     assert saved["ok"] and saved["lan_mask"] == "24" and saved["revision"] != initial["revision"], saved
     assert get("lan.ipaddr") == "192.168.2.1/24" and get("wan.ipaddr") == "10.1.1.2/24"
     assert get("wan.gateway") == "10.1.1.1" and get("lan.ip6assign") == "0"
