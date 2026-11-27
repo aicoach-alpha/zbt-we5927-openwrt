@@ -184,3 +184,13 @@ Uncertainties are never converted into PASS on the strength of source code.
 - Laboratory full-image builds now reuse only OpenWrt dl/ downloaded source tarballs under a cache key pinned to the exact upstream source commit. Default GitHub Actions cache is immutable and first fill occurs during one successful build.
 - Source completion gate still precedes dependency install, source stage and cache restoration. Every future run recompiles all build_dir and staging_dir binaries and repeats SHA256, board metadata, exact ROM content and signature prohibition checks.
 - No cache of signed keys, firmware images, toolchains, compiled packages or physical UAT; benchmark speed improvement remains NOT MEASURED until the next build.
+
+## Signed offline candidate f87e7ec5 — 27 Nov 2026 (NO FLASH APPROVAL)
+
+- GitHub Actions full lab image [run 45901493124](https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/45901493124): **SUCCESS**, exact source f87e7ec5fec2c437d65fd95e7139bff90eb3019a, OpenWrt 25.12.6, zbtlink,zbt-we5927.
+- UNSIGNED CI source image 5,898,530 bytes, checksum and CI verification report passed, 77 source ROM payloads recorded.
+- Offline-only signing (existing trust key fingerprint 1d8759d36251c36c) produced VeCI-v2-WE5927-2SIM-f87e7ec5-SIGNED-CANDIDATE-DO-NOT-FLASH.bin; signed SHA-256 3adc815e77a7c9b0e25f742601eb2dc94423aad540b26efa86423821a667abb1; signed size 5,899,090 bytes; flash partition 7,995,392 bytes; remaining 2,096,302 bytes.
+- Cryptographic verification **PASS** against matching source trust anchor; extracted signed message equals unsigned source bytes; one-byte tamper and missing-trust-key controls both rejected.
+- NAS offline evidence: /home/andre/projects/zbt-we2825-veci-openwrt/artifacts/veci-v2-f87e7ec-signed-offline-20261127/; **verify-only** ZIP at /home/andre/projects/zbt-we2825-veci-openwrt/artifacts/VeCI-v2-WE5927-2SIM-f87e7ec5-SIGNED-CANDIDATE-VERIFY-ONLY.zip, ZIP SHA256 375d2e56a7d09a308c4471c1e662133350e46924886323a7f802fa40a5125816; no private signing keys included.
+- **Still BLOCKED:** installed key on owner's only router not inspected, sysupgrade -T on exact physical router not performed, OEM/VeCI frontend parity and connected-client MT76 UAT unproved, no rollback/recovery or 72-hour soak for this image. This signed result is **not** signed release approval. No production deployment, Wi-Fi reload, network reload or reboot was performed.
+- Next action requires separate, explicit hardware-preflight consent and valid backups; production routing/Internet remain untouched.
