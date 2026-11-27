@@ -75,6 +75,36 @@ class OfflineUbootFormat(unittest.TestCase):
             with self.assertRaisesRegex(FormatGateError,"IMAGE_SIZE_OUT_OF_FLASH_BOUNDS"):
                 inspect_buffer(bytes(source)+b"\x00"*(MTD3_LIMIT-len(source)+1),tmp)
 
+    def test_ambiguous_trailers_are_never_oem_or_approved(self):
+        base = image_bytes("vendor")[:-4]
+        tails = (b"ucert"+DEADC0DE, b"FWx0"+DEADC0DE,
+                 b"FWx0ucert"+DEADC0DE, b"FWx0", b"ucert", b"")
+        with tempfile.TemporaryDirectory() as tmp:
+            for tail in tails:
+                with self.subTest(tail=tail):
+                    result = inspect_buffer(base+tail, tmp)
+                    self.assertEqual(result["trailer"]["class"],
+                                     "UNRECOGNIZED_OR_MIXED_TRAILER")
+                    self.assertFalse(result["rescue_image_approved"])
+                    self.assertEqual(result["bootloader_http_acceptance"], "NOT_VERIFIED")
+
+    def test_squashfs_bytes_used_boundary_not_arbitrary_byte_mutation(self):
+        source = bytearray(image_bytes("vendor"))
+        sq_offset = 64+0x17000
+        with tempfile.TemporaryDirectory() as tmp:
+            for size in (96, 97, len(source)-sq_offset):
+                with self.subTest(size=size):
+                    struct.pack_into("<Q", source, sq_offset+40, size)
+                    result = inspect_buffer(bytes(source), tmp)
+                    self.assertEqual(result["squashfs"]["bytes_used"], size)
+                    self.assertFalse(result["rescue_image_approved"])
+            for size in (0, 95, len(source)-sq_offset+1):
+                with self.subTest(size=size):
+                    struct.pack_into("<Q", source, sq_offset+40, size)
+                    with self.assertRaisesRegex(FormatGateError,
+                                                "SQUASHFS_BYTES_USED_OUT_OF_BOUNDS"):
+                        inspect_buffer(bytes(source), tmp)
+
     def test_real_binary_receipt_proves_format_divergence_not_restore(self):
         receipt=json.loads(REPORT.read_text())
         v=receipt["sources"]["vendor_reference"]

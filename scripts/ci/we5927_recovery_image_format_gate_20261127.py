@@ -70,7 +70,7 @@ def analyze_image(path, expected_sha):
             break
         deadc0de_indices.append(sq_offset+sq_bytes_used+found)
         cursor = found + len(DEADC0DE)
-    if (not has_fwx and tail.endswith(DEADC0DE)):
+    if (not has_fwx and not has_ucert and tail.endswith(DEADC0DE)):
         trailer_class = "OEM_STYLE_DEADC0DE_TERMINATOR"
     elif has_fwx and has_ucert and not tail.endswith(DEADC0DE):
         trailer_class = "OPENWRT_METADATA_SIGNATURE_TRAILER"
