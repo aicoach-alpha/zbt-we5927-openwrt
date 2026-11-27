@@ -371,3 +371,9 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - Previous commit 01de819: all seven executed workflows succeeded; two build workflows skipped. MTD0 hash reverified.
 - New conservative PIC/GOT analyzer resolves a unique mapping candidate and 220 matching GP prologue patterns on the real MTD0. Two HTTP string argument-load patterns converge on the same indirect call site and callee candidate. Exact offsets retained only in the restricted NAS report. This does not establish what the callee does or which validation checks precede flash.
 - Five synthetic tests passed, covering exact call pattern, wrong branch, wrong delay slot, GP disagreement and absent mapping. No physical router access, no image compatibility proof or flash approval.
+
+## Exact owner MTD0 shared message sink classification — 27 Nov 2026
+
+- All seven executed workflows on e68b220 succeeded; two build workflows were skipped. Fast-forwarded to concurrent f39930e before editing; original MTD0 hash reverified.
+- A conservative message sink classifier on actual owner MTD0 found 17 distinct matching text arguments to the shared HTTP callee, 15 non-HTTP, 17 containing newline, one containing percent, with an argument-register spill pattern. This supports LIKELY_MESSAGE_SINK, not a verified printf identity, firmware validator, or flash writer. Detailed offsets and receipt remain in restricted NAS storage.
+- Five synthetic classifier tests passed after correcting bytearray normalization; includes no mapping, insufficient evidence, invalid text, missing spill pattern, and positive case. Validation control flow and image acceptance remain NOT_VERIFIED. No router contact or flash authorization.
