@@ -1,0 +1,25 @@
+name: WE5927 offline U-Boot MIPS xref reconnaissance
+on:
+  push:
+    branches:
+      - feat/veci-v2-native-gui-refresh-20261126
+    paths:
+      - 'scripts/ci/we5927_uboot_mips_xref_20261127.py'
+      - 'scripts/tests/test_we5927_uboot_mips_xref_20261127.py'
+      - '.github/workflows/veci-we5927-uboot-mips-xref.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-xref-only:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_mips_xref_20261127.py -v
