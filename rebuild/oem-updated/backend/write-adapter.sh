@@ -455,7 +455,7 @@ case "$op" in
         ;;
     set_lan_config|set_wan_config)
         confirm="$(read_field '@.confirmation')" || fail "explicit network confirmation required"
-        [ "$confirm" = SAVE_NETWORK ] || fail "confirmation mismatch"
+        case "$op:$confirm" in set_lan_config:SAVE_NETWORK|set_wan_config:SAVE_NETWORK|set_wan_config:REPLACE_PPPOE_NEXT_BOOT) ;; *) fail "confirmation mismatch";; esac
         rpc veci.v2.interfaces status '{}'
         revision="$(native_field '@.revision')" || fail "revision unavailable"
         expected="$(read_field '@.revision')" || fail "revision required"

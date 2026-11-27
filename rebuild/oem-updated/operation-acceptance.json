@@ -674,8 +674,8 @@
     "set_lan_config": {
       "state": "PROTOTYPE",
       "provider": "veci.v2.interfaces:status/save",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Original LAN form with revision and manual activation; native source permits LAN-only edit with existing PPPoE preserved. Runtime pending."
+      "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/stage_variant.py",
+      "limitations": "Native UCI/libubox config-only DHCP/static and explicitly confirmed PPPoE replacement with isolated board/device fixtures, rollback and LTE preservation passed; original OEM form browser, adapter mutation and physical network activation acceptance pending."
     },
     "set_mac_blacklist": {
       "state": "PROTOTYPE",
@@ -793,8 +793,8 @@
     "set_wan_config": {
       "state": "PROTOTYPE",
       "provider": "veci.v2.interfaces:status/save",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Original DHCP/static WAN form; dedicated PPPoE editor uses authenticated direct savePppoe RPC (not legacy CGI); manual activation only. Returning PPPoE to DHCP/static and runtime pending."
+      "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/stage_variant.py",
+      "limitations": "Native UCI/libubox config-only DHCP/static and explicitly confirmed PPPoE replacement with isolated board/device fixtures, rollback and LTE preservation passed; original OEM form browser, adapter mutation and physical network activation acceptance pending."
     },
     "set_wan_config_nocommit": {
       "state": "SOURCE_DISABLED_REVIEWED",
