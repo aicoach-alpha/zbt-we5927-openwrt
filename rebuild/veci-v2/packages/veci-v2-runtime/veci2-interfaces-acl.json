@@ -14,7 +14,8 @@
       "ubus": {
         "veci.v2.interfaces": [
           "save",
-          "pppoeAction"
+          "pppoeAction",
+          "savePppoe"
         ]
       }
     }
