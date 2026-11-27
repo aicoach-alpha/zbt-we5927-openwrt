@@ -179,3 +179,8 @@ Uncertainties are never converted into PASS on the strength of source code.
 - Guest inspector now separates saved UCI enabled_configured from guest_ap_runtime: unavailable, not_observed, ap_running_unverified, based on selected netifd guest interface + iw type AP + hostapd ENABLED, read-only.
 - Guest and addon UI now clearly label startup configuration vs observed live AP. Guest isolation verification remains null until real firewall/guest-client UAT; enabling guest still requires separate manual restart/boot.
 - Original guest provisioning default disabled remains unchanged. No Wi-Fi, LTE, modem, SIM, firewall or router mutation was executed.
+
+## Development operation: pinned OpenWrt source download cache, 27 Nov 2026
+- Laboratory full-image builds now reuse only OpenWrt dl/ downloaded source tarballs under a cache key pinned to the exact upstream source commit. Default GitHub Actions cache is immutable and first fill occurs during one successful build.
+- Source completion gate still precedes dependency install, source stage and cache restoration. Every future run recompiles all build_dir and staging_dir binaries and repeats SHA256, board metadata, exact ROM content and signature prohibition checks.
+- No cache of signed keys, firmware images, toolchains, compiled packages or physical UAT; benchmark speed improvement remains NOT MEASURED until the next build.

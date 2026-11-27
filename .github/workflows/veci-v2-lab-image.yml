@@ -139,6 +139,16 @@ jobs:
           echo 'EXACT_TWO_SIM_SOURCE_STAGED=PASS'
           echo 'NOT_SIGNED_NOT_FLASH_APPROVED=TRUE'
 
+      # Reuse only upstream download archives for this exact pinned OpenWrt
+      # source identity. DO NOT cache output images, rootfs, host toolchains,
+      # signed keys, staging_dir or build_dir: those must be rebuilt and
+      # re-verified from the current source in every new candidate run.
+      - name: OpenWrt pinned source tarball cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/openwrt-v2/dl
+          key: ${{ runner.os }}-veci-v2-we5927-dl-${{ hashFiles('source/openwrt-source-commit.txt') }}-v1
+
       - name: Compile minimal VeCI v2 complete image
         shell: bash
         run: |
