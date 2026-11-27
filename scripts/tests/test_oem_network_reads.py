@@ -72,6 +72,54 @@ except (KeyError,IndexError,TypeError,ValueError,StopIteration): sys.exit(1)
         defaults.update(env)
         return subprocess.run(["sh",str(self.d/"adapter"),op],env=dict(os.environ,PATH=str(self.d)+":"+os.environ["PATH"],**defaults),capture_output=True,text=True,timeout=5)
 
+    def test_initial_version_lan_dhcp_reads(self):
+        self.cmd("ubus", """#!/bin/sh
+case "$*" in
+ *"system board"*) echo '{"release":{"version":"25.12.6"}}';;
+ *) printf '%s' "$NATIVE";;
+esac
+""")
+        self.cmd("uci", """#!/bin/sh
+case "$3" in
+ network.lan.proto) echo static;;
+ network.lan.ipaddr) echo 192.168.1.1/24;;
+ dhcp.lan.start) echo 100;;
+ dhcp.lan.limit) echo 150;;
+ dhcp.lan.leasetime) echo 12h;;
+ dhcp.lan.ignore) echo 0;;
+ *) exit 1;;
+esac
+""")
+        self.cmd("cat", '#!/bin/sh\ncase "$1" in */br-lan/address) echo aa:bb:cc:dd:ee:ff;; *) /bin/cat "$@";; esac\n')
+        native=json.dumps({"ok":True,"revision":"a"*64})
+        for op,expected in (
+            ("get_sys_version",["sysversion=25.12.6"]),
+            ("get_lan_config",["ipaddr=192.168.1.1","netmask=255.255.255.0","revision="+"a"*64]),
+            ("get_dhcp_config",["dhcp_start=100","dhcp_end=250","dhcp_lease=12h","dhcp_enabled=1","revision="+"a"*64])):
+            with self.subTest(op=op):
+                r=self.invoke(op,NATIVE=native)
+                self.assertEqual(r.returncode,0,r.stderr)
+                for field in expected:self.assertIn(field,r.stdout)
+        for op in ("get_lan_config","get_dhcp_config"):
+            r=self.invoke(op,NATIVE='{"ok":false}')
+            self.assertNotEqual(r.returncode,0)
+            self.assertNotIn("code=1",r.stdout)
+
+    def test_mptcp_read_never_claims_aggregation(self):
+        path=self.d/"mptcp"
+        adapter=self.d/"adapter"
+        adapter.write_text(adapter.read_text().replace("/proc/sys/net/mptcp/enabled",str(path)))
+        self.cmd("cat",'#!/bin/sh\n/bin/cat "$@"\n')
+        self.assertIn("state=unavailable",self.invoke("get_mptcp_info").stdout)
+        for value,state in (("0","disabled"),("1","enabled")):
+            path.write_text(value)
+            r=self.invoke("get_mptcp_info")
+            self.assertEqual(r.returncode,0,r.stderr)
+            self.assertIn("state="+state,r.stdout)
+            self.assertIn("aggregation_verified=false",r.stdout)
+        path.write_text("bad")
+        self.assertNotEqual(self.invoke("get_mptcp_info").returncode,0)
+
     def test_signal_native_and_no_subscriber_id(self):
         r=self.invoke("get_module_signal")
         self.assertEqual(r.returncode,0,r.stderr)

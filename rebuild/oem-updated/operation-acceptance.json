@@ -123,9 +123,9 @@
       "limitations": "Read existing optional native profile, no credentials returned; addon absent on default image, profile editor and UAT pending."
     },
     "get_ddns_log": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.system:logs",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "evidence": "scripts/tests/test_oem_module_status.py#ModuleStatus.test_ddns_events_hide_credentials_and_unrelated_messages; scripts/tests/test_oem_module_status.py#ModuleStatus.test_ddns_log_requires_native_log_scope",
       "limitations": "Bounded redacted recent event classes. Integrated OEM screen and actual ddns-scripts on target pending."
     },
     "get_ddns_stat": {
@@ -141,7 +141,10 @@
       "limitations": "Active leases only; physical DHCP and browser validation pending."
     },
     "get_dhcp_config": {
-      "state": "PROTOTYPE"
+      "state": "FIXTURE_PASS",
+      "provider": "Native OpenWrt board/UCI/RPC",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_initial_version_lan_dhcp_reads",
+      "limitations": "Isolated adapter read fixture passed; native runtime and browser acceptance pending."
     },
     "get_disk": {
       "state": "PROTOTYPE",
@@ -171,25 +174,28 @@
       "limitations": "Masked cached identifier only; no raw AT, identifier modification or hardware acceptance claim."
     },
     "get_l2tp_msg": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "netifd/UCI existing named tunnel profile",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_optional_tunnel_profiles_and_live_counters",
       "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_l2tp_sl_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "netifd/UCI existing named tunnel profile",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_optional_tunnel_profiles_and_live_counters",
       "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_l2tp_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "netifd/UCI existing named tunnel profile",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_optional_tunnel_profiles_and_live_counters",
       "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_lan_config": {
-      "state": "PROTOTYPE"
+      "state": "FIXTURE_PASS",
+      "provider": "Native OpenWrt board/UCI/RPC",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_initial_version_lan_dhcp_reads",
+      "limitations": "Isolated adapter read fixture passed; native runtime and browser acceptance pending."
     },
     "get_lan_status": {
       "state": "PROTOTYPE",
@@ -219,10 +225,15 @@
       "limitations": "Canonical cached modem status; subscriber IDs deliberately redacted; actual modem and browser acceptance pending."
     },
     "get_module_status": {
-      "state": "FIXTURE_PASS"
+      "state": "FIXTURE_PASS",
+      "evidence": "scripts/tests/test_oem_module_status.py#ModuleStatus.test_modem_status_uses_live_counter_and_link_state; scripts/tests/test_oem_module_status.py#ModuleStatus.test_down_link_does_not_return_stale_ip",
+      "limitations": "Isolated modem counter/link-state fixture; physical modem and browser acceptance pending."
     },
     "get_mptcp_info": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "Linux MPTCP sysctl observation",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_mptcp_read_never_claims_aggregation",
+      "limitations": "Read-only kernel capability; no aggregation, path configuration or hardware/browser acceptance claimed."
     },
     "get_n2n": {
       "state": "UNIMPLEMENTED"
@@ -282,21 +293,21 @@
       "limitations": "Distinguishes configured protocol, pending activation, connecting, disconnected and assigned IPv4. Public Internet not verified; physical acceptance pending."
     },
     "get_pptp_msg": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "netifd/UCI existing named tunnel profile",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_optional_tunnel_profiles_and_live_counters",
       "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_pptp_sl_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "netifd/UCI existing named tunnel profile",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_optional_tunnel_profiles_and_live_counters",
       "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_pptp_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "netifd/UCI existing named tunnel profile",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_optional_tunnel_profiles_and_live_counters",
       "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_qos": {
@@ -342,7 +353,10 @@
       "limitations": "OEM route editing and policy-rule presentation pending."
     },
     "get_sys_version": {
-      "state": "PROTOTYPE"
+      "state": "FIXTURE_PASS",
+      "provider": "Native OpenWrt board/UCI/RPC",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_initial_version_lan_dhcp_reads",
+      "limitations": "Isolated adapter read fixture passed; native runtime and browser acceptance pending."
     },
     "get_system_status": {
       "state": "PROTOTYPE",

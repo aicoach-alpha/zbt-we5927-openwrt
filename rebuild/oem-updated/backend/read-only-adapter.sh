@@ -964,6 +964,22 @@ case "$1" in
         json_close_array
         json_add_int rule_count "$count"
         ;;
+    get_mptcp_info)
+        # Kernel capability is not proof of an aggregated multi-WAN connection.
+        state=unavailable; enabled=""
+        if [ -r /proc/sys/net/mptcp/enabled ]; then
+            enabled="$(cat /proc/sys/net/mptcp/enabled)" || error "MPTCP state unavailable"
+            case "$enabled" in 0) state=disabled;; 1) state=enabled;; *) error "invalid MPTCP state";; esac
+        fi
+        success "native MPTCP capability observation"
+        json_add_string state "$state"
+        json_add_string kernel_enabled "$enabled"
+        json_add_string globle_mptcp_enable "$enabled"
+        json_add_string lan ""
+        json_add_string wan ""
+        json_add_string aggregation_verified false
+        json_add_string configuration_supported 0
+        ;;
     get_ttl)
         native="$(native_read veci.v2.firewall ttlStatus)" || error "TTL policy unavailable"
         local_ttl="$(cat /proc/sys/net/ipv4/ip_default_ttl)" || error "local TTL unavailable"

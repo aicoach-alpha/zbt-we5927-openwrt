@@ -5,7 +5,7 @@ Base: VeCI v2 d8faaeff420bdc44e03fc756a5e0527c886cdc27, OpenWrt 25.12.6 / Linux 
 ## Current state
 - OEM static asset staging only: 85 files, 3,202,323 uncompressed bytes.
 - OEM menu baseline: 20 enabled flags, 158 declared CGI operations.
-- Three internal read-only adapter prototypes: get_sys_version, get_lan_config, get_dhcp_config. Not runtime validated; all other operations remain unimplemented.
+- Current operation status is derived from the live registry, not a hardcoded initial count. Run `python3 rebuild/oem-updated/progress.py`. Fixture PASS, source-complete, disabled review and functional PASS are separate; none of the first three is release approval.
 - No legacy CGI, vendor kernel modules, proprietary executables or user overlay imported. Vendor CGI contains hardware-specific operations including writes to calibration storage; it must not be deployed.
 - LTE parity target is verified OEM Enhanced V3 behavior: Qualcomm 05c6:902e, ttyUSB2, RNDIS usb0, DHCP, serialized bounded recovery, no healthy-link redial, watchdog 60/60. Do not run old and new dialers together. Translate behavior into the single existing modern LTE service, not duplicate it.
 - Do not publish proprietary OEM assets in Git. Use a locally supplied, verified original OEM file. Do not upload raw router dumps into repository or Actions.
@@ -15,7 +15,7 @@ Install squashfs-tools on the development host. Run:
 ```
 python3 rebuild/oem-updated/stage_oem_ui.py /path/to/WE2825-2SIM_V26.03.04_V26.08.09_SSH_ROOT_MOD.bin /path/to/new-preview-dir
 ```
-This produces static assets and an operation inventory, not a bootable image. Do not serve the preview on a live router. It has no working authenticated backend.
+This produces static assets and an operation inventory, not a bootable image. Do not serve the preview on a live router. For package staging including authenticated adapters use stage_variant.py; staging does not prove runtime functionality.
 
 ## Build and release acceptance
 1. Map UI requests and response shapes to modern native services; default deny unknown operations; use authenticated sessions, ACLs, CSRF controls, input validation and no arbitrary command dispatch.
