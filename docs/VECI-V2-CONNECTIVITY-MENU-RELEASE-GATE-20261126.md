@@ -194,3 +194,20 @@ Uncertainties are never converted into PASS on the strength of source code.
 - NAS offline evidence: /home/andre/projects/zbt-we2825-veci-openwrt/artifacts/veci-v2-f87e7ec-signed-offline-20261127/; **verify-only** ZIP at /home/andre/projects/zbt-we2825-veci-openwrt/artifacts/VeCI-v2-WE5927-2SIM-f87e7ec5-SIGNED-CANDIDATE-VERIFY-ONLY.zip, ZIP SHA256 375d2e56a7d09a308c4471c1e662133350e46924886323a7f802fa40a5125816; no private signing keys included.
 - **Still BLOCKED:** installed key on owner's only router not inspected, sysupgrade -T on exact physical router not performed, OEM/VeCI frontend parity and connected-client MT76 UAT unproved, no rollback/recovery or 72-hour soak for this image. This signed result is **not** signed release approval. No production deployment, Wi-Fi reload, network reload or reboot was performed.
 - Next action requires separate, explicit hardware-preflight consent and valid backups; production routing/Internet remain untouched.
+
+## Owner physical VERIFY-ONLY result, 27 Nov 2026 10:40 WIB — exact signed candidate f87e7ec5
+
+This section supersedes only the previous installed key and sysupgrade -T not verified
+preflight statements. Owner pasted the actual PowerShell console output in ChatGPT;
+the underlying full PowerShell session transcript was not uploaded independently.
+
+- Exact signed firmware SHA256: 3adc815e77a7c9b0e25f742601eb2dc94423aad540b26efa86423821a667abb1. LOCAL_IMAGE_HASH=PASS; IMAGE_SIZE_BYTES=5899090.
+- Physical router 192.168.1.1: INITIAL_HARDWARE_PREFLIGHT=PASS (board, wired LAN IP, 0x7a0000 firmware partition, tool and trust-anchor prerequisites).
+- Router config backup generated and downloaded, local archive validation succeeded: LOCAL_CONFIG_BACKUP_VALIDATED, reported file size 7,452 bytes. It is **not a full MTD recovery backup**.
+- Signed firmware temporarily transferred to router /tmp, sha256 checked UPLOADED_FILE_SHA256=PASS.
+- On-router cryptographic verifier: SIGNATURE_VERIFIED_WITH_INSTALLED_TRUST=PASS after embedded ucert and installed public trust verification. BOARD_METADATA=PASS.
+- On-router sysupgrade -T on the exact candidate: SYSUPGRADE_TEST=PASS.
+- TEMP_PREFLIGHT_FILES=CLEARED was reported by script. No firmware write/reboot/network reload occurs in this verify-only script.
+- Script printed READY_FOR_SEPARATE_USER_APPROVED_FLASH=YES: this is **preflight technical compatibility only**, not permission to flash.
+- Recovery equivalence, original complete MTD backup, post-flash Wi-Fi/MT76 active-client, LTE+SIM, SMS, GUI, and 72h endurance remain **NOT_PROVEN**. Release gate remains **BLOCKED**, flash_authorized=false and release_permitted=false.
+- This result attaches only to exact source f87e7ec5fec2c437d65fd95e7139bff90eb3019a and signed SHA256 above, NOT later commits or OEM Updated firmware. No user permission to flash was given.
