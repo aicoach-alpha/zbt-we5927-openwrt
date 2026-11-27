@@ -58,15 +58,17 @@
       "state": "SOURCE_INTEGRATED_NOT_UAT"
     },
     "guest_wifi": {
-      "provider": "veci.v2.addon",
+      "provider": "veci.v2.guest / veci.v2.addon",
       "methods": [
         "status",
+        "provisionNative",
+        "setNativeStartup",
         "setPortalStartup"
       ],
-      "default": "absent_disabled",
+      "default": "unconfigured_disabled",
       "activation": "explicit manual configuration, subsequent manual reboot",
-      "state": "SOURCE_INTEGRATED_FOR_PREPROVISIONED_PROFILE",
-      "limitations": "safe first-time provisioning pending"
+      "state": "SOURCE_INTEGRATED_NOT_UAT",
+      "limitations": "Actual host UCI provisioning, rollback and toggle fixtures passed; fw4 mocked; physical isolation and original OEM form pending."
     },
     "firewall_defaults": {
       "provider": "veci.v2.firewall",

@@ -326,7 +326,7 @@ def stage(image, out):
         # Reuse native controls, not the complete VeCI frontend or a second backend.
         tools = files / "www/oem-tools"
         tools.mkdir()
-        for name in ("sms-codec.js", "sms-center.js", "backup.js", "dns-settings.js"):
+        for name in ("sms-codec.js", "sms-center.js", "backup.js", "dns-settings.js", "guest-check.js"):
             shutil.copyfile(shared / "veci2" / name, tools / name)
         # Existing client module has three comma-expression loops; use arrays.
         sms = tools / "sms-center.js"
@@ -351,6 +351,7 @@ def stage(image, out):
         sms_panel = panel('id="sms-status"')
         backup_panel = panel('id="backup-export"')
         dns_panel = panel('id="dns-form"')
+        guest_panel = panel('id="guest-status-read"')
         (tools / "index.html").write_text(
             '<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>OEM Updated — Services</title><link rel="stylesheet" href="tools.css"><body>'
@@ -372,7 +373,8 @@ def stage(image, out):
             '<article><h2>Traffic lokal — 24 jam terakhir</h2><p>Hanya interval yang terukur, data di RAM; reset saat reboot. Bukan kuota operator.</p>'
             '<button id="traffic-refresh" type="button">Baca traffic terukur</button><pre id="traffic-result" class="result" role="status"></pre>'
             '<button id="internet-check" type="button">Uji koneksi internet LTE</button><p id="internet-result" role="status"></p></article>'
-            '<article><h2>Guest Wi-Fi (opsional)</h2><p>Nonaktif secara default. Hanya diaktifkan manual setelah addon dan profil terisolasi siap. Perubahan berlaku pada reboot manual; tidak ada restart otomatis.</p>'
+            + guest_panel +
+            '<article><h2>Captive portal guest (addon opsional)</h2><p>Kontrol profil captive portal existing saja, terpisah dari Guest WPA2 native.</p>'
             '<button id="guest-refresh" type="button">Baca status</button>'
             '<button id="guest-enable" type="button" disabled>Aktifkan saat boot berikutnya</button>'
             '<button id="guest-disable" type="button" disabled>Nonaktifkan saat boot berikutnya</button>'
@@ -463,7 +465,7 @@ def stage(image, out):
             '<label>Expected SHA-256<input id="firmware-sha" maxlength="64" required></label>'
             '<button id="firmware-submit">Verify only</button></form><p id="firmware-result" role="status"></p></article></main>'
             '<script src="sms-codec.js"></script><script src="sms-center.js"></script>'
-            '<script src="dns-settings.js"></script><script src="tools.js"></script><script src="backup.js"></script></body></html>')
+            '<script src="dns-settings.js"></script><script src="tools.js"></script><script src="guest-check.js"></script><script src="backup.js"></script></body></html>')
         landing = files / "www/index.html"
         html = landing.read_text()
         if html.count("</body>") != 1:

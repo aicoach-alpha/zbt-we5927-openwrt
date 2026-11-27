@@ -472,6 +472,8 @@ case "$1" in
         json_add_string installed "$installed"
         json_add_string configured "$configured"
         json_add_string isolation_verified unknown
+        json_add_string mode "$(field '@.mode' || true)"
+        json_add_string revision "$(field '@.revision' || true)"
         ;;
     get_static_route)
         native="$(native_read veci.v2.routes status)" || error "route provider unavailable"

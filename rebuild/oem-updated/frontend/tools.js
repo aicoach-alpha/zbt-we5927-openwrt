@@ -4,10 +4,10 @@
 let sid = '';
 const el = id => document.getElementById(id);
 const rootSid = '00000000000000000000000000000000';
-async function rpc(object, method, args = {}, token = sid) {
+async function rpc(object, method, args = {}, token = sid, durationMs = 12000) {
   if (!token) throw Error('Login required');
   const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), method === 'sendMessage' ? 46000 : method === 'listMessages' ? 15000 : method === 'internetCheck' ? 20000 : 12000);
+  const timer = setTimeout(() => abort.abort(), method === 'sendMessage' ? 46000 : method === 'listMessages' ? 15000 : method === 'internetCheck' ? 20000 : durationMs);
   try {
     const response = await fetch('/ubus', {method:'POST', credentials:'omit', cache:'no-store',
       headers:{'Content-Type':'application/json'}, signal:abort.signal,
@@ -49,6 +49,7 @@ function clearSession() {
   ttlRevision='';el('ttl-form').reset();el('ttl-save').disabled=true;el('ttl-result').textContent='';
   macRevision=''; el('mac-form').reset(); el('mac-save').disabled=true; el('mac-result').textContent='';
   fwRevision=''; el('fw-save').disabled=true; el('offload-save').disabled=true; el('fw-form').reset(); el('offload-form').reset(); el('fw-result').textContent='';
+  globalThis.VeciGuestCheck?.reset?.();
   guestState=''; el('guest-enable').disabled=true; el('guest-disable').disabled=true; el('guest-result').textContent='';
 }
 globalThis.VeciSmsCenter.init((object,method,args) => rpc(object,method,args));
