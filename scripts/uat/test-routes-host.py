@@ -37,7 +37,7 @@ config interface 'lte'
     script = root / "provider"
     script.write_text((pkg / "veci2-routes").read_text().replace(
         "/etc/config/network", str(network)).replace("/tmp/sysinfo/board_name", str(board))
-        .replace("/var/lock/veci2-ipv6.lock", str(lock)).replace("/usr/share/libubox/jshn.sh", str(jshn)))
+        .replace("/var/run/veci2-reboot-requested",str(root/"reboot-pending")).replace("/var/lock/veci2-ipv6.lock", str(lock)).replace("/usr/share/libubox/jshn.sh", str(jshn)))
     uci = root / "uci"
     failure = root / "fail-commit"
     uci.write_text(f'#!/bin/sh\nif test -f "{failure}"; then for arg do test "$arg" != commit || exit 1; done; fi\nexec "{binary}" -c "{config}" -t "{delta}" "$@"\n')
@@ -69,9 +69,17 @@ config interface 'lte'
         fcntl.flock(held, fcntl.LOCK_EX)
         assert call("save", route)["error"] == "busy"
     failure.touch()
-    assert call("save", route)["error"] == "commit_failed"
+    assert call("save", route)["error"] == "commit_failed_rollback"
     assert before == network.read_bytes() and call("status") == initial
     failure.unlink()
+    (root/"reboot-pending").touch()
+    assert call("save",route)["error"]=="reboot_pending"
+    (root/"reboot-pending").unlink()
+    wrapper=uci.read_text()
+    uci.write_text(wrapper.replace('exec "', '"',1)+'rc=$?'+chr(10)+'case "$*" in *"commit network") exit 1;; esac'+chr(10)+'exit "$rc"'+chr(10))
+    assert call("save",route)["error"]=="commit_failed_rollback"
+    assert network.read_bytes()==before
+    uci.write_text(wrapper)
     result = call("save", route)
     assert result["ok"] and get("veci2_route_office.table") == "120"
     assert call("save", route)["error"] == "stale_configuration"
