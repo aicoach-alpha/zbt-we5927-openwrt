@@ -211,3 +211,13 @@ the underlying full PowerShell session transcript was not uploaded independently
 - Script printed READY_FOR_SEPARATE_USER_APPROVED_FLASH=YES: this is **preflight technical compatibility only**, not permission to flash.
 - Recovery equivalence, original complete MTD backup, post-flash Wi-Fi/MT76 active-client, LTE+SIM, SMS, GUI, and 72h endurance remain **NOT_PROVEN**. Release gate remains **BLOCKED**, flash_authorized=false and release_permitted=false.
 - This result attaches only to exact source f87e7ec5fec2c437d65fd95e7139bff90eb3019a and signed SHA256 above, NOT later commits or OEM Updated firmware. No user permission to flash was given.
+
+## Exact rollback backup inventory and local-only Windows checker (27 Nov 2026)
+
+- Previous owner-observed, read-only MTD backup from 23 Nov 2026 exists as source evidence in artifacts/run-45126249641-signed-uat/LIVE_OWNER_MTD_BACKUP_20261123.json. It records five partitions, 5/5 size-and-SHA matches at that time: mtd0 u-boot 196608 B, mtd1 u-boot-env 65536 B, mtd2 factory 65536 B, mtd3 firmware 7995392 B, mtd7 art 65536 B.
+- Previously recorded Windows folder: C:/Users/2024NB/Documents/VeCI-WE5927-Recovery-20261123-171236. Another reported later folder: D:/Report_CCB/WE5927-Recovery-20261125_135411. Neither folder can be directly inspected from andre-nas.
+- Added scripts/veci-we5927-mtd-recovery-audit-Windows-20261127.ps1: LOCAL FILES ONLY, verifies sizes and expected 23 Nov SHA fingerprints for each partition, separately inventories later backups with computed hashes but does not mislabel unmatched current-router evidence as verified.
+- The audit does not contact any router or run SSH, SCP, sysupgrade, network changes, reboot, flash, MTD write or erase. It writes one local audit JSON under D:/Report_CCB with metadata only. Partition bytes remain private on Windows.
+- The lightweight source safety contract passed on NAS (three tests); **actual Windows execution is pending owner output**.
+- Existing U-Boot image contains web-failsafe and TFTP-related strings according to prior offline evidence, but firmware image format requirements, physical recovery entry, restore success and suitability as current OEM rollback are NOT live-verified. Do not claim FULL RECOVERY PASS from static strings or file hashes alone.
+- Signed candidate f87e7ec5 has on-router verify-only preflight PASS, but firmware flash remains BLOCKED absent separate explicit permission and adequate physical recovery plan.
