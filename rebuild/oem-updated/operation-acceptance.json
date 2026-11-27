@@ -592,16 +592,16 @@
       "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "set_4g": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.lte:setApn/setFailover",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "One explicit action per request; legacy combined form and per-SIM APN profile not yet supported."
+      "evidence": "scripts/tests/test_owner_manual_sim_native_acceptance.py; scripts/tests/test_owner_apn_acceptance.py; scripts/tests/test_oem_lte_writes.py#LteWrites.test_policy_and_sim_adapter",
+      "limitations": "APN and failover single-action configuration only; combined form and per-SIM APN pending. Native UCI and isolated RPC fixtures passed. Administrative RPC locking only; autonomous LTE manager concurrency, actual USB/GPIO, recovery and browser UAT pending."
     },
     "set_4g_sim": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.sim:switchSim",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "POST explicit slot confirmation; legacy credential GET disabled; physical switching and timing pending."
+      "evidence": "scripts/tests/test_owner_manual_sim_native_acceptance.py; scripts/tests/test_owner_apn_acceptance.py; scripts/tests/test_oem_lte_writes.py#LteWrites.test_policy_and_sim_adapter",
+      "limitations": "Explicit SIM selection with mock modem and selector; no physical switching evidence. Native UCI and isolated RPC fixtures passed. Administrative RPC locking only; autonomous LTE manager concurrency, actual USB/GPIO, recovery and browser UAT pending."
     },
     "set_ac_info": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -696,10 +696,10 @@
       "limitations": "Software only; hardware acceleration disabled. Native revision guard, fw4 check and rollback; actual performance and runtime pending."
     },
     "set_netwatchdog": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.lte:setMonitor",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Interval only with previous value; host and legacy global-reset actions rejected; OEM form adaptation pending."
+      "evidence": "scripts/tests/test_owner_manual_sim_native_acceptance.py; scripts/tests/test_owner_apn_acceptance.py; scripts/tests/test_oem_lte_writes.py#LteWrites.test_policy_and_sim_adapter",
+      "limitations": "Interval CAS only; host and global reset edits rejected; original form pending. Native UCI and isolated RPC fixtures passed. Administrative RPC locking only; autonomous LTE manager concurrency, actual USB/GPIO, recovery and browser UAT pending."
     },
     "set_ntp": {
       "state": "PROTOTYPE",

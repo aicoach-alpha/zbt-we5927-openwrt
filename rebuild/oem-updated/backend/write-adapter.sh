@@ -509,10 +509,12 @@ case "$op" in
             SET_APN)
                 apn="$(read_field '@.apn')" || fail "APN required"
                 json_init; json_add_string apn "$apn"
-                rpc veci.v2.lte setApn "$(json_dump)";;
+                rpc veci.v2.lte setApn "$(json_dump)"
+                [ "$(native_field '@.configured_apn')" = "$apn" ] || fail "APN unconfirmed";;
             ENABLE_FAILOVER|DISABLE_FAILOVER)
                 json_init; json_add_string action "$action"
-                rpc veci.v2.lte setFailover "$(json_dump)";;
+                rpc veci.v2.lte setFailover "$(json_dump)"
+                case "$action:$(native_field '@.auto_failover')" in ENABLE_FAILOVER:true|DISABLE_FAILOVER:false) ;; *) fail "failover unconfirmed";; esac;;
             *) fail "unsupported LTE action";;
         esac
         ;;
@@ -522,6 +524,7 @@ case "$op" in
         case "$slot:$confirm" in 1:SWITCH_SIM_1|2:SWITCH_SIM_2) ;; *) fail "SIM confirmation mismatch";; esac
         json_init; json_add_int slot "$slot"; json_add_string confirmation "$confirm"
         rpc veci.v2.sim switchSim "$(json_dump)"
+        [ "$(native_field '@.configured_slot')" = "$slot" ] && [ "$(native_field '@.selector_slot')" = "$slot" ] || fail "SIM selection unconfirmed"
         ;;
     set_netwatchdog)
         interval="$(read_field '@.detect_itv')" || fail "monitor interval required"
@@ -533,6 +536,7 @@ case "$op" in
         [ -z "$(read_field '@.detect_host2' || true)" ] || fail "second monitor host unsupported"
         json_init; json_add_string interval "$interval"; json_add_string expected "$expected"
         rpc veci.v2.lte setMonitor "$(json_dump)"
+        [ "$(native_field '@.monitor_interval')" = "$interval" ] || fail "monitor interval unconfirmed"
         ;;
     setWiFi2)
         # Explicitly scoped saves; no global reload or implicit AP activation.
