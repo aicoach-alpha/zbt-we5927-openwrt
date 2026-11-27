@@ -84,3 +84,6 @@ jobs:
             Write-Host ("WINDOWS_PS51_UIMAGE_REJECT_{0}=PASS" -f $variant.ToUpperInvariant())
           }
           Write-Host 'ROUTER_NOT_CONTACTED=YES'
+          # Intentional negative cases leave LASTEXITCODE nonzero in PS5.1;
+          # all tests have passed and any unexpected failure above throws.
+          exit 0
