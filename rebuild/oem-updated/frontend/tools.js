@@ -36,6 +36,7 @@ function clearSession() {
   powerExpected=null; scheduleRevision=null; el('power-form').reset(); el('schedule-form').reset(); el('power-save').disabled=true; el('schedule-save').disabled=true; el('power-result').textContent=''; el('schedule-result').textContent='';
   resetOptional();
   resetAcl();
+  resetParent();
   resetUplink();
   pppoeRevision="";el("pppoe-profile").reset();el("pppoe-save").disabled=true;el("pppoe-result").textContent="";
   ttlRevision='';el('ttl-form').reset();el('ttl-save').disabled=true;el('ttl-result').textContent='';
@@ -518,3 +519,48 @@ el('uplink-toggle').onclick=async()=>{
     if(sid===token)el('uplink-result').textContent='Startup saved. Manual activation required.';
   }catch(e){if(sid===token)el('uplink-result').textContent=e.message;}
 };
+
+let parentRevision='',parentRules=[];
+function resetParent(){
+  parentRevision='';parentRules=[];el('parent-form').reset();el('parent-result').textContent='';
+  for(const id of ['parent-save','parent-toggle','parent-delete'])el(id).disabled=true;
+}
+function selectParent(){
+  const row=parentRules.find(r=>r.slot===el('parent-slot').value);
+  el('parent-mac').value=row?row.src_mac:'';
+  el('parent-start').value=row?row.start_time.slice(0,5):'';
+  el('parent-stop').value=row?row.stop_time.slice(0,5):'';
+  const days=row?row.weekdays.split(' '):[];
+  for(const o of el('parent-days').options)o.selected=days.includes(o.value);
+  el('parent-enabled').checked=!!row&&row.enabled==='1';
+  el('parent-save').disabled=!parentRevision;el('parent-toggle').disabled=!parentRevision||!row;el('parent-delete').disabled=!parentRevision||!row;
+}
+el('parent-slot').onchange=selectParent;
+el('parent-refresh').onclick=async()=>{
+  const token=sid,b=el('parent-refresh');if(!token||b.disabled)return;
+  b.disabled=true;resetParent();
+  try{
+    const x=await oem('get_parents_ctrl_rule',undefined,token);
+    if(!/^[0-9a-f]{64}$/.test(x.revision||'')||!Array.isArray(x.data))throw Error('Schedule inventory unavailable');
+    if(sid!==token)return;
+    parentRevision=x.revision;parentRules=x.data;
+    el('parent-result').textContent=parentRules.map(r=>'Slot '+r.slot+': '+r.src_mac+' '+r.start_time+'–'+r.stop_time+' UTC '+r.weekdays+' '+(r.enabled==='1'?'enabled':'disabled')).join('\n')||'No scheduled rules.';
+    selectParent();
+  }catch(e){if(sid===token)el('parent-result').textContent=e.message;}
+  finally{b.disabled=false;}
+};
+async function changeParent(action){
+  const token=sid,revision=parentRevision;if(!token||!revision)return;
+  const start=el('parent-start').value,stop=el('parent-stop').value;
+  if(action==='save'&&(!start||!stop||start>=stop)){el('parent-result').textContent='Use one same-day UTC interval.';return;}
+  if(!window.confirm('Apply scheduled access rule? Firewall reload may interrupt connections. Enabled schedules disable flow offload.'))return;
+  const body={revision,slot:el('parent-slot').value,action,mac:el('parent-mac').value,enabled:el('parent-enabled').checked?'1':'0',start_time:start+':00',stop_time:stop+':00',weekdays:Array.from(el('parent-days').selectedOptions,o=>o.value).join(' '),confirmation:action==='delete'?'DELETE_PARENT_SCHEDULE':'SAVE_PARENT_SCHEDULE'};
+  parentRevision='';selectParent();clearFirewall();
+  try{
+    await oem(action==='toggle'?'set_parents_ctrl_status':'set_parents_ctrl_rule',body,token);
+    if(sid===token)el('parent-result').textContent='Saved. Refresh inventory; packet enforcement unverified.';
+  }catch(e){if(sid===token)el('parent-result').textContent=e.message;}
+}
+el('parent-form').onsubmit=e=>{e.preventDefault();changeParent('save');};
+el('parent-toggle').onclick=()=>changeParent('toggle');
+el('parent-delete').onclick=()=>changeParent('delete');

@@ -73,3 +73,22 @@ esac""")
             r=self.run_rpc("saveAcl",json.dumps(request|patch),**env)
             self.assertIn(error,r.stdout,r.stderr)
             self.assertNotIn("MUTATION_ATTEMPT",r.stderr)
+
+    def test_parent_schedule_validation(self):
+        # Execute the actual validator extracted from native script.
+        source=BASE.read_text()
+        start=source.index("valid_schedule() {")
+        end=source.index("\nprefix=veci_acl",start)
+        fn=source[start:end]
+        for args,valid in [
+            (("08:00:00","09:00:00","Monday Friday"),True),
+            (("23:00:00","01:00:00","Monday"),False),
+            (("08:00:00","08:00:00","Monday"),False),
+            (("24:00:00","25:00:00","Monday"),False),
+            (("08:00:00","09:00:00","Monday Monday"),False),
+            (("08:00:00","09:00:00","Funday"),False),
+            (("08:00:00","09:00:00",""),False),
+        ]:
+            with self.subTest(args=args):
+                r=subprocess.run(["sh","-c",fn+'\nvalid_schedule "$@"',"schedule",*args],capture_output=True,text=True,timeout=5)
+                self.assertEqual(r.returncode==0,valid,r.stderr)

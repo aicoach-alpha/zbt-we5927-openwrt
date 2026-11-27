@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus|veci.v2.firewall:ttlStatus) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus|veci.v2.firewall:ttlStatus|veci.v2.firewall:parentStatus) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -932,6 +932,35 @@ case "$1" in
         json_add_string interface "$dev"; json_add_string route_state "$selected"
         json_add_string internet_status unknown
         json_add_string rx "$rx"; json_add_string tx "$tx"
+        ;;
+    get_parents_ctrl_rule|get_parents_ctrl_status)
+        native="$(native_read veci.v2.firewall parentStatus)" || error "parental schedule unavailable"
+        success "native scheduled LAN policy"
+        json_add_string revision "$(field '@.revision')"
+        json_add_string timezone UTC
+        json_add_string runtime_verified false
+        json_add_array data
+        count=0; active=0; idx=0
+        while [ "$idx" -lt 8 ]; do
+            slot="$(field "@.rules[$idx].slot" || true)"
+            [ -n "$slot" ] || break
+            case "$slot" in [1-8]) ;; *) error "invalid schedule slot";; esac
+            enabled="$(field "@.rules[$idx].enabled")" || error "invalid schedule state"
+            case "$enabled" in 0) ;; 1) active=$((active+1));; *) error "invalid schedule state";; esac
+            json_add_object ""
+            json_add_string name "$slot"; json_add_string slot "$slot"
+            json_add_string src_mac "$(field "@.rules[$idx].mac")"
+            json_add_string enabled "$enabled"
+            for key in start_time stop_time weekdays; do
+                json_add_string "$key" "$(field "@.rules[$idx].$key")"
+            done
+            json_close_object
+            count=$((count+1)); idx=$((idx+1))
+        done
+        json_close_array
+        json_add_string parents_ctrl_enabled "$(if [ "$active" -gt 0 ]; then echo 1; else echo 0; fi)"
+        json_add_int rule_count "$count"; json_add_int enabled_count "$active"
+        json_add_string management_scope per_rule
         ;;
     get_acl_rule|get_acl_status)
         # Inspect the actual native firewall rules. No synthetic OEM ACL switch.

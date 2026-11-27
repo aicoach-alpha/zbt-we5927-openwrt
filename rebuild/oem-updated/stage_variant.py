@@ -411,6 +411,12 @@ def stage(image, out):
             '<label>WPA2 password<input id="uplink-secret" type="password" minlength="8" maxlength="63" required autocomplete="new-password"></label>'
             '<button id="uplink-save" disabled>Save disabled profile</button></form>'
             '<button id="uplink-toggle" type="button" disabled>Toggle uplink startup</button></article>'
+            '<article><h2>Scheduled internet access (UTC)</h2><p>Eight optional per-device LAN-to-WAN block intervals; existing connections may not be interrupted. Overnight interval requires two slots. No global switch.</p>'
+            '<button id="parent-refresh" type="button">Read schedules</button><pre id="parent-result" role="status"></pre>'
+            '<form id="parent-form"><label>Slot<select id="parent-slot"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>'
+            '<label>MAC<input id="parent-mac" maxlength="17"></label><label>Block start UTC<input id="parent-start" type="time" required></label><label>Block end UTC<input id="parent-stop" type="time" required></label>'
+            '<label>Days (UTC)<select id="parent-days" multiple required><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></label>'
+            '<label><input id="parent-enabled" type="checkbox">Enable schedule</label><button id="parent-save" disabled>Save schedule</button><button id="parent-toggle" type="button" disabled>Change enabled state</button><button id="parent-delete" type="button" disabled>Delete schedule</button></form></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

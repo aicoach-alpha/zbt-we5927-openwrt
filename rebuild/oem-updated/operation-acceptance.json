@@ -275,10 +275,16 @@
       "limitations": "Optional add-on; runtime integration pending. Status indicates a running process only."
     },
     "get_parents_ctrl_rule": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:parentStatus",
+      "evidence": "rebuild/oem-updated/backend; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_acl_slots.py#test_parent_schedule_validation",
+      "limitations": "Eight optional UTC same-day LAN-to-WAN MAC deny schedules, per-rule toggle only. Legacy global switch and original OEM form not mapped. Schedule validation fixture only; actual packet enforcement, established connections, time synchronization, successful commit and rollback UAT pending."
     },
     "get_parents_ctrl_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:parentStatus",
+      "evidence": "rebuild/oem-updated/backend; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_acl_slots.py#test_parent_schedule_validation",
+      "limitations": "Eight optional UTC same-day LAN-to-WAN MAC deny schedules, per-rule toggle only. Legacy global switch and original OEM form not mapped. Schedule validation fixture only; actual packet enforcement, established connections, time synchronization, successful commit and rollback UAT pending."
     },
     "get_port": {
       "state": "PROTOTYPE",
@@ -649,10 +655,16 @@
       "state": "UNIMPLEMENTED"
     },
     "set_parents_ctrl_rule": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:saveParent",
+      "evidence": "rebuild/oem-updated/backend; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_acl_slots.py#test_parent_schedule_validation",
+      "limitations": "Eight optional UTC same-day LAN-to-WAN MAC deny schedules, per-rule toggle only. Legacy global switch and original OEM form not mapped. Schedule validation fixture only; actual packet enforcement, established connections, time synchronization, successful commit and rollback UAT pending."
     },
     "set_parents_ctrl_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:saveParent",
+      "evidence": "rebuild/oem-updated/backend; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_acl_slots.py#test_parent_schedule_validation",
+      "limitations": "Eight optional UTC same-day LAN-to-WAN MAC deny schedules, per-rule toggle only. Legacy global switch and original OEM form not mapped. Schedule validation fixture only; actual packet enforcement, established connections, time synchronization, successful commit and rollback UAT pending."
     },
     "set_port": {
       "state": "UNIMPLEMENTED"
