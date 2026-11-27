@@ -61,8 +61,18 @@ jobs:
           foreach($variant in @('header','payload','magic')){
             $image=Join-Path $env:RUNNER_TEMP ("synthetic-we5927-$variant.bin")
             $receipt=[IO.Path]::ChangeExtension($image,'.json')
-            $badOutput=@(& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script -ImagePath $image -ReceiptPath $receipt 2>&1)
-            if($LASTEXITCODE -eq 0){throw "INVALID_IMAGE_ACCEPTED_$variant"}
+            # Under Windows PowerShell 5.1, native stderr redirected with 2>&1
+            # becomes a PowerShell ErrorRecord. For intentionally invalid
+            # samples, capture it without the parent runner's Stop preference.
+            $priorErrorPreference=$ErrorActionPreference
+            try {
+              $ErrorActionPreference='Continue'
+              $badOutput=@(& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script -ImagePath $image -ReceiptPath $receipt 2>&1)
+              $badExit=$LASTEXITCODE
+            } finally {
+              $ErrorActionPreference=$priorErrorPreference
+            }
+            if($badExit -eq 0){throw "INVALID_IMAGE_ACCEPTED_$variant"}
             $must = switch($variant) {
               'header' {'STOP=UIMAGE_HEADER_CRC32_MISMATCH'}
               'payload' {'STOP=UIMAGE_DATA_CRC32_MISMATCH'}
