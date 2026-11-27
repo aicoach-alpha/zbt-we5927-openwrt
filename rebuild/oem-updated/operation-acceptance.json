@@ -416,7 +416,9 @@
       "limitations": "Configured dBm and live-derived conservative cap. Actual transmit power unverified; OEM legacy selector not yet adapted."
     },
     "guide_commit": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Replaced by explicit native save controls; no shared uncommitted UCI state or unconditional network restart.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_wizard_staging_refused"
     },
     "home_json": {
       "state": "PROTOTYPE",
@@ -508,7 +510,9 @@
       "limitations": "One explicit action per request, no global reload; original combined form needs frontend adaptation; remaining radio controls pending."
     },
     "setWiFi2_nocommit": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Replaced by explicit native save controls; no shared uncommitted UCI state or unconditional network restart.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_wizard_staging_refused"
     },
     "setWiFi5": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -592,7 +596,7 @@
       "state": "PROTOTYPE",
       "provider": "veci.v2.interfaces:status/save",
       "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Original OEM LAN form uses revision and explicit confirmation; no automatic redirect, network activation manual; runtime pending."
+      "limitations": "Original LAN form with revision and manual activation; native source permits LAN-only edit with existing PPPoE preserved. Runtime pending."
     },
     "set_mac_blacklist": {
       "state": "PROTOTYPE",
@@ -685,10 +689,12 @@
       "state": "PROTOTYPE",
       "provider": "veci.v2.interfaces:status/save",
       "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Original OEM WAN form adapted for DHCP/static only; separate DNS controls, PPPoE provisioning and runtime pending."
+      "limitations": "Original DHCP/static WAN form; dedicated PPPoE editor uses authenticated direct savePppoe RPC (not legacy CGI); manual activation only. Returning PPPoE to DHCP/static and runtime pending."
     },
     "set_wan_config_nocommit": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Replaced by explicit native save controls; no shared uncommitted UCI state or unconditional network restart.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_wizard_staging_refused"
     },
     "set_wifi_apclient": {
       "state": "UNIMPLEMENTED"

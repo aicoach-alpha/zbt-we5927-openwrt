@@ -241,7 +241,7 @@ def stage(image, out):
             ('var i=e.data;console.log(e.data),t.selected_protocol=i.proto',
              'if(!e||e.code!=="1"||!e.data)throw Error("WAN unavailable");t._wanRevision=e.revision;var i=e.data;t.selected_protocol=i.proto'),
             (wan_source[wan_start:wan_end],
-             'handleSave:function(){var t=this;if(t._wanBusy||!/^[0-9a-f]{64}$/.test(t._wanRevision||""))return;var p=t.selected_protocol;if(p!=="dhcp"&&p!=="static"){t.$message.error("PPPoE profile creation is not available yet.");return}var a={proto:p,revision:t._wanRevision,confirmation:"SAVE_NETWORK"};if(p==="static"){Object.assign(a,{ipaddr:t.value_static[0],netmask:t.value_static[1],gateway:t.value_static[2],dns_primary:t.value_static[3]||"",dns_secondary:t.value_static[4]||""})}else Object.assign(a,{dns_primary:t.value_dhcp[0]||"",dns_secondary:t.value_dhcp[1]||""});if(!window.confirm("Save Ethernet WAN configuration for next manual activation?"))return;t._wanBusy=true;t._wanRevision="";t.$req.post("/webapi?op=set_wan_config",a).then(function(r){if(!r||r.code!=="1")throw Error("Save rejected");t.$message.success("Saved for next manual activation.");return t.get_wan_config()}).catch(function(){t.$message.error("WAN save not confirmed; refresh. Use native DNS settings for DNS changes.")}).finally(function(){t._wanBusy=false})}'),
+             'handleSave:function(){var t=this;if(t._wanBusy||!/^[0-9a-f]{64}$/.test(t._wanRevision||""))return;var p=t.selected_protocol;if(p!=="dhcp"&&p!=="static"){t.$message.error("Use the PPPoE profile editor in OEM tools. Existing credentials are not displayed.");return}var a={proto:p,revision:t._wanRevision,confirmation:"SAVE_NETWORK"};if(p==="static"){Object.assign(a,{ipaddr:t.value_static[0],netmask:t.value_static[1],gateway:t.value_static[2],dns_primary:t.value_static[3]||"",dns_secondary:t.value_static[4]||""})}else Object.assign(a,{dns_primary:t.value_dhcp[0]||"",dns_secondary:t.value_dhcp[1]||""});if(!window.confirm("Save Ethernet WAN configuration for next manual activation?"))return;t._wanBusy=true;t._wanRevision="";t.$req.post("/webapi?op=set_wan_config",a).then(function(r){if(!r||r.code!=="1")throw Error("Save rejected");t.$message.success("Saved for next manual activation.");return t.get_wan_config()}).catch(function(){t.$message.error("WAN save not confirmed; refresh. Use native DNS settings for DNS changes.")}).finally(function(){t._wanBusy=false})}'),
         ))
         dhcp_name="chunk-003dfc75.536cfc93.js"
         edit_chunk(dhcp_name, (
@@ -375,6 +375,13 @@ def stage(image, out):
             '<label><input id="ttl-enabled" type="checkbox">Enable forwarding TTL policy</label>'
             '<label>TTL (1–255)<input id="ttl-value" type="number" min="1" max="255" required value="64"></label>'
             '<button id="ttl-save" disabled>Simpan TTL</button></form><p id="ttl-result" role="status"></p></article>'
+            '<article><h2>Ethernet PPPoE profile</h2><p>Save for next manual activation. LTE settings are preserved. Credentials are never returned to the browser.</p>'
+            '<button id="pppoe-refresh" type="button">Baca status PPPoE</button><form id="pppoe-profile" autocomplete="off">'
+            '<label>Account<input id="pppoe-account" maxlength="128" required autocomplete="off"></label>'
+            '<label>Password<input id="pppoe-secret" type="password" maxlength="128" required autocomplete="new-password"></label>'
+            '<label>Service (optional)<input id="pppoe-service" maxlength="64"></label>'
+            '<label>Access concentrator (optional)<input id="pppoe-ac" maxlength="64"></label>'
+            '<button id="pppoe-save" disabled>Save PPPoE profile</button></form><p id="pppoe-result" role="status"></p></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

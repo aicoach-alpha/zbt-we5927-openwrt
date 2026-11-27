@@ -35,6 +35,7 @@ function clearSession() {
   el('dhcp-result').textContent = ''; el('traffic-result').textContent = ''; el('internet-result').textContent = '';
   powerExpected=null; scheduleRevision=null; el('power-form').reset(); el('schedule-form').reset(); el('power-save').disabled=true; el('schedule-save').disabled=true; el('power-result').textContent=''; el('schedule-result').textContent='';
   resetOptional();
+  pppoeRevision="";el("pppoe-profile").reset();el("pppoe-save").disabled=true;el("pppoe-result").textContent="";
   ttlRevision='';el('ttl-form').reset();el('ttl-save').disabled=true;el('ttl-result').textContent='';
   macRevision=''; el('mac-form').reset(); el('mac-save').disabled=true; el('mac-result').textContent='';
   fwRevision=''; el('fw-save').disabled=true; el('offload-save').disabled=true; el('fw-form').reset(); el('offload-form').reset(); el('fw-result').textContent='';
@@ -403,4 +404,31 @@ el('sqm-form').onsubmit=async e=>{
     await oem('set_qos',{revision,confirmation:'SAVE_SQM_NEXT_BOOT',interface:el('sqm-interface').value,download:el('sqm-download').value,upload:el('sqm-upload').value,qdisc,script},token);
     if(sid===token)el('sqm-result').textContent='Disabled profile saved. Refresh before enabling.';
   }catch(e){if(sid===token)el('sqm-result').textContent=e.message;}
+};
+
+let pppoeRevision='';
+el('pppoe-refresh').onclick=async()=>{
+  const token=sid,b=el('pppoe-refresh');if(!token||b.disabled)return;
+  b.disabled=true;pppoeRevision='';el('pppoe-save').disabled=true;
+  try{
+    const x=await rpc('veci.v2.interfaces','pppoeStatus',{},token);
+    if(!x.ok||!/^[0-9a-f]{64}$/.test(x.revision||''))throw Error('PPPoE status unavailable');
+    pppoeRevision=x.revision;el('pppoe-save').disabled=false;
+    el('pppoe-result').textContent='Protocol: '+x.configured_protocol+'; state: '+x.state+'; internet unverified.';
+  }catch(e){if(sid===token)el('pppoe-result').textContent=e.message;}
+  finally{b.disabled=false;}
+};
+el('pppoe-profile').onsubmit=async e=>{
+  e.preventDefault();const token=sid,revision=pppoeRevision;if(!token||!revision)return;
+  if(location.protocol!=='https:'){el('pppoe-result').textContent='HTTPS required';return;}
+  if(!window.confirm('Save Ethernet PPPoE settings for next manual activation?'))return;
+  pppoeRevision='';el('pppoe-save').disabled=true;
+  const args={revision,confirmation:'SAVE_ETHERNET_PPPOE_NEXT_BOOT',username:el('pppoe-account').value,password:el('pppoe-secret').value,service:el('pppoe-service').value,ac:el('pppoe-ac').value};
+  el('pppoe-secret').value='';
+  try{
+    const x=await rpc('veci.v2.interfaces','savePppoe',args,token);
+    if(!x.ok||!x.saved)throw Error('PPPoE save rejected; check configuration and allowed characters');
+    if(sid===token)el('pppoe-result').textContent='Saved for manual activation. No automatic network restart.';
+  }catch(e){if(sid===token)el('pppoe-result').textContent=e.message;}
+  finally{args.password='';}
 };

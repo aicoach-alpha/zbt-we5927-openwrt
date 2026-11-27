@@ -124,12 +124,13 @@
       "methods": [
         "pppoeStatus",
         "pppoeDiscovery",
-        "pppoeAction"
+        "pppoeAction",
+        "savePppoe"
       ],
-      "scope": "existing Ethernet WAN profile; no LTE reset",
+      "scope": "Ethernet WAN profile creation/edit via direct authenticated HTTPS RPC, discovery and scoped connection controls; no LTE reset",
       "original_oem_buttons": "source patched and syntax checked",
       "state": "SOURCE_INTEGRATED_NOT_UAT",
-      "limitations": "profile creation, physical device mapping, discovery and reconnect not verified"
+      "limitations": "Credential character subset, existing PPPoE to DHCP/static transition, physical port mapping and actual session acceptance pending"
     },
     "ddns": {
       "provider": "veci.v2.addon",
