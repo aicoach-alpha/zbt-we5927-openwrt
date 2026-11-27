@@ -4,8 +4,8 @@ set -eu
 umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 case "$1" in
-  list) echo '{"status":{},"setVpnStartup":{"action":"String","expected":"String"},"setPortalStartup":{"action":"String","expected":"String"},"openvpnStatus":{},"setOpenvpnStartup":{"revision":"String","enabled":"String","confirmation":"String"},"ddnsStatus":{},"sqmStatus":{},"ddnsLookup":{},"saveSqm":{"revision":"String","confirmation":"String","interface":"String","download":"String","upload":"String","qdisc":"String","script":"String"},"setOptionalStartup":{"service":"String","enabled":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
-  call) case "$2" in status|setVpnStartup|setPortalStartup|openvpnStatus|setOpenvpnStartup|ddnsStatus|sqmStatus|ddnsLookup|saveSqm|setOptionalStartup) ;; *) fail unsupported_method ;; esac ;;
+  list) echo '{"status":{},"setVpnStartup":{"action":"String","expected":"String"},"setPortalStartup":{"action":"String","expected":"String"},"legacyTunnelStatus":{},"disableLegacyTunnel":{"name":"String","protocol":"String","revision":"String","confirmation":"String"},"openvpnStatus":{},"setOpenvpnStartup":{"revision":"String","enabled":"String","confirmation":"String"},"ddnsStatus":{},"sqmStatus":{},"ddnsLookup":{},"saveSqm":{"revision":"String","confirmation":"String","interface":"String","download":"String","upload":"String","qdisc":"String","script":"String"},"setOptionalStartup":{"service":"String","enabled":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
+  call) case "$2" in status|setVpnStartup|setPortalStartup|legacyTunnelStatus|disableLegacyTunnel|openvpnStatus|setOpenvpnStartup|ddnsStatus|sqmStatus|ddnsLookup|saveSqm|setOptionalStartup) ;; *) fail unsupported_method ;; esac ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
@@ -17,6 +17,8 @@ case "$2" in
   status) profile_status ;;
   setVpnStartup) set_vpn_startup ;;
   setPortalStartup) set_portal_startup ;;
+  legacyTunnelStatus) legacy_tunnel_status ;;
+  disableLegacyTunnel) legacy_tunnel_disable ;;
   openvpnStatus) openvpn_status ;;
   setOpenvpnStartup) openvpn_toggle ;;
   ddnsStatus) optional_status ddns ;;

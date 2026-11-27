@@ -309,3 +309,66 @@ openvpn_toggle() {
   [ "$(uci -q get openvpn.sample_client.enabled)" = "$requested" ] || fail commit_failed
   openvpn_status
 }
+
+# Legacy tunnel retirement: preserve all profile parameters and credentials.
+# Only a named existing interface can have its startup flag disabled.
+# No tunnel activation, arbitrary protocol, route change or live reload.
+legacy_tunnel_inventory() {
+  cfg=/etc/config/network
+  [ -f "$cfg" ] && [ ! -L "$cfg" ] || fail config_unavailable
+  digest=$(sha256sum "$cfg") || fail config_unavailable
+  revision=${digest%% *}
+  pending=$(uci -q changes network) || fail config_unavailable
+  [ -z "$pending" ] || fail pending_changes
+  inventory=$(uci -q show network) || fail config_unavailable
+  names=$(printf '%s\n' "$inventory" | sed -nE "s/^network\.([a-zA-Z0-9_]+)\.proto='(pptp|l2tp|n2n)'$/\1/p")
+}
+legacy_tunnel_allowed() {
+  case "$1" in ''|*[!a-zA-Z0-9_]*|lan|wan|wan6|lte|wwan|loopback|veci_guest|veci_wg) return 1;; esac
+  [ "${#1}" -le 32 ] || return 1
+  [ "$(uci -q get "network.$1" || :)" = interface ] || return 1
+  case "$(uci -q get "network.$1.proto" || :)" in pptp|l2tp|n2n) ;; *) return 1;; esac
+}
+legacy_tunnel_status() {
+  legacy_tunnel_inventory
+  json_init; json_add_boolean ok 1; json_add_string revision "$revision"
+  json_add_array profiles
+  count=0
+  for name in $names; do
+    legacy_tunnel_allowed "$name" || continue
+    count=$((count+1)); [ "$count" -le 8 ] || fail inventory_limit
+    proto=$(uci -q get "network.$name.proto")
+    auto=$(uci -q get "network.$name.auto" || :)
+    case "$auto" in ''|1) auto=1;; 0) ;; *) fail invalid_startup;; esac
+    json_add_object ""; json_add_string name "$name"; json_add_string protocol "$proto"
+    json_add_string auto "$auto"; json_close_object
+  done
+  json_close_array; json_add_boolean activation_supported 0
+  json_add_boolean tunnel_verified 0; json_dump
+}
+legacy_tunnel_disable() {
+  exec 9>/var/lock/veci2-ipv6.lock; flock -n 9 || fail busy
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation
+  json_get_var name name; json_get_var proto protocol
+  [ "$confirm" = DISABLE_LEGACY_TUNNEL_NEXT_BOOT ] || fail confirmation_required
+  case "$proto" in pptp|l2tp|n2n) ;; *) fail unsupported_protocol;; esac
+  legacy_tunnel_inventory
+  [ "$expected" = "$revision" ] || fail stale_configuration
+  legacy_tunnel_allowed "$name" || fail profile_unavailable
+  [ "$(uci -q get "network.$name.proto")" = "$proto" ] || fail protocol_mismatch
+  auto=$(uci -q get "network.$name.auto" || :)
+  case "$auto" in 0) legacy_tunnel_status; return;; ''|1) ;; *) fail invalid_startup;; esac
+  tmp=$(mktemp -d /tmp/veci2-tunnel-disable.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  cp "$cfg" "$tmp/original" || fail backup_failed
+  uci -q -t "$tmp" set "network.$name.auto=0" || fail stage_failed
+  pending=$(uci -q changes network) || fail config_unavailable
+  [ -z "$pending" ] && [ "$(sha256sum "$cfg")" = "$digest" ] || fail stale_configuration
+  if ! uci -q -t "$tmp" commit network || [ "$(uci -q get "network.$name.auto" || :)" != 0 ]; then
+    cp "$tmp/original" "$cfg" || fail rollback_failed
+    fail commit_failed
+  fi
+  legacy_tunnel_status
+}
