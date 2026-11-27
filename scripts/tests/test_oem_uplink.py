@@ -22,6 +22,8 @@ json_dump() { :; }
             s=SOURCE.read_text()
             for old,new in (("/tmp/sysinfo/board_name","board"),("/etc/config/wireless","wireless"),("/etc/config/network","network"),("/etc/config/firewall","firewall"),("/usr/share/libubox/jshn.sh","jshn"),("/var/lock/veci2-ipv6.lock","lock")):
                 s=s.replace(old,str(d/new))
+            s=s.replace("/etc/config/$cfg",str(d)+"/$cfg").replace("/usr/libexec/rpcd/veci.v2.firewall",str(d/"fw-rpc"))
+            (d/"fw-rpc").touch()
             (d/"rpc").write_text(s)
             uci=d/"uci"
             uci.write_text("""#!/bin/sh

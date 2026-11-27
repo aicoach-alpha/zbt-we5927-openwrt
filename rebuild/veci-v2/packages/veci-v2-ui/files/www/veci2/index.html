@@ -19,6 +19,7 @@
   <script src="/veci2/addon-profiles.js" defer></script>
   <script src="/veci2/update-policy.js" defer></script>
   <script src="/veci2/guest-check.js" defer></script>
+  <script src="/veci2/uplink.js" defer></script>
   <script src="/veci2/watchdog-status.js" defer></script>
   <script src="/veci2/observability.js" defer></script>
   <script src="/veci2/backup.js" defer></script>
@@ -132,6 +133,18 @@
             <input id="monitor-interval" type="number" min="5" max="120" step="1" disabled>
             <button id="monitor-save" type="button" disabled>Simpan interval</button>
             <p id="monitor-result" role="status"></p>
+          </article>
+          <article class="panel" data-group="wifi">
+            <h2>Wi-Fi uplink (opsional)</h2>
+            <p>Siapkan WWAN DHCP IPv4 pada zona WAN, metric 50. Profil STA WPA2 disimpan nonaktif. Radio tunggal: aktivasi STA dapat memengaruhi AP utama. Tidak ada reload otomatis.</p>
+            <button id="uplink-refresh" type="button">Baca status uplink</button>
+            <button id="uplink-provision" type="button" disabled>Siapkan jaringan WWAN</button>
+            <form id="uplink-form" autocomplete="off"><label>SSID<input id="uplink-ssid" maxlength="32" required></label>
+              <label>Passphrase WPA2<input id="uplink-secret" type="password" minlength="8" maxlength="63" required autocomplete="new-password"></label>
+              <button id="uplink-save" disabled>Simpan profil nonaktif</button>
+            </form>
+            <button id="uplink-toggle" type="button" disabled>Ubah startup uplink</button>
+            <p id="uplink-result" role="status"></p>
           </article>
           <article class="panel" data-group="wifi">
             <h2>Guest Wi-Fi — Isolasi</h2>

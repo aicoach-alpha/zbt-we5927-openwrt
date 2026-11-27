@@ -39,13 +39,71 @@ save_option() {
   rm -rf "$tmp"
   trap - EXIT HUP INT TERM
 }
-# Only manage a dedicated STA on an already provisioned, WAN-zoned DHCP
-# network. No network/firewall topology changes or live radio reload.
+# Optional dedicated STA on WAN-zoned DHCP. Provisioning is config-only; no live reload.
 uplink=wireless.veci_uplink
 uplink_revision() {
+  for cfg in wireless network firewall; do [ -f "/etc/config/$cfg" ] && [ ! -L "/etc/config/$cfg" ] || return 1; done
   digest=$(sha256sum /etc/config/wireless /etc/config/network /etc/config/firewall) || return 1
   digest=$(printf '%s' "$digest" | sha256sum) || return 1
   printf '%s' "${digest%% *}"
+}
+# First-time WWAN provisioning is deliberately separate from credentials and
+# activation. Never take over a foreign network, STA, or zone.
+wwan_empty() {
+  [ -z "$(uci -q get network.wwan || :)" ] &&
+  [ -z "$(uci -q get "$uplink" || :)" ] || return 1
+  [ "$(uci -q get firewall.@zone[0].name || :)" = lan ] &&
+  [ "$(uci -q get firewall.@zone[1].name || :)" = wan ] &&
+  [ "$(uci -q get firewall.@zone[1].input || :)" = REJECT ] &&
+  [ "$(uci -q get firewall.@zone[1].masq || :)" = 1 ] || return 1
+  zones=$(uci -q show firewall) || return 1
+  # Reject any existing references to WWAN, including foreign rule bindings.
+  if printf '%s\n' "$zones" | grep -Eq '(^|[^a-zA-Z0-9_])wwan([^a-zA-Z0-9_]|$)'; then return 1; fi
+  [ "$(printf '%s\n' "$zones" | awk -F= 'BEGIN{q=sprintf("%c",39)} $1~/[.]name$/ && $2==q "wan" q {n++} END{print n+0}')" = 1 ] || return 1
+  networks=$(uci -q get 'firewall.@zone[1].network') || return 1
+  case " $networks " in *" wan "*) ;; *) return 1;; esac
+  case " $networks " in *" lte "*) ;; *) return 1;; esac
+  wifi=$(uci -q show wireless) || return 1
+  if printf '%s\n' "$wifi" | grep -Eq "(^|[^a-zA-Z0-9_])wwan([^a-zA-Z0-9_]|$)|[.]mode='sta'$"; then return 1; fi
+  net=$(uci -q show network) || return 1
+  if printf '%s\n' "$net" | grep -Eq '(^|[^a-zA-Z0-9_])wwan([^a-zA-Z0-9_]|$)'; then return 1; fi
+}
+wwan_provision() {
+  for cfg in network firewall wireless; do
+    changes=$(uci -q changes "$cfg") || fail config_unavailable
+    [ -z "$changes" ] || fail pending_changes
+  done
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
+  request=$(head -c 513)
+  [ "${#request}" -le 512 ] || fail invalid_request
+  set +u; . /usr/share/libubox/jshn.sh
+  json_load "$request" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation
+  [ "$confirm" = PROVISION_WWAN_DISABLED ] || fail confirmation_required
+  [ -n "$expected" ] && [ "$expected" = "$(uplink_revision)" ] || fail stale_configuration
+  wwan_empty || fail foreign_or_unsupported_topology
+  tmp=$(mktemp -d /tmp/veci2-wwan.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  for cfg in network firewall; do cp -p "/etc/config/$cfg" "$tmp/$cfg.original" || fail backup_failed; done
+  change() { uci -q -t "$tmp" "$@"; }
+  change set network.wwan=interface &&
+  change set network.wwan.proto=dhcp &&
+  change set network.wwan.metric=50 &&
+  change set network.wwan.ipv6=0 &&
+  change add_list 'firewall.@zone[1].network=wwan' || fail stage_failed
+  [ "$expected" = "$(uplink_revision)" ] || fail stale_configuration
+  for cfg in network firewall wireless; do
+    changes=$(uci -q changes "$cfg") || fail config_unavailable
+    [ -z "$changes" ] || fail pending_changes
+  done
+  rollback_wwan() {
+    for cfg in network firewall; do cp -p "$tmp/$cfg.original" "/etc/config/$cfg" || return 1; done
+  }
+  if ! change commit network || ! change commit firewall || ! uplink_ready || ! fw4 check >/dev/null 2>&1; then
+    rollback_wwan || fail rollback_failed
+    fail validation_failed_rollback
+  fi
+  uplink_status
 }
 uplink_ready() {
   [ "$(uci -q get network.wwan || :)" = interface ] &&
@@ -56,7 +114,8 @@ uplink_ready() {
   case " $(uci -q get firewall.@zone[1].network || :) " in *" wwan "*) ;; *) return 1;; esac
   case " $(uci -q get firewall.@zone[0].network || :) " in *" wwan "*) return 1;; esac
   # No other STA, including anonymous UCI sections.
-  sta=$(uci -q show wireless | sed -nE "s/^wireless\.([^.]*)\.mode='sta'$/\1/p")
+  inventory=$(uci -q show wireless) || return 1
+  sta=$(printf '%s\n' "$inventory" | sed -nE "s/^wireless\.([^.]*)\.mode='sta'$/\1/p")
   [ -z "$sta" ] || [ "$sta" = veci_uplink ] || return 1
   if [ -n "$(uci -q get "$uplink" || :)" ]; then
     [ "$(uci -q get "$uplink" || :)" = wifi-iface ] &&
@@ -66,7 +125,8 @@ uplink_ready() {
   fi
 }
 uplink_status() {
-  ready=0; exists=0; enabled=0
+  ready=0; exists=0; enabled=0; provisionable=0
+  if wwan_empty; then provisionable=1; fi
   if uplink_ready; then ready=1; fi
   if [ "$(uci -q get "$uplink" || :)" = wifi-iface ]; then
     exists=1
@@ -75,7 +135,9 @@ uplink_status() {
   set +u
   . /usr/share/libubox/jshn.sh
   json_init; json_add_boolean ok 1
-  json_add_string revision "$(uplink_revision)"
+  rev=$(uplink_revision) || fail config_unavailable
+  json_add_string revision "$rev"
+  json_add_boolean provisionable "$provisionable"
   json_add_boolean eligible "$ready"; json_add_boolean configured "$exists"
   json_add_boolean enabled "$enabled"
   json_add_string ssid "$(uci -q get "$uplink.ssid" || :)"
@@ -95,10 +157,11 @@ uplink_save() {
   json_load "$request" || fail invalid_request
   json_get_var expected revision; json_get_var confirm confirmation
   json_get_var action action; json_get_var name ssid; json_get_var secret password
-  [ "$expected" = "$(uplink_revision)" ] || fail stale_configuration
+  [ -n "$expected" ] && [ "$expected" = "$(uplink_revision)" ] || fail stale_configuration
   case "$action:$confirm" in save:SAVE_UPLINK_DISABLED|enable:ENABLE_UPLINK_NEXT_BOOT|disable:DISABLE_UPLINK_NEXT_BOOT) ;; *) fail confirmation_required;; esac
   tmp=$(mktemp -d /tmp/veci2-uplink.XXXXXX) || fail stage_failed
   trap 'rm -rf "$tmp"' EXIT
+  cp -p /etc/config/wireless "$tmp/wireless.original" || fail backup_failed
   change() { uci -q -t "$tmp" "$@"; }
   if [ "$action" = save ]; then
     [ -z "$(uci -q get "$uplink" || :)" ] || [ "$(uci -q get "$uplink.disabled" || :)" = 1 ] || fail disable_profile_first
@@ -127,16 +190,22 @@ uplink_save() {
     changes=$(uci -q changes "$cfg") || fail config_unavailable
     [ -z "$changes" ] || fail pending_changes
   done
-  change commit wireless || fail commit_failed
+  if ! change commit wireless || ! uplink_ready; then
+    cp -p "$tmp/wireless.original" /etc/config/wireless || fail rollback_failed
+    fail validation_failed_rollback
+  fi
   uplink_status
 }
 case "${1:-}:${2:-}" in
-  list:*) echo '{"status":{},"uplinkStatus":{},"saveUplink":{"revision":"String","confirmation":"String","action":"String","ssid":"String","password":"String"},"info":{},"survey":{},"setChannel":{"channel":"String"},"power":{},"setPower":{"dbm":"String","expected":"String","confirmation":"String"},"setAuth":{"mode":"String","key_hex":"String"},"setAccess":{"mode":"String","addresses":"String"},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"},"activationStatus":{},"activateAp":{"confirmation":"String"}}'; exit 0 ;;
-  call:uplinkStatus|call:saveUplink)
+  list:*) echo '{"status":{},"uplinkStatus":{},"provisionWwan":{"revision":"String","confirmation":"String"},"saveUplink":{"revision":"String","confirmation":"String","action":"String","ssid":"String","password":"String"},"info":{},"survey":{},"setChannel":{"channel":"String"},"power":{},"setPower":{"dbm":"String","expected":"String","confirmation":"String"},"setAuth":{"mode":"String","key_hex":"String"},"setAccess":{"mode":"String","addresses":"String"},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"},"activationStatus":{},"activateAp":{"confirmation":"String"}}'; exit 0 ;;
+  call:uplinkStatus|call:saveUplink|call:provisionWwan)
     exec 8>/var/lock/veci2-ipv6.lock; flock -n 8 || fail network_busy
     exec 9<"$0"; flock -n 9 || fail wifi_busy
     check_ap
-    if [ "$2" = uplinkStatus ]; then uplink_status; else uplink_save; fi
+    if [ "$2" = uplinkStatus ]; then uplink_status; else
+      exec 7</usr/libexec/rpcd/veci.v2.firewall; flock -n 7 || fail firewall_busy
+      if [ "$2" = provisionWwan ]; then wwan_provision; else uplink_save; fi
+    fi
     exit 0 ;;
   call:activationStatus|call:activateAp)
     check_ap
