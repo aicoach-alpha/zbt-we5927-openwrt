@@ -29,7 +29,7 @@ class ExistingNativeInterfacesAcceptance(unittest.TestCase):
         result=subprocess.run(command,cwd=ROOT,env=env,text=True,capture_output=True,timeout=90)
         self.assertEqual(result.returncode,0,result.stdout+"\n"+result.stderr)
         for expected in ("PASS LAN IPv4","DHCP/static WAN","overlap and gateway rejection",
-                         "stale revision","LTE/IPv6/device/metric preservation"):
+                         "stale revision","LTE/IPv6/device/metric preservation","PASS explicit PPPoE retirement"):
             self.assertIn(expected,result.stdout)
 
     def test_native_ui_rpc_acl_and_installation(self):
@@ -39,8 +39,8 @@ class ExistingNativeInterfacesAcceptance(unittest.TestCase):
         self.assertIn("veci2-interfaces-acl.json",runtime_make)
         self.assertIn("interfaces.js",ui_make)
         acl=json.loads((RUNTIME/"veci2-interfaces-acl.json").read_text())["veci-v2-interfaces"]
-        self.assertEqual(acl["read"]["ubus"]["veci.v2.interfaces"],["status"])
-        self.assertEqual(acl["write"]["ubus"]["veci.v2.interfaces"],["save"])
+        self.assertEqual(acl["read"]["ubus"]["veci.v2.interfaces"],["status","pppoeStatus","pppoeDiscovery"])
+        self.assertEqual(acl["write"]["ubus"]["veci.v2.interfaces"],["save","pppoeAction","savePppoe"])
         html=(UI/"files/www/veci2/index.html").read_text()
         self.assertEqual(html.count('id="interface-form"'),1)
         self.assertIn("/veci2/interfaces.js",html)
