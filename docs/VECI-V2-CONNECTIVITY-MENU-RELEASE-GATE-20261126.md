@@ -221,3 +221,14 @@ the underlying full PowerShell session transcript was not uploaded independently
 - The lightweight source safety contract passed on NAS (three tests); **actual Windows execution is pending owner output**.
 - Existing U-Boot image contains web-failsafe and TFTP-related strings according to prior offline evidence, but firmware image format requirements, physical recovery entry, restore success and suitability as current OEM rollback are NOT live-verified. Do not claim FULL RECOVERY PASS from static strings or file hashes alone.
 - Signed candidate f87e7ec5 has on-router verify-only preflight PASS, but firmware flash remains BLOCKED absent separate explicit permission and adequate physical recovery plan.
+
+## Owner Windows historical MTD audit result, 27 Nov 2026 11:51 WIB
+
+Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and pasted its terminal results. This proves file availability and previous November backup integrity, not on-device rollback:
+
+- 23 Nov backup, all five unique partitions mtd0/u-boot, mtd1/u-boot-env, mtd2/factory, mtd3/firmware and mtd7/art: HISTORICAL_SHA_PASS for each exact size and previously recorded SHA-256. Report: HISTORICAL_NOV23_FIVE_MTD_SHA256=PASS.
+- 25 Nov backup, all five partitions: SIZE_PASS_HASH_RECORDED_NOT_ROUTER_MATCHED for each; all hash values computed locally and kept in user's Windows JSON, but not compared against today's router or the 23 Nov dataset.
+- Reported local audit report: D:/Report_CCB/WE5927-RECOVERY-AUDIT-20261127_115107.json. No source backup bytes or current hashes were uploaded into this repo.
+- Explicit negative assertions remain CURRENT_ROUTER_MTD_EQUALS_BACKUP=NOT_TESTED and LIVE_BOOTLOADER_RECOVERY=NOT_TESTED; owner did NOT flash or contact router.
+- Previous source documentation that laptop backup existence is 'not inspected' is superseded by this user-executed offline audit. However, format/restore capability and present-day image identity are still not proven. Firmware release gate remains BLOCKED.
+- Next safe step: compare NOV23 and NOV25 individual SHA-256 values using ONLY local JSON. The firmware mtd3 hash may legitimately differ; don't interpret a difference as a corrupted backup. Do not alter unique calibration partitions or attempt blind MTD restoration.
