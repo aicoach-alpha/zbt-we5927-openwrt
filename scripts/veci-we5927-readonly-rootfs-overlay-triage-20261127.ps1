@@ -78,10 +78,26 @@ set -- $hoverlay
 echo "LIVE_MTD6_OVERLAY_SHA256=$1"
 prefix_blocks=$((base/65536))
 overlay_blocks=$((s6/65536))
-prefix="$(dd if=/dev/mtd3 bs=65536 count="$prefix_blocks" 2>/dev/null | sha256sum)" || exit 3
+# sha256sum succeeds even if its upstream reader failed or stopped early.
+# Send data directly to the hasher, capturing only dd's short status text.
+set -o pipefail
+read_blocks() {
+  skip=$1
+  blocks=$2
+  stats=$(LC_ALL=C dd if=/dev/mtd3 bs=65536 skip="$skip" count="$blocks" 2>&1 >&3) || return 1
+  case "
+$stats
+" in
+    *"
+$blocks+0 records out
+"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+prefix="$(read_blocks 0 "$prefix_blocks" 3>&1 | sha256sum)" || { echo STOP=INCOMPLETE_PARENT_PREFIX >&2; exit 3; }
 set -- $prefix
 echo "LIVE_MTD3_PRE_OVERLAY_SHA256=$1"
-tailhash="$(dd if=/dev/mtd3 bs=65536 skip="$prefix_blocks" count="$overlay_blocks" 2>/dev/null | sha256sum)" || exit 3
+tailhash="$(read_blocks "$prefix_blocks" "$overlay_blocks" 3>&1 | sha256sum)" || { echo STOP=INCOMPLETE_PARENT_TAIL >&2; exit 3; }
 set -- $tailhash
 echo "LIVE_MTD3_TAIL_SHA256=$1"
 echo "ROOTFS_OVERLAY_LAYOUT_HASHES_READ_ONLY_DONE=YES"

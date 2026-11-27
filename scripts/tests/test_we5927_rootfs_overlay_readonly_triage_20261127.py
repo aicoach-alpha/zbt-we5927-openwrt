@@ -58,7 +58,7 @@ class RootfsOverlayTriage(unittest.TestCase):
         body = self.shell.replace("/tmp/sysinfo/board_name", str(board)).replace("/proc/mtd", str(mtd))
         for name in ("mtd3", "mtd4", "mtd5", "mtd6"):
             body = body.replace("/dev/" + name, str(work / name))
-        return body, parent
+        return 'dd() { busybox dd "$@"; }\n' + body, parent
 
     def test_real_busybox_remote_ash_syntax(self):
         subprocess.run(["busybox", "ash", "-n"], input=self.shell, text=True, check=True, timeout=8)
@@ -93,6 +93,17 @@ class RootfsOverlayTriage(unittest.TestCase):
             self.assertNotEqual(output["LIVE_MTD3_TAIL_SHA256"], output["LIVE_MTD6_OVERLAY_SHA256"])
             self.assertIn("NOT_VERIFIED_LAYOUT_ALIAS", self.text)
             self.assertIn("ROOTFS_DATA_IS_PARENT_TAIL", self.text)
+
+    def test_incomplete_parent_reads_do_not_produce_a_comparison(self):
+        for size, reason in ((PREFIX - 1, "PREFIX"), (M3 - 65536, "TAIL")):
+            with self.subTest(size=size), tempfile.TemporaryDirectory() as tmp:
+                code, _ = self.fixture(tmp)
+                with (Path(tmp) / "mtd3").open("rb+") as parent:
+                    parent.truncate(size)
+                result = subprocess.run(["busybox", "ash", "-c", code], capture_output=True, text=True, timeout=20)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("STOP=INCOMPLETE_PARENT_" + reason, result.stderr)
+                self.assertNotIn("ROOTFS_OVERLAY_LAYOUT_HASHES_READ_ONLY_DONE=YES", result.stdout)
 
     def test_malformed_partition_map_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
