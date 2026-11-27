@@ -662,7 +662,10 @@
       "evidence": "scripts/tests/test_oem_module_status.py#test_privileged_modem_controls_are_disabled"
     },
     "set_l2tp": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "veci.v2.addon:disableLegacyTunnel",
+      "evidence": "scripts/tests/test_oem_legacy_tunnel.py#LegacyTunnel.test_inventory_and_three_disabled_startups; scripts/tests/test_oem_legacy_tunnel.py#LegacyTunnel.test_fail_closed_and_rollback; scripts/tests/test_oem_legacy_tunnel.py#LegacyTunnel.test_oem_adapter_protocol_scope_and_acl",
+      "limitations": "Disable existing named profile startup ONLY. Scope is narrower than original OEM create/edit/enable operation. Isolated native config mutation, rollback and adapter ACL fixtures passed; actual native UCI, browser, package and runtime acceptance pending. Full legacy VPN functionality not implemented."
     },
     "set_lan_config": {
       "state": "PROTOTYPE",
@@ -677,7 +680,10 @@
       "limitations": "Explicit revision and confirmation; owned LAN-to-WAN rule, disables flow offload when list configured; existing connections, actual nft enforcement and OEM original form pending."
     },
     "set_n2n": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "veci.v2.addon:disableLegacyTunnel",
+      "evidence": "scripts/tests/test_oem_legacy_tunnel.py#LegacyTunnel.test_inventory_and_three_disabled_startups; scripts/tests/test_oem_legacy_tunnel.py#LegacyTunnel.test_fail_closed_and_rollback; scripts/tests/test_oem_legacy_tunnel.py#LegacyTunnel.test_oem_adapter_protocol_scope_and_acl",
+      "limitations": "Disable existing named profile startup ONLY. Scope is narrower than original OEM create/edit/enable operation. Isolated native config mutation, rollback and adapter ACL fixtures passed; actual native UCI, browser, package and runtime acceptance pending. Full legacy VPN functionality not implemented."
     },
     "set_nat_acceleration": {
       "state": "PROTOTYPE",
@@ -722,7 +728,10 @@
       "limitations": "Explicit rejection only, not functional support. Original UI and release review pending."
     },
     "set_pptp": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "veci.v2.addon:disableLegacyTunnel",
+      "evidence": "scripts/tests/test_oem_legacy_tunnel.py#LegacyTunnel.test_inventory_and_three_disabled_startups; scripts/tests/test_oem_legacy_tunnel.py#LegacyTunnel.test_fail_closed_and_rollback; scripts/tests/test_oem_legacy_tunnel.py#LegacyTunnel.test_oem_adapter_protocol_scope_and_acl",
+      "limitations": "Disable existing named profile startup ONLY. Scope is narrower than original OEM create/edit/enable operation. Isolated native config mutation, rollback and adapter ACL fixtures passed; actual native UCI, browser, package and runtime acceptance pending. Full legacy VPN functionality not implemented."
     },
     "set_qos": {
       "state": "PROTOTYPE",

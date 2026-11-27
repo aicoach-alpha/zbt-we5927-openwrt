@@ -38,6 +38,7 @@ function clearSession() {
   resetAcl();
   resetParent();
   resetVpn();
+  resetLegacyVpn();
   resetManualReboot();
   el("tunnel-result").textContent="";
   el("mesh-result").textContent="";
@@ -657,4 +658,42 @@ el('reboot-now').onclick=async()=>{
     await oem('reboot',{boot_id:boot,confirmation:'REBOOT_WE5927_NOW'},token);
     if(sid===token)el('reboot-result').textContent='Request accepted; actual reboot not yet verified.';
   }catch(e){if(sid===token)el('reboot-result').textContent='Request outcome unknown. Do not retry until you confirm router status.';}
+};
+
+let legacyVpnRevision='',legacyVpnProfiles=[];
+function resetLegacyVpn(){
+  legacyVpnRevision='';legacyVpnProfiles=[];el('legacy-vpn-profile').replaceChildren();
+  el('legacy-vpn-disable').disabled=true;el('legacy-vpn-result').textContent='';
+}
+el('legacy-vpn-profile').onchange=()=>{
+  const row=legacyVpnProfiles[Number(el('legacy-vpn-profile').value)];
+  el('legacy-vpn-disable').disabled=!legacyVpnRevision||!row||row.auto!=='1';
+};
+el('legacy-vpn-refresh').onclick=async()=>{
+  const token=sid,b=el('legacy-vpn-refresh');if(!token||b.disabled)return;
+  b.disabled=true;resetLegacyVpn();
+  try{
+    const x=await rpc('veci.v2.addon','legacyTunnelStatus',{},token);
+    if(!x.ok||!/^[0-9a-f]{64}$/.test(x.revision||'')||!Array.isArray(x.profiles))throw Error('Profile inventory unavailable');
+    if(sid!==token)return;
+    legacyVpnRevision=x.revision;legacyVpnProfiles=x.profiles;
+    for(const [i,row] of x.profiles.entries()){
+      const option=document.createElement('option');option.value=String(i);
+      option.textContent=row.name+' ('+row.protocol+') — '+(row.auto==='1'?'startup enabled':'startup disabled');
+      el('legacy-vpn-profile').append(option);
+    }
+    el('legacy-vpn-result').textContent=x.profiles.length?'Select an existing profile.':'No eligible named legacy profiles.';
+    el('legacy-vpn-profile').onchange();
+  }catch(e){if(sid===token)el('legacy-vpn-result').textContent=e.message;}
+  finally{b.disabled=false;}
+};
+el('legacy-vpn-disable').onclick=async()=>{
+  const token=sid,revision=legacyVpnRevision,row=legacyVpnProfiles[Number(el('legacy-vpn-profile').value)];
+  if(!token||!revision||!row||row.auto!=='1'||!['pptp','l2tp','n2n'].includes(row.protocol))return;
+  if(!window.confirm('Disable startup of '+row.name+'? Existing connections remain unchanged until manual activation.'))return;
+  resetLegacyVpn();
+  try{
+    await oem('set_'+row.protocol,{name:row.name,revision,enabled:'0',confirmation:'DISABLE_LEGACY_TUNNEL_NEXT_BOOT'},token);
+    if(sid===token)el('legacy-vpn-result').textContent='Startup disabled. Refresh inventory.';
+  }catch(e){if(sid===token)el('legacy-vpn-result').textContent=e.message;}
 };

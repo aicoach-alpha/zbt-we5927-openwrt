@@ -450,6 +450,9 @@ def stage(image, out):
             '<button id="mesh-refresh" type="button">Read mesh interfaces</button><pre id="mesh-result" role="status"></pre></article>'
             '<article><h2>Manual reboot</h2><p>Explicit owner action only. All connections will be interrupted. Firmware verification and restore must be idle. No automatic retry.</p>'
             '<button id="reboot-check" type="button">Check availability</button><button id="reboot-now" type="button" disabled>Reboot router now</button><p id="reboot-result" role="status"></p></article>'
+            '<article><h2>Legacy VPN startup retirement</h2><p>Existing named PPTP, L2TP and N2N profiles only. Disable startup without altering credentials or live connections. Enabling and provisioning are not supported.</p>'
+            '<button id="legacy-vpn-refresh" type="button">Read profiles</button><label>Profile<select id="legacy-vpn-profile"></select></label>'
+            '<button id="legacy-vpn-disable" type="button" disabled>Disable at next boot</button><p id="legacy-vpn-result" role="status"></p></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

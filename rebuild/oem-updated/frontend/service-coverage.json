@@ -244,6 +244,16 @@
       "scope": "Explicit owner confirmation, current boot identity, verification and restore interlocks, no retry",
       "state": "SOURCE_INTEGRATED_NOT_UAT",
       "limitations": "Mocked native request only; actual reboot and recovery unverified"
+    },
+    "legacy_vpn_retirement": {
+      "provider": "veci.v2.addon",
+      "methods": [
+        "legacyTunnelStatus",
+        "disableLegacyTunnel"
+      ],
+      "scope": "Disable startup of existing named PPTP/L2TP/N2N only; no provisioning, enabling, live reload or credential editing",
+      "state": "FIXTURE_PASS_NOT_UAT",
+      "limitations": "Isolated mutation and rollback fixtures; actual UCI/browser/runtime pending"
     }
   },
   "remaining": [
