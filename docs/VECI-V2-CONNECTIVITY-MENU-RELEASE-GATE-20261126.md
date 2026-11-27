@@ -358,3 +358,10 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - New scripts/ci/we5927_uboot_mips_xref_20261127.py scans only two distinct, exact-hash 196608-byte owner MTD0 copies. It enumerates adjacent MIPS little-endian LUI/ADDIU or LUI/ORI candidate references to known HTTP/TFTP strings, inferring page-aligned candidate virtual bases only when multiple instruction and string sites agree. It exports offsets and candidate base values, not binary content.
 - Five unit tests passed on NAS using synthetic data, including signed ADDIU carry, ORI, missing code, register mismatch and exact backup hash rejection. Windows and Linux CI added; real owner MTD0 scan is NOT_RUN because the bytes remain exclusively on the office laptop.
 - This is reconnaissance, not a disassembly of the actual handler. Adjacent instruction pairs can be data, relocated code and non-adjacent instructions can be missed; no xref is not proof of absence. No HTTP control flow, accepted image or recovery capability is certified. release_permitted=false; flash_authorized=false; no router access.
+
+## Exact owner MTD0 centralized and offline mapping reconnaissance — 27 Nov 2026
+
+- Both original 196608-byte owner snapshots independently hash-verified and byte-identical on restricted NAS storage. Encrypted private GitHub archive verified after decryption; no plaintext bootloader or key committed to public source.
+- Actual adjacent MIPS XREF scan found all five selected markers but zero qualifying groups. This is not evidence of absent HTTP handler.
+- New linked pointer-table analyzer found one consistent candidate address mapping on the actual owner MTD0, with 127 consecutive linked pointer pairs and one direct TFTP marker pointer; no direct HTTP marker pointer found. This is a mapping candidate, not proven control flow. Detailed offsets kept in restricted NAS report. Three synthetic tests pass.
+- No physical router action; image acceptance and recovery remain unverified. Flash authorization remains false.
