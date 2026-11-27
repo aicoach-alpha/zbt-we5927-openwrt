@@ -30,6 +30,7 @@ json_dump() { :; }
         (self.d/"rpc").write_text(s)
         self.cmd("uci", """case "$2" in
  changes) exit 0;;
+ show) printf "%s\\n" "$3=rule" "$3.name=fixture" "$3.src=lan" "$3.dest=wan" "$3.target=REJECT" "$3.proto=all" "$3.family=any" "$3.src_mac=fixture" "$3.enabled=1"; exit 0;;
  get) case "$3" in
  firewall.@zone*) :;;
  esac;;

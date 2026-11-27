@@ -212,6 +212,55 @@ esac
         self.assertTrue(blocked["ok"],blocked)
         self.assertEqual(self.call("setOffload",**(offload|dict(revision=blocked["revision"])))["error"],"mac_block_requires_offload_disabled")
 
+    def test_native_mac_list_acl_and_parent_lifecycle(self):
+        mac="02:00:00:00:00:01"; other="02:00:00:00:00:02"
+        rev=self.call("status")["revision"]
+        result=self.call("setMacBlock",addresses=mac+" "+other+" "+mac,revision=rev,confirmation="SAVE_MAC_BLOCK")
+        self.assertTrue(result["ok"],result)
+        self.assertEqual(result["blocked_macs"],[mac,other])
+        before=self.firewall.read_bytes()
+        self.assertEqual(self.call("setMacBlock",addresses="",revision=rev,confirmation="SAVE_MAC_BLOCK")["error"],"stale_configuration")
+        self.failflag.touch()
+        self.assertEqual(self.call("setMacBlock",addresses="",revision=result["revision"],confirmation="SAVE_MAC_BLOCK")["error"],"firewall_apply_failed_rollback_attempted")
+        self.assertEqual(self.firewall.read_bytes(),before)
+        cleared=self.call("setMacBlock",addresses="",revision=result["revision"],confirmation="SAVE_MAC_BLOCK")
+        self.assertEqual(cleared["blocked_macs"],[])
+        for method,read,confirm,delete,section in (
+          ("saveAcl","aclStatus","SAVE_LAN_ACL","DELETE_LAN_ACL","veci_acl_1"),
+          ("saveParent","parentStatus","SAVE_PARENT_SCHEDULE","DELETE_PARENT_SCHEDULE","veci_parent_1")):
+            args=dict(slot="1",mac=mac,enabled="1",action="save",revision=self.call(read)["revision"],confirmation=confirm)
+            if method=="saveParent":args.update(start_time="08:00:00",stop_time="09:00:00",weekdays="Monday Friday")
+            result=self.call(method,**args)
+            self.assertTrue(result["ok"],result)
+            self.assertEqual(result["rules"][0]["enabled"],"1")
+            self.assertEqual(result["rules"][0]["mac"],mac)
+            if method=="saveParent":
+                self.assertEqual(result["rules"][0]["timezone"],"UTC")
+                self.assertEqual(result["rules"][0]["weekdays"],"Monday Friday")
+            offload=self.call("setOffload",enabled="1",revision=result["revision"],confirmation="SAVE_SOFTWARE_OFFLOAD")
+            self.assertEqual(offload["error"],"acl_requires_offload_disabled")
+            args.update(revision=result["revision"],enabled="0")
+            result=self.call(method,**args)
+            self.assertTrue(result["ok"],result)
+            self.assertEqual(result["rules"][0]["enabled"],"0")
+            before=self.firewall.read_bytes()
+            self.failflag.touch()
+            args.update(revision=result["revision"],action="delete",confirmation=delete)
+            self.assertEqual(self.call(method,**args)["error"],"firewall_apply_failed_rollback_attempted")
+            self.assertEqual(self.firewall.read_bytes(),before)
+            self.assertEqual(self.call(method,**args)["rules"],[])
+            self.assertNotEqual(self.uci("-q","get","firewall."+section).returncode,0)
+    def test_foreign_rule_extra_conditions_are_not_overwritten(self):
+        args=dict(slot="1",mac="02:00:00:00:00:01",enabled="1",action="save",revision=self.call("aclStatus")["revision"],confirmation="SAVE_LAN_ACL")
+        self.assertTrue(self.call("saveAcl",**args)["ok"])
+        self.uci("set","firewall.veci_acl_1.dest_port=443");self.uci("commit","firewall")
+        before=self.firewall.read_bytes()
+        import hashlib
+        args["revision"]=hashlib.sha256(before).hexdigest()
+        self.assertEqual(self.call("saveAcl",**args)["error"],"foreign_acl_slot")
+        self.assertEqual(self.call("aclStatus")["error"],"foreign_acl_slot")
+        self.assertEqual(self.firewall.read_bytes(),before)
+
     def test_acl_scope_and_no_wan_policy_relaxation(self):
         acl=json.loads((RUNTIME/"veci2-status-acl.json").read_text())["veci-v2-firewall"]
         self.assertEqual(set(acl["read"]["ubus"]["veci.v2.firewall"]),{"status","ttlStatus","aclStatus","parentStatus"})
