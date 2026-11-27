@@ -65,6 +65,7 @@ exit 0
         data=SOURCE.read_text()
         data=data.replace("/tmp/sysinfo/board_name",str(board))
         data=data.replace("/etc/config/firewall",str(self.firewall))
+        data=data.replace("/etc/config/network",str(network)).replace("/usr/libexec/veci2-lan-bounds",str(RUNTIME/"veci2-lan-bounds")).replace("/var/lock/veci2-ipv6.lock",str(self.root/"network.lock")).replace("/var/run/veci2-reboot-requested",str(self.root/"reboot-pending")).replace("/etc/nftables.d/90-veci-ttl.nft",str(self.root/"ttl.nft"))
         data=data.replace("/etc/init.d/firewall",str(reloadscript))
         data=data.replace("/usr/share/libubox/jshn.sh",str(Path(LIBUBOX)/"share/libubox/jshn.sh"))
         program.write_text(data)
@@ -89,13 +90,16 @@ print(value)
         calc.chmod(0o755)
         ip=self.root/"ip"
         ip.write_text("""#!/bin/sh
-case "$3" in
-  192.168.1.0|192.168.1.1|192.168.1.255) echo "unreachable $3" ;;
-  192.168.1.*) printf 'local %s dev br-lan\\n' "$3" ;;
-  *) echo "unreachable $3" ;;
+case "$4" in
+  192.168.1.0|192.168.1.1|192.168.1.255) echo "unreachable $4" ;;
+  192.168.1.*) printf '%s dev br-lan\\n' "$4" ;;
+  *) echo "unreachable $4" ;;
 esac
 """)
         ip.chmod(0o755)
+        fw4=self.root/"fw4"
+        fw4.write_text('#!/bin/sh\n[ "$*" = check ] || exit 99\n[ "${FAIL_FW:-0}" = 0 ]\n')
+        fw4.chmod(0o755)
         self.delta=self.root/"delta"
         self.delta.mkdir()
         self.call_log=self.root/"called.log"
@@ -120,6 +124,8 @@ esac
         added=self.call("addForward",from_port=8082,to_port=80,protocol="tcp",
             destination="192.168.1.23",confirmation="FORWARD_8082")
         self.assertTrue(added["ok"],added)
+        self.assertEqual(sum(x["name"]=="veci_port_tcp_8082" for x in added["forwards"]),1,added)
+        self.assertEqual(sum(x["source_port"]=="8082" for x in added["forwards"]),1,added)
         self.assertEqual(self.uci("-q","get","firewall.veci_port_tcp_8082.dest_ip").stdout.strip(),"192.168.1.23")
         self.assertEqual(self.uci("-q","get","firewall.@zone[1].input").stdout.strip(),"REJECT")
         self.assertEqual(self.uci("-q","get","firewall.external_rule.name").stdout.strip(),"ExternalUnaffected")
@@ -167,11 +173,50 @@ esac
                 self.assertEqual(before,self.firewall.read_bytes())
         self.assertEqual(self.uci("-q","get","firewall.external_rule.name").stdout.strip(),"ExternalUnaffected")
 
+    def test_cidr_destination_overlap_and_ownership(self):
+        for cmd in (("set","network.lan.ipaddr=192.168.1.1/24"),("delete","network.lan.netmask"),("commit","network")):
+            self.assertEqual(self.uci(*cmd).returncode,0)
+        args=dict(from_port=8443,to_port=443,protocol="tcp",destination="192.168.1.23",confirmation="FORWARD_8443")
+        before=self.firewall.read_bytes()
+        self.assertEqual(self.call("addForward",**args)["error"],"overlapping_or_unverified_redirect")
+        self.assertEqual(self.firewall.read_bytes(),before)
+        args.update(from_port=8083,confirmation="FORWARD_8083")
+        self.assertTrue(self.call("addForward",**args)["ok"])
+        self.uci("set","firewall.veci_port_tcp_8083.name=Foreign")
+        self.uci("commit","firewall")
+        before=self.firewall.read_bytes()
+        self.assertEqual(self.call("deleteForward",name="veci_port_tcp_8083",confirmation="DELETE_veci_port_tcp_8083")["error"],"not_owner_redirect")
+        self.assertEqual(self.firewall.read_bytes(),before)
+        import fcntl
+        with (self.root/"network.lock").open("w") as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            self.assertEqual(self.call("addForward",**args)["error"],"network_busy")
+        self.assertEqual(self.firewall.read_bytes(),before)
+    def test_native_defaults_and_software_offload(self):
+        rev=self.call("status")["revision"]
+        args=dict(drop_invalid="1",syn_flood="1",revision=rev,confirmation="SAVE_FIREWALL_DEFAULTS")
+        before=self.firewall.read_bytes()
+        self.failflag.touch()
+        self.assertEqual(self.call("setDefaults",**args)["error"],"firewall_apply_failed_rollback_attempted")
+        self.assertEqual(self.firewall.read_bytes(),before)
+        saved=self.call("setDefaults",**args)
+        self.assertTrue(saved["ok"],saved)
+        self.assertEqual(self.uci("get","firewall.@defaults[0].synflood_protect").stdout.strip(),"1")
+        offload=dict(enabled="1",revision=saved["revision"],confirmation="SAVE_SOFTWARE_OFFLOAD")
+        result=self.call("setOffload",**offload)
+        self.assertTrue(result["ok"],result)
+        self.assertEqual(self.uci("get","firewall.@defaults[0].flow_offloading_hw").stdout.strip(),"0")
+        self.assertEqual(self.uci("get","firewall.@defaults[0].flow_offloading").stdout.strip(),"1")
+        self.assertEqual(self.call("setOffload",**offload)["error"],"stale_configuration")
+        blocked=self.call("setMacBlock",addresses="02:00:00:00:00:01",revision=result["revision"],confirmation="SAVE_MAC_BLOCK")
+        self.assertTrue(blocked["ok"],blocked)
+        self.assertEqual(self.call("setOffload",**(offload|dict(revision=blocked["revision"])))["error"],"mac_block_requires_offload_disabled")
+
     def test_acl_scope_and_no_wan_policy_relaxation(self):
         acl=json.loads((RUNTIME/"veci2-status-acl.json").read_text())["veci-v2-firewall"]
-        self.assertEqual(acl["read"]["ubus"]["veci.v2.firewall"],["status"])
+        self.assertEqual(set(acl["read"]["ubus"]["veci.v2.firewall"]),{"status","ttlStatus","aclStatus","parentStatus"})
         self.assertEqual(set(acl["write"]["ubus"]["veci.v2.firewall"]),
-                         {"addForward","deleteForward","setDmz"})
+                         {"addForward","deleteForward","setDmz","setDefaults","setOffload","setMacBlock","saveAcl","saveParent","setTtl"})
         self.assertIn("unsafe_wan_policy",SOURCE.read_text())
         subprocess.run(["busybox","ash","-n",str(SOURCE)],check=True)
 
