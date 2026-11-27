@@ -616,16 +616,16 @@
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "set_acl_rule": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:saveAcl",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; scripts/tests/test_oem_acl_slots.py",
-      "limitations": "Owned eight LAN-to-WAN MAC deny slots only; status toggle per slot, not global firewall switch. Negative native fixture passed; successful commit/reload/rollback, OEM original form and packet enforcement pending."
+      "evidence": "scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_oem_acl_slots.py; scripts/tests/test_oem_client_policy_writes.py#ClientPolicyWrites.test_client_policy_mutations_and_receipts",
+      "limitations": "Eight owned LAN-to-WAN MAC deny slots, save/delete. Native UCI configuration lifecycle, rollback, ownership/offload guards and isolated adapter receipts passed. fw4 and reload simulated; established flows, actual nft enforcement, clock sync and browser UAT pending."
     },
     "set_acl_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:saveAcl",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; scripts/tests/test_oem_acl_slots.py",
-      "limitations": "Owned eight LAN-to-WAN MAC deny slots only; status toggle per slot, not global firewall switch. Negative native fixture passed; successful commit/reload/rollback, OEM original form and packet enforcement pending."
+      "evidence": "scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_oem_acl_slots.py; scripts/tests/test_oem_client_policy_writes.py#ClientPolicyWrites.test_client_policy_mutations_and_receipts",
+      "limitations": "Per-slot toggle, not global ACL. Native UCI configuration lifecycle, rollback, ownership/offload guards and isolated adapter receipts passed. fw4 and reload simulated; established flows, actual nft enforcement, clock sync and browser UAT pending."
     },
     "set_cloud_login": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -680,10 +680,10 @@
       "limitations": "Native host UCI/libubox configuration lifecycle and isolated adapter ACL/response fixtures passed. Manual activation only; original OEM browser behavior, physical network, DHCP reservation consistency and actual routing pending. DHCP pool/reservation compatibility and guest subnet guards now covered by native UCI fixtures; unsupported reservation types fail closed on LAN changes."
     },
     "set_mac_blacklist": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:setMacBlock",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Explicit revision and confirmation; owned LAN-to-WAN rule, disables flow offload when list configured; existing connections, actual nft enforcement and OEM original form pending."
+      "evidence": "scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_oem_acl_slots.py; scripts/tests/test_oem_client_policy_writes.py#ClientPolicyWrites.test_client_policy_mutations_and_receipts",
+      "limitations": "Owned LAN-to-WAN MAC list (max 16). Native UCI configuration lifecycle, rollback, ownership/offload guards and isolated adapter receipts passed. fw4 and reload simulated; established flows, actual nft enforcement, clock sync and browser UAT pending."
     },
     "set_n2n": {
       "state": "FIXTURE_PASS",
@@ -716,16 +716,16 @@
       "limitations": "Existing native certificate-based client profile startup toggle only; package and secure TLS profile required. No key upload, configuration import or network restart. Successful native write, tunnel and original OEM form pending."
     },
     "set_parents_ctrl_rule": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:saveParent",
-      "evidence": "rebuild/oem-updated/backend; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_acl_slots.py#test_parent_schedule_validation",
-      "limitations": "Eight optional UTC same-day LAN-to-WAN MAC deny schedules, per-rule toggle only. Legacy global switch and original OEM form not mapped. Schedule validation fixture only; actual packet enforcement, established connections, time synchronization, successful commit and rollback UAT pending."
+      "evidence": "scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_oem_acl_slots.py; scripts/tests/test_oem_client_policy_writes.py#ClientPolicyWrites.test_client_policy_mutations_and_receipts",
+      "limitations": "Eight UTC same-day scheduled MAC deny slots, save/delete. Native UCI configuration lifecycle, rollback, ownership/offload guards and isolated adapter receipts passed. fw4 and reload simulated; established flows, actual nft enforcement, clock sync and browser UAT pending."
     },
     "set_parents_ctrl_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:saveParent",
-      "evidence": "rebuild/oem-updated/backend; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_acl_slots.py#test_parent_schedule_validation",
-      "limitations": "Eight optional UTC same-day LAN-to-WAN MAC deny schedules, per-rule toggle only. Legacy global switch and original OEM form not mapped. Schedule validation fixture only; actual packet enforcement, established connections, time synchronization, successful commit and rollback UAT pending."
+      "evidence": "scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_oem_acl_slots.py; scripts/tests/test_oem_client_policy_writes.py#ClientPolicyWrites.test_client_policy_mutations_and_receipts",
+      "limitations": "Per-slot schedule toggle, not global parental control. Native UCI configuration lifecycle, rollback, ownership/offload guards and isolated adapter receipts passed. fw4 and reload simulated; established flows, actual nft enforcement, clock sync and browser UAT pending."
     },
     "set_port": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -810,10 +810,10 @@
       "limitations": "Host native UCI config-only provisioning and STA lifecycle plus mocked CGI ACL/status verification passed. fw4 check mocked, default WAN topology only. Real AP/STA association, traffic routing/priority, browser and original OEM form pending."
     },
     "set_wifi_client": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:status/setMacBlock",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Individual client LAN-to-WAN block/unblock with explicit confirmation and revision guard; original OEM client form source adapted; runtime/browser acceptance pending."
+      "evidence": "scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_oem_acl_slots.py; scripts/tests/test_oem_client_policy_writes.py#ClientPolicyWrites.test_client_policy_mutations_and_receipts",
+      "limitations": "Individual block/unblock in owned LAN-to-WAN list. Native UCI configuration lifecycle, rollback, ownership/offload guards and isolated adapter receipts passed. fw4 and reload simulated; established flows, actual nft enforcement, clock sync and browser UAT pending."
     },
     "set_wifi_guest": {
       "state": "PROTOTYPE",

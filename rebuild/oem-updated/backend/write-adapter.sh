@@ -8,7 +8,7 @@ fail() { json_init; json_add_string code -4; json_add_string reason "$1"; json_d
 read_field() { printf '%s' "$body" | jsonfilter -e "$1"; }
 native_field() { printf '%s' "$native" | jsonfilter -e "$1"; }
 rpc() {
-    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.dhcp:setPool|veci.v2.addon:setPortalStartup|veci.v2.guest:setNativeStartup|veci.v2.addon:setOptionalStartup|veci.v2.addon:saveSqm|veci.v2.addon:setOpenvpnStartup|veci.v2.addon:disableLegacyTunnel|veci.v2.addon:disableSmbStartup|veci.v2.addon:ddnsLookup|veci.v2.system:setNtp|veci.v2.system:rebootNow|veci.v2.firewall:setDmz|veci.v2.firewall:setDefaults|veci.v2.firewall:setOffload|veci.v2.firewall:setMacBlock|veci.v2.firewall:setTtl|veci.v2.firewall:saveAcl|veci.v2.firewall:aclStatus|veci.v2.firewall:parentStatus|veci.v2.firewall:saveParent|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.interfaces:pppoeAction|veci.v2.interfaces:pppoeDiscovery|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.wifi:setPower|veci.v2.wifi:saveUplink|veci.v2.cron:setReboot|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
+    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.dhcp:setPool|veci.v2.addon:setPortalStartup|veci.v2.guest:setNativeStartup|veci.v2.addon:setOptionalStartup|veci.v2.addon:saveSqm|veci.v2.addon:setOpenvpnStartup|veci.v2.addon:disableLegacyTunnel|veci.v2.addon:disableSmbStartup|veci.v2.addon:ddnsLookup|veci.v2.system:setNtp|veci.v2.system:rebootNow|veci.v2.firewall:status|veci.v2.firewall:setDmz|veci.v2.firewall:setDefaults|veci.v2.firewall:setOffload|veci.v2.firewall:setMacBlock|veci.v2.firewall:setTtl|veci.v2.firewall:saveAcl|veci.v2.firewall:aclStatus|veci.v2.firewall:parentStatus|veci.v2.firewall:saveParent|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.interfaces:pppoeAction|veci.v2.interfaces:pppoeDiscovery|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.wifi:setPower|veci.v2.wifi:saveUplink|veci.v2.cron:setReboot|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
     # Do not bypass the session's permission on the actual backend method.
     json_init; json_add_string ubus_rpc_session "$session"; json_add_string scope ubus
     json_add_string object "$1"; json_add_string function "$2"
@@ -16,6 +16,53 @@ rpc() {
     [ "$permit" = true ] || fail "native permission denied"
     native="$(ubus -t 20 call "$1" "$2" "$3")" || fail "native call failed"
     [ "$(native_field '@.ok')" = true ] || fail "native operation rejected"
+}
+normalize_macs() (
+    seen=" "; count=0
+    for item in $1; do
+        printf '%s\n' "$item" | grep -Eiq '^[0-9a-f][02468ace](:[0-9a-f]{2}){5}$' || return 1
+        item="$(printf '%s' "$item" | tr A-F a-f)"
+        [ "$item" != 00:00:00:00:00:00 ] || return 1
+        case "$seen" in *" $item "*) continue;; esac
+        seen="$seen$item "; count=$((count+1))
+        [ "$count" -le 16 ] || return 1
+    done
+    seen=${seen# }; printf '%s' "${seen% }"
+)
+native_macs() (
+    json_load "$native" && json_get_type typ blocked_macs && [ "$typ" = array ] || return 1
+    json_select blocked_macs; json_get_keys keys
+    all=""
+    for k in $keys; do
+        json_get_type kind "$k" && [ "$kind" = string ] || return 1
+        json_get_var item "$k"
+        # Each JSON array element must contain exactly one MAC.
+        printf '%s\n' "$item" | grep -Eiq '^[0-9a-f][02468ace](:[0-9a-f]{2}){5}$' || return 1
+        all="${all:+$all }$item"
+    done
+    normalize_macs "$all"
+)
+verify_slot() {
+    (json_load "$native" && json_get_type typ rules && [ "$typ" = array ]) || fail "rule inventory unavailable"
+    idx=0; matches=0
+    while [ "$idx" -lt 8 ]; do
+        entry="$(native_field "@.rules[$idx].slot" || true)"
+        [ -n "$entry" ] || break
+        if [ "$entry" = "$slot" ]; then
+            [ "$action" = save ] || fail "rule deletion unconfirmed"
+            [ "$(native_field "@.rules[$idx].mac" | tr A-F a-f)" = "$(printf '%s' "$mac" | tr A-F a-f)" ] &&
+            [ "$(native_field "@.rules[$idx].enabled")" = "$enabled" ] || fail "rule state unconfirmed"
+            if [ "$op" = set_parents_ctrl_rule ] || [ "$op" = set_parents_ctrl_status ]; then
+                [ "$(native_field "@.rules[$idx].start_time")" = "$start" ] &&
+                [ "$(native_field "@.rules[$idx].stop_time")" = "$stop" ] &&
+                [ "$(native_field "@.rules[$idx].weekdays")" = "$days" ] &&
+                [ "$(native_field "@.rules[$idx].timezone")" = UTC ] || fail "schedule unconfirmed"
+            fi
+            matches=$((matches+1))
+        fi
+        idx=$((idx+1))
+    done
+    case "$action:$matches" in save:1|delete:0) ;; *) fail "rule state unconfirmed";; esac
 }
 [ "$#" = 2 ] || fail "invalid arguments"
 op="$1"; session="$2"
@@ -95,6 +142,7 @@ case "$op" in
         json_add_string mac "$mac"; json_add_string enabled "$enabled"
         json_add_string start_time "$start"; json_add_string stop_time "$stop"; json_add_string weekdays "$days"
         rpc veci.v2.firewall saveParent "$(json_dump)"
+        verify_slot
         json_init; json_add_string code 1; json_add_string reason "Scheduled rule saved; packet enforcement unverified"
         json_add_string revision "$(native_field '@.revision')"; json_dump; exit 0
         ;;
@@ -127,6 +175,7 @@ case "$op" in
         json_add_string confirmation "$confirmation"; json_add_string action "$action"
         json_add_string mac "$mac"; json_add_string enabled "$enabled"
         rpc veci.v2.firewall saveAcl "$(json_dump)"
+        verify_slot
         json_init; json_add_string code 1; json_add_string reason "Scoped LAN ACL saved; packet enforcement unverified"
         json_add_string revision "$(native_field '@.revision')"; json_dump; exit 0
         ;;
@@ -283,9 +332,9 @@ case "$op" in
         case "$operation:$confirm" in REJECT:BLOCK_CLIENT|ACCEPT:UNBLOCK_CLIENT) ;; *) fail "confirmation mismatch";; esac
         rpc veci.v2.firewall status '{}'
         [ "$(native_field '@.revision')" = "$revision" ] || fail "stale firewall configuration"
-        (json_load "$native" && json_get_type typ blocked_macs && [ "$typ" = array ]) || fail "MAC inventory unavailable"
+        existing="$(native_macs)" || fail "MAC inventory unavailable"
         addresses=""; found=0
-        for entry in $(native_field '@.blocked_macs[*]' || true); do
+        for entry in $existing; do
             printf '%s\n' "$entry" | grep -Eiq '^[0-9a-f]{2}(:[0-9a-f]{2}){5}$' || fail "invalid existing MAC"
             entry="$(printf '%s' "$entry" | tr A-F a-f)"
             if [ "$entry" = "$mac" ]; then found=1; continue; fi
@@ -298,6 +347,8 @@ case "$op" in
             json_init; json_add_string revision "$revision"; json_add_string confirmation SAVE_MAC_BLOCK
             json_add_string addresses "$addresses"
             rpc veci.v2.firewall setMacBlock "$(json_dump)"
+            actual="$(native_macs)" || fail "MAC inventory unavailable"
+            [ "$actual" = "$addresses" ] || fail "client policy unconfirmed"
         fi
         json_init; json_add_string code 1; json_add_string reason "native client policy accepted"
         json_add_string return_operation "$operation"; json_add_string scope lan_to_wan
@@ -317,9 +368,12 @@ case "$op" in
             addresses="${addresses:+$addresses }$mac"
         done
         json_select ..
+        addresses="$(normalize_macs "$addresses")" || fail "invalid MAC list"
         json_init; json_add_string revision "$revision"; json_add_string confirmation "$confirm"
         json_add_string addresses "$addresses"
         rpc veci.v2.firewall setMacBlock "$(json_dump)"
+        actual="$(native_macs)" || fail "MAC inventory unavailable"
+        [ "$actual" = "$addresses" ] || fail "MAC list unconfirmed"
         ;;
     set_fw_setting|set_nat_acceleration)
         revision="$(read_field '@.revision')" || fail "firewall revision required"
