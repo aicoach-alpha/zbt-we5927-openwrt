@@ -71,6 +71,28 @@ class FeatureContract(unittest.TestCase):
         self.assertTrue(any(x.startswith("hardware_uat_missing:") for x in blockers))
         self.assertIn("signed_image_not_verified",blockers)
 
+    def test_recovery_cannot_be_replaced_by_static_or_boolean(self):
+        for value in (True, "PASS", {"evidence_type":"static", "result":"PASS"}):
+            self.assertTrue(GATE.recovery_blockers({"physical_recovery_receipt":value}))
+        self.assertIn("physical_recovery_receipt_missing",GATE.evaluate(CONTRACT,{}))
+
+    def test_recovery_receipt_requires_exact_bindings(self):
+        receipt={"schema":"we5927-physical-recovery.v1","board_id":"ZBT-WE5927-DSIM",
+                 "bootloader_sha256":GATE.OWNER_MTD0_SHA,
+                 "signed_candidate_sha256":"a"*64,"rescue_image_sha256":"b"*64,
+                 "evidence_sha256":"c"*64,"evidence_type":"physical_test","result":"PASS"}
+        for key in ("recovery_entry_verified","restore_verified","boot_after_restore_verified",
+                    "critical_partitions_unchanged","owner_approved"):
+            receipt[key]=True
+        ev={"signed_image_sha256":"a"*64,"physical_recovery_receipt":receipt}
+        self.assertEqual(GATE.recovery_blockers(ev),[])
+        self.assertIn("contract_disallows_flash",GATE.evaluate(CONTRACT,ev))
+        for key,value in (("bootloader_sha256","d"*64),("signed_candidate_sha256","d"*64),
+                          ("rescue_image_sha256","0"*64),("evidence_type","static"),
+                          ("restore_verified","true"),("evidence_sha256","")):
+            broken=dict(receipt,**{key:value})
+            self.assertTrue(GATE.recovery_blockers(dict(ev,physical_recovery_receipt=broken)),key)
+
     def test_owner_endurance_starts_after_flash(self):
         self.assertEqual(CONTRACT["post_flash_gates"], ["continuous_72h_on_owner_router"])
         self.assertFalse(any("72h" in gate for gate in CONTRACT["mandatory_gates"]))

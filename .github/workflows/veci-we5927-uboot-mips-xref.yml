@@ -12,6 +12,8 @@ on:
       - 'scripts/tests/test_we5927_uboot_pic_got_20261127.py'
       - 'scripts/ci/we5927_uboot_message_sink_20261127.py'
       - 'scripts/tests/test_we5927_uboot_message_sink_20261127.py'
+      - 'scripts/ci/we5927_uboot_return_branch_20261127.py'
+      - 'scripts/tests/test_we5927_uboot_return_branch_20261127.py'
       - '.github/workflows/veci-we5927-uboot-mips-xref.yml'
   workflow_dispatch:
 permissions:
@@ -32,3 +34,4 @@ jobs:
       - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_pointer_table_20261127.py -v
       - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_pic_got_20261127.py -v
       - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_message_sink_20261127.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_return_branch_20261127.py -v
