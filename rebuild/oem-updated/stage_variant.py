@@ -23,13 +23,18 @@ REPLACEMENTS = (
      'function i(e){return fetch("/ubus",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({jsonrpc:"2.0",id:1,method:"call",params:["00000000000000000000000000000000","session","login",{username:e.username,password:e.password,timeout:300}]})}).then(function(r){if(!r.ok)throw Error("Login failed");return r.json()}).then(function(r){if(!r.result||r.result[0]!==0||!r.result[1]||!/^[a-f0-9]{32}$/.test(r.result[1].ubus_rpc_session))throw Error("Login failed");return {code:"1",reason:"success",access_token:r.result[1].ubus_rpc_session,wifi_type:"2"}})}'),
     ('a={access_token:t,t:new Date};return e.params?Object.assign(e.params,a):e.params=a,e',
      'a={t:new Date};return e.headers=e.headers||{},t&&(e.headers["X-OEM-Session"]=t),e.params?Object.assign(e.params,a):e.params=a,e'),
+    # Keep the authenticated session path, without logging the rpcd token or
+    # copying the submitted password into the OEM global Vuex state.
+    ('username:"admin",password:"admin"', 'username:"admin",password:""'),
+    ('var a=t.username,l=t.password;e.username=a,e.password=l', 'e.username=t.username'),
+    ('console.log(l);var i=l.access_token;', 'var i=l.access_token;'),
     ('url:"/webapi/login?op=logout",method:"get"', 'url:"/webapi?op=logout",method:"post"'),
     ('method:"get",params:{token:e}', 'method:"get"'),
 )
 MAKEFILE = """include $(TOPDIR)/rules.mk
 PKG_NAME:=oem-updated-ui-dev
 PKG_VERSION:=0.1
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 include $(INCLUDE_DIR)/package.mk
 define Package/oem-updated-ui-dev
   SECTION:=admin
@@ -186,6 +191,18 @@ def stage(image, out):
                 value=value.replace(old,new)
             path.write_text(value)
             subprocess.run(["node","--check",str(path)],check=True)
+        # Both desktop and compact OEM forms logged password-bearing objects.
+        for name, variable in (("chunk-33a47ebe.c8f6e7f1.js", "t"),
+                               ("chunk-2d213e1f.23b815a9.js", "s")):
+            call = 'this.proxy_req("post","/webapi?op=set_samba_info"'
+            edit_chunk(name, [('console.log(' + variable + '),' + call, call)])
+        for name in ("chunk-74b534eb.83542645.js", "chunk-2d2213f8.4e8313da.js"):
+            edit_chunk(name, [
+                ('t.values=t.obj_to_arr(e,t.form_dict),console.log(t.values)',
+                 't.values=t.obj_to_arr(e,t.form_dict)'),
+                ('t.proto=this.category,console.log(t),this.proxy_req',
+                 't.proto=this.category,this.proxy_req'),
+            ])
         edit_chunk("chunk-2d224d12.c4bda38e.js", [
             ('this.proxy_req("post","/webapi?op=get_ddns_log"',
              'this.proxy_req("get","/webapi?op=get_ddns_log"'),
