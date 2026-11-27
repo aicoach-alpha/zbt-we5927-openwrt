@@ -257,6 +257,7 @@ case "$op" in
         json_init; json_add_string dbm "$dbm"; json_add_string expected "$expected"
         json_add_string confirmation "$confirm"
         rpc veci.v2.wifi setPower "$(json_dump)"
+        [ "$(native_field '@.configured')" = "$dbm" ] || fail "Wi-Fi power unconfirmed"
         ;;
     setAutoreboot)
         enabled="$(read_field '@.enabled')" || fail "schedule enable state required"
@@ -547,30 +548,46 @@ case "$op" in
         case "$action" in
             SET_SSID)
                 ssid="$(read_field '@.ssid_hex')" || fail "encoded SSID required"
-                json_init; json_add_string ssid_hex "$ssid"
-                rpc veci.v2.wifi setSsid "$(json_dump)";;
+                original_ssid="$ssid"
+                case "$ssid" in ''|*[!0123456789abcdef]*) fail "invalid encoded SSID";; esac
+                [ "${#ssid}" -le 64 ] && [ $((${#ssid} % 2)) -eq 0 ] || fail "invalid encoded SSID"
+                wanted=
+                while [ -n "$ssid" ]; do
+                    rest=${ssid#??}; pair=${ssid%"$rest"}
+                    case "$pair" in 0?|1?|7f) fail "invalid encoded SSID";; esac
+                    wanted=$wanted$(printf '%b' "$(printf '\\%03o' "0x$pair")")
+                    ssid=$rest
+                done
+                json_init; json_add_string ssid_hex "$original_ssid"
+                rpc veci.v2.wifi setSsid "$(json_dump)"
+                [ "$(native_field '@.ssid')" = "$wanted" ] || fail "SSID unconfirmed";;
             SET_CHANNEL)
                 channel="$(read_field '@.channel')" || fail "channel required"
                 if [ "$channel" = 0 ]; then
                     json_init; json_add_string action AUTO_CHANNEL_2G
                     rpc veci.v2.wifi setAutoChannel "$(json_dump)"
+                    channel=auto
                 else
                     json_init; json_add_string channel "$channel"
                     rpc veci.v2.wifi setChannel "$(json_dump)"
-                fi;;
+                fi
+                [ "$(native_field '@.configured_channel')" = "$channel" ] || fail "channel unconfirmed";;
             SHOW_SSID|HIDE_SSID)
                 json_init; json_add_string action "$action"
-                rpc veci.v2.wifi setVisibility "$(json_dump)";;
+                rpc veci.v2.wifi setVisibility "$(json_dump)"
+                case "$action:$(native_field '@.configured_visible')" in SHOW_SSID:true|HIDE_SSID:false) ;; *) fail "visibility unconfirmed";; esac;;
             SET_AUTH)
                 mode="$(read_field '@.encryption')" || fail "security mode required"
                 key="$(read_field '@.key_hex')" || fail "encoded key required"
                 json_init; json_add_string mode "$mode"; json_add_string key_hex "$key"
-                rpc veci.v2.wifi setAuth "$(json_dump)";;
+                rpc veci.v2.wifi setAuth "$(json_dump)"
+                [ "$(native_field '@.configured_encryption')" = "$mode" ] || fail "encryption unconfirmed";;
             SET_ACCESS)
                 mode="$(read_field '@.macfilter')" || fail "access mode required"
                 macs="$(read_field '@.addresses')" || fail "MAC list required"
                 json_init; json_add_string mode "$mode"; json_add_string addresses "$macs"
-                rpc veci.v2.wifi setAccess "$(json_dump)";;
+                rpc veci.v2.wifi setAccess "$(json_dump)"
+                [ "$(native_field '@.configured_access')" = "$mode" ] || fail "access mode unconfirmed";;
             *) fail "unsupported Wi-Fi action";;
         esac
         ;;

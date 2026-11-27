@@ -571,10 +571,10 @@
       "limitations": "Explicit opt-in, revision guarded and owned cron record; existing cron jobs preserved. Actual scheduled reboot acceptance pending."
     },
     "setWiFi2": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.wifi:setSsid/setChannel/setAutoChannel/setVisibility/setAuth/setAccess",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "One explicit action per request, no global reload; original combined form needs frontend adaptation; remaining radio controls pending."
+      "evidence": "scripts/tests/test_owner_wifi_acceptance.py; scripts/uat/test-wifi-name-host.py; scripts/uat/test-wifi-controls-host.py; scripts/tests/test_oem_wifi_writes.py#WifiWrites.test_wifi_mutation_response_and_acl",
+      "limitations": "Single explicit action SSID, visibility, auto/manual channel, security and MAC access; shared staged UCI rollback and activation interlock. Native UCI/libubox with simulated RF and ubus passed. Original OEM combined forms and physical activation pending."
     },
     "setWiFi2_nocommit": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -825,10 +825,10 @@
       "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "set_wifi_power": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.wifi:setPower",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Native dBm or regulatory auto, conservative cap from live permitted channels, next manual boot only. Legacy high/medium/low form not mapped; radio UAT pending."
+      "evidence": "scripts/tests/test_owner_wifi_acceptance.py; scripts/uat/test-wifi-name-host.py; scripts/uat/test-wifi-controls-host.py; scripts/tests/test_oem_wifi_writes.py#WifiWrites.test_wifi_mutation_response_and_acl",
+      "limitations": "dBm/auto only, conservative regulatory cap, next manual boot; actual driver transmit power not verified. Native UCI/libubox with simulated RF and ubus passed. Original OEM combined forms and physical activation pending."
     },
     "setbootflag": {
       "state": "SOURCE_DISABLED_REVIEWED",
