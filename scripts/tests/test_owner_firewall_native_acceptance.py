@@ -68,6 +68,8 @@ exit 0
         data=data.replace("/etc/config/network",str(network)).replace("/usr/libexec/veci2-lan-bounds",str(RUNTIME/"veci2-lan-bounds")).replace("/var/lock/veci2-ipv6.lock",str(self.root/"network.lock")).replace("/var/run/veci2-reboot-requested",str(self.root/"reboot-pending")).replace("/etc/nftables.d/90-veci-ttl.nft",str(self.root/"ttl.nft"))
         data=data.replace("/etc/init.d/firewall",str(reloadscript))
         data=data.replace("/usr/share/libubox/jshn.sh",str(Path(LIBUBOX)/"share/libubox/jshn.sh"))
+        (self.root/"nftables.d").mkdir()
+        data=data.replace("/etc/nftables.d",str(self.root/"nftables.d"))
         program.write_text(data)
         program.chmod(0o755)
         self.program=program
@@ -100,11 +102,20 @@ esac
         fw4=self.root/"fw4"
         fw4.write_text('#!/bin/sh\n[ "$*" = check ] || exit 99\n[ "${FAIL_FW:-0}" = 0 ]\n')
         fw4.chmod(0o755)
+        nft=self.root/"nft"
+        nft.write_text("""#!/bin/sh
+case "$*" in
+ 'list table inet fw4') [ ! -f "$TABLE_MISSING" ];;
+ 'list chain inet fw4 veci_ttl_forward') [ -f "$TTL_FILE" ] && cat "$TTL_FILE";;
+ *) exit 99;;
+esac
+""")
+        nft.chmod(0o700)
         self.delta=self.root/"delta"
         self.delta.mkdir()
         self.call_log=self.root/"called.log"
         self.env=dict(os.environ,HOST_UCI=UCI_HOST,TEST_CFG=str(self.config),
-                      TEST_DELTA=str(self.delta),RELOAD_FAIL_ONCE=str(self.failflag),JSON_PREFIX="",JSON_UNSET="",JSON_SEQ="0",JSON_CUR="J_V",FAKE_CALL_LOG=str(self.call_log),
+                      TEST_DELTA=str(self.delta),TTL_FILE=str(self.root/"ttl.nft"),TABLE_MISSING=str(self.root/"table-missing"),RELOAD_FAIL_ONCE=str(self.failflag),JSON_PREFIX="",JSON_UNSET="",JSON_SEQ="0",JSON_CUR="J_V",FAKE_CALL_LOG=str(self.call_log),
                       PATH=str(self.root)+":"+LIBUBOX+"/bin:"+os.environ["PATH"],
                       LD_LIBRARY_PATH=LIBUBOX+"/lib:"+os.environ.get("LD_LIBRARY_PATH",""))
     def uci(self, *args):
@@ -261,6 +272,24 @@ esac
         self.assertEqual(self.call("aclStatus")["error"],"foreign_acl_slot")
         self.assertEqual(self.firewall.read_bytes(),before)
 
+    def test_ttl_state_and_rollback(self):
+        initial=self.call("ttlStatus")
+        args=dict(enabled="1",ttl="64",revision=initial["revision"],confirmation="ENABLE_FORWARD_TTL")
+        (self.root/"reboot-pending").touch()
+        self.assertEqual(self.call("setTtl",**args)["error"],"reboot_pending")
+        (self.root/"reboot-pending").unlink()
+        self.failflag.touch()
+        self.assertEqual(self.call("setTtl",**args)["error"],"ttl_apply_failed_rollback_attempted")
+        self.assertFalse((self.root/"ttl.nft").exists())
+        saved=self.call("setTtl",**args)
+        self.assertEqual(saved["runtime"],"rule_present",saved)
+        self.assertFalse(saved["packet_verified"])
+        disable=dict(enabled="0",revision=saved["revision"],confirmation="DISABLE_FORWARD_TTL")
+        (self.root/"table-missing").touch()
+        self.assertEqual(self.call("setTtl",**disable)["error"],"ttl_apply_failed_rollback_attempted")
+        self.assertTrue((self.root/"ttl.nft").exists())
+        (self.root/"table-missing").unlink()
+        self.assertEqual(self.call("setTtl",**disable)["runtime"],"rule_absent")
     def test_acl_scope_and_no_wan_policy_relaxation(self):
         acl=json.loads((RUNTIME/"veci2-status-acl.json").read_text())["veci-v2-firewall"]
         self.assertEqual(set(acl["read"]["ubus"]["veci.v2.firewall"]),{"status","ttlStatus","aclStatus","parentStatus"})

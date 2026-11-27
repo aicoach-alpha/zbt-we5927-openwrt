@@ -166,6 +166,7 @@ ttl_status() {
 if [ "$2" = ttlStatus ] || [ "$2" = setTtl ]; then
   exec 9<"$0"; flock -n 9 || fail busy
   if [ "$2" = ttlStatus ]; then ttl_status; exit 0; fi
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
   request=$(head -c 513)
   [ "${#request}" -le 512 ] || fail request_too_large
   enabled=$(jsonfilter -s "$request" -e '@.enabled') || fail invalid_request
@@ -189,11 +190,15 @@ if [ "$2" = ttlStatus ] || [ "$2" = setTtl ]; then
   staged=$(mktemp /etc/nftables.d/.veci-ttl.XXXXXX) || { rm -rf "$tmp"; fail tmp_failed; }
   trap 'rm -rf "$tmp"; rm -f "$staged"' EXIT
   if [ "$ttl_enabled" = 1 ]; then cp "$ttl_file" "$tmp/previous" || fail backup_failed; fi
+  pending=$(uci -q changes firewall) || fail config_unavailable
+  [ -z "$pending" ] || fail pending_firewall_changes
+  ttl_read
+  [ "$revision" = "$ttl_revision" ] || fail stale_configuration
   if [ "$enabled" = 1 ]; then ttl_render "$value" > "$staged" && mv "$staged" "$ttl_file" || fail stage_failed
   else rm -f "$ttl_file" || fail stage_failed; fi
   if ! fw4 check >/dev/null 2>&1 || ! /etc/init.d/firewall reload >/dev/null 2>&1 ||
      { [ "$enabled" = 1 ] && ! nft list chain inet fw4 veci_ttl_forward 2>/dev/null | grep -Fq "ip ttl set $value counter"; } ||
-     { [ "$enabled" = 0 ] && nft list chain inet fw4 veci_ttl_forward >/dev/null 2>&1; }; then
+     { [ "$enabled" = 0 ] && { ! nft list table inet fw4 >/dev/null 2>&1 || nft list chain inet fw4 veci_ttl_forward >/dev/null 2>&1; }; }; then
     if [ -f "$tmp/previous" ]; then cp "$tmp/previous" "$staged" && mv "$staged" "$ttl_file" || fail rollback_failed
     else rm -f "$ttl_file" || fail rollback_failed; fi
     /etc/init.d/firewall reload >/dev/null 2>&1 || fail rollback_failed
