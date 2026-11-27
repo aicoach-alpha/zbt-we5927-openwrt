@@ -234,6 +234,16 @@
       "scope": "Passive mesh interface and observed station counts",
       "state": "FIXTURE_PASS_NOT_UAT",
       "limitations": "No mesh provisioning or connectivity proof"
+    },
+    "manual_reboot": {
+      "provider": "veci.v2.system",
+      "methods": [
+        "rebootStatus",
+        "rebootNow"
+      ],
+      "scope": "Explicit owner confirmation, current boot identity, verification and restore interlocks, no retry",
+      "state": "SOURCE_INTEGRATED_NOT_UAT",
+      "limitations": "Mocked native request only; actual reboot and recovery unverified"
     }
   },
   "remaining": [

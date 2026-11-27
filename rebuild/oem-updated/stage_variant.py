@@ -448,6 +448,8 @@ def stage(image, out):
             '<button id="tunnel-refresh" type="button">Read optional profiles</button><pre id="tunnel-result" role="status"></pre></article>'
             '<article><h2>Native mesh observation</h2><p>Passive driver inventory only. No mesh configuration or WPS script. Observed stations do not establish a working topology.</p>'
             '<button id="mesh-refresh" type="button">Read mesh interfaces</button><pre id="mesh-result" role="status"></pre></article>'
+            '<article><h2>Manual reboot</h2><p>Explicit owner action only. All connections will be interrupted. Firmware verification and restore must be idle. No automatic retry.</p>'
+            '<button id="reboot-check" type="button">Check availability</button><button id="reboot-now" type="button" disabled>Reboot router now</button><p id="reboot-result" role="status"></p></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

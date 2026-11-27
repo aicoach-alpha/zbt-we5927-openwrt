@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "upstream_commit": "c1e7aea26fd09bcbc62fa2d2e50781ffac5b3d3d",
+  "upstream_commit": "267539363ea3e477d6501ce0b5b3a844a822479e",
   "upstream_branch": "feat/shared-dhcp-pool-traffic-20261126",
   "status": "source_synced_not_runtime_accepted",
   "files": {
@@ -11,7 +11,7 @@
     "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6": "038862684426c507120a1e40b22d2f7016fcc57da08ce542c53bd73667c7329b",
     "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra": "0c1797aabfd2c7e343e42afe5d96dae74e418bc2d3a637e1b010be264369c273",
     "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json": "eb74a43c6b3cb8364ee7ada9c910c7840f5b6d08314b1821020ea7158c89a455",
-    "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "afca548695d918410223688dbba7edca6515fb3b0fe46981ee4d8bf0a6734200",
+    "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "016205f538a76d8730b092e0e9c35f143c2656d2218d19fea3f4f3681b6b25ed",
     "rebuild/veci-v2/packages/veci-v2-runtime/files/etc/init.d/veci2-observe": "3d692a3f4ecad588732a61543ece7aba1becb98c35ced541145ef001e008e4be",
     "rebuild/veci-v2/packages/veci-v2-runtime/update-policy.default": "5cbd4963ad40386508a15657dc46eca771d7d830cc90b8833adf0453020c247c",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-access": "39151ca7f60d0ecf54d63180a3b2f0973e96c2064f3f6626ee652e9e96e6c7e6",
@@ -43,8 +43,8 @@
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-sim-manual": "0f096a5806ea0d59fafe2f453f83dd39a7c31ab8cce9ceadb8fa91099d91b7a4",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-static-leases": "803403375b725eda35e5d9bf35d2ca12af91e5f2c0a19c876807702a5ffad902",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status": "546c97c5d89f2cb02c36fc7c8d45a2a95a5bf72080942cd2d0adfe4317ef74d8",
-    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "8245c6eff80d9ea5b38eceec58cd44c3b551927f284c1178b8cb6689398d278e",
-    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin": "3ae3ea5adffcf19bd73a864daa47baf0c6a4f270db02b4711675af0e5c16e5b3",
+    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "c834cd08c0a6e7619dabfa209e28a6a15b693cb5aabc24d0cf96cf35221420da",
+    "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin": "0764a393be22432a2d7c78914d17ccd9cabeda28610071a61ade902f462f788f",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-update-policy": "90eb2f545a7c2377e48365bb5bfe046b1eb104476d4d49e08f53598136f1218e",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-verify-image": "4c674c92aba523f35af0501315fb7e817a0039c0b0bc30305525736732bff19d",
     "rebuild/veci-v2/packages/veci-v2-runtime/veci2-watchdog-acl.json": "160bd2f1bae39c1faa3a8bd818ba51bb981834a887d9227140931be213cdf9f4",

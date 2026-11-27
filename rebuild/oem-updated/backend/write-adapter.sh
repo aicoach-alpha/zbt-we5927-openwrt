@@ -8,7 +8,7 @@ fail() { json_init; json_add_string code -4; json_add_string reason "$1"; json_d
 read_field() { printf '%s' "$body" | jsonfilter -e "$1"; }
 native_field() { printf '%s' "$native" | jsonfilter -e "$1"; }
 rpc() {
-    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.dhcp:setPool|veci.v2.addon:setPortalStartup|veci.v2.addon:setOptionalStartup|veci.v2.addon:saveSqm|veci.v2.addon:setOpenvpnStartup|veci.v2.addon:ddnsLookup|veci.v2.system:setNtp|veci.v2.firewall:setDmz|veci.v2.firewall:setDefaults|veci.v2.firewall:setOffload|veci.v2.firewall:setMacBlock|veci.v2.firewall:setTtl|veci.v2.firewall:saveAcl|veci.v2.firewall:aclStatus|veci.v2.firewall:parentStatus|veci.v2.firewall:saveParent|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.interfaces:pppoeAction|veci.v2.interfaces:pppoeDiscovery|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.wifi:setPower|veci.v2.wifi:saveUplink|veci.v2.cron:setReboot|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
+    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.dhcp:setPool|veci.v2.addon:setPortalStartup|veci.v2.addon:setOptionalStartup|veci.v2.addon:saveSqm|veci.v2.addon:setOpenvpnStartup|veci.v2.addon:ddnsLookup|veci.v2.system:setNtp|veci.v2.system:rebootNow|veci.v2.firewall:setDmz|veci.v2.firewall:setDefaults|veci.v2.firewall:setOffload|veci.v2.firewall:setMacBlock|veci.v2.firewall:setTtl|veci.v2.firewall:saveAcl|veci.v2.firewall:aclStatus|veci.v2.firewall:parentStatus|veci.v2.firewall:saveParent|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.interfaces:pppoeAction|veci.v2.interfaces:pppoeDiscovery|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.wifi:setPower|veci.v2.wifi:saveUplink|veci.v2.cron:setReboot|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
     # Do not bypass the session's permission on the actual backend method.
     json_init; json_add_string ubus_rpc_session "$session"; json_add_string scope ubus
     json_add_string object "$1"; json_add_string function "$2"
@@ -25,6 +25,17 @@ body="$(head -c 2049)"
 [ "$(printf '%s' "$body" | wc -c)" -le 2048 ] || fail "request too large"
 json_load "$body" || fail "invalid JSON"
 case "$op" in
+    reboot)
+        confirmation="$(read_field '@.confirmation')" || fail "confirmation required"
+        [ "$confirmation" = REBOOT_WE5927_NOW ] || fail "confirmation mismatch"
+        boot_id="$(read_field '@.boot_id')" || fail "boot identity required"
+        printf '%s' "$boot_id" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' || fail "invalid boot identity"
+        json_init; json_add_string confirmation "$confirmation"; json_add_string boot_id "$boot_id"
+        rpc veci.v2.system rebootNow "$(json_dump)"
+        [ "$(native_field '@.requested')" = true ] || fail "reboot request unconfirmed"
+        json_init; json_add_string code 1; json_add_string reason "Reboot requested; completion not verified"
+        json_add_string reboot_verified false; json_dump; exit 0
+        ;;
     ddns_detection)
         [ "$(read_field '@.confirmation')" = CHECK_DDNS_LOOKUP ] || fail "confirmation required"
         rpc veci.v2.addon ddnsLookup '{}'

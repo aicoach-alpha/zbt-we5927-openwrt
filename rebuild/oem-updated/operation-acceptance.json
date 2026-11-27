@@ -535,7 +535,10 @@
       "limitations": "Scoped Ethernet down/up request, not proof of session establishment. Device mapping, disconnected netifd layout, and live reconnection acceptance pending."
     },
     "reboot": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.system:rebootStatus/rebootNow",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_manual_reboot.py",
+      "limitations": "Explicit HTTPS authenticated POST with native boot ID and maintenance interlocks; mocked native request, stale/duplicate/locked cases passed. Actual procd reboot, post-reboot recovery, concurrent maintenance after accepted request and OEM original form pending."
     },
     "refresh_days_traffic": {
       "state": "PROTOTYPE",

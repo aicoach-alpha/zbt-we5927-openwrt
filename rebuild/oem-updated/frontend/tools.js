@@ -38,6 +38,7 @@ function clearSession() {
   resetAcl();
   resetParent();
   resetVpn();
+  resetManualReboot();
   el("tunnel-result").textContent="";
   el("mesh-result").textContent="";
   resetUplink();
@@ -630,4 +631,30 @@ el('mesh-refresh').onclick=async()=>{
     if(sid===token)el('mesh-result').textContent=x.data.length?x.data.map(r=>r.interface+': '+(r.observed_station_count||'unknown')+' observed stations').join('\n')+'\nTopology unverified.':'No mesh interface observed.';
   }catch(e){if(sid===token)el('mesh-result').textContent=e.message;}
   finally{b.disabled=false;}
+};
+
+let currentBoot=null;
+function resetManualReboot(){
+  currentBoot=null;el('reboot-now').disabled=true;el('reboot-result').textContent='';
+}
+el('reboot-check').onclick=async()=>{
+  const token=sid,b=el('reboot-check');if(!token||b.disabled)return;
+  b.disabled=true;resetManualReboot();
+  try{
+    const x=await rpc('veci.v2.system','rebootStatus',{},token);
+    if(!x.ok||!/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.test(x.boot_id||''))throw Error('Boot identity unavailable');
+    if(sid!==token)return;
+    if(x.eligible===true){currentBoot=x.boot_id;el('reboot-now').disabled=false;}
+    el('reboot-result').textContent=x.eligible?'Maintenance locks available.':'Maintenance busy or unavailable.';
+  }catch(e){if(sid===token)el('reboot-result').textContent=e.message;}
+  finally{b.disabled=false;}
+};
+el('reboot-now').onclick=async()=>{
+  const token=sid,boot=currentBoot;if(!token||!boot)return;
+  if(!window.confirm('Reboot this WE5927 router now? All connected clients will lose service temporarily.'))return;
+  resetManualReboot();
+  try{
+    await oem('reboot',{boot_id:boot,confirmation:'REBOOT_WE5927_NOW'},token);
+    if(sid===token)el('reboot-result').textContent='Request accepted; actual reboot not yet verified.';
+  }catch(e){if(sid===token)el('reboot-result').textContent='Request outcome unknown. Do not retry until you confirm router status.';}
 };
