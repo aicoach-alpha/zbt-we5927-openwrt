@@ -326,7 +326,7 @@ def stage(image, out):
         # Reuse native controls, not the complete VeCI frontend or a second backend.
         tools = files / "www/oem-tools"
         tools.mkdir()
-        for name in ("sms-codec.js", "sms-center.js", "backup.js", "dns-settings.js", "guest-check.js"):
+        for name in ("sms-codec.js", "sms-center.js", "backup.js", "dns-settings.js", "guest-check.js", "uplink.js"):
             shutil.copyfile(shared / "veci2" / name, tools / name)
         # Existing client module has three comma-expression loops; use arrays.
         sms = tools / "sms-center.js"
@@ -352,6 +352,7 @@ def stage(image, out):
         backup_panel = panel('id="backup-export"')
         dns_panel = panel('id="dns-form"')
         guest_panel = panel('id="guest-status-read"')
+        uplink_panel = panel('id="uplink-refresh"')
         (tools / "index.html").write_text(
             '<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>OEM Updated — Services</title><link rel="stylesheet" href="tools.css"><body>'
@@ -430,12 +431,7 @@ def stage(image, out):
             '<label>Client MAC<input id="acl-mac" maxlength="17" placeholder="aa:bb:cc:dd:ee:ff"></label>'
             '<label><input id="acl-enabled" type="checkbox">Enable block</label>'
             '<button id="acl-save" disabled>Save slot</button><button id="acl-toggle" type="button" disabled>Change enabled state</button><button id="acl-delete" type="button" disabled>Delete slot</button></form></article>'
-            '<article><h2>Wi-Fi uplink (optional)</h2><p>Requires preconfigured WWAN DHCP in the WAN zone. New profile is disabled. Single radio: enabling STA may affect primary AP channel or availability. No automatic reload.</p>'
-            '<button id="uplink-refresh" type="button">Read uplink profile</button><p id="uplink-result" role="status"></p>'
-            '<form id="uplink-form" autocomplete="off"><label>SSID<input id="uplink-ssid" maxlength="32" required></label>'
-            '<label>WPA2 password<input id="uplink-secret" type="password" minlength="8" maxlength="63" required autocomplete="new-password"></label>'
-            '<button id="uplink-save" disabled>Save disabled profile</button></form>'
-            '<button id="uplink-toggle" type="button" disabled>Toggle uplink startup</button></article>'
+            + uplink_panel +
             '<article><h2>Scheduled internet access (UTC)</h2><p>Eight optional per-device LAN-to-WAN block intervals; existing connections may not be interrupted. Overnight interval requires two slots. No global switch.</p>'
             '<button id="parent-refresh" type="button">Read schedules</button><pre id="parent-result" role="status"></pre>'
             '<form id="parent-form"><label>Slot<select id="parent-slot"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>'
@@ -465,7 +461,7 @@ def stage(image, out):
             '<label>Expected SHA-256<input id="firmware-sha" maxlength="64" required></label>'
             '<button id="firmware-submit">Verify only</button></form><p id="firmware-result" role="status"></p></article></main>'
             '<script src="sms-codec.js"></script><script src="sms-center.js"></script>'
-            '<script src="dns-settings.js"></script><script src="tools.js"></script><script src="guest-check.js"></script><script src="backup.js"></script></body></html>')
+            '<script src="dns-settings.js"></script><script src="tools.js"></script><script src="guest-check.js"></script><script src="uplink.js"></script><script src="backup.js"></script></body></html>')
         landing = files / "www/index.html"
         html = landing.read_text()
         if html.count("</body>") != 1:

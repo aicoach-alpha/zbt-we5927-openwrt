@@ -57,6 +57,7 @@ case "$op" in
         json_init; json_add_string action "$action"; json_add_string revision "$revision"
         json_add_string confirmation "$confirmation"
         rpc veci.v2.wifi saveUplink "$(json_dump)"
+        case "$action:$(native_field '@.enabled')" in enable:true|disable:false) ;; *) fail "uplink state unconfirmed";; esac
         json_init; json_add_string code 1; json_add_string reason "Uplink startup saved; manual activation required"
         json_dump; exit 0
         ;;

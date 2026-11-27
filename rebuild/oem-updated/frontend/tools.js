@@ -44,7 +44,7 @@ function clearSession() {
   el("reset-result").textContent="";
   el("tunnel-result").textContent="";
   el("mesh-result").textContent="";
-  resetUplink();
+  globalThis.VeciUplink?.reset?.();
   pppoeRevision="";el("pppoe-profile").reset();el("pppoe-save").disabled=true;el("pppoe-result").textContent="";
   ttlRevision='';el('ttl-form').reset();el('ttl-save').disabled=true;el('ttl-result').textContent='';
   macRevision=''; el('mac-form').reset(); el('mac-save').disabled=true; el('mac-result').textContent='';
@@ -484,49 +484,6 @@ async function changeAcl(action){
 el('acl-form').onsubmit=e=>{e.preventDefault();changeAcl('save');};
 el('acl-toggle').onclick=()=>changeAcl('toggle');
 el('acl-delete').onclick=()=>changeAcl('delete');
-
-let uplinkProfile=null;
-function resetUplink(){
-  uplinkProfile=null;el('uplink-form').reset();el('uplink-save').disabled=true;el('uplink-toggle').disabled=true;el('uplink-result').textContent='';
-}
-el('uplink-refresh').onclick=async()=>{
-  const token=sid,b=el('uplink-refresh');if(!token||b.disabled)return;
-  b.disabled=true;resetUplink();
-  try{
-    const x=await rpc('veci.v2.wifi','uplinkStatus',{},token);
-    if(!x.ok||!/^[0-9a-f]{64}$/.test(x.revision||''))throw Error('Uplink status unavailable');
-    if(sid!==token)return;
-    el('uplink-result').textContent=x.eligible?'WWAN topology eligible; connection not verified.':'WWAN topology unavailable; provisioning required.';
-    if(!x.eligible)return;
-    uplinkProfile=x;el('uplink-ssid').value=x.ssid||'';
-    el('uplink-save').disabled=x.enabled===true;
-    el('uplink-toggle').disabled=x.configured!==true;
-    el('uplink-toggle').textContent=x.enabled?'Disable at next boot':'Enable at next boot';
-  }catch(e){if(sid===token)el('uplink-result').textContent=e.message;}
-  finally{b.disabled=false;}
-};
-el('uplink-form').onsubmit=async e=>{
-  e.preventDefault();const token=sid,x=uplinkProfile;if(!token||!x||x.enabled)return;
-  if(location.protocol!=='https:'||!window.confirm('Save a disabled WPA2 uplink profile?'))return;
-  const args={revision:x.revision,action:'save',confirmation:'SAVE_UPLINK_DISABLED',ssid:el('uplink-ssid').value,password:el('uplink-secret').value};
-  resetUplink();
-  try{
-    const r=await rpc('veci.v2.wifi','saveUplink',args,token);
-    if(!r.ok||r.configured!==true||r.enabled!==false)throw Error('Save rejected or unverified');
-    if(sid===token)el('uplink-result').textContent='Disabled profile saved. Refresh before enabling.';
-  }catch(e){if(sid===token)el('uplink-result').textContent=e.message;}
-  finally{args.password='';}
-};
-el('uplink-toggle').onclick=async()=>{
-  const token=sid,x=uplinkProfile;if(!token||!x||!x.configured)return;
-  const action=x.enabled?'disable':'enable';
-  if(!window.confirm('Change uplink startup? Manual activation may affect primary Wi-Fi.'))return;
-  resetUplink();
-  try{
-    await oem('set_wifi_apclient',{revision:x.revision,action,confirmation:action==='enable'?'ENABLE_UPLINK_NEXT_BOOT':'DISABLE_UPLINK_NEXT_BOOT'},token);
-    if(sid===token)el('uplink-result').textContent='Startup saved. Manual activation required.';
-  }catch(e){if(sid===token)el('uplink-result').textContent=e.message;}
-};
 
 let parentRevision='',parentRules=[];
 function resetParent(){

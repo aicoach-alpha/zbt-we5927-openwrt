@@ -802,10 +802,10 @@
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_wizard_staging_refused"
     },
     "set_wifi_apclient": {
-      "state": "PROTOTYPE",
-      "provider": "veci.v2.wifi:saveUplink",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_uplink.py",
-      "limitations": "Startup toggle through CGI; credential editor through direct authenticated HTTPS RPC. Requires preprovisioned WAN-zoned WWAN DHCP and one owned STA profile. No automatic radio reload. Negative native fixture passed; successful write, first-time WWAN provisioning, original form, and single-radio AP/STA coexistence UAT pending."
+      "state": "FIXTURE_PASS",
+      "provider": "veci.v2.wifi:saveUplink/provisionWwan",
+      "evidence": "scripts/tests/test_oem_wwan_native.py#WwanNative.test_native_wwan_and_sta_lifecycle; #test_reject_and_rollback; #test_oem_uplink_adapter_scope_and_acl",
+      "limitations": "Host native UCI config-only provisioning and STA lifecycle plus mocked CGI ACL/status verification passed. fw4 check mocked, default WAN topology only. Real AP/STA association, traffic routing/priority, browser and original OEM form pending."
     },
     "set_wifi_client": {
       "state": "PROTOTYPE",

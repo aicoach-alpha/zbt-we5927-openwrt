@@ -194,11 +194,12 @@
       "provider": "veci.v2.wifi",
       "methods": [
         "uplinkStatus",
+        "provisionWwan",
         "saveUplink"
       ],
-      "scope": "Optional WPA2 STA profile on existing compatible WWAN DHCP, save disabled and separately enable at manual activation",
-      "state": "SOURCE_INTEGRATED_NOT_UAT",
-      "limitations": "Topology fixture passed; native write, WWAN provisioning, actual connectivity and AP coexistence pending"
+      "scope": "Native config-only WWAN DHCP IPv4 metric 50 in existing WAN zone; separate disabled WPA2 STA profile and manual activation; shared frontend",
+      "state": "FIXTURE_PASS_NOT_UAT",
+      "limitations": "Native host UCI lifecycle and isolated adapter fixtures passed; actual fw4, link, routing and single-radio AP coexistence pending."
     },
     "parental_schedule": {
       "provider": "veci.v2.firewall",

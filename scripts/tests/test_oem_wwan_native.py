@@ -1,5 +1,6 @@
 """Native host UCI WWAN lifecycle; firewall compilation and RF are mocked."""
 import os
+import json
 import subprocess
 import tempfile
 import unittest
@@ -84,3 +85,55 @@ json_dump() { :; }
         self.assertIn("provisionable=0",self.call("uplinkStatus").stdout)
         self.assertIn("foreign_or_unsupported_topology",self.provision().stdout)
         self.assertEqual({x.name:x.read_bytes() for x in self.cfg.iterdir()},original)
+
+    def test_oem_uplink_adapter_scope_and_acl(self):
+        # Resolve from the repository, independent of working directory.
+        adapter=Path(__file__).resolve().parents[2]/"rebuild/oem-updated/backend/write-adapter.sh"
+        (self.d/"adapter").write_text(adapter.read_text().replace("/usr/share/libubox/jshn.sh",str(self.d/"adapter-jshn")))
+        (self.d/"adapter-jshn").write_text("""
+json_load() { [ -n "$1" ]; }
+json_init() { fields=""; }
+json_add_string() { fields="$fields\n$1=$2"; }
+json_dump() {
+ printf '%b' "$fields" | python3 -c 'import sys,json; print(json.dumps(dict(x.split("=",1) for x in sys.stdin.read().splitlines() if x)))'
+}
+""")
+        f=self.d/"jsonfilter"
+        f.write_text("""#!/usr/bin/env python3
+import sys,json
+try:
+ v=json.load(sys.stdin)[sys.argv[2][2:]]
+ print(str(v).lower() if isinstance(v,bool) else v)
+except (KeyError,ValueError):sys.exit(1)
+""");f.chmod(0o700)
+        u=self.d/"ubus"
+        u.write_text("""#!/usr/bin/env python3
+import json,sys,os
+args=sys.argv[1:]
+if args[:2]==["-t","3"] and args[2:5]==["call","session","access"]:
+ a=json.loads(args[5])
+ assert a["object"]=="veci.v2.wifi" and a["function"]=="saveUplink"
+ print(json.dumps({"access":os.getenv("DENY")!="1"}))
+elif args[:2]==["-t","20"] and args[2:5]==["call","veci.v2.wifi","saveUplink"]:
+ with open(os.environ["CALLS"],"a") as f: f.write(args[5]+chr(10))
+ print(json.dumps({'ok':True,'enabled':json.loads(args[5])['action']=='enable' and os.getenv('MISMATCH')!='1'}))
+else:sys.exit(99)
+""");u.chmod(0o700)
+        def call(op,**patch):
+            body=dict(action="enable",revision="a"*64,confirmation="ENABLE_UPLINK_NEXT_BOOT")
+            deny=patch.pop("deny","0")
+            mismatch=patch.pop("mismatch","0")
+            body.update(patch)
+            return subprocess.run(["sh",str(self.d/"adapter"),op,"a"*32],input=json.dumps(body),text=True,capture_output=True,timeout=5,env=dict(os.environ,PATH=str(self.d)+":"+os.environ["PATH"],CALLS=str(self.d/"calls"),DENY=deny,MISMATCH=mismatch))
+        for action in ("enable","disable"):
+            r=call("set_wifi_apclient",action=action,confirmation=action.upper()+"_UPLINK_NEXT_BOOT")
+            self.assertEqual(json.loads(r.stdout)["code"],"1",r.stderr)
+        calls=[json.loads(x) for x in (self.d/"calls").read_text().splitlines()]
+        self.assertEqual([x["action"] for x in calls],["enable","disable"])
+        self.assertTrue(all(set(x)=={"action","revision","confirmation"} for x in calls))
+        for patch in ({"action":"save"},{"confirmation":"wrong"},{"password":"fixture-key"},{"deny":"1"}):
+            r=call("set_wifi_apclient",**patch)
+            self.assertEqual(json.loads(r.stdout)["code"],"-4",r.stderr)
+        self.assertEqual(len((self.d/"calls").read_text().splitlines()),2)
+        r=call("set_wifi_apclient",mismatch="1")
+        self.assertEqual(json.loads(r.stdout)["code"],"-4",r.stderr)
