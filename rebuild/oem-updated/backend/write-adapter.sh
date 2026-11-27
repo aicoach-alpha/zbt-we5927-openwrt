@@ -665,7 +665,7 @@ case "$op" in
                 gateway="$(read_field '@.gateway' || true)"
                 metric="$(read_field '@.metric' || true)"
                 case "$metric" in ''|0) ;; *) fail "custom route metric unsupported";; esac
-                prefix="$(awk -v m="$mask" 'BEGIN{if(split(m,a,"[.]")!=4)exit 1; v=0; for(i=1;i<=4;i++){if(a[i]!~/^(0|[1-9][0-9]?[0-9]?)$/||a[i]>255)exit 1;v=v*256+a[i]} for(p=0;p<=32;p++)if(v==4294967296-2^(32-p)){print p;exit}exit 1}')" || fail "invalid route mask"
+                prefix="$(awk -v m="$mask" 'BEGIN{if(split(m,a,"[.]")!=4)exit 1; v=0; for(i=1;i<=4;i++){if(a[i]!~/^(0|[1-9][0-9]?[0-9]?)$/||a[i]>255)exit 1;v=v*256+a[i]} block=4294967296;for(p=0;p<=32;p++){if(v==4294967296-block){print p;exit}block/=2}exit 1}')" || fail "invalid route mask"
                 json_add_string kind route; json_add_string prefix "$target/$prefix"
                 json_add_string interface "$iface"; json_add_string gateway "$gateway"; json_add_string table 254
                 rpc veci.v2.routes save "$(json_dump)";;

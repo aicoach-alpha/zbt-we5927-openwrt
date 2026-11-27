@@ -55,7 +55,7 @@ case "$1" in
                 address="${address%/*}"
                 case "$prefix" in ''|*[!0-9]*) error "invalid prefix";; esac
                 [ "$prefix" -le 32 ] || error "invalid prefix"
-                mask="$(awk -v p="$prefix" 'BEGIN {for(i=0;i<4;i++){n=p>8?8:p; if(n<0)n=0; printf "%s%d",i?".":"",256-2^(8-n);p-=n}}')"
+                mask="$(awk -v p="$prefix" 'BEGIN {for(i=0;i<4;i++){n=p>8?8:p; if(n<0)n=0; b=1;for(j=n;j<8;j++)b*=2;printf "%s%d",i?".":"",256-b;p-=n}}')"
                 ;;
             *) mask="$(get network.lan.netmask)" || error "LAN netmask unavailable" ;;
         esac
