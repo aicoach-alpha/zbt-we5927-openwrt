@@ -294,6 +294,9 @@ case "$op" in
         json_init; json_add_string enabled "$enabled"; json_add_string ttl "$ttl"
         json_add_string revision "$revision"; json_add_string confirmation "$confirmation"
         rpc veci.v2.firewall setTtl "$(json_dump)"
+        [ "$(native_field '@.enabled')" = "$enabled" ] || fail "TTL state unconfirmed"
+        case "$enabled:$(native_field '@.runtime')" in 1:rule_present|0:rule_absent) ;; *) fail "TTL runtime unconfirmed";; esac
+        if [ "$enabled" = 1 ]; then [ "$(native_field '@.ttl')" = "$ttl" ] || fail "TTL value unconfirmed"; fi
         json_init; json_add_string code 1; json_add_string reason "TTL policy saved"
         json_add_string runtime "$(native_field '@.runtime')"; json_add_string packet_verified false
         json_dump; exit 0
@@ -671,6 +674,22 @@ case "$op" in
                 rpc veci.v2.routes save "$(json_dump)";;
             *) fail "confirmation mismatch";;
         esac
+        (json_load "$native" && json_get_type typ entries && [ "$typ" = array ]) || fail "route inventory unavailable"
+        idx=0; matches=0
+        while [ "$idx" -lt 256 ]; do
+            entry="$(native_field "@.entries[$idx].section" || true)"
+            [ -n "$entry" ] || break
+            if [ "$entry" = "veci2_route_$name" ]; then
+                [ "$action" = SAVE_ROUTE ] || fail "route removal unconfirmed"
+                [ "$(native_field "@.entries[$idx].target")" = "$target/$prefix" ] &&
+                [ "$(native_field "@.entries[$idx].interface")" = "$iface" ] &&
+                [ "$(native_field "@.entries[$idx].gateway" || true)" = "$gateway" ] &&
+                [ "$(native_field "@.entries[$idx].table")" = 254 ] || fail "route save unconfirmed"
+                matches=$((matches+1))
+            fi
+            idx=$((idx+1))
+        done
+        case "$action:$matches" in SAVE_ROUTE:1|DELETE_ROUTE:0) ;; *) fail "route receipt unconfirmed";; esac
         ;;
     set_redirect_dnat)
         action="$(read_field '@.action')" || fail "explicit forwarding action required"
