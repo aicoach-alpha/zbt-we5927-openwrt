@@ -207,3 +207,46 @@ ddns_lookup() {
   json_add_boolean provider_update_verified 0
   json_dump
 }
+
+# Create/edit only the owned SQM queue. Creating a profile never enables it.
+sqm_save() {
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation
+  json_get_var iface interface; json_get_var download download; json_get_var upload upload
+  json_get_var qdisc qdisc; json_get_var script script
+  [ "$confirm" = SAVE_SQM_NEXT_BOOT ] || fail confirmation_required
+  case "$iface" in usb0|eth0.2|pppoe-wan) ;; *) fail unsupported_interface;; esac
+  for rate in "$download" "$upload"; do
+    case "$rate" in ''|0*|*[!0-9]*) fail invalid_rate;; esac
+    [ "${#rate}" -le 7 ] && [ "$rate" -ge 64 ] && [ "$rate" -le 2000000 ] || fail invalid_rate
+  done
+  case "$qdisc:$script" in cake:piece_of_cake.qos|cake:layer_cake.qos|fq_codel:simple.qos) ;; *) fail unsupported_queue;; esac
+  exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  exec 8</usr/libexec/rpcd/veci.v2.firewall; flock -n 8 || fail firewall_busy
+  service_profile sqm
+  [ -n "$revision" ] && [ "$revision" = "$expected" ] || fail stale_configuration
+  # Editing requires disabled state; do not change a running queue's profile.
+  case "$state" in disabled) ;; unconfigured)
+    [ -z "$(uci -q get sqm.veci || :)" ] || fail foreign_profile;;
+    *) fail disable_profile_first;;
+  esac
+  changes=$(uci -q changes sqm) || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  tmp=$(mktemp -d /tmp/veci2-sqm.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  change() { uci -q -t "$tmp" "$@"; }
+  change set sqm.veci=queue &&
+    change set sqm.veci.enabled=0 &&
+    change set "sqm.veci.interface=$iface" &&
+    change set "sqm.veci.download=$download" &&
+    change set "sqm.veci.upload=$upload" &&
+    change set "sqm.veci.qdisc=$qdisc" &&
+    change set "sqm.veci.script=$script" || fail stage_failed
+  [ "$(sha256sum "$config")" = "$digest" ] || fail stale_configuration
+  changes=$(uci -q changes sqm) || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  change commit sqm || fail commit_failed
+  [ "$(uci -q get sqm.veci.enabled)" = 0 ] || fail commit_failed
+  optional_status sqm
+}
