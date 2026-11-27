@@ -672,10 +672,10 @@
       "limitations": "Disable existing named profile startup ONLY. Scope is narrower than original OEM create/edit/enable operation. Isolated native config mutation, rollback and adapter ACL fixtures passed; actual native UCI, browser, package and runtime acceptance pending. Full legacy VPN functionality not implemented."
     },
     "set_lan_config": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.interfaces:status/save",
-      "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/stage_variant.py",
-      "limitations": "Native UCI/libubox config-only DHCP/static and explicitly confirmed PPPoE replacement with isolated board/device fixtures, rollback and LTE preservation passed; original OEM form browser, adapter mutation and physical network activation acceptance pending."
+      "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; scripts/tests/test_oem_interface_writes.py#InterfaceWrites.test_lan_preserves_pppoe_and_wan_replacement",
+      "limitations": "Native host UCI/libubox configuration lifecycle and isolated adapter ACL/response fixtures passed. Manual activation only; original OEM browser behavior, physical network, DHCP reservation consistency and actual routing pending."
     },
     "set_mac_blacklist": {
       "state": "PROTOTYPE",
@@ -791,10 +791,10 @@
       "evidence": "scripts/tests/test_oem_module_status.py#test_gps_and_voice_require_session_and_refuse_hardware_calls"
     },
     "set_wan_config": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.interfaces:status/save",
-      "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/stage_variant.py",
-      "limitations": "Native UCI/libubox config-only DHCP/static and explicitly confirmed PPPoE replacement with isolated board/device fixtures, rollback and LTE preservation passed; original OEM form browser, adapter mutation and physical network activation acceptance pending."
+      "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; scripts/tests/test_oem_interface_writes.py#InterfaceWrites.test_lan_preserves_pppoe_and_wan_replacement",
+      "limitations": "Native host UCI/libubox configuration lifecycle and isolated adapter ACL/response fixtures passed. Manual activation only; original OEM browser behavior, physical network, DHCP reservation consistency and actual routing pending."
     },
     "set_wan_config_nocommit": {
       "state": "SOURCE_DISABLED_REVIEWED",

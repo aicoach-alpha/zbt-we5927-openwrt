@@ -496,6 +496,11 @@ case "$op" in
         json_add_string wan_mode "$mode"; json_add_string wan "$wan"
         json_add_string wan_mask "$wan_mask"; json_add_string gateway "$gateway"
         rpc veci.v2.interfaces save "$(json_dump)"
+        [ "$(native_field '@.lan')" = "$lan" ] &&
+        [ "$(native_field '@.wan_mode')" = "$mode" ] || fail "network configuration unconfirmed"
+        if [ "$mode" = static ]; then
+            [ "$(native_field '@.wan')" = "$wan" ] && [ "$(native_field '@.gateway')" = "$gateway" ] || fail "WAN configuration unconfirmed"
+        fi
         ;;
     set_4g)
         # Single explicit action avoids partly applying a legacy multi-field form.
