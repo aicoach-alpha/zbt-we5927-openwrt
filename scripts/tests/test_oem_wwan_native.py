@@ -39,7 +39,7 @@ json_add_string() { printf '%s=%s\\n' "$1" "$2"; }
 json_dump() { :; }
 """)
         s=SOURCE.read_text()
-        for old,new in (("/etc/config/","config/"),("/tmp/sysinfo/board_name","board"),("/usr/libexec/rpcd/veci.v2.firewall","fw-rpc"),("/usr/share/libubox/jshn.sh","jshn"),("/var/lock/veci2-ipv6.lock","network.lock"),("/var/run/veci2-reboot-requested","reboot-pending")):
+        for old,new in (("/etc/config/","config/"),("/tmp/sysinfo/board_name","board"),("/usr/libexec/rpcd/veci.v2.firewall","fw-rpc"),("/usr/share/libubox/jshn.sh","jshn"),("/var/lock/veci2-ipv6.lock","network.lock"),("/var/run/veci2-reboot-requested","reboot-pending"),("/tmp/veci2-wifi-activation.lock","activation.lock")):
             s=s.replace(old,str(self.d)+"/"+new)
         (self.d/"rpc").write_text(s)
         self.env=dict(os.environ,HOST_UCI=UCI,TEST_CFG=str(self.cfg),TEST_DELTA=str(self.delta),PATH=str(self.d)+":"+os.environ["PATH"])

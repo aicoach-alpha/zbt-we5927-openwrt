@@ -10,6 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "rebuild/veci-v2/packages/veci-v2-runtime"
 uci = Path(sys.argv[1]).resolve(strict=True)
+prefix=Path(os.environ["VECI_LIBUBOX_PREFIX"])
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
     for folder in ("config", "delta"):
@@ -22,10 +23,7 @@ with tempfile.TemporaryDirectory() as tmp:
     board = root / "board"
     board.write_text("zbtlink,zbt-we5927\n")
     provider = root / "provider"
-    jshn = Path(os.environ["VECI_LIBUBOX_PREFIX"]) / "share/libubox/jshn.sh"
-    provider.write_text((RUNTIME / "veci2-wifi").read_text()
-        .replace("/tmp/sysinfo/board_name", str(board))
-        .replace("/usr/share/libubox/jshn.sh", str(jshn)))
+    provider.write_text((RUNTIME / "veci2-wifi").read_text().replace("/tmp/sysinfo/board_name", str(board)).replace("/etc/config/wireless",str(config)).replace("/tmp/veci2-wifi-activation.lock",str(root/"activation.lock")).replace("/var/run/veci2-reboot-requested",str(root/"reboot-pending")).replace("/usr/share/libubox/jshn.sh",str(prefix/"share/libubox/jshn.sh")))
     provider.chmod(0o700)
     commands = {
         "uci": f'#!/bin/sh\nexec "{uci}" -c "{root}/config" -t "{root}/delta" "$@"\n',
@@ -35,7 +33,7 @@ with tempfile.TemporaryDirectory() as tmp:
         file = root / command
         file.write_text(body)
         file.chmod(0o700)
-    env = dict(os.environ, PATH=f"{root}:" + os.environ["PATH"])
+    env = dict(os.environ, PATH=f"{root}:{prefix}/bin:" + os.environ["PATH"])
 
     def call(method, **params):
         # OpenWrt runs /bin/sh via BusyBox ash. libubox jshn.sh uses
@@ -75,6 +73,18 @@ with tempfile.TemporaryDirectory() as tmp:
     with provider.open("rb") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         assert call("setSsid", ssid_hex="61")["error"] == "busy"
+    with (root/"activation.lock").open("w") as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        assert call("setSsid",ssid_hex="61")["error"]=="activation_busy"
+    (root/"reboot-pending").touch()
+    assert call("setAutoChannel",action="AUTO_CHANNEL_2G")["error"]=="reboot_pending"
+    (root/"reboot-pending").unlink()
+    # Partial commit must be rolled back byte-for-byte.
+    shim=root/"uci"; original=shim.read_text()
+    shim.write_text(original.replace('exec "', '"',1)+'rc=$?'+chr(10)+'case "$*" in *"commit wireless") exit 1;; esac'+chr(10)+'exit "$rc"'+chr(10))
+    assert call("setSsid",ssid_hex="61")["error"]=="save_failed_rollback"
+    assert config.read_bytes()==before
+    shim.write_text(original)
     subprocess.run([root / "uci", "set", "wireless.guest.ssid=Pending"], env=env, check=True)
     assert call("setSsid", ssid_hex="61")["error"] == "pending_wireless_changes"
     assert call("setAutoChannel", action="AUTO_CHANNEL_2G")["error"] == "pending_wireless_changes"
