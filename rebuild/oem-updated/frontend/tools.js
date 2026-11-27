@@ -66,7 +66,7 @@ el('login').addEventListener('submit', async e => {
     el('login').reset(); el('login').hidden=true; el('tools').hidden=false;
     el('login-result').textContent='';
     const target = location.hash.slice(1);
-    if (['backup-export', 'backup-restore-file', 'reset-check'].includes(target)) {
+    if (['backup-export', 'backup-restore-file', 'reset-check', 'firmware-image'].includes(target)) {
       el(target).focus();
     }
     globalThis.VeciSmsCenter.activate();

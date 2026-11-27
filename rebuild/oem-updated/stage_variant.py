@@ -242,6 +242,15 @@ def stage(image, out):
         backup_view = (HERE / "frontend/backup-view.js").read_text().strip()
         edit_chunk(backup_name, [(component, "var i=" + backup_view +
             ',o=[],l={created:function(){this.$bus.emit("changeTab",1)}}')])
+        firmware_name = "chunk-25db5b9c.30ea3a80.js"
+        stock = (files / "www/assets/js" / firmware_name).read_text()
+        start = stock.index("var a=function(){")
+        end = stock.index(",d=u,r=", start)
+        component = stock[start:end]
+        if sha(component.encode()) != "eb8bc95737540869cfaf51d83f6be6cc0ef1a0880bd45b8eb19e3dbdc5b663a3":
+            raise ValueError("OEM firmware component changed")
+        firmware_view = (HERE / "frontend/firmware-view.js").read_text().strip()
+        edit_chunk(firmware_name, [(component, "var u=" + firmware_view + ",a=u.render,n=[]")])
         voice_name = "chunk-2d0d6200.6fca3f4f.js"
         voice = (files / "www/assets/js" / voice_name).read_text()
         start = voice.index("var i=function")
