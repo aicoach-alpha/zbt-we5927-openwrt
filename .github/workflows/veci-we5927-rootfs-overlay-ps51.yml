@@ -8,11 +8,7 @@ on:
       - 'scripts/veci-we5927-readonly-rootfs-overlay-triage-20261127.ps1'
       - 'scripts/tests/test_we5927_rootfs_overlay_readonly_triage_20261127.py'
       - '.github/workflows/veci-we5927-rootfs-overlay-ps51.yml'
-  pull_request:
-    paths:
-      - 'scripts/veci-we5927-readonly-rootfs-overlay-triage-20261127.ps1'
-      - 'scripts/tests/test_we5927_rootfs_overlay_readonly_triage_20261127.py'
-      - '.github/workflows/veci-we5927-rootfs-overlay-ps51.yml'
+  # No duplicate PR/push builds on the active development branch.
   workflow_dispatch:
 
 permissions:
@@ -28,8 +24,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends busybox
+          if command -v busybox >/dev/null 2>&1; then
+            echo 'BusyBox already installed; no apt operations needed'
+          else
+            # GitHub ubuntu-24.04 runners may have a third-party Microsoft
+            # apt source returning HTTP 403. Use only the official Ubuntu
+            # sources to install the test shell, without touching system state
+            # outside this disposable CI runner.
+            test -s /etc/apt/sources.list.d/ubuntu.sources
+            sudo apt-get update -qq \
+              -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources \
+              -o Dir::Etc::sourceparts=-
+            sudo apt-get install -y -qq --no-install-recommends busybox
+          fi
+          busybox ash -c 'echo BUSYBOX_ASH_READY=PASS'
       - name: Verify read-only shell on synthetic MTD and malformed layout
         shell: bash
         run: |
