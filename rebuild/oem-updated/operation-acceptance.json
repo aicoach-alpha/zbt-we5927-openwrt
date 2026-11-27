@@ -649,16 +649,16 @@
       "limitations": "Explicit rejection only, not functional support. Original UI and release review pending."
     },
     "set_dmz": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:setDmz",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Explicit confirmation required; full-port canonical DMZ only; OEM confirmation UI pending."
+      "evidence": "scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_owner_firewall_source.py; scripts/tests/test_oem_firewall_writes.py#FirewallWrites.test_firewall_writes_and_response_checks",
+      "limitations": "Explicit full-port canonical DMZ add/delete of owned rule only. Native UCI and isolated adapter tests passed. fw4 compilation, reload, routes and ubus simulated; original OEM form, real packet enforcement and runtime UAT pending."
     },
     "set_fw_setting": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:setDefaults",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Drop-invalid and SYN flood settings only; WAN input remains REJECT, IPv6 and redirect policy unchanged. Browser and live reload acceptance pending."
+      "evidence": "scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_owner_firewall_source.py; scripts/tests/test_oem_firewall_writes.py#FirewallWrites.test_firewall_writes_and_response_checks",
+      "limitations": "Drop-invalid and SYN flood only; WAN input remains REJECT. Native UCI and isolated adapter tests passed. fw4 compilation, reload, routes and ubus simulated; original OEM form, real packet enforcement and runtime UAT pending."
     },
     "set_imei": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -690,10 +690,10 @@
       "limitations": "Disable existing named profile startup ONLY. Scope is narrower than original OEM create/edit/enable operation. Isolated native config mutation, rollback and adapter ACL fixtures passed; actual native UCI, browser, package and runtime acceptance pending. Full legacy VPN functionality not implemented."
     },
     "set_nat_acceleration": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:setOffload",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Software only; hardware acceleration disabled. Native revision guard, fw4 check and rollback; actual performance and runtime pending."
+      "evidence": "scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_owner_firewall_source.py; scripts/tests/test_oem_firewall_writes.py#FirewallWrites.test_firewall_writes_and_response_checks",
+      "limitations": "Software offload only, hardware disabled; conflict with MAC rules rejected. Native UCI and isolated adapter tests passed. fw4 compilation, reload, routes and ubus simulated; original OEM form, real packet enforcement and runtime UAT pending."
     },
     "set_netwatchdog": {
       "state": "FIXTURE_PASS",
@@ -750,10 +750,10 @@
       "limitations": "Explicit enable/disable existing SQM profile, offload must be disabled; no immediate restart. Provisioning and live queue verification pending."
     },
     "set_redirect_dnat": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:addForward/deleteForward",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Single-port WAN-to-LAN native rules, explicit confirmation; ranges/edit and OEM form pending."
+      "evidence": "scripts/tests/test_owner_firewall_native_acceptance.py; scripts/tests/test_owner_firewall_source.py; scripts/tests/test_oem_firewall_writes.py#FirewallWrites.test_firewall_writes_and_response_checks",
+      "limitations": "Single-port TCP/UDP add/delete of owned rules only; CIDR LAN validation and conservative overlap rejection. Native UCI and isolated adapter tests passed. fw4 compilation, reload, routes and ubus simulated; original OEM form, real packet enforcement and runtime UAT pending."
     },
     "set_samba_info": {
       "state": "SOURCE_DISABLED_REVIEWED",

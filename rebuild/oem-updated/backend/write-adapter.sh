@@ -337,12 +337,14 @@ case "$op" in
             json_init; json_add_string revision "$revision"; json_add_string confirmation "$confirm"
             json_add_string drop_invalid "$drop"; json_add_string syn_flood "$syn"
             rpc veci.v2.firewall setDefaults "$(json_dump)"
+            [ "$(native_field '@.drop_invalid')" = "$drop" ] && [ "$(native_field '@.synflood_protect')" = "$syn" ] || fail "firewall defaults unconfirmed"
         else
             [ "$confirm" = SAVE_SOFTWARE_OFFLOAD ] || fail "confirmation mismatch"
             enabled="$(read_field '@.status')" || fail "offload state required"
             json_init; json_add_string revision "$revision"; json_add_string confirmation "$confirm"
             json_add_string enabled "$enabled"
             rpc veci.v2.firewall setOffload "$(json_dump)"
+            [ "$(native_field '@.flow_offloading')" = "$enabled" ] && [ "$(native_field '@.flow_offloading_hw')" = 0 ] || fail "offload unconfirmed"
         fi
         ;;
     set_wifi_guest)
@@ -452,6 +454,7 @@ case "$op" in
         esac
         json_init; json_add_string destination "$dest"; json_add_string confirmation "$confirm"
         rpc veci.v2.firewall setDmz "$(json_dump)"
+        if [ "$dest" = DISABLE ]; then [ -z "$(native_field '@.dmz_destination')" ] || fail "DMZ disable unconfirmed"; else [ "$(native_field '@.dmz_destination')" = "$dest" ] || fail "DMZ destination unconfirmed"; fi
         ;;
     set_lan_config|set_wan_config)
         confirm="$(read_field '@.confirmation')" || fail "explicit network confirmation required"
@@ -616,12 +619,32 @@ case "$op" in
                 [ "$confirm" = "FORWARD_$from" ] || fail "confirmation mismatch"
                 json_init; json_add_int from_port "$from"; json_add_int to_port "$to"
                 json_add_string protocol "$proto"; json_add_string destination "$dest"; json_add_string confirmation "$confirm"
-                rpc veci.v2.firewall addForward "$(json_dump)";;
+                rpc veci.v2.firewall addForward "$(json_dump)"
+                idx=0; matches=0
+                while [ "$idx" -lt 128 ]; do
+                    found="$(native_field "@.forwards[$idx].name" || true)"
+                    [ -n "$found" ] || break
+                    if [ "$found" = "veci_port_${proto}_$from" ]; then
+                        [ "$(native_field "@.forwards[$idx].destination")" = "$dest" ] &&
+                        [ "$(native_field "@.forwards[$idx].destination_port")" = "$to" ] &&
+                        [ "$(native_field "@.forwards[$idx].source_port")" = "$from" ] || fail "forward unconfirmed"
+                        matches=$((matches+1))
+                    fi
+                    idx=$((idx+1))
+                done
+                [ "$matches" = 1 ] || fail "forward unconfirmed";;
             DELETE_FORWARD)
                 name="$(read_field '@.name')" || fail "forward name required"
                 [ "$confirm" = "DELETE_$name" ] || fail "confirmation mismatch"
                 json_init; json_add_string name "$name"; json_add_string confirmation "$confirm"
-                rpc veci.v2.firewall deleteForward "$(json_dump)";;
+                rpc veci.v2.firewall deleteForward "$(json_dump)"
+                idx=0
+                while [ "$idx" -lt 128 ]; do
+                    found="$(native_field "@.forwards[$idx].name" || true)"
+                    [ -n "$found" ] || break
+                    [ "$found" != "$name" ] || fail "forward deletion unconfirmed"
+                    idx=$((idx+1))
+                done;;
             *) fail "unsupported forwarding action";;
         esac
         ;;
