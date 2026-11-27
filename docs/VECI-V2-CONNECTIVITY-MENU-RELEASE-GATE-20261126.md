@@ -232,3 +232,10 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - Explicit negative assertions remain CURRENT_ROUTER_MTD_EQUALS_BACKUP=NOT_TESTED and LIVE_BOOTLOADER_RECOVERY=NOT_TESTED; owner did NOT flash or contact router.
 - Previous source documentation that laptop backup existence is 'not inspected' is superseded by this user-executed offline audit. However, format/restore capability and present-day image identity are still not proven. Firmware release gate remains BLOCKED.
 - Next safe step: compare NOV23 and NOV25 individual SHA-256 values using ONLY local JSON. The firmware mtd3 hash may legitimately differ; don't interpret a difference as a corrupted backup. Do not alter unique calibration partitions or attempt blind MTD restoration.
+
+## Owner Nov23 vs Nov25 cross-backup hashes, 27 November 2026
+
+- Owner executed local-only PowerShell JSON comparison of SHA256 values for five MTD partitions; terminal shows mtd0=IDENTICAL, mtd1=IDENTICAL, mtd2=IDENTICAL, mtd3=DIFFERENT, mtd7=IDENTICAL.
+- This confirms four unchanged backup contents between dates; the firmware (mtd3) was different. An intervening firmware change is plausible but cannot be concluded from hash difference alone.
+- No comparison against current live router was performed, no recovery boot mode was tested, no firmware/image was flashed, and no restore image format has been verified.
+- current_router_mtd_equals_backup=NOT_TESTED; live_bootloader_recovery=NOT_TESTED; flash_authorized=false; release_permitted=false. Preserve both backup generations; do not write MTD0/1/2/7.

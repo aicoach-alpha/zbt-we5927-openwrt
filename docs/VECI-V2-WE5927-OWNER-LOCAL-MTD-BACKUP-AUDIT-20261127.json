@@ -25,8 +25,15 @@
       "mtd7"
     ],
     "status": "SIZE_PASS_5_OF_5_SHA_COMPUTED_NOT_ROUTER_MATCHED",
-    "comparison_to_nov23": "NOT_DONE",
-    "comparison_to_current_router": "NOT_DONE"
+    "comparison_to_nov23": "OWNER_LOCAL_SHA256_COMPARISON_REPORTED",
+    "comparison_to_current_router": "NOT_DONE",
+    "cross_backup_hash_by_partition": {
+      "mtd0": "IDENTICAL",
+      "mtd1": "IDENTICAL",
+      "mtd2": "IDENTICAL",
+      "mtd3": "DIFFERENT",
+      "mtd7": "IDENTICAL"
+    }
   },
   "windows_audit_report_path": "D:/Report_CCB/WE5927-RECOVERY-AUDIT-20261127_115107.json",
   "actual_backup_image_bytes_seen_by_assistant": false,
@@ -34,5 +41,7 @@
   "current_router_mtd_equals_backup": "NOT_TESTED",
   "live_bootloader_recovery": "NOT_TESTED",
   "flash_authorized": false,
-  "release_permitted": false
+  "release_permitted": false,
+  "comparison_source": "User-pasted PowerShell command output comparing hashes of existing local audit JSON",
+  "reason_for_mtd3_difference": "NOT_PROVEN; possible installed firmware change"
 }
