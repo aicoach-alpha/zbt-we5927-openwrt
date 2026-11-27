@@ -1,0 +1,31 @@
+{
+  "schema": "we5927-owner-reported-live-mtd-sha-comparison.v1",
+  "source": "owner-pasted Windows PowerShell terminal output",
+  "date_local": "2026-11-27",
+  "script_commit": "b8f111f43cf245547dc674cce4a5425767b4e407",
+  "windows_report": "D:/Report_CCB/WE5927-LIVE-MTD-HASH-COMPARISON-20261127_120800.json",
+  "report_json_directly_inspected": false,
+  "live_hash_values_provided": false,
+  "router_ip": "192.168.1.1",
+  "board_preflight": "passed_by_script",
+  "hash_comparison_complete": true,
+  "partition_comparison": {
+    "mtd0": "MATCH_BOTH",
+    "mtd1": "MATCH_BOTH",
+    "mtd2": "MATCH_BOTH",
+    "mtd3": "MATCH_NEITHER",
+    "mtd7": "MATCH_BOTH"
+  },
+  "interpretation": {
+    "mtd0_mtd1_mtd2_mtd7": "current partition hash equals hashes in both dated backup snapshots",
+    "mtd3": "current whole-firmware partition hash differs from both snapshots; cannot infer corruption or a distinct base firmware solely from this",
+    "possible_overlay_note": "on observed OpenWrt layout mtd6 rootfs_data is a writable subpartition of mtd3 firmware; normal configuration/overlay writes can alter the parent hash",
+    "base_kernel_rootfs_identity": "NOT_VERIFIED"
+  },
+  "router_mutation_performed": false,
+  "bootloader_recovery_test": "NOT_RUN",
+  "restore_image_format": "NOT_VERIFIED",
+  "postflash_72h_uat": "NOT_RUN",
+  "flash_authorized": false,
+  "release_permitted": false
+}
