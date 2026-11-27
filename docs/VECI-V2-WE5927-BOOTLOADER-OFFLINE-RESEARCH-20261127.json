@@ -2,13 +2,16 @@
   "schema": "veci-we5927-offline-uboot-recovery-structure.v1",
   "date_local": "2026-11-27",
   "basis": {
-    "owner_mtd0_string_indicators": "Owner-pasted static Windows ASCII scan preserved in existing owner signing-and-verification report; actual raw MTD0 not uploaded to NAS",
+    "owner_mtd0_string_indicators": "New owner-pasted exact-SHA256-pinned offline Windows 2026-11-27 audit reports all nine markers FOUND in both Nov23 and Nov25 MTD0 backups; actual raw bytes remain on owner laptop",
     "owner_mtd0_sha256": "b2acbf1e762e310d467cfcbae853257a9f63ce311511134bc9d0d5953f835330",
     "owner_mtd0_size_bytes": 196608,
     "historical_backup_comparison": "Nov23 = Nov25 = live router MTD0 SHA256",
     "current_user_mtd3": "owner-pasted exact current mtd3 raw backup SHA matching router before and after, uImage CRCs PASS",
     "vendor_image": "on-NAS vendor research reference, not proven physical router's current OEM image",
-    "veci_candidate": "exact source f87e7ec5 signed candidate in NAS artifacts"
+    "veci_candidate": "exact source f87e7ec5 signed candidate in NAS artifacts",
+    "offline_audit_script_sha256": "2f01ca583c90bdb932487002193522cc98bfd0c0b75b7f9affa6f9698d0448b3",
+    "owner_windows_audit_receipt": "D:/Report_CCB/WE5927-UBOOT-WEBFAILSAFE-OFFLINE-AUDIT-20261127_130023.json",
+    "owner_console_as_source": "User-pasted full script output; audit JSON and raw binary not independently viewed on NAS"
   },
   "owner_uboot_static_indicators": {
     "http_server_update_message": true,
@@ -18,7 +21,21 @@
     "http_upload_upgrading_message": true,
     "tftp_boot_command": true,
     "warning": "HTTP upload is done! Upgrading... means upload may immediately flash; never upload for a read-only test",
-    "observed_only_static_strings": true
+    "observed_only_static_strings": true,
+    "new_owner_audit_status": "NOV23_AND_NOV25_ALL_9_OF_9_FOUND",
+    "source_integrity": "EXACT_MTD0_NOV23_AND_NOV25_SHA256=PASS",
+    "marker_ids": [
+      "UBOOT_SIGNATURE",
+      "HTTP_SERVER_START",
+      "HTTP_SERVER_READY",
+      "WEB_FAILSAFE_MENU",
+      "RESET_UPDATE_MODE",
+      "HTTP_FIRMWARE_FORM",
+      "MT76X8_UPDATE_PAGE",
+      "UPLOAD_TRIGGERS_UPGRADE",
+      "TFTP_COMMAND"
+    ],
+    "offline_script_execution": "PASS_LOCAL_ONLY_ROUTER_ACCESS_NONE"
   },
   "offline_image_structure": {
     "vendor_reference": {

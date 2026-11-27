@@ -329,3 +329,11 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - CI https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/45948209204 on commit b59ad5683525e43f9d00ee7a44f84d5ab4c69035: SUCCESS for Windows PowerShell 5.1 parsing, synthetic 196,608-byte U-Boot marker fixture with 9 different markers, mixed-case lookup and absent-string negative control.
 - Exact source audit script SHA256 2f01ca583c90bdb932487002193522cc98bfd0c0b75b7f9affa6f9698d0448b3, with read-only local file hash verification for both owner Nov23 and Nov25 MTD0 backups, and no router command.
 - **Owner's actual raw mtd0 marker scan remains NOT_RUN** for this new script. CI is not a physical recovery test and does not authorize HTTP firmware upload or flashing.
+
+## Owner actual Nov23 and Nov25 U-Boot offline web-failsafe marker audit, 27 November 2026 13:00 WIB
+
+- Owner executed the SHA256-pinned local-only Windows script. Output reported EXACT_MTD0_NOV23_AND_NOV25_SHA256=PASS. Each of the nine markers was FOUND in both backup copies: UBOOT_SIGNATURE, HTTP_SERVER_START, HTTP_SERVER_READY, WEB_FAILSAFE_MENU, RESET_UPDATE_MODE, HTTP_FIRMWARE_FORM, MT76X8_UPDATE_PAGE, UPLOAD_TRIGGERS_UPGRADE, TFTP_COMMAND.
+- Aggregate owner console WEB_FAILSAFE_STATIC_MARKERS=9_OF_9_FOUND. Report stored only on Windows: D:/Report_CCB/WE5927-UBOOT-WEBFAILSAFE-OFFLINE-AUDIT-20261127_130023.json. Source is pasted owner console, NOT raw MTD0 or JSON evidence inspected remotely.
+- Owner console explicitly warned DANGER=HTTP_FIRMWARE_UPLOAD_MAY_TRIGGER_IMMEDIATE_FLASH. No router contact, recovery UI entry, test upload, flash or reboot occurred. Source markers are code-string presence evidence and DO NOT prove U-Boot actually reaches web failsafe, validates image format, or can restore firmware.
+- Preserve backup and avoid visiting Web Failsafe via reset until an owner-approved maintenance window and recovery plan. Uploading a 'test' firmware through HTTP form would be an unsafe flash experiment.
+- CURRENT STATUS: bootloader marker static audit PASS; restoration acceptance NOT_VERIFIED; release_permitted=false; flash_authorized=false.
