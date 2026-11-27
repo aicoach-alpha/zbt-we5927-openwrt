@@ -319,6 +319,7 @@ function showLogin() {
   globalThis.VeciCron?.reset?.();
   globalThis.VeciWatchdog?.reset?.();
   globalThis.VeciGuestCheck?.reset?.();
+  globalThis.VeciUplink?.reset?.();
   globalThis.VeciMonitor?.reset?.();
   globalThis.VeciAddonProfiles?.reset?.();
   globalThis.VeciUpdatePolicy?.reset?.();

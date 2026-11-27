@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci-v2-ui
 PKG_VERSION:=0.1
-PKG_RELEASE:=30
+PKG_RELEASE:=31
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -48,6 +48,7 @@ define Package/veci-v2-ui/install
 	$(INSTALL_DATA) ./files/www/veci2/watchdog-status.js $(1)/www/veci2/watchdog-status.js
 	$(INSTALL_DATA) ./files/www/veci2/observability.js $(1)/www/veci2/observability.js
 	$(INSTALL_DATA) ./files/www/veci2/guest-check.js $(1)/www/veci2/guest-check.js
+	$(INSTALL_DATA) ./files/www/veci2/uplink.js $(1)/www/veci2/uplink.js
 	$(INSTALL_DATA) ./files/www/veci2/update-policy.js $(1)/www/veci2/update-policy.js
 	$(INSTALL_DATA) ./files/www/veci2/addon-profiles.js $(1)/www/veci2/addon-profiles.js
 	$(INSTALL_DATA) ./files/www/veci2/monitor-settings.js $(1)/www/veci2/monitor-settings.js

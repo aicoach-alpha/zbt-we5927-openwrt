@@ -219,7 +219,8 @@
           "setAuth",
           "activateAp",
           "setPower",
-          "saveUplink"
+          "saveUplink",
+          "provisionWwan"
         ]
       }
     }
