@@ -1,0 +1,98 @@
+name: WE5927 rootfs overlay read-only triage PS5.1 contract
+
+on:
+  push:
+    branches:
+      - feat/veci-v2-native-gui-refresh-20261126
+    paths:
+      - 'scripts/veci-we5927-readonly-rootfs-overlay-triage-20261127.ps1'
+      - 'scripts/tests/test_we5927_rootfs_overlay_readonly_triage_20261127.py'
+      - '.github/workflows/veci-we5927-rootfs-overlay-ps51.yml'
+  pull_request:
+    paths:
+      - 'scripts/veci-we5927-readonly-rootfs-overlay-triage-20261127.ps1'
+      - 'scripts/tests/test_we5927_rootfs_overlay_readonly_triage_20261127.py'
+      - '.github/workflows/veci-we5927-rootfs-overlay-ps51.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-busybox-mtd-layout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provide BusyBox ash for actual fake MTD tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends busybox
+      - name: Verify read-only shell on synthetic MTD and malformed layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p test_we5927_rootfs_overlay_readonly_triage_20261127.py -v
+
+  windows-ps51-stream-sha:
+    runs-on: windows-2022
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Windows PowerShell 5.1 syntax and local SHA256 segment correctness (NO ROUTER)
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $scriptPath=(Resolve-Path 'scripts/veci-we5927-readonly-rootfs-overlay-triage-20261127.ps1').Path
+          $tokens=$null
+          $errors=$null
+          $ast=[System.Management.Automation.Language.Parser]::ParseFile($scriptPath,[ref]$tokens,[ref]$errors)
+          if($errors.Count -gt 0){
+            $errors | Format-List | Out-String | Write-Host
+            throw 'POWERSHELL_51_PARSE_FAILED'
+          }
+          Write-Host 'POWERSHELL_51_SYNTAX=PASS'
+          $fn=$ast.Find({ param($node)
+              $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+              $node.Name -eq 'Get-SegmentSha256'
+            }, $true)
+          if($null -eq $fn){throw 'SEGMENT_SHA_HELPER_MISSING'}
+          # Dot-source ONLY the pure local hash function, not the whole router script.
+          . ([scriptblock]::Create($fn.Extent.Text))
+          $bytes=New-Object byte[] 131072
+          for($i=0;$i -lt $bytes.Length;$i++){ $bytes[$i]=[byte]($i%251) }
+          $testFile=Join-Path $env:RUNNER_TEMP 'we5927-synthetic-mtd3.bin'
+          [System.IO.File]::WriteAllBytes($testFile,$bytes)
+          try {
+            $sha=[System.Security.Cryptography.SHA256]::Create()
+            try {
+              $first=New-Object byte[] 65536
+              $second=New-Object byte[] 65536
+              [Array]::Copy($bytes,0,$first,0,65536)
+              [Array]::Copy($bytes,65536,$second,0,65536)
+              $a=[BitConverter]::ToString($sha.ComputeHash($first)).Replace('-','').ToLowerInvariant()
+              $b=[BitConverter]::ToString($sha.ComputeHash($second)).Replace('-','').ToLowerInvariant()
+            } finally { $sha.Dispose() }
+            if((Get-SegmentSha256 -Path $testFile -Offset 0 -Count 65536) -ne $a){
+              throw 'FIRST_SEGMENT_HASH_INCORRECT'
+            }
+            if((Get-SegmentSha256 -Path $testFile -Offset 65536 -Count 65536) -ne $b){
+              throw 'SECOND_SEGMENT_HASH_INCORRECT'
+            }
+            $wasRejected=$false
+            try {
+              Get-SegmentSha256 -Path $testFile -Offset 100000 -Count 65536 | Out-Null
+            } catch {
+              if($_.Exception.Message -match 'STOP=SEGMENT_OUT_OF_RANGE'){
+                $wasRejected=$true
+              } else { throw }
+            }
+            if(!$wasRejected){throw 'INVALID_SEGMENT_RANGE_NOT_REJECTED'}
+            Write-Host 'WINDOWS_51_LOCAL_HASH_SEGMENTS=PASS'
+            Write-Host 'WINDOWS_51_OUT_OF_RANGE_REJECTED=PASS'
+            Write-Host 'NO_ROUTER_CONTACT=YES'
+          } finally {
+            Remove-Item -LiteralPath $testFile -Force -ErrorAction SilentlyContinue
+          }
