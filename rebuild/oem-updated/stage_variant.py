@@ -23,6 +23,9 @@ REPLACEMENTS = (
      'function i(e){return fetch("/ubus",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({jsonrpc:"2.0",id:1,method:"call",params:["00000000000000000000000000000000","session","login",{username:e.username,password:e.password,timeout:300}]})}).then(function(r){if(!r.ok)throw Error("Login failed");return r.json()}).then(function(r){if(!r.result||r.result[0]!==0||!r.result[1]||!/^[a-f0-9]{32}$/.test(r.result[1].ubus_rpc_session))throw Error("Login failed");return {code:"1",reason:"success",access_token:r.result[1].ubus_rpc_session,wifi_type:"2"}})}'),
     ('a={access_token:t,t:new Date};return e.params?Object.assign(e.params,a):e.params=a,e',
      'a={t:new Date};return e.headers=e.headers||{},t&&(e.headers["X-OEM-Session"]=t),e.params?Object.assign(e.params,a):e.params=a,e'),
+    # The OEM HTTP client resolves application errors as JSON on HTTP 200.
+    ('t.code;e.show_dialog=!1,e.$message.success(e.$t("notification.changePwdSuccess"))',
+     'if(!t||t.code!=="1"){e.notice_change=t&&t.reason||e.$t("notification.oldpwderr");return}e.show_dialog=!1,e.$message.success(e.$t("notification.changePwdSuccess"))'),
     # Keep the authenticated session path, without logging the rpcd token or
     # copying the submitted password into the OEM global Vuex state.
     ('username:"admin",password:"admin"', 'username:"admin",password:""'),
