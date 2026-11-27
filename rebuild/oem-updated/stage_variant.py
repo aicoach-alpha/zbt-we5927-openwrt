@@ -421,6 +421,8 @@ def stage(image, out):
             '<button id="vpn-refresh" type="button">Read OpenVPN</button><p id="vpn-result" role="status"></p>'
             '<button id="vpn-toggle" type="button" disabled>Change OpenVPN startup</button>'
             '<button id="smb-refresh" type="button">Read SMB availability</button><p id="smb-result" role="status"></p></article>'
+            '<article><h2>Optional tunnel inventory</h2><p>Existing named N2N and Shadowsocks profiles only. No credentials or tunnel setup. Configured profiles do not prove working tunnels.</p>'
+            '<button id="tunnel-refresh" type="button">Read optional profiles</button><pre id="tunnel-result" role="status"></pre></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

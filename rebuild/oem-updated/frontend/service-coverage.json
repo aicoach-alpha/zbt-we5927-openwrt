@@ -222,6 +222,12 @@
       "provider": "Linux process and OpenWrt service inventory",
       "scope": "Read only; no password disclosure or share management",
       "state": "FIXTURE_PASS_NOT_UAT"
+    },
+    "optional_tunnel_inventory": {
+      "provider": "OpenWrt UCI/netifd",
+      "scope": "Existing named N2N and Shadowsocks DNS/redirect/tunnel public profile inventory; no credentials or mutation",
+      "state": "FIXTURE_PASS_NOT_UAT",
+      "limitations": "Package availability, native runtime and OEM original form compatibility pending"
     }
   },
   "remaining": [

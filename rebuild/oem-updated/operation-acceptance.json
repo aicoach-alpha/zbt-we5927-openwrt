@@ -46,7 +46,10 @@
       "limitations": "Original OEM delete form uses displayed revision, explicit confirmation, one reservation at a time; runtime pending."
     },
     "enable_mptcp_set": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Target kernel configuration does not select MPTCP; legacy anyos setting cannot establish native multipath.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_topology_storage_mptcp_write_refused",
+      "limitations": "Explicit rejection only, not functional support. Original UI and release review pending."
     },
     "getAutoreboot": {
       "state": "PROTOTYPE",
@@ -236,10 +239,16 @@
       "limitations": "Read-only kernel capability; no aggregation, path configuration or hardware/browser acceptance claimed."
     },
     "get_n2n": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "OpenWrt UCI/netifd public profile inventory",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_n2n_inventory_and_link_state",
+      "limitations": "Existing named profiles only, optional service not provisioned. No credentials or tunnel configuration. Native runtime and original OEM form compatibility pending; inventory is not proof of tunnel or traffic success."
     },
     "get_n2n_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "OpenWrt UCI/netifd public profile inventory",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_n2n_inventory_and_link_state",
+      "limitations": "Existing named profiles only, optional service not provisioned. No credentials or tunnel configuration. Native runtime and original OEM form compatibility pending; inventory is not proof of tunnel or traffic success."
     },
     "get_nat_acceleration": {
       "state": "PROTOTYPE"
@@ -341,13 +350,22 @@
       "limitations": "Service inventory only; no actual share or configuration verification. Packages not selected in default image; storage and SMB configuration pending."
     },
     "get_ss_dns": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "OpenWrt Shadowsocks UCI public profile inventory",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_shadowsocks_profile_inventory",
+      "limitations": "Existing named profiles only, optional service not provisioned. No credentials or tunnel configuration. Native runtime and original OEM form compatibility pending; inventory is not proof of tunnel or traffic success."
     },
     "get_ss_redir": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "OpenWrt Shadowsocks UCI public profile inventory",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_shadowsocks_profile_inventory",
+      "limitations": "Existing named profiles only, optional service not provisioned. No credentials or tunnel configuration. Native runtime and original OEM form compatibility pending; inventory is not proof of tunnel or traffic success."
     },
     "get_ss_tunnel_info": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "OpenWrt Shadowsocks UCI public profile inventory",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_shadowsocks_profile_inventory",
+      "limitations": "Existing named profiles only, optional service not provisioned. No credentials or tunnel configuration. Native runtime and original OEM form compatibility pending; inventory is not proof of tunnel or traffic success."
     },
     "get_static_dhcp": {
       "state": "FIXTURE_PASS",
@@ -599,7 +617,10 @@
       "limitations": "Original OEM pool form adapted; native lease duration conversion and revision guard; runtime pending."
     },
     "set_disk": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Legacy public web-root deletion rejected; separate safe native storage lifecycle remains unimplemented.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_topology_storage_mptcp_write_refused",
+      "limitations": "Explicit rejection only, not functional support. Original UI and release review pending."
     },
     "set_dmz": {
       "state": "PROTOTYPE",
@@ -673,7 +694,10 @@
       "limitations": "Eight optional UTC same-day LAN-to-WAN MAC deny schedules, per-rule toggle only. Legacy global switch and original OEM form not mapped. Schedule validation fixture only; actual packet enforcement, established connections, time synchronization, successful commit and rollback UAT pending."
     },
     "set_port": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Target uses fixed board topology; legacy switch remapping is not compatible without board-specific verification.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_topology_storage_mptcp_write_refused",
+      "limitations": "Explicit rejection only, not functional support. Original UI and release review pending."
     },
     "set_pptp": {
       "state": "UNIMPLEMENTED"

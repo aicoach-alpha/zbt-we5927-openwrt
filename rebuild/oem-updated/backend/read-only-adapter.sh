@@ -557,6 +557,82 @@ case "$1" in
         formatted="$(printf '%s\n' "$logs" | awk 'NF>=5 {d=$2" "$3" "$4; sub(/^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +/,""); gsub(/"/,"\047"); printf "%s system: \"%s\"\n",d,$0}')"
         json_add_string data "$formatted"
         ;;
+    get_n2n|get_n2n_status)
+        # Public profile/link inventory only; never return community keys.
+        config="$(uci -q show network)" || error "network inventory unavailable"
+        names="$(printf '%s\n' "$config" | sed -nE "s/^network\.([a-zA-Z0-9_]+)\.proto='n2n'$/\1/p")"
+        success "optional N2N profile inventory"
+        json_add_string configuration_supported 0
+        json_add_array data
+        count=0
+        for section in $names; do
+            count=$((count+1)); [ "$count" -le 8 ] || error "N2N inventory exceeds limit"
+            [ "$(get "network.$section")" = interface ] || error "invalid N2N section"
+            json_add_object ""
+            json_add_string n2n_name "$section"
+            json_add_string key ""; json_add_string subnet_name ""
+            auto="$(get "network.$section.auto" || true)"
+            case "$auto" in ''|1) auto=1;; 0) ;; *) error "invalid N2N startup";; esac
+            json_add_string auto "$auto"
+            json_add_string server_ip "$(get "network.$section.server" || true)"
+            json_add_string server_port "$(get "network.$section.port" || true)"
+            if [ "$1" = get_n2n_status ]; then
+                native="$(ubus -t 3 call "network.interface.$section" status '{}' || true)"
+                up="$(field '@.up' || true)"
+                proto="$(field '@.proto' || true)"
+                live=unknown; ip=""; uptime=""
+                if [ "$proto" = n2n ]; then
+                    case "$up" in
+                        false) live=down;;
+                        true) ip="$(field '@["ipv4-address"][0].address' || true)"
+                              uptime="$(field '@.uptime' || true)"
+                              if [ -n "$ip" ]; then live=link_up; else live=link_up_no_ipv4; fi;;
+                    esac
+                fi
+                json_add_string runtime "$live"; json_add_string n2n_ip "$ip"
+                json_add_string n2n_uptime "$uptime"
+                json_add_string n2n_rx ""; json_add_string n2n_tx ""
+                json_add_string tunnel_verified false
+            fi
+            json_close_object
+        done
+        json_close_array
+        json_add_int profile_count "$count"
+        if [ "$count" = 0 ]; then json_add_string state unconfigured; else json_add_string state configured; fi
+        json_add_string driver_available "$(if [ -f /lib/netifd/proto/n2n.sh ]; then echo 1; else echo 0; fi)"
+        ;;
+    get_ss_dns|get_ss_redir|get_ss_tunnel_info)
+        # Enumerate only the matching native Shadowsocks section types.
+        # No credential, server secret, arbitrary file or tunnel activation.
+        case "$1" in get_ss_dns|get_ss_tunnel_info) kind=ss_tunnel;; *) kind=ss_redir;; esac
+        if [ -f /etc/config/shadowsocks-libev ]; then
+            config="$(uci -q show shadowsocks-libev)" || error "optional profile inventory unavailable"
+            state=configured
+        else
+            config=""; state=absent
+        fi
+        names="$(printf '%s\n' "$config" | sed -nE "s/^shadowsocks-libev\.([a-zA-Z0-9_]+)=$kind$/\1/p")"
+        success "optional Shadowsocks public profile inventory"
+        json_add_array data
+        count=0
+        for section in $names; do
+            if [ "$1" = get_ss_dns ] && [ "$section" != dns ]; then continue; fi
+            count=$((count+1)); [ "$count" -le 8 ] || error "profile inventory exceeds limit"
+            disabled="$(get "shadowsocks-libev.$section.disabled" || true)"
+            case "$disabled" in ''|0) enabled=1;; 1) enabled=0;; *) error "invalid profile state";; esac
+            json_add_object ""; json_add_string name "$section"; json_add_string enabled "$enabled"
+            json_add_string mode "$(get "shadowsocks-libev.$section.mode" || true)"
+            json_add_string listen_port "$(get "shadowsocks-libev.$section.local_port" || true)"
+            json_close_object
+        done
+        json_close_array
+        json_add_int profile_count "$count"
+        if [ "$state" = configured ] && [ "$count" = 0 ]; then state=unconfigured; fi
+        json_add_string state "$state"
+        json_add_string runtime unknown
+        json_add_string configuration_supported 0
+        json_add_string aggregation_verified false
+        ;;
     get_samba_info)
         # Inventory only; no public mount, password or share contents.
         packages=absent

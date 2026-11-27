@@ -38,6 +38,7 @@ function clearSession() {
   resetAcl();
   resetParent();
   resetVpn();
+  el("tunnel-result").textContent="";
   resetUplink();
   pppoeRevision="";el("pppoe-profile").reset();el("pppoe-save").disabled=true;el("pppoe-result").textContent="";
   ttlRevision='';el('ttl-form').reset();el('ttl-save').disabled=true;el('ttl-result').textContent='';
@@ -601,4 +602,20 @@ el('smb-refresh').onclick=async()=>{
     if(sid===token)el('smb-result').textContent='Package: '+x.state+'; process: '+x.runtime+'; shares unverified.';
   }catch(e){if(sid===token)el('smb-result').textContent=e.message;}
   finally{b.disabled=false;}
+};
+
+el('tunnel-refresh').onclick=async()=>{
+  const token=sid,b=el('tunnel-refresh');if(!token||b.disabled)return;
+  b.disabled=true;el('tunnel-result').textContent='';
+  const rows=[];
+  try{
+    for(const [label,op] of [['N2N','get_n2n_status'],['Shadowsocks DNS','get_ss_dns'],['Shadowsocks redirect','get_ss_redir'],['Shadowsocks tunnel','get_ss_tunnel_info']]){
+      try{
+        const x=await oem(op,undefined,token);
+        if(sid!==token)return;
+        rows.push(label+': '+x.state+' / '+x.profile_count+' profile(s); runtime not verified.');
+      }catch(e){if(sid!==token)return;rows.push(label+': inventory unavailable.');}
+    }
+    if(sid===token)el('tunnel-result').textContent=rows.join('\n');
+  }finally{b.disabled=false;}
 };

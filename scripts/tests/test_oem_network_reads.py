@@ -15,6 +15,7 @@ class NetworkReads(unittest.TestCase):
         self.d=Path(tmp.name)
         self.cmd("jshn", """json_init() { :; }
 json_add_string() { printf '%s=%s\\n' "$1" "$2"; }
+json_add_int() { printf '%s=%s\\n' "$1" "$2"; }
 json_add_array() { printf 'array:%s\\n' "$1"; }
 json_add_object() { :; }
 json_close_object() { :; }
@@ -137,6 +138,68 @@ esac
         self.assertIn("share_verified=false",r.stdout)
         self.cmd("pidof",'#!/bin/sh\necho 123\n')
         self.assertIn("runtime=process_present",self.invoke("get_samba_info").stdout)
+
+    def test_n2n_inventory_and_link_state(self):
+        self.cmd("uci", """#!/bin/sh
+case "$2:$3" in
+ show:network)
+    [ "${EMPTY:-0}" = 1 ] || printf "%s\n" "network.vpn0.proto='n2n'" "network.vpn0.key='secret-community-key'"
+    exit 0;;
+ get:network.vpn0) echo interface;;
+ get:network.vpn0.auto) echo 1;;
+ get:network.vpn0.server) echo vpn.example;;
+ get:network.vpn0.port) echo 1234;;
+ get:network.vpn0.key) echo secret-community-key;;
+ *) exit 1;;
+esac
+""")
+        self.cmd("ubus",'#!/bin/sh\nprintf "%s" "$NATIVE"\n')
+        r=self.invoke("get_n2n",EMPTY="1")
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn("state=unconfigured",r.stdout)
+        self.assertIn("profile_count=0",r.stdout)
+        for op in ("get_n2n","get_n2n_status"):
+            r=self.invoke(op,NATIVE=json.dumps({"proto":"n2n","up":True,"ipv4-address":[{"address":"192.0.2.2"}],"uptime":20}))
+            self.assertEqual(r.returncode,0,r.stderr)
+            self.assertIn("n2n_name=vpn0",r.stdout)
+            self.assertIn("profile_count=1",r.stdout)
+            self.assertNotIn("secret-community-key",r.stdout)
+            if op.endswith("status"):
+                self.assertIn("runtime=link_up",r.stdout)
+                self.assertIn("tunnel_verified=false",r.stdout)
+        r=self.invoke("get_n2n_status",NATIVE=json.dumps({"proto":"n2n","up":False,"ipv4-address":[{"address":"192.0.2.2"}]}))
+        self.assertIn("runtime=down",r.stdout)
+        self.assertNotIn("192.0.2.2",r.stdout)
+
+    def test_shadowsocks_profile_inventory(self):
+        adapter=self.d/"adapter"
+        cfg=self.d/"ss-config"
+        adapter.write_text(adapter.read_text().replace("/etc/config/shadowsocks-libev",str(cfg)))
+        self.cmd("uci", """#!/bin/sh
+case "$2:$3" in
+ show:shadowsocks-libev)
+    printf "%s\n" "shadowsocks-libev.dns=ss_tunnel" "shadowsocks-libev.other=ss_tunnel" "shadowsocks-libev.redirect=ss_redir" "shadowsocks-libev.server.password='secret'"
+    ;;
+ get:*.disabled) echo "${DISABLED:-1}";;
+ get:*.mode) echo tcp_only;;
+ get:*.local_port) echo 5353;;
+ *) exit 1;;
+esac
+""")
+        for op,n in (("get_ss_dns",1),("get_ss_tunnel_info",2),("get_ss_redir",1)):
+            with self.subTest(op=op):
+                if cfg.exists(): cfg.unlink()
+                r=self.invoke(op)
+                self.assertEqual(r.returncode,0,r.stderr)
+                self.assertIn("state=absent",r.stdout)
+                cfg.touch()
+                r=self.invoke(op)
+                self.assertEqual(r.returncode,0,r.stderr)
+                self.assertIn("profile_count="+str(n),r.stdout)
+                self.assertIn("enabled=0",r.stdout)
+                self.assertIn("runtime=unknown",r.stdout)
+                self.assertNotIn("secret",r.stdout)
+                self.assertNotEqual(self.invoke(op,DISABLED="bad").returncode,0)
 
     def test_optional_openvpn_profile_status(self):
         self.cmd("ubus",'#!/bin/sh\nprintf "%s" "$NATIVE"\n')
