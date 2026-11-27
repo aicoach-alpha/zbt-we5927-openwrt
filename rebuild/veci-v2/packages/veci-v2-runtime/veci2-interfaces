@@ -149,18 +149,25 @@ for section in lan wan; do
 done
 current=$(revision) || fail config_unavailable
 if [ "$2" = save ]; then
-  # Existing generic editor cannot silently replace a PPPoE profile.
+  # Explicit Ethernet protocol retirement; ordinary saves cannot remove PPPoE.
   old_mode="$mode"
   input=$(head -c 1025)
   [ "${#input}" -le 1024 ] && json_load "$input" || fail invalid_request
   json_get_var token revision ''; json_get_var confirm confirm ''
   [ "$token" = "$current" ] || fail stale_configuration
-  [ "$confirm" = SAVE_NETWORK ] || fail confirmation_required
+  case "$confirm" in SAVE_NETWORK|REPLACE_PPPOE_NEXT_BOOT) ;; *) fail confirmation_required;; esac
   json_get_var lan lan ''; json_get_var lan_mask lan_mask ''; json_get_var mode wan_mode ''
   json_get_var wan wan ''; json_get_var wan_mask wan_mask ''; json_get_var gateway gateway ''
-  if [ "$old_mode" = pppoe ] || [ "$mode" = pppoe ]; then
-    [ "$old_mode:$mode" = pppoe:pppoe ] || fail use_dedicated_pppoe_configuration
-  fi
+  retire_pppoe=0
+  case "$old_mode:$mode" in
+    pppoe:dhcp|pppoe:static)
+      [ "$confirm" = REPLACE_PPPOE_NEXT_BOOT ] || fail explicit_pppoe_replacement_required
+      pppoe_device >/dev/null || fail ethernet_wan_unverified
+      retire_pppoe=1 ;;
+    pppoe:pppoe|dhcp:dhcp|dhcp:static|static:dhcp|static:static)
+      [ "$confirm" = SAVE_NETWORK ] || fail confirmation_required ;;
+    *) fail use_dedicated_pppoe_configuration ;;
+  esac
   case "$mode" in dhcp|pppoe) wan=; wan_mask=; gateway= ;; static) ;; *) fail invalid_wan_mode ;; esac
   # Convert each mask to prefix length and validate usable, disjoint subnets.
   for arg in "$lan" "$lan_mask" "$wan" "$wan_mask" "$gateway"; do
@@ -185,10 +192,14 @@ if [ "$2" = save ]; then
   set -- $masks
   tmp=$(mktemp -d /tmp/veci2-interfaces.XXXXXX) || fail stage_failed
   trap 'rm -rf "$tmp"' EXIT
+  cp -p "$cfg" "$tmp/network.original" || fail backup_failed
   change() { uci -q -t "$tmp" "$@"; }
   remove() { if change get "$1" >/dev/null; then change delete "$1"; fi; }
   change set "network.lan.ipaddr=$lan/$1" && remove network.lan.netmask &&
     change set "network.wan.proto=$mode" || fail stage_failed
+  if [ "$retire_pppoe" = 1 ]; then
+    for option in username password service ac; do remove "network.wan.$option" || fail stage_failed; done
+  fi
   if [ "$mode" != pppoe ]; then
   remove network.wan.netmask || fail stage_failed
   if [ "$mode" = dhcp ]; then
@@ -199,7 +210,10 @@ if [ "$2" = save ]; then
   fi
   pending=$(uci -q changes network) || fail config_unavailable
   [ "$(revision)" = "$current" ] && [ -z "$pending" ] || fail stale_configuration
-  change commit network || fail commit_failed
+  if ! change commit network || [ "$(get wan.proto)" != "$mode" ] || [ "$(get lan.ipaddr)" != "$lan/$1" ]; then
+    cp -p "$tmp/network.original" "$cfg" || fail rollback_failed
+    fail commit_failed_rollback
+  fi
   current=$(revision) || fail config_unavailable; lan_mask=$1; [ "$mode" != static ] || wan_mask=$2
 fi
 json_init

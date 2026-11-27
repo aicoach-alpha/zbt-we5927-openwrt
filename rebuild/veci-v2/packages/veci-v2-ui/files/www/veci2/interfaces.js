@@ -4,6 +4,7 @@
   const fields = form.elements;
   let revision = '';
   let owner = '';
+  let originalMode = '';
   let pending = false;
   function toggleWan() {
     el('interface-static').disabled = fields.wan_mode.value !== 'static';
@@ -19,7 +20,9 @@
     if (save) {
       for (const name of ['lan', 'lan_mask', 'wan_mode', 'wan', 'wan_mask', 'gateway']) args[name] = fields[name].value.trim();
       if (!confirm('Simpan untuk aktivasi jaringan berikutnya? Catat alamat LAN baru dan pastikan rentang DHCP serta reservasi tetap sesuai.')) return;
-      Object.assign(args, {revision, confirm: 'SAVE_NETWORK'});
+      const replacing = originalMode === 'pppoe' && args.wan_mode !== 'pppoe';
+      if (replacing && !confirm('Ganti PPPoE dengan '+args.wan_mode+'? Pengaturan PPPoE lama dihapus; berlaku pada aktivasi manual.')) return;
+      Object.assign(args, {revision, confirm: replacing ? 'REPLACE_PPPOE_NEXT_BOOT' : 'SAVE_NETWORK'});
     }
     pending = true;
     fields.controls.disabled = true;
@@ -28,6 +31,7 @@
       if (sid !== session) return;
       if (!data.ok) throw new Error(data.error);
       revision = data.revision;
+      originalMode = data.wan_mode;
       owner = session;
       for (const name of ['lan', 'lan_mask', 'wan_mode', 'wan', 'wan_mask', 'gateway']) fields[name].value = data[name];
       toggleWan();
@@ -40,7 +44,7 @@
   }
   globalThis.VeciInterfaces = {reset() {
     form.reset();
-    revision = owner = '';
+    revision = owner = originalMode = '';
     fields.controls.disabled = true;
     el('interface-message').textContent = '';
   }};
