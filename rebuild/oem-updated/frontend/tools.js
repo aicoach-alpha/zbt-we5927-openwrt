@@ -35,6 +35,7 @@ function clearSession() {
   el('dhcp-result').textContent = ''; el('traffic-result').textContent = ''; el('internet-result').textContent = '';
   powerExpected=null; scheduleRevision=null; el('power-form').reset(); el('schedule-form').reset(); el('power-save').disabled=true; el('schedule-save').disabled=true; el('power-result').textContent=''; el('schedule-result').textContent='';
   resetOptional();
+  resetAcl();
   pppoeRevision="";el("pppoe-profile").reset();el("pppoe-save").disabled=true;el("pppoe-result").textContent="";
   ttlRevision='';el('ttl-form').reset();el('ttl-save').disabled=true;el('ttl-result').textContent='';
   macRevision=''; el('mac-form').reset(); el('mac-save').disabled=true; el('mac-result').textContent='';
@@ -432,3 +433,44 @@ el('pppoe-profile').onsubmit=async e=>{
   }catch(e){if(sid===token)el('pppoe-result').textContent=e.message;}
   finally{args.password='';}
 };
+
+let aclRevision='',aclRules=[];
+function resetAcl(){
+  aclRevision='';aclRules=[];el('acl-form').reset();el('acl-result').textContent='';
+  for(const id of ['acl-save','acl-toggle','acl-delete'])el(id).disabled=true;
+}
+function selectAcl(){
+  const row=aclRules.find(x=>x.slot===el('acl-slot').value);
+  el('acl-mac').value=row?row.mac:'';el('acl-enabled').checked=!!row&&row.enabled==='1';
+  el('acl-save').disabled=!aclRevision;el('acl-toggle').disabled=!aclRevision||!row;
+  el('acl-delete').disabled=!aclRevision||!row;
+}
+el('acl-slot').onchange=selectAcl;
+el('acl-refresh').onclick=async()=>{
+  const token=sid,b=el('acl-refresh');if(!token||b.disabled)return;
+  b.disabled=true;resetAcl();
+  try{
+    const x=await rpc('veci.v2.firewall','aclStatus',{},token);
+    if(!x.ok||!/^[0-9a-f]{64}$/.test(x.revision||'')||!Array.isArray(x.rules))throw Error('ACL unavailable');
+    if(sid!==token)return;
+    aclRevision=x.revision;aclRules=x.rules;
+    el('acl-result').textContent=aclRules.map(r=>'Slot '+r.slot+': '+r.mac+' / '+(r.enabled==='1'?'blocked':'disabled')).join('\n')||'No managed rules.';
+    selectAcl();
+  }catch(e){if(sid===token)el('acl-result').textContent=e.message;}
+  finally{b.disabled=false;}
+};
+async function changeAcl(action){
+  const token=sid,revision=aclRevision;if(!token||!revision)return;
+  const slot=el('acl-slot').value,mac=el('acl-mac').value.trim(),enabled=el('acl-enabled').checked?'1':'0';
+  if(action==='save'&&!/^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i.test(mac)){el('acl-result').textContent='Invalid MAC';return;}
+  if(!window.confirm('Apply managed ACL slot '+slot+'? Firewall reload may interrupt connections. Enabled blocks disable flow offload.'))return;
+  aclRevision='';selectAcl();clearFirewall();
+  try{
+    const body={slot,revision,action,mac,enabled,confirmation:action==='delete'?'DELETE_LAN_ACL':'SAVE_LAN_ACL'};
+    await oem(action==='toggle'?'set_acl_status':'set_acl_rule',body,token);
+    if(sid===token)el('acl-result').textContent='Saved. Refresh inventory; packet enforcement unverified.';
+  }catch(e){if(sid===token)el('acl-result').textContent=e.message;}
+}
+el('acl-form').onsubmit=e=>{e.preventDefault();changeAcl('save');};
+el('acl-toggle').onclick=()=>changeAcl('toggle');
+el('acl-delete').onclick=()=>changeAcl('delete');

@@ -177,6 +177,16 @@
       ],
       "activation": "manual",
       "interface": "usb0"
+    },
+    "managed_acl": {
+      "provider": "veci.v2.firewall",
+      "methods": [
+        "aclStatus",
+        "saveAcl"
+      ],
+      "scope": "Eight owned LAN-to-WAN deny slots; create/edit/toggle/delete; no global switch",
+      "state": "SOURCE_INTEGRATED_NOT_UAT",
+      "limitations": "Native read and invalid write fixture passed; live rule application and original OEM form pending"
     }
   },
   "remaining": [

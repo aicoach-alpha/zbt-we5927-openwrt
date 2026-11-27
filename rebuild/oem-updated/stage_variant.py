@@ -399,6 +399,12 @@ def stage(image, out):
             '<label>Service (optional)<input id="pppoe-service" maxlength="64"></label>'
             '<label>Access concentrator (optional)<input id="pppoe-ac" maxlength="64"></label>'
             '<button id="pppoe-save" disabled>Save PPPoE profile</button></form><p id="pppoe-result" role="status"></p></article>'
+            '<article><h2>Managed LAN to WAN ACL</h2><p>Eight optional MAC block slots. No global firewall switch. Enabling a deny rule disables flow offload.</p>'
+            '<button id="acl-refresh" type="button">Read managed rules</button><pre id="acl-result" role="status"></pre>'
+            '<form id="acl-form"><label>Slot<select id="acl-slot"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>'
+            '<label>Client MAC<input id="acl-mac" maxlength="17" placeholder="aa:bb:cc:dd:ee:ff"></label>'
+            '<label><input id="acl-enabled" type="checkbox">Enable block</label>'
+            '<button id="acl-save" disabled>Save slot</button><button id="acl-toggle" type="button" disabled>Change enabled state</button><button id="acl-delete" type="button" disabled>Delete slot</button></form></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

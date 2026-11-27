@@ -561,10 +561,16 @@
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "set_acl_rule": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:saveAcl",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; scripts/tests/test_oem_acl_slots.py",
+      "limitations": "Owned eight LAN-to-WAN MAC deny slots only; status toggle per slot, not global firewall switch. Negative native fixture passed; successful commit/reload/rollback, OEM original form and packet enforcement pending."
     },
     "set_acl_status": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.firewall:saveAcl",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; scripts/tests/test_oem_acl_slots.py",
+      "limitations": "Owned eight LAN-to-WAN MAC deny slots only; status toggle per slot, not global firewall switch. Negative native fixture passed; successful commit/reload/rollback, OEM original form and packet enforcement pending."
     },
     "set_cloud_login": {
       "state": "SOURCE_DISABLED_REVIEWED",

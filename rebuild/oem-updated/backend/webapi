@@ -141,7 +141,7 @@ case "$op" in
     long_link)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         reply '{"code":"1","reason":"success"}' ;;
-    set_qos|set_ttl|ddns_detection|set_ddns|set_qos_status|pppoe_detection|pppoe_disconnect|pppoe_reconnect|set_wifi_client|set_wifi_power|setAutoreboot|set_mac_blacklist|set_fw_setting|set_nat_acceleration|set_wifi_guest|set_dhcp_config|set_static_dhcp|delete_static_dhcp|set_ntp|set_dmz|set_lan_config|set_wan_config|set_4g|set_4g_sim|set_netwatchdog|setWiFi2|set_static_route|set_redirect_dnat)
+    set_acl_rule|set_acl_status|set_qos|set_ttl|ddns_detection|set_ddns|set_qos_status|pppoe_detection|pppoe_disconnect|pppoe_reconnect|set_wifi_client|set_wifi_power|setAutoreboot|set_mac_blacklist|set_fw_setting|set_nat_acceleration|set_wifi_guest|set_dhcp_config|set_static_dhcp|delete_static_dhcp|set_ntp|set_dmz|set_lan_config|set_wan_config|set_4g|set_4g_sim|set_netwatchdog|setWiFi2|set_static_route|set_redirect_dnat)
         [ "${REQUEST_METHOD:-}" = POST ] || err -4 "method refused"
         case "${CONTENT_TYPE:-}" in application/json|application/json\;*) ;; *) err -4 "JSON required";; esac
         case "${CONTENT_LENGTH:-}" in ''|*[!0-9]*) err -4 "invalid body length";; esac
