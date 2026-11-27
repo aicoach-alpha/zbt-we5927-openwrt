@@ -291,3 +291,10 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - Compared with earlier Nov23/Nov25 backup, current MTD3 main kernel and pre-overlay content differ. This new snapshot preserves actual current firmware bytes while historical backups also remain intact. RAW MTD3 is **not** proven to be a valid U-Boot rescue or sysupgrade payload.
 - **Next gates unresolved**: backup restore image format, demonstrated physical recovery capability, active-client Wi-Fi/MT76, LTE/SMS post-install UAT and 72h soak. Flash candidate f87e7ec5 remains release_permitted=false and flash_authorized=false, NO physical flash/reboot/network reload performed.
 - Preserve raw MTD3 and accompanying JSON strictly on owner's Windows. MTD backup may include live network and access credentials; do not upload to public repository.
+
+## Owner offline MTD3 legacy uImage initial header — 27 Nov 2026
+
+- Owner Windows, from the exact current 7,995,392 byte RAW MTD3 image: HEADER_MAGIC=27051956, UIMAGE_PAYLOAD_BYTES=1959054, UIMAGE_HEADER_BOUNDS=PLAUSIBLE. This indicates a potential legacy U-Boot uImage header at the partition start but **does not** validate header or data CRC32, nor the U-Boot recovery loader's accepted firmware format.
+- Source format is U-Boot legacy image.h: header is 64 bytes, CRC32 header at offset 4 (computed with its field zeroed), payload size at offset 12 and CRC32 payload at offset 24, encoded in network byte order. Reference: https://qemu.googlesource.com/u-boot/+/e9a1ff9724348408144c7f1c5b5cc26130ba46e5/include/image.h
+- New offline Windows tool scripts/veci-we5927-uimage-offline-integrity-20261127.ps1 checks the matching current backup receipt and SHA256 before calculating both CRC32s with exact payload boundaries. It performs no router action or recovery; live user output is pending. CRC32 is integrity evidence, not authenticity, secure boot, hardware rescue compatibility, or flash authorization.
+- Historical stable backup retention and signed f87e7ec5 candidate preflight PASS remain unchanged; release_permitted=false until recovery and post-flash physical UAT.
