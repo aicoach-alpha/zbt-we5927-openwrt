@@ -76,6 +76,10 @@ case "$session" in ''|*[!0-9a-f]*|00000000000000000000000000000000) err -1 "acce
 permit="$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"ubus\",\"object\":\"oem.updated\",\"function\":\"read\"}" | jsonfilter -e '@.access')" || err -1 "session unavailable"
 [ "$permit" = true ] || err -1 "access denied"
 case "$op" in
+    activate_ngrokc|get_cloud_login|set_cloud_login|get_ac_info|set_ac_info|get_ac_switch|set_ac_switch)
+        err -4 "Proprietary OEM cloud management is not supported; use authenticated local management" ;;
+    bootflag|setbootflag)
+        err -4 "Legacy boot flag is not supported; use verified firmware recovery" ;;
     send_at) err -4 "Raw modem commands disabled on WE5927-2SIM" ;;
     set_imei) err -4 "Modem identity is read-only on WE5927-2SIM" ;;
     getWiFi5|setWiFi5|setWiFi5_nocommit|get_wifi_guest5|set_wifi_guest5)
@@ -135,7 +139,7 @@ case "$op" in
     long_link)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         reply '{"code":"1","reason":"success"}' ;;
-    set_ttl|ddns_detection|set_ddns|set_qos_status|pppoe_detection|pppoe_disconnect|pppoe_reconnect|set_wifi_client|set_wifi_power|setAutoreboot|set_mac_blacklist|set_fw_setting|set_nat_acceleration|set_wifi_guest|set_dhcp_config|set_static_dhcp|delete_static_dhcp|set_ntp|set_dmz|set_lan_config|set_wan_config|set_4g|set_4g_sim|set_netwatchdog|setWiFi2|set_static_route|set_redirect_dnat)
+    set_qos|set_ttl|ddns_detection|set_ddns|set_qos_status|pppoe_detection|pppoe_disconnect|pppoe_reconnect|set_wifi_client|set_wifi_power|setAutoreboot|set_mac_blacklist|set_fw_setting|set_nat_acceleration|set_wifi_guest|set_dhcp_config|set_static_dhcp|delete_static_dhcp|set_ntp|set_dmz|set_lan_config|set_wan_config|set_4g|set_4g_sim|set_netwatchdog|setWiFi2|set_static_route|set_redirect_dnat)
         [ "${REQUEST_METHOD:-}" = POST ] || err -4 "method refused"
         case "${CONTENT_TYPE:-}" in application/json|application/json\;*) ;; *) err -4 "JSON required";; esac
         case "${CONTENT_LENGTH:-}" in ''|*[!0-9]*) err -4 "invalid body length";; esac

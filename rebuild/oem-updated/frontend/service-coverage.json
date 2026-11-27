@@ -146,10 +146,11 @@
       "provider": "veci.v2.addon",
       "methods": [
         "sqmStatus",
-        "setOptionalStartup"
+        "setOptionalStartup",
+        "saveSqm"
       ],
       "default": "optional absent",
-      "scope": "preconfigured interface queue; software and hardware offload conflict guard",
+      "scope": "Create/edit disabled interface queue; separate opt-in activation; offload conflict guard",
       "state": "SOURCE_INTEGRATED_NOT_UAT"
     },
     "original_network_forms": {

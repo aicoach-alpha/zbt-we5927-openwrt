@@ -8,7 +8,7 @@ fail() { json_init; json_add_string code -4; json_add_string reason "$1"; json_d
 read_field() { printf '%s' "$body" | jsonfilter -e "$1"; }
 native_field() { printf '%s' "$native" | jsonfilter -e "$1"; }
 rpc() {
-    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.dhcp:setPool|veci.v2.addon:setPortalStartup|veci.v2.addon:setOptionalStartup|veci.v2.addon:ddnsLookup|veci.v2.system:setNtp|veci.v2.firewall:setDmz|veci.v2.firewall:setDefaults|veci.v2.firewall:setOffload|veci.v2.firewall:setMacBlock|veci.v2.firewall:setTtl|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.interfaces:pppoeAction|veci.v2.interfaces:pppoeDiscovery|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.wifi:setPower|veci.v2.cron:setReboot|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
+    case "$1:$2" in veci.v2.dhcp:add|veci.v2.dhcp:delete|veci.v2.dhcp:status|veci.v2.dhcp:setPool|veci.v2.addon:setPortalStartup|veci.v2.addon:setOptionalStartup|veci.v2.addon:saveSqm|veci.v2.addon:ddnsLookup|veci.v2.system:setNtp|veci.v2.firewall:setDmz|veci.v2.firewall:setDefaults|veci.v2.firewall:setOffload|veci.v2.firewall:setMacBlock|veci.v2.firewall:setTtl|veci.v2.interfaces:status|veci.v2.interfaces:save|veci.v2.interfaces:pppoeAction|veci.v2.interfaces:pppoeDiscovery|veci.v2.lte:status|veci.v2.lte:setApn|veci.v2.lte:setFailover|veci.v2.lte:setMonitor|veci.v2.sim:switchSim|veci.v2.wifi:setSsid|veci.v2.wifi:setChannel|veci.v2.wifi:setAutoChannel|veci.v2.wifi:setVisibility|veci.v2.wifi:setAuth|veci.v2.wifi:setAccess|veci.v2.wifi:setPower|veci.v2.cron:setReboot|veci.v2.routes:save|veci.v2.routes:remove|veci.v2.firewall:addForward|veci.v2.firewall:deleteForward) ;; *) fail "unsupported RPC";; esac
     # Do not bypass the session's permission on the actual backend method.
     json_init; json_add_string ubus_rpc_session "$session"; json_add_string scope ubus
     json_add_string object "$1"; json_add_string function "$2"
@@ -33,6 +33,19 @@ case "$op" in
         json_init; json_add_string code 1; json_add_string reason "DNS lookup only; update not verified"
         json_add_string detection_ret "$output"; json_add_string exit_code "$rc"
         json_add_string provider_update_verified false; json_dump; exit 0
+        ;;
+    set_qos)
+        revision="$(read_field '@.revision')" || fail "revision required"
+        confirmation="$(read_field '@.confirmation')" || fail "confirmation required"
+        [ "$confirmation" = SAVE_SQM_NEXT_BOOT ] || fail "confirmation mismatch"
+        json_init; json_add_string revision "$revision"; json_add_string confirmation "$confirmation"
+        for key in interface download upload qdisc script; do
+            value="$(read_field "@.$key")" || fail "missing SQM field"
+            json_add_string "$key" "$value"
+        done
+        rpc veci.v2.addon saveSqm "$(json_dump)"
+        json_init; json_add_string code 1; json_add_string reason "SQM profile saved disabled"
+        json_add_string apply_state pending_manual_activation; json_dump; exit 0
         ;;
     set_ddns|set_qos_status)
         revision="$(read_field '@.revision')" || fail "profile revision required"

@@ -3,7 +3,9 @@
   "reference_sha256": "80529b8e9c31d686eb7f63a1517d6dbcf781f26cb4aceb7b8b1ff27c2d51d1f9",
   "operations": {
     "activate_ngrokc": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Vendor proprietary cloud/tunnel omitted; local authenticated management retained.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "app_home": {
       "state": "PROTOTYPE",
@@ -12,7 +14,9 @@
       "limitations": "Measured byte rates on current default IPv4 interface, unknown Internet reachability; counter reset and route changes produce gaps. Browser/runtime acceptance pending."
     },
     "bootflag": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Legacy anyos boot flag not supported by native signed recovery contract.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "change_password": {
       "state": "UNIMPLEMENTED"
@@ -74,10 +78,14 @@
       "limitations": "Filtered native recent logs; OEM UI integration and redaction review pending."
     },
     "get_ac_info": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Vendor proprietary cloud/tunnel omitted; local authenticated management retained.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "get_ac_switch": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Vendor proprietary cloud/tunnel omitted; local authenticated management retained.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "get_acl_rule": {
       "state": "PROTOTYPE",
@@ -98,7 +106,9 @@
       "limitations": "Complete LAN neighbours only; actual device and OEM UI integration pending."
     },
     "get_cloud_login": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Vendor proprietary cloud/tunnel omitted; local authenticated management retained.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "get_days_traffic": {
       "state": "PROTOTYPE",
@@ -523,10 +533,14 @@
       "limitations": "POST explicit slot confirmation; legacy credential GET disabled; physical switching and timing pending."
     },
     "set_ac_info": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Vendor proprietary cloud/tunnel omitted; local authenticated management retained.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "set_ac_switch": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Vendor proprietary cloud/tunnel omitted; local authenticated management retained.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "set_acl_rule": {
       "state": "UNIMPLEMENTED"
@@ -535,7 +549,9 @@
       "state": "UNIMPLEMENTED"
     },
     "set_cloud_login": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Vendor proprietary cloud/tunnel omitted; local authenticated management retained.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "set_ddns": {
       "state": "PROTOTYPE",
@@ -621,7 +637,10 @@
       "state": "UNIMPLEMENTED"
     },
     "set_qos": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:saveSqm",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Creates or edits disabled owned interface SQM profile only; requires installed addon and existing config file. Explicit enable remains separate. Package availability and runtime pending."
     },
     "set_qos_status": {
       "state": "PROTOTYPE",
@@ -698,7 +717,9 @@
       "limitations": "Native dBm or regulatory auto, conservative cap from live permitted channels, next manual boot only. Legacy high/medium/low form not mapped; radio UAT pending."
     },
     "setbootflag": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Legacy anyos boot flag not supported by native signed recovery contract.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "site_survey": {
       "state": "PROTOTYPE",

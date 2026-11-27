@@ -96,6 +96,17 @@ esac
         identity = self.run_script("gateway", QUERY_STRING="op=get_imei")
         self.assertIn("ADAPTER_CALLED:get_imei", identity.stdout)
 
+    def test_legacy_cloud_and_bootflag_refused(self):
+        for op in ("activate_ngrokc","get_cloud_login","set_cloud_login","get_ac_info","set_ac_info","get_ac_switch","set_ac_switch","bootflag","setbootflag"):
+            for method in ("GET","POST"):
+                with self.subTest(op=op,method=method):
+                    args=dict(QUERY_STRING="op="+op,REQUEST_METHOD=method)
+                    result=self.run_script("gateway",**args)
+                    self.assertIn("not supported",result.stdout)
+                    self.assertNotIn("ADAPTER_CALLED",result.stdout)
+                    denied=self.run_script("gateway",HTTP_X_OEM_SESSION="",**args)
+                    self.assertIn("access denied",denied.stdout)
+
     def test_ddns_events_hide_credentials_and_unrelated_messages(self):
         self.command("jsonfilter", """case "$2" in
           '@.ok') echo true;;

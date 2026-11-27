@@ -311,9 +311,10 @@ el('schedule-form').onsubmit=async e=>{
   }catch(err){if(sid===token)el('schedule-result').textContent=err.message;}
 };
 
-let optionalProfiles={ddns:null,sqm:null};
+let optionalProfiles={ddns:null,sqm:null},sqmRevision="";
 function resetOptional(){
   optionalProfiles={ddns:null,sqm:null};
+  sqmRevision="";el("sqm-form").reset();el("sqm-save").disabled=true;
   for(const k of ['ddns','sqm']){
     el(k+'-toggle').disabled=true;el(k+'-result').textContent='';
   }
@@ -332,6 +333,14 @@ el('optional-refresh').onclick=async()=>{
       el(key+'-toggle').textContent=x.state==='enabled'?'Disable '+key+' at next boot':'Enable '+key+' at next boot';
       el(key+'-result').textContent='Configuration: '+x.state+'; service startup: '+(x.service_startup||'unknown')+'; runtime unverified.';
       if(key==='ddns')el('ddns-check').disabled=!ready;
+      if(key==='sqm'&&['disabled','unconfigured'].includes(x.state)&&/^[0-9a-f]{64}$/.test(x.revision||'')){
+        sqmRevision=x.revision;const q=Array.isArray(x.data)?x.data[0]:null;
+        if(q){
+          el('sqm-interface').value=q.interface;el('sqm-download').value=q.download;
+          el('sqm-upload').value=q.upload;el('sqm-queue').value=q.qdisc+':'+q.script;
+        }
+        el('sqm-save').disabled=false;
+      }
     }
   }catch(e){if(sid===token){resetOptional();el('ddns-result').textContent=e.message;}}
   finally{b.disabled=false;}
@@ -341,6 +350,7 @@ async function toggleOptional(key){
   const enable=x.state==='disabled',action=(enable?'ENABLE_':'DISABLE_')+key.toUpperCase()+'_NEXT_BOOT';
   if(!window.confirm((enable?'Enable ':'Disable ')+key+' at next manual boot?'))return;
   optionalProfiles[key]=null;el(key+'-toggle').disabled=true;
+  if(key==='sqm'){sqmRevision='';el('sqm-save').disabled=true;}
   try{
     const body={revision:x.revision,confirmation:action};
     body[key==='ddns'?'enabled':'qos_enabled']=enable?'1':'0';
@@ -382,4 +392,15 @@ el('ttl-form').onsubmit=async e=>{
     const x=await oem('set_ttl',{ttl_enabled:enabled?'1':'0',ttl_cnt:ttl,revision,confirmation:enabled?'ENABLE_FORWARD_TTL':'DISABLE_FORWARD_TTL'},token);
     if(sid===token)el('ttl-result').textContent='Policy saved. Runtime: '+x.runtime+'; packet verification pending.';
   }catch(e){if(sid===token)el('ttl-result').textContent=e.message;}
+};
+
+el('sqm-form').onsubmit=async e=>{
+  e.preventDefault();const token=sid,revision=sqmRevision;if(!token||!revision)return;
+  const [qdisc,script]=el('sqm-queue').value.split(':');
+  if(!window.confirm('Save a disabled SQM profile? Enable separately after reviewing.'))return;
+  sqmRevision='';el('sqm-save').disabled=true;el('sqm-toggle').disabled=true;optionalProfiles.sqm=null;
+  try{
+    await oem('set_qos',{revision,confirmation:'SAVE_SQM_NEXT_BOOT',interface:el('sqm-interface').value,download:el('sqm-download').value,upload:el('sqm-upload').value,qdisc,script},token);
+    if(sid===token)el('sqm-result').textContent='Disabled profile saved. Refresh before enabling.';
+  }catch(e){if(sid===token)el('sqm-result').textContent=e.message;}
 };

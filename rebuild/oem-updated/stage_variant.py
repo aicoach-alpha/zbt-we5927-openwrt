@@ -101,7 +101,14 @@ def stage(image, out):
         shutil.copytree(tmp / "preview/preview/www", files / "www")
         # Both OEM menu profiles and the login response constrain the UI to radio0.
         for profile in ("menu_conf.json", "menu_conf1.json"):
-            wifi = json.loads((files / "www" / profile).read_text())["wifi"]
+            profile_path=files / "www" / profile
+            menu=json.loads(profile_path.read_text())
+            for key in ("srv_cloud_login","srv_cloud_control"):
+                if key not in menu["srv"]:
+                    raise ValueError("OEM cloud menu anchor missing: "+key)
+                menu["srv"][key]=0
+            profile_path.write_text(json.dumps(menu,indent=2)+"\n")
+            wifi = menu["wifi"]
             if (wifi["wifi_2"], wifi["wifi_5"], wifi["wifi_60"]) != (1, 0, 0):
                 raise ValueError("unexpected radio capabilities in " + profile)
         app = files / APP
@@ -353,11 +360,16 @@ def stage(image, out):
             '<label>Minute<input id="schedule-minute" type="number" min="0" max="59" required></label>'
             '<label>Days (0 Sunday to 6 Saturday, comma separated)<input id="schedule-days" required maxlength="13"></label>'
             '<button id="schedule-save" disabled>Simpan jadwal</button></form><p id="schedule-result" role="status"></p></article>'
-            '<article><h2>Optional services: DDNS / SQM</h2><p>Requires an installed compatible addon and configured profile. Settings are saved for next boot; no automatic restart. SQM requires offload disabled.</p>'
+            '<article><h2>Optional services: DDNS / SQM</h2><p>Requires an installed compatible addon. SQM profiles can be created disabled; DDNS requires an existing profile. Settings are saved for next boot; no automatic restart. SQM requires offload disabled.</p>'
             '<button id="optional-refresh" type="button">Baca status addon</button>'
             '<p id="ddns-result" role="status"></p><button id="ddns-toggle" disabled>Toggle DDNS</button>'
             '<button id="ddns-check" disabled>Check DNS lookup</button><pre id="ddns-lookup-result" class="result"></pre>'
-            '<p id="sqm-result" role="status"></p><button id="sqm-toggle" disabled>Toggle SQM</button></article>'
+            '<p id="sqm-result" role="status"></p><button id="sqm-toggle" disabled>Toggle SQM</button>'
+            '<form id="sqm-form"><label>Interface<select id="sqm-interface"><option>usb0</option><option>eth0.2</option><option>pppoe-wan</option></select></label>'
+            '<label>Download (kbit/s)<input id="sqm-download" type="number" min="64" max="2000000" required></label>'
+            '<label>Upload (kbit/s)<input id="sqm-upload" type="number" min="64" max="2000000" required></label>'
+            '<label>Queue<select id="sqm-queue"><option value="cake:piece_of_cake.qos">CAKE simple</option><option value="cake:layer_cake.qos">CAKE layered</option><option value="fq_codel:simple.qos">FQ-CoDel</option></select></label>'
+            '<button id="sqm-save" disabled>Save disabled profile</button></form></article>'
             '<article><h2>IPv4 forwarding TTL (optional)</h2><p>Default disabled. Scope: LAN to WAN forwarding only, not locally originated traffic. Flow offload must be disabled.</p>'
             '<button id="ttl-refresh" type="button">Baca TTL</button><form id="ttl-form">'
             '<label><input id="ttl-enabled" type="checkbox">Enable forwarding TTL policy</label>'
