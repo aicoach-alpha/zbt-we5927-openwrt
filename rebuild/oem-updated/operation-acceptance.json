@@ -755,7 +755,10 @@
       "limitations": "Bounded five-hop diagnostic; applet dependencies and browser integration pending."
     },
     "test_wget": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2:internetCheck",
+      "evidence": "rebuild/oem-updated/backend/webapi",
+      "limitations": "Fixed LTE HTTPS diagnostic via existing authenticated native provider; arbitrary URL download not supported. Existing supplementary internet-check UI uses the same provider. Legacy original wget form, shell execution on target, and runtime acceptance pending."
     },
     "url_upgrade": {
       "state": "UNIMPLEMENTED"
