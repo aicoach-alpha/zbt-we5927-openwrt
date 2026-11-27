@@ -9,7 +9,8 @@
           "sqmStatus",
           "ddnsLookup",
           "openvpnStatus",
-          "legacyTunnelStatus"
+          "legacyTunnelStatus",
+          "smbStatus"
         ]
       }
     },
@@ -21,7 +22,8 @@
           "setOptionalStartup",
           "saveSqm",
           "setOpenvpnStartup",
-          "disableLegacyTunnel"
+          "disableLegacyTunnel",
+          "disableSmbStartup"
         ]
       }
     }
