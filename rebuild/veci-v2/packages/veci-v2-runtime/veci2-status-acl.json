@@ -180,7 +180,8 @@
           "leds",
           "observability",
           "diagnostics",
-          "rebootStatus"
+          "rebootStatus",
+          "resetReadiness"
         ]
       }
     },

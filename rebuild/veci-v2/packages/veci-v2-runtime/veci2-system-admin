@@ -19,9 +19,9 @@ valid_host() {
 }
 [ "$#" -ge 1 ] || fail unsupported_method
 case "$1" in
-  list) echo '{"ntp":{},"rebootStatus":{},"rebootNow":{"boot_id":"String","confirmation":"String"},"setNtp":{"first":"String","second":"String","confirmation":"String"},"logs":{},"diagnostics":{},"leds":{},"observability":{}}'; exit 0 ;;
+  list) echo '{"ntp":{},"resetReadiness":{},"rebootStatus":{},"rebootNow":{"boot_id":"String","confirmation":"String"},"setNtp":{"first":"String","second":"String","confirmation":"String"},"logs":{},"diagnostics":{},"leds":{},"observability":{}}'; exit 0 ;;
   call) [ "$#" -ge 2 ] || fail unsupported_method
-    case "$2" in ntp|setNtp|logs|diagnostics|leds|observability|rebootStatus|rebootNow) ;; *) fail unsupported_method ;; esac ;;
+    case "$2" in ntp|setNtp|logs|diagnostics|leds|observability|resetReadiness|rebootStatus|rebootNow) ;; *) fail unsupported_method ;; esac ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
@@ -108,7 +108,7 @@ reboot_locks() {
 reboot_status() {
   boot=$(boot_identity) || fail boot_identity_unavailable
   eligible=0
-  if (reboot_locks); then eligible=1; fi
+  if [ ! -e /var/run/veci2-reboot-requested ] && [ ! -L /var/run/veci2-reboot-requested ] && (reboot_locks); then eligible=1; fi
   json_init; json_add_boolean ok 1; json_add_string boot_id "$boot"
   json_add_boolean eligible "$eligible"; json_add_boolean reboot_verified 0
   json_dump
@@ -134,7 +134,22 @@ manual_reboot() {
   json_add_boolean reboot_verified 0; json_add_string previous_boot_id "$expected"
   json_dump
 }
+# Read-only factory reset preflight. Availability is not recovery proof.
+reset_readiness() {
+  tool=0; overlay=0; layout=0; idle=0
+  [ ! -x /sbin/factoryreset ] || tool=1
+  if awk '$2=="/overlay" && $3=="jffs2" && $4 ~ /(^|,)rw(,|$)/ {ok=1} END{exit !ok}' /proc/mounts; then overlay=1; fi
+  if awk '$2=="007a0000" && $4=="\"firmware\"" {ok=1} END{exit !ok}' /proc/mtd; then layout=1; fi
+  if [ ! -e /var/run/veci2-reboot-requested ] && [ ! -L /var/run/veci2-reboot-requested ] && (reboot_locks); then idle=1; fi
+  json_init; json_add_boolean ok 1
+  json_add_boolean factoryreset_available "$tool"; json_add_boolean writable_jffs2_overlay "$overlay"
+  json_add_boolean expected_firmware_size "$layout"; json_add_boolean maintenance_idle "$idle"
+  json_add_boolean recovery_verified 0; json_add_boolean defaults_verified 0
+  json_add_boolean reset_allowed 0; json_add_string reason recovery_and_defaults_acceptance_required
+  json_dump
+}
 case "$2" in
+  resetReadiness) reset_readiness; exit 0;;
   rebootStatus) reboot_status; exit 0;;
   rebootNow) manual_reboot; exit 0;;
   ntp) ntp_status; exit 0 ;;
