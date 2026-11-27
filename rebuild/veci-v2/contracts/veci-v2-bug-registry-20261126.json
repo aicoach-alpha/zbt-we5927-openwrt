@@ -435,8 +435,8 @@
       "kind": "validation_gap",
       "area": "release",
       "severity": "critical",
-      "summary": "Signed candidate, trust anchor and sysupgrade -T not yet verified on device",
-      "root_cause": "Source build or packaging alone cannot prove flash safety",
+      "summary": "Exact f87e7ec5 signed image trust and sysupgrade -T preflight passed on owner router; restoration and post-flash acceptance pending",
+      "root_cause": "Source-only evidence cannot prove device compatibility; exact candidate verify-only hardware preflight was subsequently executed but not a release or recovery acceptance",
       "source_state": "requires_hardware_verification",
       "candidate_hardware": "not_tested",
       "affected_modules": [
@@ -447,7 +447,17 @@
         "test_finalize_sysupgrade_no_fake_metadata.py",
         "test_verify_veci_image.py"
       ],
-      "protection": "Require manifest + ucert signature + sysupgrade dry run and exact board"
+      "protection": "Owner-pasted on-router verify-only receipt confirms signed SHA, installed trust and sysupgrade -T for f87e7ec5. Do not promote to pass_new_candidate: a preflight does not prove successful flash, boot, rollback, WiFi/LTE/SMS, or 72h reliability.",
+      "candidate_preflight": {
+        "source_commit": "f87e7ec5fec2c437d65fd95e7139bff90eb3019a",
+        "signed_sha256": "3adc815e77a7c9b0e25f742601eb2dc94423aad540b26efa86423821a667abb1",
+        "receipt": "docs/VECI-V2-WE5927-PHYSICAL-PREFLIGHT-f87e7ec5-20261127.json",
+        "signature_with_installed_trust": "owner_reported_pass",
+        "sysupgrade_test_only": "owner_reported_pass",
+        "flash_or_reboot": "not_performed",
+        "rollback_and_restore": "not_verified",
+        "live_new_firmware_uat": "not_performed"
+      }
     },
     {
       "id": "REL-004",

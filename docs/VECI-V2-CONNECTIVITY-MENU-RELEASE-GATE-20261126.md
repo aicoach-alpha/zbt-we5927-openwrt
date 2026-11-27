@@ -239,3 +239,10 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - This confirms four unchanged backup contents between dates; the firmware (mtd3) was different. An intervening firmware change is plausible but cannot be concluded from hash difference alone.
 - No comparison against current live router was performed, no recovery boot mode was tested, no firmware/image was flashed, and no restore image format has been verified.
 - current_router_mtd_equals_backup=NOT_TESTED; live_bootloader_recovery=NOT_TESTED; flash_authorized=false; release_permitted=false. Preserve both backup generations; do not write MTD0/1/2/7.
+
+## Next operation: live-vs-backup MTD SHA comparison (source only, not executed)
+
+- New Windows script scripts/veci-we5927-compare-live-mtd-hashes-20261127.ps1 accepts the existing local JSON backup inventory. It rejects nonunique, non-size-matching or incomplete Nov23/Nov25 reference hashes *before* any SSH.
+- After separately authorized invocation, the script uses a pinned known-host SSH connection on owner Windows and read-only sha256sum of /dev/mtd0, mtd1, mtd2, mtd3, mtd7 after exact board and MTD partition-layout validation, then compares with both old backups, saving local-only JSON. No raw MTD image leaves the router; on-router reads may temporarily use I/O resources.
+- This script has NOT been executed against the physical router. Any hash mismatch must be investigated without automatically rewriting flash; matching hashes do NOT prove bootloader recovery or firmware restore format.
+- REL-003 registry wording now reflects owner-reported exact f87e7ec5 installed trust and sysupgrade -T **preflight** PASS while preserving candidate_hardware=not_tested. Release-permitted remains false until restored recovery and new firmware hardware acceptance are independently established.
