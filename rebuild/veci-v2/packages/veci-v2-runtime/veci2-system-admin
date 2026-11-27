@@ -19,9 +19,9 @@ valid_host() {
 }
 [ "$#" -ge 1 ] || fail unsupported_method
 case "$1" in
-  list) echo '{"ntp":{},"setNtp":{"first":"String","second":"String","confirmation":"String"},"logs":{},"diagnostics":{},"leds":{},"observability":{}}'; exit 0 ;;
+  list) echo '{"ntp":{},"rebootStatus":{},"rebootNow":{"boot_id":"String","confirmation":"String"},"setNtp":{"first":"String","second":"String","confirmation":"String"},"logs":{},"diagnostics":{},"leds":{},"observability":{}}'; exit 0 ;;
   call) [ "$#" -ge 2 ] || fail unsupported_method
-    case "$2" in ntp|setNtp|logs|diagnostics|leds|observability) ;; *) fail unsupported_method ;; esac ;;
+    case "$2" in ntp|setNtp|logs|diagnostics|leds|observability|rebootStatus|rebootNow) ;; *) fail unsupported_method ;; esac ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
@@ -89,7 +89,54 @@ obs_status() {
   json_add_string ssh_listening "$(pidof dropbear >/dev/null 2>&1 && echo yes || echo no)"
   json_dump; echo
 }
+# Manual reboot only: bound to the currently observed kernel boot instance.
+# All locks are shared with existing upgrade and restore paths.
+boot_identity() {
+  id=$(cat /proc/sys/kernel/random/boot_id) || return 1
+  printf '%s\n' "$id" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' || return 1
+  printf '%s' "$id"
+}
+reboot_locks() {
+  [ -x /usr/libexec/veci2-verify-image ] || return 1
+  exec 7</usr/libexec/veci2-verify-image || return 1
+  flock -n 7 || return 1
+  exec 8>/var/run/veci2-restore.action.lock || return 1
+  flock -n 8 || return 1
+  exec 9<"$0" || return 1
+  flock -n 9 || return 1
+}
+reboot_status() {
+  boot=$(boot_identity) || fail boot_identity_unavailable
+  eligible=0
+  if (reboot_locks); then eligible=1; fi
+  json_init; json_add_boolean ok 1; json_add_string boot_id "$boot"
+  json_add_boolean eligible "$eligible"; json_add_boolean reboot_verified 0
+  json_dump
+}
+manual_reboot() {
+  request=$(head -c 257)
+  [ "${#request}" -le 256 ] || fail invalid_request
+  json_load "$request" || fail invalid_request
+  json_get_var confirm confirmation; json_get_var expected boot_id
+  [ "$confirm" = REBOOT_WE5927_NOW ] || fail confirmation_required
+  [ "$expected" = "$(boot_identity)" ] && [ -n "$expected" ] || fail stale_boot_identity
+  reboot_locks || fail maintenance_busy
+  [ "$expected" = "$(boot_identity)" ] || fail stale_boot_identity
+  # Refuse duplicate requests on this boot; retain marker in RAM until reboot.
+  marker=/var/run/veci2-reboot-requested
+  [ ! -e "$marker" ] && [ ! -L "$marker" ] || fail reboot_already_requested
+  (set -C; printf '%s\n' "$expected" > "$marker") || fail reboot_marker_failed
+  if ! ubus -t 5 call system reboot '{}' >/dev/null 2>&1; then
+    # The request may have reached procd before a timeout. Do not retry.
+    fail reboot_request_unconfirmed
+  fi
+  json_init; json_add_boolean ok 1; json_add_boolean requested 1
+  json_add_boolean reboot_verified 0; json_add_string previous_boot_id "$expected"
+  json_dump
+}
 case "$2" in
+  rebootStatus) reboot_status; exit 0;;
+  rebootNow) manual_reboot; exit 0;;
   ntp) ntp_status; exit 0 ;;
   logs) logs_status; exit 0 ;;
   diagnostics) diagnostics_status; exit 0 ;;

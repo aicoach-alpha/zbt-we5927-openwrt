@@ -179,14 +179,16 @@
           "logs",
           "leds",
           "observability",
-          "diagnostics"
+          "diagnostics",
+          "rebootStatus"
         ]
       }
     },
     "write": {
       "ubus": {
         "veci.v2.system": [
-          "setNtp"
+          "setNtp",
+          "rebootNow"
         ]
       }
     }
