@@ -16,7 +16,8 @@
         "veci.v2.addon": [
           "setVpnStartup",
           "setPortalStartup",
-          "setOptionalStartup"
+          "setOptionalStartup",
+          "saveSqm"
         ]
       }
     }

@@ -4,8 +4,8 @@ set -eu
 umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 case "$1" in
-  list) echo '{"status":{},"setVpnStartup":{"action":"String","expected":"String"},"setPortalStartup":{"action":"String","expected":"String"},"ddnsStatus":{},"sqmStatus":{},"ddnsLookup":{},"setOptionalStartup":{"service":"String","enabled":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
-  call) case "$2" in status|setVpnStartup|setPortalStartup|ddnsStatus|sqmStatus|ddnsLookup|setOptionalStartup) ;; *) fail unsupported_method ;; esac ;;
+  list) echo '{"status":{},"setVpnStartup":{"action":"String","expected":"String"},"setPortalStartup":{"action":"String","expected":"String"},"ddnsStatus":{},"sqmStatus":{},"ddnsLookup":{},"saveSqm":{"revision":"String","confirmation":"String","interface":"String","download":"String","upload":"String","qdisc":"String","script":"String"},"setOptionalStartup":{"service":"String","enabled":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
+  call) case "$2" in status|setVpnStartup|setPortalStartup|ddnsStatus|sqmStatus|ddnsLookup|saveSqm|setOptionalStartup) ;; *) fail unsupported_method ;; esac ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
@@ -19,6 +19,7 @@ case "$2" in
   setPortalStartup) set_portal_startup ;;
   ddnsStatus) optional_status ddns ;;
   sqmStatus) optional_status sqm ;;
+  saveSqm) sqm_save ;;
   ddnsLookup) ddns_lookup ;;
   setOptionalStartup) optional_toggle ;;
 esac
