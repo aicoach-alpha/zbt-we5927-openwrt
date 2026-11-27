@@ -365,3 +365,9 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - Actual adjacent MIPS XREF scan found all five selected markers but zero qualifying groups. This is not evidence of absent HTTP handler.
 - New linked pointer-table analyzer found one consistent candidate address mapping on the actual owner MTD0, with 127 consecutive linked pointer pairs and one direct TFTP marker pointer; no direct HTTP marker pointer found. This is a mapping candidate, not proven control flow. Detailed offsets kept in restricted NAS report. Three synthetic tests pass.
 - No physical router action; image acceptance and recovery remain unverified. Flash authorization remains false.
+
+## Exact owner MTD0 PIC/GOT static references — 27 Nov 2026
+
+- Previous commit 01de819: all seven executed workflows succeeded; two build workflows skipped. MTD0 hash reverified.
+- New conservative PIC/GOT analyzer resolves a unique mapping candidate and 220 matching GP prologue patterns on the real MTD0. Two HTTP string argument-load patterns converge on the same indirect call site and callee candidate. Exact offsets retained only in the restricted NAS report. This does not establish what the callee does or which validation checks precede flash.
+- Five synthetic tests passed, covering exact call pattern, wrong branch, wrong delay slot, GP disagreement and absent mapping. No physical router access, no image compatibility proof or flash approval.
