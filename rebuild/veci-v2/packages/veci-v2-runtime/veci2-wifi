@@ -3,6 +3,11 @@ set -eu
 umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 ap=wireless.default_radio0
+lock_activation() {
+  exec 6>/tmp/veci2-wifi-activation.lock
+  flock -n 6 || fail activation_busy
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
+}
 check_ap() {
   [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
   [ "$(uci -q get "$ap")" = wifi-iface ] &&
@@ -30,12 +35,31 @@ primary_channel() {
   channel=$(uci -q get wireless.radio0.channel) || return 1
   case "$channel" in auto|[1-9]|1[0-4]) printf '%s' "$channel" ;; *) return 1 ;; esac
 }
-save_option() {
-  local tmp
+# Shared configuration transaction for primary AP edits; no radio reload.
+wifi_stage() {
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
+  cfgfile=/etc/config/wireless
+  [ -f "$cfgfile" ] && [ ! -L "$cfgfile" ] || fail config_unavailable
+  original_digest=$(sha256sum "$cfgfile") || fail config_unavailable
   tmp=$(mktemp -d /tmp/veci2-wifi.XXXXXX) || fail save_failed
   trap 'rm -rf "$tmp"' EXIT
   trap 'exit 1' HUP INT TERM
-  uci -q -t "$tmp" set "$1=$2" && uci -q -t "$tmp" commit wireless || fail save_failed
+  cp -p "$cfgfile" "$tmp/original" || fail backup_failed
+}
+wifi_rollback() {
+  cp -p "$tmp/original" "$cfgfile" || fail rollback_failed
+  fail save_failed_rollback
+}
+wifi_commit() {
+  changes=$(uci -q changes wireless) || fail config_unavailable
+  [ -z "$changes" ] && [ "$(sha256sum "$cfgfile")" = "$original_digest" ] || fail stale_configuration
+  uci -q -t "$tmp" commit wireless || wifi_rollback
+}
+save_option() {
+  wifi_stage
+  uci -q -t "$tmp" set "$1=$2" || fail save_failed
+  wifi_commit
+  [ "$(uci -q get "$1" || :)" = "$2" ] || wifi_rollback
   rm -rf "$tmp"
   trap - EXIT HUP INT TERM
 }
@@ -203,6 +227,7 @@ case "${1:-}:${2:-}" in
     exec 9<"$0"; flock -n 9 || fail wifi_busy
     check_ap
     if [ "$2" = uplinkStatus ]; then uplink_status; else
+      lock_activation
       exec 7</usr/libexec/rpcd/veci.v2.firewall; flock -n 7 || fail firewall_busy
       if [ "$2" = provisionWwan ]; then wwan_provision; else uplink_save; fi
     fi
@@ -261,6 +286,7 @@ case "${1:-}:${2:-}" in
         request=$(head -c 1025)
         test "$(printf '%s' "$request" | wc -c)" -le 1024 || fail invalid_request
         exec 9<"$0"; flock -n 9 || fail busy
+        lock_activation
         check_ap; advanced_write "$@" ;;
     esac
     exit 0 ;;
@@ -270,6 +296,7 @@ case "${1:-}:${2:-}" in
     [ "${#request}" -le 256 ] || fail invalid_request
     exec 9<"$0"
     flock -n 9 || fail busy
+    lock_activation
     check_ap
     visibility
     if [ "$2" = setAutoChannel ]; then

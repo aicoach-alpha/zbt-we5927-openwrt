@@ -24,7 +24,7 @@ json_dump() { :; }
                 s=s.replace(old,str(d/new))
             s=s.replace("/etc/config/$cfg",str(d)+"/$cfg").replace("/usr/libexec/rpcd/veci.v2.firewall",str(d/"fw-rpc"))
             (d/"fw-rpc").touch()
-            (d/"rpc").write_text(s)
+            (d/"rpc").write_text(s.replace("/tmp/veci2-wifi-activation.lock",str(d/"activation.lock")).replace("/var/run/veci2-reboot-requested",str(d/"reboot-pending")))
             uci=d/"uci"
             uci.write_text("""#!/bin/sh
 case "$2" in

@@ -10,6 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "rebuild/veci-v2/packages/veci-v2-runtime"
 uci = Path(sys.argv[1]).resolve(strict=True)
+prefix=Path(os.environ["VECI_LIBUBOX_PREFIX"])
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
     for folder in ("config", "delta"):
@@ -22,7 +23,7 @@ with tempfile.TemporaryDirectory() as tmp:
     board = root / "board"
     board.write_text("zbtlink,zbt-we5927\n")
     provider = root / "provider"
-    provider.write_text((RUNTIME / "veci2-wifi").read_text().replace("/tmp/sysinfo/board_name", str(board)))
+    provider.write_text((RUNTIME / "veci2-wifi").read_text().replace("/tmp/sysinfo/board_name", str(board)).replace("/etc/config/wireless",str(config)).replace("/tmp/veci2-wifi-activation.lock",str(root/"activation.lock")).replace("/var/run/veci2-reboot-requested",str(root/"reboot-pending")).replace("/usr/share/libubox/jshn.sh",str(prefix/"share/libubox/jshn.sh")))
     provider.chmod(0o700)
     commands = {
         "uci": f'#!/bin/sh\nexec "{uci}" -c "{root}/config" -t "{root}/delta" "$@"\n',
@@ -32,21 +33,21 @@ with tempfile.TemporaryDirectory() as tmp:
         file = root / command
         file.write_text(body)
         file.chmod(0o700)
-    env = dict(os.environ, PATH=f"{root}:" + os.environ["PATH"])
+    env = dict(os.environ, PATH=f"{root}:{prefix}/bin:" + os.environ["PATH"])
 
     def call(method, **params):
-        p = subprocess.run([provider, "call", method], input=json.dumps(params), text=True,
+        p = subprocess.run(["busybox","ash",provider, "call", method], input=json.dumps(params), text=True,
                            env=env, capture_output=True, check=True)
         return json.loads(p.stdout)
 
     def config_value(key):
         return subprocess.check_output([root / "uci", "get", "wireless." + key], env=env)[:-1]
 
-    assert call("status")["ssid_hex"] == b"Old".hex()
+    assert call("status")["ssid"] == "Old"
     for name in ("Kantor 2", "é" * 16, " A'\"$;\\ akhir "):
         raw = name.encode()
         result = call("setSsid", ssid_hex=raw.hex())
-        assert result == {"ok": True, "configured_visible": False, "ssid_hex": raw.hex(), "configured_channel": "6"}, result
+        assert result == {"ok": True, "configured_visible": False, "ssid": name, "configured_channel": "6"}, result
         assert config_value("default_radio0.ssid") == raw
         assert config_value("guest.ssid") == b"Guest"
         assert config_value("default_radio0.encryption") == b"psk2"
@@ -67,6 +68,18 @@ with tempfile.TemporaryDirectory() as tmp:
     with provider.open("rb") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         assert call("setSsid", ssid_hex="61")["error"] == "busy"
+    with (root/"activation.lock").open("w") as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        assert call("setSsid",ssid_hex="61")["error"]=="activation_busy"
+    (root/"reboot-pending").touch()
+    assert call("setAutoChannel",action="AUTO_CHANNEL_2G")["error"]=="reboot_pending"
+    (root/"reboot-pending").unlink()
+    # Partial commit must be rolled back byte-for-byte.
+    shim=root/"uci"; original=shim.read_text()
+    shim.write_text(original.replace('exec "', '"',1)+'rc=$?'+chr(10)+'case "$*" in *"commit wireless") exit 1;; esac'+chr(10)+'exit "$rc"'+chr(10))
+    assert call("setSsid",ssid_hex="61")["error"]=="save_failed_rollback"
+    assert config.read_bytes()==before
+    shim.write_text(original)
     subprocess.run([root / "uci", "set", "wireless.guest.ssid=Pending"], env=env, check=True)
     assert call("setSsid", ssid_hex="61")["error"] == "pending_wireless_changes"
     assert call("setAutoChannel", action="AUTO_CHANNEL_2G")["error"] == "pending_wireless_changes"

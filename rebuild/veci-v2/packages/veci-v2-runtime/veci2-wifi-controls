@@ -11,7 +11,7 @@ radio_paths() {
 }
 permitted_channels() {
   local info
-  info=$(timeout 4 iw phy "$phy" info 9<&-) || return 1
+  info=$(timeout 4 iw phy "$phy" info 9<&- 6<&-) || return 1
   printf '%s\n' "$info" | awk '$1=="*" && $2>=2412 && $2<=2484 && $3=="MHz" && $4 ~ /^\[[0-9]+\]$/ && $0 !~ /disabled|no IR|radar detection/ { n=substr($4,2,length($4)-2)+0; if(n>=1 && n<=14) print n }'
 }
 # Use the most restrictive permitted 2.4 GHz channel, even for auto channel.
@@ -19,7 +19,7 @@ permitted_channels() {
 power_cap() {
   local raw
   radio_paths || return 1
-  raw=$(LC_ALL=C timeout 4 iw phy "$phy" info 9<&-) || return 1
+  raw=$(LC_ALL=C timeout 4 iw phy "$phy" info 9<&- 6<&-) || return 1
   printf '%s\n' "$raw" | awk '
     $1=="*" && $2>=2412 && $2<=2484 && $3=="MHz" && $4~/^\[[0-9]+\]$/ && $0!~/disabled|no IR|radar detection/ {
       if($5!~/^\([0-9]+(\.[0-9]+)?$/ || $6!="dBm)") {bad=1;next}
@@ -45,9 +45,7 @@ valid_mac() {
 }
 advanced_write() (
   local tmp channel wanted mode mac macs list seen count secret pair rest pass
-  tmp=$(mktemp -d /tmp/veci2-wifi.XXXXXX) || fail save_failed
-  trap 'rm -rf "$tmp"' EXIT
-  trap 'exit 1' HUP INT TERM
+  wifi_stage
   change() { uci -q -t "$tmp" "$@"; }
   case "$2" in
     setPower)
@@ -67,11 +65,11 @@ advanced_write() (
         [ "$dbm" -le "$cap" ] || fail regulatory_limit
         change set "wireless.radio0.txpower=$dbm" || fail save_failed
       fi
-      change commit wireless || fail save_failed
+      wifi_commit
       current=$(uci -q get wireless.radio0.txpower || :)
       [ -n "$current" ] || current=auto
-      [ "$current" = "$dbm" ] || fail save_failed
-      printf '{"ok":true,"saved":true,"reboot_required":true,"live_power_verified":false}\n'
+      [ "$current" = "$dbm" ] || wifi_rollback
+      printf '{"ok":true,"saved":true,"configured":"%s","reboot_required":true,"live_power_verified":false}\n' "$current"
       exit 0 ;;
     setChannel)
       channel=$(jsonfilter -s "$request" -e '@.channel') || fail invalid_channel
@@ -111,8 +109,23 @@ advanced_write() (
       done
       change set "$ap.encryption=$mode" && change set "$ap.key=$pass" || fail save_failed ;;
   esac
-  change commit wireless || fail save_failed
-  printf '{"ok":true,"saved":true}\n'
+  wifi_commit
+  case "$2" in
+    setChannel)
+      [ "$(uci -q get wireless.radio0.channel || :)" = "$channel" ] || wifi_rollback
+      printf '{"ok":true,"saved":true,"configured_channel":"%s"}\n' "$channel";;
+    setAccess)
+      [ "$(uci -q get "$ap.macfilter" || :)" = "$mode" ] || wifi_rollback
+      actual=$(uci -q get "$ap.maclist" || :)
+      # The normalized staged list has exactly one space between entries.
+      [ "$actual" = "${seen# }" ] || [ "$actual " = "${seen# }" ] || wifi_rollback
+      printf '{"ok":true,"saved":true,"configured_access":"%s"}\n' "$mode";;
+    setAuth)
+      [ "$(uci -q get "$ap.encryption" || :)" = "$mode" ] &&
+      [ "$(uci -q get "$ap.key" || :)" = "$pass" ] || wifi_rollback
+      unset pass secret
+      printf '{"ok":true,"saved":true,"configured_encryption":"%s"}\n' "$mode";;
+  esac
 )
 advanced_info() {
   local mode mac list enc channel chans stations
@@ -136,7 +149,7 @@ advanced_info() {
       for channel in $chans; do json_add_int '' "$channel"; done
       json_close_array
     fi
-    if stations=$(timeout 4 iw dev "$wlan" station dump); then
+    if stations=$(timeout 4 iw dev "$wlan" station dump 9<&- 6<&-); then
       json_add_array clients
       for mac in $(printf '%s\n' "$stations" | awk '$1=="Station" {print $2}'); do
         valid_mac "$mac" && json_add_string '' "$mac"
@@ -149,7 +162,7 @@ advanced_info() {
 survey() {
   local raw
   radio_paths || fail radio_unavailable
-  raw=$(timeout 12 iw dev "$wlan" scan passive 9<&-) || fail scan_unavailable
+  raw=$(timeout 12 iw dev "$wlan" scan passive 9<&- 6<&-) || fail scan_unavailable
   LC_ALL=C printf '%s\n' "$raw" | LC_ALL=C awk '
   function emit() {
     if(mac=="" || freq<2412 || freq>2484 || count>=100) return

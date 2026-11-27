@@ -46,7 +46,7 @@ class OwnerWifi(unittest.TestCase):
             provider = root/"provider"
             provider.write_text((PKG/"veci2-wifi").read_text().replace(
                 "/tmp/sysinfo/board_name", str(root/"board")).replace(
-                "/usr/libexec/veci2-wifi-controls", str(PKG/"veci2-wifi-controls")))
+                "/usr/libexec/veci2-wifi-controls", str(PKG/"veci2-wifi-controls")).replace("/etc/config/wireless",str(wireless)).replace("/tmp/veci2-wifi-activation.lock",str(root/"activation.lock")).replace("/var/run/veci2-reboot-requested",str(root/"reboot-pending")))
             shim = root/"uci"
             shim.write_text(f"""#!/bin/sh
 for arg do [ "$arg" != commit ] || exit 7; done
@@ -78,7 +78,7 @@ exec "{self.uci}" -c "{cfg}" -t "{root}/delta" "$@"
                                   "setSsid":{"ssid_hex":"61"}, "setVisibility":{"action":"HIDE_SSID"}})
                 for method, args in calls.items():
                     with self.subTest(band=band, method=method):
-                        expected = "save_failed" if band == "2g" else "channel_unavailable"
+                        expected = "save_failed_rollback" if band == "2g" else "channel_unavailable"
                         self.assertEqual(call(method, **args), {"ok":False, "error":expected})
                         self.assertEqual(wireless.read_bytes(), before)
                         self.assertFalse((root/"radio-called").exists())
@@ -86,10 +86,10 @@ exec "{self.uci}" -c "{cfg}" -t "{root}/delta" "$@"
 
     def test_privileged_actions_have_write_acl(self):
         acl = json.loads((PKG/"veci2-status-acl.json").read_text())["veci-v2-wifi"]
-        self.assertEqual(set(acl["read"]["ubus"]["veci.v2.wifi"]), {"status", "info"})
+        self.assertEqual(set(acl["read"]["ubus"]["veci.v2.wifi"]), {"status", "info","activationStatus","power","uplinkStatus"})
         self.assertEqual(set(acl["write"]["ubus"]["veci.v2.wifi"]),
                          {"setVisibility", "setSsid", "setAutoChannel", "setChannel", "survey",
-                          "setAuth", "setAccess"})
+                          "setAuth", "setAccess","activateAp","setPower","saveUplink","provisionWwan"})
 
 
 if __name__ == "__main__":

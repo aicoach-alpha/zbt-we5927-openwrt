@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory() as temp:
                       .replace('/usr/share/libubox/jshn.sh', str(prefix / 'share/libubox/jshn.sh')))
     provider = root / 'provider'
     provider.write_text((pkg / 'veci2-wifi').read_text().replace('/tmp/sysinfo/board_name', str(root / 'board'))
-                        .replace('/usr/libexec/veci2-wifi-controls', str(helper)))
+                        .replace('/usr/libexec/veci2-wifi-controls', str(helper)).replace('/etc/config/wireless',str(wireless)).replace('/tmp/veci2-wifi-activation.lock',str(root/'activation.lock')).replace('/var/run/veci2-reboot-requested',str(root/'reboot-pending')))
     scripts = {
         'uci': f'#!/bin/sh\nexec "{uci}" -c "{config}" -t "{root}/delta" "$@"\n',
         'ubus': '#!/bin/sh\necho radio\n',
@@ -59,7 +59,7 @@ esac
     assert info['channels'] == [1, 6] and info['clients'] == ['02:12:34:56:78:9a'], info
     assert call('survey')['networks'][0]['ssid'] == 'nearby "one"'
     assert call('setChannel', channel='11')['error'] == 'channel_unavailable'
-    assert call('setChannel', channel='6')['saved'] and value('radio0.channel') == '6'
+    saved=call('setChannel', channel='6'); assert saved.get('saved') and value('radio0.channel') == '6',saved
     assert call('setAccess', mode='allow', addresses='')['error'] == 'empty_allow_list'
     for bad in ('01:00:00:00:00:01','00:00:00:00:00:00','not-a-mac'):
         assert call('setAccess', mode='deny', addresses=bad)['error'] == 'invalid_access'
@@ -74,6 +74,23 @@ esac
     assert call('setAuth', mode='sae-mixed', key_hex=key.hex())['saved']
     assert value('default_radio0.key') == key.decode() and key.decode() not in str(call('info'))
     assert value('guest.ssid') == 'Guest'
+    assert call('power')['safe_max_dbm']=='20'
+    before=wireless.read_bytes()
+    for fields in (dict(dbm='21',expected='auto'),dict(dbm='15',expected='10')):
+        assert not call('setPower',confirmation='SAVE_TXPOWER_NEXT_BOOT',**fields)['ok']
+        assert wireless.read_bytes()==before
+    saved=call('setPower',dbm='15',expected='auto',confirmation='SAVE_TXPOWER_NEXT_BOOT')
+    assert saved['configured']=='15' and not saved['live_power_verified']
+    assert value('radio0.txpower')=='15'
+    assert call('setPower',dbm='auto',expected='15',confirmation='SAVE_TXPOWER_NEXT_BOOT')['configured']=='auto'
+    before=wireless.read_bytes()
+    shim=root/'uci'; original=shim.read_text()
+    shim.write_text(original.replace('exec "', '"',1)+'rc=$?'+chr(10)+'case "$*" in *"commit wireless") exit 1;; esac'+chr(10)+'exit "$rc"'+chr(10))
+    assert call('setPower',dbm='10',expected='auto',confirmation='SAVE_TXPOWER_NEXT_BOOT')['error']=='save_failed_rollback'
+    assert wireless.read_bytes()==before
+    assert call('setChannel',channel='1')['error']=='save_failed_rollback'
+    assert wireless.read_bytes()==before
+    shim.write_text(original)
     subprocess.run([root/'uci','set','wireless.guest.ssid=Pending'], env=env, check=True)
     assert call('setAccess', mode='disable', addresses='')['error'] == 'pending_wireless_changes'
     print('PASS: native UCI/jshn, ACL modes, invalid MACs/empty allow list, deduplication, associated clients, legal channels, passive scan, auth, pending edits, guest preservation')
