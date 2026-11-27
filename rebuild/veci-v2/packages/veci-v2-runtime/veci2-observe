@@ -7,6 +7,7 @@ umask 077
 export LC_ALL=C
 store=/tmp/veci2-observe
 log=$store/samples.jsonl
+traffic_log=$store/traffic.tsv
 lock=/var/run/veci2-observe.lock
 board=/tmp/sysinfo/board_name
 case "$(cat "$board" 2>/dev/null || :)" in
@@ -28,6 +29,59 @@ get_route() {
   # This is NOT public Internet reachability proof.
   ip -4 route show default 2>/dev/null | grep -Eq '(^|[[:space:]])dev[[:space:]]usb0([[:space:]]|$)' &&
     printf 1 || printf 0
+}
+# Local byte usage only, never operator quota/balance. Use the existing
+# procd sampler; no second daemon, no flash writes.
+byte_counter() {
+  v=$(cat "/sys/class/net/$1/statistics/$2" 2>/dev/null || :)
+  case "$v" in ''|*[!0-9]*) printf '%s' -1;;
+    *) if [ "${#v}" -le 15 ]; then printf '%s' "$v"; else printf '%s' -1; fi;;
+  esac
+}
+traffic_sample() {
+  [ ! -L "$traffic_log" ] || return 1
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$epoch" "$uptime" \
+    "$(byte_counter usb0 rx_bytes)" "$(byte_counter usb0 tx_bytes)" \
+    "$(byte_counter br-lan rx_bytes)" "$(byte_counter br-lan tx_bytes)" >> "$traffic_log" || return 1
+  chmod 600 "$traffic_log" || return 1
+  if [ "$(wc -l < "$traffic_log")" -gt 2944 ]; then
+    t=$(mktemp "$store/traffic-prune.XXXXXX") || return 1
+    tail -n 2881 "$traffic_log" > "$t" && chmod 600 "$t" && mv "$t" "$traffic_log" || { rm -f "$t"; return 1; }
+  fi
+}
+traffic_history() {
+  exec 9>"$lock"
+  flock -n 9 || { echo '{"ok":false,"error":"collector_busy"}'; return 0; }
+  [ -f "$traffic_log" ] && [ ! -L "$traffic_log" ] || {
+    echo '{"ok":true,"source":"kernel_sampled_bytes","state":"unavailable","persistent":false}'; return 0;
+  }
+  now=$(digits "$(date +%s)")
+  # Only count adjacent monotonic samples in the trailing 24h window.
+  # Counter resets, missing devices, clock jumps and missed samples are gaps.
+  # Never extrapolate a missing interval or claim seven days of history.
+  awk -v now="$now" '
+    function valid(x){return x~/^[0-9]+$/ && length(x)<=15}
+    function pair(a,b,c,d){return valid(a)&&valid(b)&&valid(c)&&valid(d)&&c>=a&&d>=b}
+    NF==6 && valid($1) && valid($2) && $1>=now-86400 && $1<=now {
+      if(!n++) first=$1; last=$1
+      if(n>1){
+        dt=$1-t; du=$2-u
+        if(dt>=1&&dt<=65&&du>=1&&du<=65&&dt-du<=5&&du-dt<=5){
+          if(pair(r,x,$3,$4)){rx+=$3-r;tx+=$4-x;lte_seconds+=du}else lte_gaps++
+          if(pair(l,y,$5,$6)){lr+=$5-l;lt+=$6-y;lan_seconds+=du}else lan_gaps++
+        }else{lte_gaps++;lan_gaps++}
+      }
+      t=$1;u=$2;r=$3;x=$4;l=$5;y=$6
+    }
+    END{
+      printf "{\"ok\":true,\"source\":\"kernel_sampled_bytes\",\"persistent\":false,\"window_seconds\":86400,\"samples\":%d",n
+      if(n<2){print ",\"state\":\"insufficient_samples\"}";exit}
+      printf ",\"state\":\"observed_partial\",\"first_epoch\":%.0f,\"last_epoch\":%.0f",first,last
+      printf ",\"lte_observed_seconds\":%d,\"lan_observed_seconds\":%d,\"lte_gaps\":%d,\"lan_gaps\":%d",lte_seconds,lan_seconds,lte_gaps,lan_gaps
+      if(lte_seconds>0)printf ",\"lte_rx_bytes\":%.0f,\"lte_tx_bytes\":%.0f",rx,tx;else printf ",\"lte_rx_bytes\":null,\"lte_tx_bytes\":null"
+      if(lan_seconds>0)printf ",\"lan_rx_bytes\":%.0f,\"lan_tx_bytes\":%.0f",lr,lt;else printf ",\"lan_rx_bytes\":null,\"lan_tx_bytes\":null"
+      print "}"
+    }' "$traffic_log"
 }
 sample() {
   exec 9>"$lock"
@@ -61,6 +115,7 @@ sample() {
   fi
   record=$(printf '{"epoch_s":%s,"uptime_s":%s,"memory_available_kib":%s,"usb0_carrier":%s,"usb0_ipv4":%s,"lte_default_route":%s,"wifi_operstate":"%s","usb0_rx_errors":%s,"usb0_tx_errors":%s,"state":"%s","alert":"%s"}' \
     "$epoch" "$uptime" "$memory" "$carrier" "$ipv4" "$route" "$wifi" "$rxerr" "$txerr" "$state" "$alert")
+  traffic_sample || : # missing traffic is reported separately, never as health failure
   printf '%s\n' "$record" >> "$log" || return 1
   chmod 600 "$log" || return 1
   # Bounded tmpfs, no NOR flash wear; samples never carry IP/MAC/IMEI/SSID.
@@ -99,6 +154,7 @@ status() {
 case "$1" in
   once) sample ;;
   status) status ;;
+  traffic-history) traffic_history ;;
   daemon)
     while :; do
       # Use the same code path as single-shot collection. Transient failure

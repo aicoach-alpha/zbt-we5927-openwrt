@@ -55,6 +55,7 @@ fi
 verify=/usr/libexec/veci2-verify-image
 exec 9<"$verify"
 flock -n 9 || reply '409 Conflict' '{"error":"verification_busy"}'
+[ ! -e /var/run/veci2-reboot-requested ] && [ ! -L /var/run/veci2-reboot-requested ] || reply '409 Conflict' '{"error":"reboot_pending"}'
 mode=$(cat /etc/veci2-update-policy 2>/dev/null) || mode=
 allow_install=false
 [ "$mode" != manual ] || allow_install=true

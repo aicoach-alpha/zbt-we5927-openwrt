@@ -4,7 +4,13 @@
     "read": {
       "ubus": {
         "veci.v2.addon": [
-          "status"
+          "status",
+          "ddnsStatus",
+          "sqmStatus",
+          "ddnsLookup",
+          "openvpnStatus",
+          "legacyTunnelStatus",
+          "smbStatus"
         ]
       }
     },
@@ -12,7 +18,12 @@
       "ubus": {
         "veci.v2.addon": [
           "setVpnStartup",
-          "setPortalStartup"
+          "setPortalStartup",
+          "setOptionalStartup",
+          "saveSqm",
+          "setOpenvpnStartup",
+          "disableLegacyTunnel",
+          "disableSmbStartup"
         ]
       }
     }

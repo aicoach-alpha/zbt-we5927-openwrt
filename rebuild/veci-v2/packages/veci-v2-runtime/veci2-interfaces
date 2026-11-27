@@ -3,8 +3,8 @@ set -ef
 umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 case "$1:${2:-}" in
-  list:*) echo '{"status":{},"save":{"revision":"String","confirm":"String","lan":"String","lan_mask":"String","wan_mode":"String","wan":"String","wan_mask":"String","gateway":"String"}}'; exit 0 ;;
-  call:save|call:status) ;;
+  list:*) echo '{"status":{},"pppoeStatus":{},"savePppoe":{"revision":"String","confirmation":"String","username":"String","password":"String","service":"String","ac":"String"},"pppoeDiscovery":{},"pppoeAction":{"action":"String","revision":"String","confirmation":"String"},"save":{"revision":"String","confirm":"String","lan":"String","lan_mask":"String","wan_mode":"String","wan":"String","wan_mask":"String","gateway":"String"}}'; exit 0 ;;
+  call:save|call:status|call:pppoeStatus|call:pppoeDiscovery|call:pppoeAction|call:savePppoe) ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail board_mismatch
@@ -16,8 +16,125 @@ cfg=/etc/config/network
 revision() { digest=$(sha256sum "$cfg") || return 1; echo "${digest%% *}"; }
 get() { uci -q get "network.$1" || :; }
 [ "$(get lan)" = interface ] && [ "$(get wan)" = interface ] && [ "$(get lan.proto)" = static ] || fail unsupported_layout
+# Ethernet PPPoE must never operate on the cellular RNDIS device.
+pppoe_device() {
+  dev=$(get wan.device)
+  expected=$(jsonfilter -i /etc/board.json -e '@.network.wan.device' 2>/dev/null) || return 1
+  [ "$dev" = eth0.2 ] && [ "$expected" = "$dev" ] && [ -d "/sys/class/net/$dev" ] || return 1
+  [ "$(get lte.device)" = usb0 ] || return 1
+  [ "$(get lan.device)" != "$dev" ] || return 1
+  printf '%s' "$dev"
+}
+pppoe_status() {
+  proto=$(get wan.proto)
+  snapshot=$(ubus -t 3 call network.interface.wan status '{}') || fail wan_state_unavailable
+  live_proto=$(printf '%s' "$snapshot" | jsonfilter -e '@.proto' || :)
+  up=$(printf '%s' "$snapshot" | jsonfilter -e '@.up' || :)
+  pending=$(printf '%s' "$snapshot" | jsonfilter -e '@.pending' || :)
+  case "$up:$pending" in true:true|true:false|false:true|false:false) ;; *) fail invalid_wan_state;; esac
+  ip=$(printf '%s' "$snapshot" | jsonfilter -e '@["ipv4-address"][0].address' || :)
+  state=not_configured
+  if [ "$proto" = pppoe ]; then
+    state=disconnected
+    if [ "$live_proto" != pppoe ]; then state=pending_activation
+    elif [ "$pending" = true ]; then state=connecting
+    elif [ "$up" = true ] && [ -n "$ip" ] && [ "$ip" != 0.0.0.0 ]; then state=connected
+    elif [ "$up" = true ]; then state=link_up_no_ipv4; fi
+  fi
+  [ "$state" = connected ] || ip=
+  json_init; json_add_boolean ok 1
+  json_add_string revision "$(revision)"
+  json_add_string configured_protocol "$proto"
+  json_add_boolean credentials_configured "$(if [ "$proto" = pppoe ] && [ -n "$(get wan.username)" ] && [ -n "$(get wan.password)" ]; then echo 1; else echo 0; fi)"
+  json_add_string state "$state"; json_add_string ipv4 "$ip"
+  json_add_boolean internet_verified 0
+  json_dump
+}
+case "$2" in
+  savePppoe)
+    dev=$(pppoe_device) || fail ethernet_wan_unverified
+    [ -x /usr/sbin/pppd ] && [ -x /lib/netifd/proto/ppp.sh ] || fail pppoe_package_unavailable
+    changes=$(uci -q changes network) || fail config_unavailable
+    [ -z "$changes" ] || fail pending_network_changes
+    input=$(head -c 1025)
+    [ "${#input}" -le 1024 ] && json_load "$input" || fail invalid_request
+    json_get_var token revision; json_get_var confirm confirmation
+    json_get_var account username; json_get_var secret password
+    json_get_var service service; json_get_var ac ac
+    [ "$confirm" = SAVE_ETHERNET_PPPOE_NEXT_BOOT ] || fail confirmation_required
+    [ "$token" = "$(revision)" ] || fail stale_configuration
+    case "$(get wan.proto)" in dhcp|static|pppoe) ;; *) fail unsupported_wan_protocol;; esac
+    # Strict printable credential subset: never evaluate strings or place them
+    # in a process argument. The UCI batch receives them via stdin.
+    [ -n "$account" ] && [ "${#account}" -le 128 ] && [ -n "$secret" ] && [ "${#secret}" -le 128 ] || fail invalid_credentials
+    for value in "$account" "$secret"; do
+      case "$value" in *[!a-zA-Z0-9._@%+=,:!/?#~-]*) fail unsupported_credential_characters;; esac
+    done
+    for value in "$service" "$ac"; do
+      [ "${#value}" -le 64 ] || fail invalid_service
+      case "$value" in *[!a-zA-Z0-9._@-]*) fail invalid_service;; esac
+    done
+    tmp=$(mktemp -d /tmp/veci2-pppoe.XXXXXX) || fail stage_failed
+    trap 'rm -rf "$tmp"' EXIT
+    change() { uci -q -t "$tmp" "$@"; }
+    remove() { if change get "$1" >/dev/null 2>&1; then change delete "$1"; fi; }
+    remove network.wan.ipaddr && remove network.wan.netmask && remove network.wan.gateway &&
+      remove network.wan.service && remove network.wan.ac || fail stage_failed
+    # printf is a shell builtin; no password in external process argv.
+    {
+      printf 'set network.wan.proto=pppoe\n'
+      printf "set network.wan.username='%s'\n" "$account"
+      printf "set network.wan.password='%s'\n" "$secret"
+      [ -z "$service" ] || printf "set network.wan.service='%s'\n" "$service"
+      [ -z "$ac" ] || printf "set network.wan.ac='%s'\n" "$ac"
+    } | change batch >/dev/null 2>&1 || fail stage_failed
+    unset secret input value
+    pending=$(uci -q changes network) || fail config_unavailable
+    [ "$token" = "$(revision)" ] && [ -z "$pending" ] || fail stale_configuration
+    change commit network || fail commit_failed
+    [ "$(get wan.proto)" = pppoe ] || fail commit_failed
+    json_init; json_add_boolean ok 1; json_add_boolean saved 1
+    json_add_string revision "$(revision)"
+    json_add_string state pending_manual_activation
+    json_add_boolean internet_verified 0
+    json_dump; exit 0;;
+  pppoeStatus) pppoe_status; exit 0;;
+  pppoeDiscovery)
+    dev=$(pppoe_device) || fail ethernet_wan_unverified
+    [ -x /usr/sbin/pppoe-discovery ] || fail discovery_tool_unavailable
+    # Discovery only, no session establishment or link reset.
+    rc=0
+    output=$(timeout 12 /usr/sbin/pppoe-discovery -I "$dev" 2>&1) || rc=$?
+    json_init; json_add_boolean ok 1; json_add_int exit_code "$rc"
+    json_add_string interface "$dev"
+    json_add_string output "$(printf '%s' "$output" | head -c 2048)"
+    json_add_boolean session_established 0
+    json_dump; exit 0;;
+  pppoeAction)
+    dev=$(pppoe_device) || fail ethernet_wan_unverified
+    [ "$(get wan.proto)" = pppoe ] || fail pppoe_not_configured
+    changes=$(uci -q changes network) || fail config_unavailable
+    [ -z "$changes" ] || fail pending_network_changes
+    request=$(head -c 513)
+    [ "${#request}" -le 512 ] && json_load "$request" || fail invalid_request
+    json_get_var token revision; json_get_var action action; json_get_var confirm confirmation
+    [ "$token" = "$(revision)" ] || fail stale_configuration
+    case "$action:$confirm" in disconnect:DISCONNECT_ETHERNET_PPPOE|reconnect:RECONNECT_ETHERNET_PPPOE) ;; *) fail confirmation_required;; esac
+    snapshot=$(ubus -t 3 call network.interface.wan status '{}') || fail wan_state_unavailable
+    [ "$(printf '%s' "$snapshot" | jsonfilter -e '@.proto')" = pppoe ] || fail pending_activation
+    live_dev=$(printf '%s' "$snapshot" | jsonfilter -e '@.device' || :)
+    [ "$live_dev" = "$dev" ] || fail ethernet_wan_unverified
+    # Scope netifd to Ethernet WAN only. No network reload, LTE restart or modem action.
+    ubus -t 5 call network.interface.wan down '{}' >/dev/null || fail disconnect_failed
+    if [ "$action" = reconnect ]; then
+      ubus -t 5 call network.interface.wan up '{}' >/dev/null || fail reconnect_failed
+    fi
+    json_init; json_add_boolean ok 1; json_add_boolean requested 1
+    json_add_string state pending_verification; json_add_boolean internet_verified 0
+    json_dump; exit 0;;
+esac
 mode=$(get wan.proto)
-case "$mode" in dhcp|static) ;; *) fail unsupported_wan_protocol ;; esac
+case "$mode" in dhcp|static|pppoe) ;; *) fail unsupported_wan_protocol ;; esac
 pending=$(uci -q changes network) || fail config_unavailable
 [ -z "$pending" ] || fail pending_network_changes
 lan=$(get lan.ipaddr); lan_mask=$(get lan.netmask)
@@ -32,6 +149,8 @@ for section in lan wan; do
 done
 current=$(revision) || fail config_unavailable
 if [ "$2" = save ]; then
+  # Existing generic editor cannot silently replace a PPPoE profile.
+  old_mode="$mode"
   input=$(head -c 1025)
   [ "${#input}" -le 1024 ] && json_load "$input" || fail invalid_request
   json_get_var token revision ''; json_get_var confirm confirm ''
@@ -39,7 +158,10 @@ if [ "$2" = save ]; then
   [ "$confirm" = SAVE_NETWORK ] || fail confirmation_required
   json_get_var lan lan ''; json_get_var lan_mask lan_mask ''; json_get_var mode wan_mode ''
   json_get_var wan wan ''; json_get_var wan_mask wan_mask ''; json_get_var gateway gateway ''
-  case "$mode" in dhcp) wan=; wan_mask=; gateway= ;; static) ;; *) fail invalid_wan_mode ;; esac
+  if [ "$old_mode" = pppoe ] || [ "$mode" = pppoe ]; then
+    [ "$old_mode:$mode" = pppoe:pppoe ] || fail use_dedicated_pppoe_configuration
+  fi
+  case "$mode" in dhcp|pppoe) wan=; wan_mask=; gateway= ;; static) ;; *) fail invalid_wan_mode ;; esac
   # Convert each mask to prefix length and validate usable, disjoint subnets.
   for arg in "$lan" "$lan_mask" "$wan" "$wan_mask" "$gateway"; do
     case "$arg" in *[!0-9.]*) fail invalid_address ;; esac
@@ -67,16 +189,18 @@ if [ "$2" = save ]; then
   remove() { if change get "$1" >/dev/null; then change delete "$1"; fi; }
   change set "network.lan.ipaddr=$lan/$1" && remove network.lan.netmask &&
     change set "network.wan.proto=$mode" || fail stage_failed
+  if [ "$mode" != pppoe ]; then
   remove network.wan.netmask || fail stage_failed
   if [ "$mode" = dhcp ]; then
     remove network.wan.ipaddr && remove network.wan.gateway || fail stage_failed
   else
     change set "network.wan.ipaddr=$wan/$2" && change set "network.wan.gateway=$gateway" || fail stage_failed
   fi
+  fi
   pending=$(uci -q changes network) || fail config_unavailable
   [ "$(revision)" = "$current" ] && [ -z "$pending" ] || fail stale_configuration
   change commit network || fail commit_failed
-  current=$(revision) || fail config_unavailable; lan_mask=$1; [ "$mode" = dhcp ] || wan_mask=$2
+  current=$(revision) || fail config_unavailable; lan_mask=$1; [ "$mode" != static ] || wan_mask=$2
 fi
 json_init
 json_add_boolean ok 1

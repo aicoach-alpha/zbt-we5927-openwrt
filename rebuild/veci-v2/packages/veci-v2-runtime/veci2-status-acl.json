@@ -24,7 +24,8 @@
       "ubus": {
         "veci.v2.dhcp": [
           "add",
-          "delete"
+          "delete",
+          "setPool"
         ]
       }
     }
@@ -51,7 +52,10 @@
     "read": {
       "ubus": {
         "veci.v2.firewall": [
-          "status"
+          "status",
+          "ttlStatus",
+          "aclStatus",
+          "parentStatus"
         ]
       }
     },
@@ -60,7 +64,13 @@
         "veci.v2.firewall": [
           "addForward",
           "deleteForward",
-          "setDmz"
+          "setDmz",
+          "setDefaults",
+          "setOffload",
+          "setMacBlock",
+          "setTtl",
+          "saveAcl",
+          "saveParent"
         ]
       }
     }
@@ -169,14 +179,17 @@
           "logs",
           "leds",
           "observability",
-          "diagnostics"
+          "diagnostics",
+          "rebootStatus",
+          "resetReadiness"
         ]
       }
     },
     "write": {
       "ubus": {
         "veci.v2.system": [
-          "setNtp"
+          "setNtp",
+          "rebootNow"
         ]
       }
     }
@@ -188,7 +201,9 @@
         "veci.v2.wifi": [
           "status",
           "info",
-          "activationStatus"
+          "activationStatus",
+          "power",
+          "uplinkStatus"
         ]
       }
     },
@@ -202,7 +217,9 @@
           "setChannel",
           "setAccess",
           "setAuth",
-          "activateAp"
+          "activateAp",
+          "setPower",
+          "saveUplink"
         ]
       }
     }

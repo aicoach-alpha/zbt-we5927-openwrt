@@ -18,7 +18,7 @@ function valid(s, a) {
 }
 BEGIN {
   marker="# VeCI paused: "
-  if ((mode=="save" || mode=="add") && !valid(schedule)) { invalid=1; exit 2 }
+  if ((mode=="save" || mode=="add" || mode=="setReboot") && !valid(schedule)) { invalid=1; exit 2 }
 }
 {
   original=$0
@@ -36,6 +36,18 @@ BEGIN {
     old=old (i==1?"":" ") token
   }
   supported=valid(old) && length(remaining)>0
+  owned=(remaining=="/sbin/reboot # VeCI managed autoreboot")
+  if (owned) {
+    owned_count++
+    if (!supported || split(old,fields," ")!=5 || fields[1]!~/^[0-9][0-9]?$/ || fields[2]!~/^[0-9][0-9]?$/ || fields[3]!="*" || fields[4]!="*" || fields[5]!~/^[0-6](,[0-6])*$/) owned_invalid=1
+    reboot_enabled=enabled; reboot_minute=fields[1]+0; reboot_hour=fields[2]+0; reboot_days=fields[5]
+    if(mode=="setReboot" || mode=="rebootstate") next
+    # Dedicated API only: ordinary cron editing cannot enable this reboot.
+    if(mode=="list") next
+    if(mode=="save" || mode=="remove"){if(NR==row)exit 2;print original;next}
+  }
+  if(mode=="rebootstate") next
+  if(mode=="setReboot"){print original;next}
   if (mode=="list" && supported) {
     command=remaining
     sub(/[ \t].*$/,"",command)
@@ -53,6 +65,13 @@ BEGIN {
   }
 }
 END {
+  if(mode=="rebootstate" || mode=="setReboot"){
+    if(invalid || owned_count>1 || owned_invalid)exit 2
+    if(mode=="rebootstate"){
+      if(!owned_count) print "0\t0\t3\t0,1,2,3,4,5,6"
+      else print reboot_enabled "\t" reboot_minute "\t" reboot_hour "\t" reboot_days
+    }else print (active=="1"?"":marker) schedule " /sbin/reboot # VeCI managed autoreboot"
+  }
   if (mode=="add" && !invalid) print (active=="1"?"":marker) schedule " " cmd
   if ((mode=="save" || mode=="remove") && !changed) exit 2
 }

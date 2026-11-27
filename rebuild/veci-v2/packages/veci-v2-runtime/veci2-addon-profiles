@@ -99,3 +99,323 @@ set_portal_startup() {
   eq "$option" "$value" || fail save_failed
   profile_status
 }
+
+# Optional DDNS/SQM profile controls, not a replacement for their daemons.
+service_profile() {
+  case "$1" in ddns) package=ddns; section=service;; sqm) package=sqm; section=queue;; *) fail unsupported_service;; esac
+  state=absent; revision=""; enabled=0; runtime=unknown
+  installed_app "$package" || return 0
+  [ -x "/etc/init.d/$package" ] || return 0
+  state=unconfigured
+  config="/etc/config/$package"
+  [ -f "$config" ] && [ ! -L "$config" ] || return 0
+  digest=$(sha256sum "$config") || fail config_unavailable
+  revision=${digest%% *}
+  [ "$(uci -q get "$package.veci" || :)" = "$section" ] || return 0
+  case "$(uci -q get "$package.veci.enabled" || :)" in 0) state=disabled;; 1) state=enabled; enabled=1;; *) return 0;; esac
+  if "/etc/init.d/$package" enabled >/dev/null 2>&1; then boot=enabled; else boot=disabled; fi
+}
+optional_status() {
+  service_profile "$1"
+  json_init; json_add_boolean ok 1
+  json_add_string service "$package"; json_add_string state "$state"
+  json_add_string revision "$revision"; json_add_string enabled "$enabled"
+  json_add_string runtime "$runtime"; json_add_string service_startup "${boot:-unknown}"
+  if [ "$state" = enabled ] || [ "$state" = disabled ]; then
+    if [ "$package" = ddns ]; then
+      for key in service_name lookup_host domain ip_network; do
+        json_add_string "$key" "$(uci -q get "ddns.veci.$key" || :)"
+      done
+      # Never return credentials or raw provider logs.
+      json_add_boolean credential_set "$(if uci -q get ddns.veci.password | grep -q .; then echo 1; else echo 0; fi)"
+    else
+      for key in interface download upload qdisc script; do
+        json_add_string "$key" "$(uci -q get "sqm.veci.$key" || :)"
+      done
+    fi
+  fi
+  json_dump
+}
+optional_toggle() {
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var service service; json_get_var expected revision
+  json_get_var enabled_request enabled; json_get_var confirm confirmation
+  case "$service:$enabled_request:$confirm" in
+    ddns:1:ENABLE_DDNS_NEXT_BOOT|ddns:0:DISABLE_DDNS_NEXT_BOOT|sqm:1:ENABLE_SQM_NEXT_BOOT|sqm:0:DISABLE_SQM_NEXT_BOOT) ;;
+    *) fail confirmation_required;;
+  esac
+  exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  # Serialize SQM enable with the existing native firewall writer.
+  if [ "$service" = sqm ]; then
+    exec 8</usr/libexec/rpcd/veci.v2.firewall; flock -n 8 || fail firewall_busy
+  fi
+  service_profile "$service"
+  case "$state" in enabled|disabled) ;; *) fail profile_unavailable;; esac
+  [ "$revision" = "$expected" ] || fail stale_configuration
+  changes=$(uci -q changes "$package") || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  if [ "$enabled_request" = 1 ]; then
+    [ "$boot" = enabled ] || fail service_startup_disabled
+    if [ "$service" = ddns ]; then
+      provider=$(uci -q get ddns.veci.service_name || :)
+      case "$provider" in cloudflare.com-v4|duckdns.org|no-ip.com) ;; *) fail unsupported_provider;; esac
+      [ "$(uci -q get ddns.veci.use_https || :)" = 1 ] || fail https_required
+      for key in lookup_host domain; do
+        value=$(uci -q get "ddns.veci.$key" || :)
+        case "$value" in ''|-*|*[!a-zA-Z0-9._-]*) fail invalid_profile;; esac
+      done
+      uci -q get ddns.veci.password | grep -q . || fail credentials_missing
+      case "$(uci -q get ddns.veci.ip_network || :)" in lte|wan) ;; *) fail unsupported_network;; esac
+    else
+      for key in flow_offloading flow_offloading_hw; do
+        case "$(uci -q get "firewall.@defaults[0].$key" || :)" in 0|'') ;; *) fail offload_must_be_disabled;; esac
+      done
+      iface=$(uci -q get sqm.veci.interface || :)
+      case "$iface" in usb0|eth0.2|pppoe-wan) ;; *) fail unsupported_interface;; esac
+      [ -d "/sys/class/net/$iface" ] || fail interface_unavailable
+      for key in download upload; do
+        value=$(uci -q get "sqm.veci.$key" || :)
+        case "$value" in ''|0*|*[!0-9]*) fail invalid_rate;; esac
+        [ "${#value}" -le 7 ] && [ "$value" -ge 64 ] && [ "$value" -le 2000000 ] || fail invalid_rate
+      done
+      case "$(uci -q get sqm.veci.qdisc || :)":"$(uci -q get sqm.veci.script || :)" in
+        cake:piece_of_cake.qos|cake:layer_cake.qos|fq_codel:simple.qos) ;; *) fail unsupported_queue;;
+      esac
+    fi
+  fi
+  tmp=$(mktemp -d /tmp/veci2-optional.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  uci -q -t "$tmp" set "$package.veci.enabled=$enabled_request" || fail stage_failed
+  [ "$(sha256sum "$config")" = "$digest" ] || fail stale_configuration
+  changes=$(uci -q changes "$package") || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  uci -q -t "$tmp" commit "$package" || fail commit_failed
+  [ "$(uci -q get "$package.veci.enabled")" = "$enabled_request" ] || fail commit_failed
+  # Save only. No service restart or network reload.
+  optional_status "$service"
+}
+ddns_lookup() {
+  service_profile ddns
+  case "$state" in enabled|disabled) ;; *) fail profile_unavailable;; esac
+  host=$(uci -q get ddns.veci.lookup_host || :)
+  case "$host" in ''|-*|.*|*[!a-zA-Z0-9.-]*) fail invalid_lookup_host;; esac
+  [ "${#host}" -le 253 ] || fail invalid_lookup_host
+  rc=0; output=$(timeout 8 nslookup "$host" 2>&1) || rc=$?
+  json_init; json_add_boolean ok 1; json_add_int exit_code "$rc"
+  json_add_string output "$(printf '%s' "$output" | head -c 2048)"
+  json_add_boolean provider_update_verified 0
+  json_dump
+}
+
+# Create/edit only the owned SQM queue. Creating a profile never enables it.
+sqm_save() {
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation
+  json_get_var iface interface; json_get_var download download; json_get_var upload upload
+  json_get_var qdisc qdisc; json_get_var script script
+  [ "$confirm" = SAVE_SQM_NEXT_BOOT ] || fail confirmation_required
+  case "$iface" in usb0|eth0.2|pppoe-wan) ;; *) fail unsupported_interface;; esac
+  for rate in "$download" "$upload"; do
+    case "$rate" in ''|0*|*[!0-9]*) fail invalid_rate;; esac
+    [ "${#rate}" -le 7 ] && [ "$rate" -ge 64 ] && [ "$rate" -le 2000000 ] || fail invalid_rate
+  done
+  case "$qdisc:$script" in cake:piece_of_cake.qos|cake:layer_cake.qos|fq_codel:simple.qos) ;; *) fail unsupported_queue;; esac
+  exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  exec 8</usr/libexec/rpcd/veci.v2.firewall; flock -n 8 || fail firewall_busy
+  service_profile sqm
+  [ -n "$revision" ] && [ "$revision" = "$expected" ] || fail stale_configuration
+  # Editing requires disabled state; do not change a running queue's profile.
+  case "$state" in disabled) ;; unconfigured)
+    [ -z "$(uci -q get sqm.veci || :)" ] || fail foreign_profile;;
+    *) fail disable_profile_first;;
+  esac
+  changes=$(uci -q changes sqm) || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  tmp=$(mktemp -d /tmp/veci2-sqm.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  change() { uci -q -t "$tmp" "$@"; }
+  change set sqm.veci=queue &&
+    change set sqm.veci.enabled=0 &&
+    change set "sqm.veci.interface=$iface" &&
+    change set "sqm.veci.download=$download" &&
+    change set "sqm.veci.upload=$upload" &&
+    change set "sqm.veci.qdisc=$qdisc" &&
+    change set "sqm.veci.script=$script" || fail stage_failed
+  [ "$(sha256sum "$config")" = "$digest" ] || fail stale_configuration
+  changes=$(uci -q changes sqm) || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  change commit sqm || fail commit_failed
+  [ "$(uci -q get sqm.veci.enabled)" = 0 ] || fail commit_failed
+  optional_status sqm
+}
+
+# Existing native OpenVPN client only; never import inline keys or arbitrary
+# configuration files through this endpoint.
+openvpn_profile() {
+  vpn_state=absent; revision=""; flag=""; eligible=0
+  [ -x /usr/sbin/openvpn ] && [ -x /etc/init.d/openvpn ] || return 0
+  vpn_state=unconfigured
+  config=/etc/config/openvpn
+  [ -f "$config" ] && [ ! -L "$config" ] || return 0
+  digest=$(sha256sum "$config") || fail config_unavailable
+  revision=${digest%% *}
+  [ "$(uci -q get openvpn.sample_client || :)" = openvpn ] || return 0
+  [ -z "$(uci -q get openvpn.sample_client.config || :)" ] || return 0
+  flag=$(uci -q get openvpn.sample_client.enabled || :)
+  case "$flag" in 0) vpn_state=disabled;; 1) vpn_state=enabled;; *) return 0;; esac
+  [ "$(uci -q get openvpn.sample_client.client || :)" = 1 ] &&
+  [ "$(uci -q get openvpn.sample_client.dev_type || :)" = tun ] &&
+  [ "$(uci -q get openvpn.sample_client.remote_cert_tls || :)" = server ] || return 0
+  case "$(uci -q get openvpn.sample_client.proto || :)" in udp|udp4|tcp-client|tcp4-client) ;; *) return 0;; esac
+  for item in ca cert key; do
+    path=$(uci -q get "openvpn.sample_client.$item" || :)
+    case "$path" in /etc/openvpn/*) ;; *) return 0;; esac
+    case "${path#/etc/openvpn/}" in ''|*/*|.|..|*[!a-zA-Z0-9._-]*) return 0;; esac
+    [ -f "$path" ] && [ ! -L "$path" ] && [ -s "$path" ] || return 0
+  done
+  eligible=1
+}
+openvpn_status() {
+  openvpn_profile
+  json_init; json_add_boolean ok 1; json_add_string state "$vpn_state"
+  json_add_string revision "$revision"; json_add_string enabled "$flag"
+  json_add_boolean eligible "$eligible"; json_add_boolean tunnel_verified 0
+  json_dump
+}
+openvpn_toggle() {
+  exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation; json_get_var requested enabled
+  case "$requested:$confirm" in 1:ENABLE_OPENVPN_NEXT_BOOT|0:DISABLE_OPENVPN_NEXT_BOOT) ;; *) fail confirmation_required;; esac
+  openvpn_profile
+  case "$vpn_state" in enabled|disabled) ;; *) fail profile_unavailable;; esac
+  [ "$expected" = "$revision" ] || fail stale_configuration
+  if [ "$requested" = 1 ]; then
+    [ "$eligible" = 1 ] || fail secure_profile_required
+    /etc/init.d/openvpn enabled >/dev/null 2>&1 || fail service_startup_disabled
+  fi
+  changes=$(uci -q changes openvpn) || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  tmp=$(mktemp -d /tmp/veci2-openvpn.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  uci -q -t "$tmp" set "openvpn.sample_client.enabled=$requested" || fail stage_failed
+  [ "$(sha256sum "$config")" = "$digest" ] || fail stale_configuration
+  changes=$(uci -q changes openvpn) || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  uci -q -t "$tmp" commit openvpn || fail commit_failed
+  [ "$(uci -q get openvpn.sample_client.enabled)" = "$requested" ] || fail commit_failed
+  openvpn_status
+}
+
+# Legacy tunnel retirement: preserve all profile parameters and credentials.
+# Only a named existing interface can have its startup flag disabled.
+# No tunnel activation, arbitrary protocol, route change or live reload.
+legacy_tunnel_inventory() {
+  cfg=/etc/config/network
+  [ -f "$cfg" ] && [ ! -L "$cfg" ] || fail config_unavailable
+  digest=$(sha256sum "$cfg") || fail config_unavailable
+  revision=${digest%% *}
+  pending=$(uci -q changes network) || fail config_unavailable
+  [ -z "$pending" ] || fail pending_changes
+  inventory=$(uci -q show network) || fail config_unavailable
+  names=$(printf '%s\n' "$inventory" | sed -nE "s/^network\.([a-zA-Z0-9_]+)\.proto='(pptp|l2tp|n2n)'$/\1/p")
+}
+legacy_tunnel_allowed() {
+  case "$1" in ''|*[!a-zA-Z0-9_]*|lan|wan|wan6|lte|wwan|loopback|veci_guest|veci_wg) return 1;; esac
+  [ "${#1}" -le 32 ] || return 1
+  [ "$(uci -q get "network.$1" || :)" = interface ] || return 1
+  case "$(uci -q get "network.$1.proto" || :)" in pptp|l2tp|n2n) ;; *) return 1;; esac
+}
+legacy_tunnel_status() {
+  legacy_tunnel_inventory
+  json_init; json_add_boolean ok 1; json_add_string revision "$revision"
+  json_add_array profiles
+  count=0
+  for name in $names; do
+    legacy_tunnel_allowed "$name" || continue
+    count=$((count+1)); [ "$count" -le 8 ] || fail inventory_limit
+    proto=$(uci -q get "network.$name.proto")
+    auto=$(uci -q get "network.$name.auto" || :)
+    case "$auto" in ''|1) auto=1;; 0) ;; *) fail invalid_startup;; esac
+    json_add_object ""; json_add_string name "$name"; json_add_string protocol "$proto"
+    json_add_string auto "$auto"; json_close_object
+  done
+  json_close_array; json_add_boolean activation_supported 0
+  json_add_boolean tunnel_verified 0; json_dump
+}
+legacy_tunnel_disable() {
+  exec 9>/var/lock/veci2-ipv6.lock; flock -n 9 || fail busy
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation
+  json_get_var name name; json_get_var proto protocol
+  [ "$confirm" = DISABLE_LEGACY_TUNNEL_NEXT_BOOT ] || fail confirmation_required
+  case "$proto" in pptp|l2tp|n2n) ;; *) fail unsupported_protocol;; esac
+  legacy_tunnel_inventory
+  [ "$expected" = "$revision" ] || fail stale_configuration
+  legacy_tunnel_allowed "$name" || fail profile_unavailable
+  [ "$(uci -q get "network.$name.proto")" = "$proto" ] || fail protocol_mismatch
+  auto=$(uci -q get "network.$name.auto" || :)
+  case "$auto" in 0) legacy_tunnel_status; return;; ''|1) ;; *) fail invalid_startup;; esac
+  tmp=$(mktemp -d /tmp/veci2-tunnel-disable.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  cp "$cfg" "$tmp/original" || fail backup_failed
+  uci -q -t "$tmp" set "network.$name.auto=0" || fail stage_failed
+  pending=$(uci -q changes network) || fail config_unavailable
+  [ -z "$pending" ] && [ "$(sha256sum "$cfg")" = "$digest" ] || fail stale_configuration
+  if ! uci -q -t "$tmp" commit network || [ "$(uci -q get "network.$name.auto" || :)" != 0 ]; then
+    cp "$tmp/original" "$cfg" || fail rollback_failed
+    fail commit_failed
+  fi
+  legacy_tunnel_status
+}
+
+# Existing optional SMB service: observe and disable startup only.
+# Do not create shares, change credentials or restart running services.
+smb_profile() {
+  smb_state=absent; smb_service=""; smb_revision=""
+  for name in samba4 ksmbd; do
+    [ -x "/etc/init.d/$name" ] || continue
+    [ -z "$smb_service" ] || { smb_state=ambiguous; smb_service=""; return 0; }
+    smb_service="$name"
+  done
+  [ -n "$smb_service" ] || return 0
+  smb_init="/etc/init.d/$smb_service"
+  [ -f "$smb_init" ] && [ ! -L "$smb_init" ] || fail invalid_service
+  if "$smb_init" enabled >/dev/null 2>&1; then smb_state=enabled
+  else
+    rc=$?
+    [ "$rc" = 1 ] || fail startup_state_unavailable
+    smb_state=disabled
+  fi
+  digest=$(sha256sum "$smb_init") || fail service_unavailable
+  digest=$(printf '%s\n' "$digest:$smb_state" | sha256sum) || fail service_unavailable
+  smb_revision=${digest%% *}
+}
+smb_status() {
+  smb_profile
+  json_init; json_add_boolean ok 1
+  json_add_string state "$smb_state"; json_add_string service "$smb_service"
+  json_add_string revision "$smb_revision"
+  json_add_boolean activation_supported 0; json_add_boolean share_verified 0
+  json_dump
+}
+smb_disable() {
+  exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation; json_get_var service service
+  [ "$confirm" = DISABLE_SMB_NEXT_BOOT ] || fail confirmation_required
+  smb_profile
+  case "$smb_state" in enabled|disabled) ;; *) fail service_unavailable;; esac
+  [ "$service" = "$smb_service" ] && [ "$expected" = "$smb_revision" ] || fail stale_configuration
+  if [ "$smb_state" = enabled ]; then
+    "$smb_init" disable >/dev/null 2>&1 || fail startup_disable_failed
+    smb_profile
+    [ "$smb_state" = disabled ] && [ "$smb_service" = "$service" ] || fail startup_disable_unconfirmed
+  fi
+  smb_status
+}
