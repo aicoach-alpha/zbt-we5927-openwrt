@@ -250,3 +250,62 @@ sqm_save() {
   [ "$(uci -q get sqm.veci.enabled)" = 0 ] || fail commit_failed
   optional_status sqm
 }
+
+# Existing native OpenVPN client only; never import inline keys or arbitrary
+# configuration files through this endpoint.
+openvpn_profile() {
+  vpn_state=absent; revision=""; flag=""; eligible=0
+  [ -x /usr/sbin/openvpn ] && [ -x /etc/init.d/openvpn ] || return 0
+  vpn_state=unconfigured
+  config=/etc/config/openvpn
+  [ -f "$config" ] && [ ! -L "$config" ] || return 0
+  digest=$(sha256sum "$config") || fail config_unavailable
+  revision=${digest%% *}
+  [ "$(uci -q get openvpn.sample_client || :)" = openvpn ] || return 0
+  [ -z "$(uci -q get openvpn.sample_client.config || :)" ] || return 0
+  flag=$(uci -q get openvpn.sample_client.enabled || :)
+  case "$flag" in 0) vpn_state=disabled;; 1) vpn_state=enabled;; *) return 0;; esac
+  [ "$(uci -q get openvpn.sample_client.client || :)" = 1 ] &&
+  [ "$(uci -q get openvpn.sample_client.dev_type || :)" = tun ] &&
+  [ "$(uci -q get openvpn.sample_client.remote_cert_tls || :)" = server ] || return 0
+  case "$(uci -q get openvpn.sample_client.proto || :)" in udp|udp4|tcp-client|tcp4-client) ;; *) return 0;; esac
+  for item in ca cert key; do
+    path=$(uci -q get "openvpn.sample_client.$item" || :)
+    case "$path" in /etc/openvpn/*) ;; *) return 0;; esac
+    case "${path#/etc/openvpn/}" in ''|*/*|.|..|*[!a-zA-Z0-9._-]*) return 0;; esac
+    [ -f "$path" ] && [ ! -L "$path" ] && [ -s "$path" ] || return 0
+  done
+  eligible=1
+}
+openvpn_status() {
+  openvpn_profile
+  json_init; json_add_boolean ok 1; json_add_string state "$vpn_state"
+  json_add_string revision "$revision"; json_add_string enabled "$flag"
+  json_add_boolean eligible "$eligible"; json_add_boolean tunnel_verified 0
+  json_dump
+}
+openvpn_toggle() {
+  exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  input=$(head -c 513)
+  [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation; json_get_var requested enabled
+  case "$requested:$confirm" in 1:ENABLE_OPENVPN_NEXT_BOOT|0:DISABLE_OPENVPN_NEXT_BOOT) ;; *) fail confirmation_required;; esac
+  openvpn_profile
+  case "$vpn_state" in enabled|disabled) ;; *) fail profile_unavailable;; esac
+  [ "$expected" = "$revision" ] || fail stale_configuration
+  if [ "$requested" = 1 ]; then
+    [ "$eligible" = 1 ] || fail secure_profile_required
+    /etc/init.d/openvpn enabled >/dev/null 2>&1 || fail service_startup_disabled
+  fi
+  changes=$(uci -q changes openvpn) || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  tmp=$(mktemp -d /tmp/veci2-openvpn.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  uci -q -t "$tmp" set "openvpn.sample_client.enabled=$requested" || fail stage_failed
+  [ "$(sha256sum "$config")" = "$digest" ] || fail stale_configuration
+  changes=$(uci -q changes openvpn) || fail config_unavailable
+  [ -z "$changes" ] || fail pending_changes
+  uci -q -t "$tmp" commit openvpn || fail commit_failed
+  [ "$(uci -q get openvpn.sample_client.enabled)" = "$requested" ] || fail commit_failed
+  openvpn_status
+}
