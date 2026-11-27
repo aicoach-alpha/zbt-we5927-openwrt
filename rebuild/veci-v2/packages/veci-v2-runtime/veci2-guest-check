@@ -1,13 +1,227 @@
 #!/bin/sh
-# Read-only guest separation inventory. Never claim Wi-Fi/firewall runtime PASS.
+# Native optional WPA2 guest and legacy separation inventory. No live reload.
 set -eu
+set -f
+umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 case "${1:-}:${2:-}" in
-  list:*) echo '{"status":{}}'; exit 0 ;;
-  call:status) ;;
+  list:*) echo '{"status":{},"provisionNative":{"revision":"String","confirmation":"String","ssid":"String","password":"String"},"setNativeStartup":{"revision":"String","confirmation":"String","enabled":"String"}}'; exit 0 ;;
+  call:status|call:provisionNative|call:setNativeStartup) ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
+# Fixed, isolated guest IPv4 /24. No portal, vouchers, or optional packages.
+configs="network dhcp firewall wireless"
+owned="network.veci_guest dhcp.veci_guest firewall.veci_guest_zone firewall.veci_guest_dhcp firewall.veci_guest_dns firewall.veci_guest_internet wireless.veci_guest"
+get() { uci -q get "$1" || :; }
+eq() { [ "$(get "$1")" = "$2" ]; }
+revision() {
+  for c in $configs; do [ -f "/etc/config/$c" ] && [ ! -L "/etc/config/$c" ] || return 1; done
+  d=$(sha256sum /etc/config/network /etc/config/dhcp /etc/config/firewall /etc/config/wireless) || return 1
+  d=$(printf '%s' "$d" | sha256sum) || return 1
+  printf '%s' "${d%% *}"
+}
+no_pending() {
+  for c in $configs; do
+    pending=$(uci -q changes "$c") || return 1
+    [ -z "$pending" ] || return 1
+  done
+}
+locks() {
+  exec 6>/var/lock/veci2-ipv6.lock; flock -n 6 || fail network_busy
+  exec 7</usr/libexec/rpcd/veci.v2.wifi; flock -n 7 || fail wifi_busy
+  exec 8>>/var/lock/veci2-dhcp.lock; flock -n 8 || fail dhcp_busy
+  exec 9</usr/libexec/rpcd/veci.v2.firewall; flock -n 9 || fail firewall_busy
+}
+empty_layout() {
+  for section in $owned; do [ -z "$(get "$section")" ] || return 1; done
+  [ ! -x /usr/libexec/rpcd/veci.app.guest ] || return 1
+}
+# Each setting is deliberately explicit; no forwarding object permits IPv6.
+layout() {
+  cat <<'EOF'
+network.veci_guest=interface
+network.veci_guest.proto=static
+network.veci_guest.ipaddr=10.20.0.1
+network.veci_guest.netmask=255.255.255.0
+network.veci_guest.ipv6=0
+dhcp.veci_guest=dhcp
+dhcp.veci_guest.interface=veci_guest
+dhcp.veci_guest.start=100
+dhcp.veci_guest.limit=100
+dhcp.veci_guest.leasetime=1h
+dhcp.veci_guest.ra=disabled
+dhcp.veci_guest.dhcpv6=disabled
+dhcp.veci_guest.ndp=disabled
+firewall.veci_guest_zone=zone
+firewall.veci_guest_zone.name=veci_guest
+firewall.veci_guest_zone.network=veci_guest
+firewall.veci_guest_zone.input=REJECT
+firewall.veci_guest_zone.output=ACCEPT
+firewall.veci_guest_zone.forward=REJECT
+firewall.veci_guest_dhcp=rule
+firewall.veci_guest_dhcp.name=VeCI_Guest_DHCP
+firewall.veci_guest_dhcp.src=veci_guest
+firewall.veci_guest_dhcp.proto=udp
+firewall.veci_guest_dhcp.dest_port=67
+firewall.veci_guest_dhcp.family=ipv4
+firewall.veci_guest_dhcp.target=ACCEPT
+firewall.veci_guest_dns=rule
+firewall.veci_guest_dns.name=VeCI_Guest_DNS
+firewall.veci_guest_dns.src=veci_guest
+firewall.veci_guest_dns.proto=tcp udp
+firewall.veci_guest_dns.dest_port=53
+firewall.veci_guest_dns.family=ipv4
+firewall.veci_guest_dns.target=ACCEPT
+firewall.veci_guest_internet=rule
+firewall.veci_guest_internet.name=VeCI_Guest_Internet
+firewall.veci_guest_internet.src=veci_guest
+firewall.veci_guest_internet.dest=wan
+firewall.veci_guest_internet.proto=all
+firewall.veci_guest_internet.family=ipv4
+firewall.veci_guest_internet.target=ACCEPT
+wireless.veci_guest=wifi-iface
+wireless.veci_guest.veci2_managed=1
+wireless.veci_guest.device=radio0
+wireless.veci_guest.mode=ap
+wireless.veci_guest.network=veci_guest
+wireless.veci_guest.encryption=psk2
+wireless.veci_guest.isolate=1
+EOF
+}
+native_valid() {
+  expected_layout=$(layout)
+  while IFS= read -r pair; do
+    eq "${pair%%=*}" "${pair#*=}" || return 1
+  done <<EOF
+$expected_layout
+EOF
+  # No unreviewed options in the owned sections (e.g. alternative networks).
+  for section in $owned; do
+    actual=$(uci -q show "$section") || return 1
+    keys=$(printf '%s\n' "$actual" | cut -d= -f1)
+    for key in $keys; do
+      case "$key" in wireless.veci_guest.ssid|wireless.veci_guest.key|wireless.veci_guest.disabled) ;;
+      *) printf '%s\n' "$expected_layout" | cut -d= -f1 | grep -Fxq "$key" || return 1;; esac
+    done
+  done
+  case "$(get wireless.veci_guest.disabled)" in 0|1) ;; *) return 1;; esac
+  [ -n "$(get wireless.veci_guest.ssid)" ] || return 1
+  k=$(get wireless.veci_guest.key)
+  [ "${#k}" -ge 8 ] && [ "${#k}" -le 63 ] || return 1
+  unset k
+}
+topology_ok() {
+  eq wireless.radio0 wifi-device && eq wireless.radio0.band 2g &&
+    eq wireless.default_radio0.mode ap && eq wireless.default_radio0.network lan || return 1
+  eq network.lan.proto static || return 1
+  case "$(get network.lan.ipaddr)" in 192.168.1.1|192.168.1.1/24) ;; *) return 1;; esac
+  case "$(get network.lan.netmask)" in ''|255.255.255.0) ;; *) return 1;; esac
+  eq firewall.@zone[1].name wan && eq firewall.@zone[1].input REJECT &&
+    eq firewall.@zone[1].masq 1 || return 1
+  case "$(get firewall.@defaults[0].forward)" in REJECT|DROP) ;; *) return 1;; esac
+  # Block foreign rules or bindings mentioning guest, and wildcard ingress
+  # accept rules. Only the above narrowly scoped rules may grant guest access.
+  rules=$(uci -q show firewall) || return 1
+  printf '%s\n' "$rules" | awk -F= '
+    $1 ~ /^firewall[.]veci_guest_(zone|dhcp|dns|internet)([.]|$)/ {next}
+    $0 ~ /veci_guest/ {bad=1}
+    BEGIN{q=sprintf("%c",39)}
+    $1 ~ /[.]src$/ && ($2==q "*" q || $2==q "any" q) {bad=1}
+    END{exit bad+0}' || return 1
+  wifi=$(uci -q show wireless) || return 1
+  printf '%s\n' "$wifi" | awk '$0 !~ /^wireless[.]veci_guest([.]|=)/ && /veci_guest/ {bad=1} END{exit bad+0}' || return 1
+  network=$(uci -q show network) || return 1
+  printf '%s\n' "$network" | awk '
+    /network[.]veci_guest[.]/ {next}
+    /10[.]20[.]0[.]/ {bad=1}
+    BEGIN{q=sprintf("%c",39)}
+    index($0,".proto=" q "static" q) && $0 !~ /^network[.](lan|loopback)[.]/ {bad=1}
+    END{exit bad+0}' || return 1
+  routes=$(ip -4 route show table all) || return 1
+  # Ignore defaults; reject every overlapping live route before enable.
+  printf '%s\n' "$routes" | awk '
+    function ipnum(s, a,n,i,v){n=split(s,a,".");if(n!=4)return -1;v=0;for(i=1;i<=4;i++){if(a[i]!~/^[0-9]+$/||a[i]>255)return -1;v=v*256+a[i]}return v}
+    {t=$1;if(t=="default")next;if(t=="local"||t=="broadcast"||t=="unreachable"||t=="blackhole"||t=="prohibit")t=$2;
+     if(t=="default")next;n=split(t,a,"/");v=ipnum(a[1]);if(v<0)next;p=(n==1?32:a[2]+0);if(p<0||p>32){bad=1;next}
+     size=2^(32-p);start=int(v/size)*size;guest=ipnum("10.20.0.0");
+     if(start<=guest+255 && start+size-1>=guest)bad=1}
+    END{exit bad+0}' || return 1
+}
+native_status() {
+  state=unconfigured; eligible=0; enabled=0; configured=0
+  if eq wireless.veci_guest.veci2_managed 1; then
+    state=configuration_needs_audit
+    if native_valid; then
+      state=configuration_separation_present; configured=1
+      [ "$(get wireless.veci_guest.disabled)" != 0 ] || enabled=1
+      if topology_ok; then eligible=1; fi
+    fi
+  elif empty_layout && topology_ok; then eligible=1
+  fi
+  rev=$(revision) || fail config_unavailable
+  set +u; . /usr/share/libubox/jshn.sh
+  json_init; json_add_boolean ok 1; json_add_boolean installed 1
+  json_add_boolean configured "$configured"; json_add_boolean enabled_configured "$enabled"
+  json_add_boolean native_eligible "$eligible"; json_add_string configuration_state "$state"
+  json_add_string mode native; json_add_string revision "$rev"
+  json_add_string ssid "$(get wireless.veci_guest.ssid)"
+  json_add_null guest_isolation_verified; json_dump
+}
+native_write() {
+  locks; no_pending || fail pending_changes
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
+  rev=$(revision) || fail config_unavailable
+  input=$(head -c 1025)
+  [ "${#input}" -le 1024 ] || fail invalid_request
+  set +u; . /usr/share/libubox/jshn.sh
+  json_load "$input" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation
+  [ "$expected" = "$rev" ] || fail stale_configuration
+  tmp=$(mktemp -d /tmp/veci2-guest.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  for c in $configs; do cp -p "/etc/config/$c" "$tmp/$c.original" || fail backup_failed; done
+  change() { uci -q -t "$tmp" "$@"; }
+  if [ "$2" = provisionNative ]; then
+    [ "$confirm" = PROVISION_GUEST_DISABLED ] || fail confirmation_required
+    empty_layout || fail profile_exists
+    topology_ok || fail unsupported_or_overlapping_topology
+    json_get_var name ssid; json_get_var secret password
+    [ "${#name}" -ge 1 ] && [ "${#name}" -le 32 ] && [ "${#secret}" -ge 8 ] && [ "${#secret}" -le 63 ] || fail invalid_credentials
+    case "$name$secret" in *[!a-zA-Z0-9._@%+=,:!/?#~\ -]*) fail unsupported_credential_characters;; esac
+    {
+      layout | while IFS= read -r pair; do printf "set %s='%s'\n" "${pair%%=*}" "${pair#*=}"; done
+      printf "set wireless.veci_guest.ssid='%s'\n" "$name"
+      printf "set wireless.veci_guest.key='%s'\n" "$secret"
+      printf "set wireless.veci_guest.disabled='1'\n"
+    } | change batch >/dev/null 2>&1 || fail stage_failed
+    unset secret input
+    targets="$configs"
+  else
+    native_valid || fail profile_unavailable
+    json_get_var enable enabled
+    case "$enable:$confirm" in 1:ENABLE_NATIVE_GUEST_NEXT_BOOT) disabled=0;; 0:DISABLE_NATIVE_GUEST_NEXT_BOOT) disabled=1;; *) fail confirmation_required;; esac
+    if [ "$disabled" = 0 ]; then topology_ok || fail unsupported_or_overlapping_topology; fi
+    change set "wireless.veci_guest.disabled=$disabled" || fail stage_failed
+    targets=wireless
+  fi
+  no_pending && [ "$(revision)" = "$rev" ] || fail stale_configuration
+  rollback() {
+    for c in $targets; do cp -p "$tmp/$c.original" "/etc/config/$c" || return 1; done
+  }
+  # Commit configuration only, not live interfaces. Roll back all touched
+  # configs if commit or firewall compilation fails.
+  for c in $targets; do
+    if ! change commit "$c"; then rollback || fail rollback_failed; fail commit_failed; fi
+  done
+  if ! native_valid || ! fw4 check >/dev/null 2>&1; then
+    rollback || fail rollback_failed
+    fail validation_failed_rollback
+  fi
+  native_status
+}
+if [ "$2" != status ]; then native_write "$@"; exit 0; fi
+if eq wireless.veci_guest.veci2_managed 1 || empty_layout; then native_status; exit 0; fi
 installed=false
 configured=false
 enabled=false

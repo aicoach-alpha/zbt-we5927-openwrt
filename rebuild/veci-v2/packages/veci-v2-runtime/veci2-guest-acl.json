@@ -1,7 +1,20 @@
 {
   "veci-v2-guest-inspect": {
-    "description": "Guest configuration inventory, no write access",
-    "read": {"ubus": {"veci.v2.guest": ["status"]}},
-    "write": {"ubus": {}}
+    "description": "Native isolated guest profile inventory and explicitly confirmed configuration only",
+    "read": {
+      "ubus": {
+        "veci.v2.guest": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "veci.v2.guest": [
+          "provisionNative",
+          "setNativeStartup"
+        ]
+      }
+    }
   }
 }
