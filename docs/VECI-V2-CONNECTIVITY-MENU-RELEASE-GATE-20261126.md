@@ -298,3 +298,10 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - Source format is U-Boot legacy image.h: header is 64 bytes, CRC32 header at offset 4 (computed with its field zeroed), payload size at offset 12 and CRC32 payload at offset 24, encoded in network byte order. Reference: https://qemu.googlesource.com/u-boot/+/e9a1ff9724348408144c7f1c5b5cc26130ba46e5/include/image.h
 - New offline Windows tool scripts/veci-we5927-uimage-offline-integrity-20261127.ps1 checks the matching current backup receipt and SHA256 before calculating both CRC32s with exact payload boundaries. It performs no router action or recovery; live user output is pending. CRC32 is integrity evidence, not authenticity, secure boot, hardware rescue compatibility, or flash authorization.
 - Historical stable backup retention and signed f87e7ec5 candidate preflight PASS remain unchanged; release_permitted=false until recovery and post-flash physical UAT.
+
+### Offline uImage CRC CI Windows PASS run 45947184115 — 27 November 2026
+
+- Exact published offline legacy uImage script SHA-256: 9f75e9642f8d23019614a680252f3a3a3ab60feff7b9820a15a7a97ec4fc50e7. The script requires a matching backup receipt, size 7995392 bytes and SHA256 matching local MTD3 before parsing; no SSH or router calls.
+- GitHub Actions https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/45947184115, source commit e221aeef452392f25acbf2014d049a6405eb213e: SUCCESS for both synthetic-crc Ubuntu and windows-ps51 jobs.
+- Windows real execution: valid 7,995,392-byte fixture produced header/payload CRC32 PASS. Tampered header, tampered payload and tampered uImage magic were each rejected with nonzero exits. Earlier 2 CI runs initially failed only due to harness handling of expected PowerShell native stderr and LASTEXITCODE; the corrected run passed both jobs.
+- **Owner current backup CRCs have not been tested** by the new script yet, so do not label CRC32 PASS on that user's physical MTD3 backup. No bootloader restore capability was verified; flash authorization is still absent and release_permitted=false.
