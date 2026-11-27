@@ -32,7 +32,18 @@ valid_ip() {
      if(mode=="prefix"){block=1;for(i=$5;i<32;i++)block*=2;if(v % block != 0)exit 1}
      if(mode=="gateway" && ($1==0 || $1==127 || $1>=224))exit 1}'
 }
+owned_route() (
+  key="$1"
+  case "$(get "$key"):$(get "$key.veci2_managed")" in route:1) allowed="interface target table gateway veci2_managed";; rule:1) allowed="src lookup priority veci2_managed";; *) return 1;; esac
+  raw=$(uci -q show "network.$key") || return 1
+  for field in $(printf '%s\n' "$raw" | cut -d= -f1); do
+    [ "$field" != "network.$key" ] || continue
+    case "$field" in "network.$key."*) opt=${field#network.$key.};; *) return 1;; esac
+    case " $allowed " in *" $opt "*) ;; *) return 1;; esac
+  done
+)
 if [ "$2" != status ]; then
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
   input=$(head -c 1025)
   [ "${#input}" -le 1024 ] && json_load "$input" || fail invalid_request
   json_get_var token revision ''; [ "$token" = "$rev" ] || fail stale_configuration
@@ -40,10 +51,11 @@ if [ "$2" != status ]; then
   section=veci2_route_$name
   existing=$(get "$section")
   if [ -n "$existing" ]; then
-    case "$existing:$(get "$section.veci2_managed")" in route:1|rule:1) ;; *) fail unmanaged_section ;; esac
+    owned_route "$section" || fail unmanaged_section
   fi
   tmp=$(mktemp -d /tmp/veci2-routes.XXXXXX) || fail stage_failed
   trap 'rm -rf "$tmp"' EXIT
+  cp -p "$cfg" "$tmp/original" || fail backup_failed
   change() { uci -q -t "$tmp" "$@"; }
   if [ "$2" = remove ]; then
     [ -n "$existing" ] || fail missing_section
@@ -76,7 +88,17 @@ if [ "$2" != status ]; then
     put veci2_managed 1
   fi
   clean && [ "$(revision)" = "$rev" ] || fail stale_configuration
-  change commit network || fail commit_failed
+  rollback_route() { cp -p "$tmp/original" "$cfg" || fail rollback_failed; fail commit_failed_rollback; }
+  change commit network || rollback_route
+  if [ "$2" = remove ]; then
+    [ -z "$(get "$section")" ] || rollback_route
+  else
+    owned_route "$section" || rollback_route
+    case "$kind" in
+      route) [ "$(get "$section.target")" = "$prefix" ] && [ "$(get "$section.interface")" = "$iface" ] && [ "$(get "$section.gateway")" = "$gateway" ] && [ "$(get "$section.table")" = "$table" ] || rollback_route;;
+      rule) [ "$(get "$section.src")" = "$prefix" ] && [ "$(get "$section.lookup")" = "$table" ] && [ "$(get "$section.priority")" = "$priority" ] || rollback_route;;
+    esac
+  fi
   rev=$(revision) || fail config_unavailable
 fi
 json_init
@@ -88,7 +110,7 @@ for key in $sections; do
   json_add_object ''
   json_add_string section "$key"; json_add_string kind "$(get "$key")"
   editable=0
-  case "$key" in veci2_route_*) valid_id "${key#veci2_route_}" && [ "$(get "$key.veci2_managed")" = 1 ] && editable=1 ;; esac
+  case "$key" in veci2_route_*) valid_id "${key#veci2_route_}" && owned_route "$key" && editable=1 ;; esac
   json_add_boolean editable "$editable"
   for option in target src dest lookup table priority gateway interface; do
     value=$(get "$key.$option"); [ -z "$value" ] || json_add_string "$option" "$value"
