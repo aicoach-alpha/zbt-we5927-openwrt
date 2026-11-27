@@ -305,3 +305,12 @@ Owner ran the local-only SHA256-pinned PowerShell recovery-audit script and past
 - GitHub Actions https://github.com/aicoach-alpha/zbt-we5927-openwrt/actions/runs/45947184115, source commit e221aeef452392f25acbf2014d049a6405eb213e: SUCCESS for both synthetic-crc Ubuntu and windows-ps51 jobs.
 - Windows real execution: valid 7,995,392-byte fixture produced header/payload CRC32 PASS. Tampered header, tampered payload and tampered uImage magic were each rejected with nonzero exits. Earlier 2 CI runs initially failed only due to harness handling of expected PowerShell native stderr and LASTEXITCODE; the corrected run passed both jobs.
 - **Owner current backup CRCs have not been tested** by the new script yet, so do not label CRC32 PASS on that user's physical MTD3 backup. No bootloader restore capability was verified; flash authorization is still absent and release_permitted=false.
+
+## Owner real MTD3 legacy uImage header and payload CRC32, 27 November 2026
+
+- Owner ran SHA256-pinned local-only Windows verifier on D:/Report_CCB/WE5927-CURRENT-MTD3-RAW-NOT-FLASHABLE-20261127_122757.bin and matching .json receipt.
+- Owner-pasted console: LOCAL_BACKUP_AND_RECEIPT_SHA256=PASS, UIMAGE_MAGIC=27051956, UIMAGE_PAYLOAD_BYTES=1959054, UIMAGE_TOTAL_BYTES=1959118.
+- Header CRC32: expected=1bde8bfb, calculated=1bde8bfb, PASS. Payload CRC32: expected=f3c0fa95, calculated=f3c0fa95, PASS.
+- UIMAGE_OS_CODE=5, UIMAGE_ARCH_CODE=5, UIMAGE_TYPE_CODE=2, UIMAGE_COMPRESSION_CODE=3; UIMAGE_METADATA=LINUX_MIPS_KERNEL; UIMAGE_LEGACY_CHECKSUMS=PASS.
+- This authenticates neither file origin nor U-Boot recovery acceptance; CRCs apply only to the legacy uImage header and kernel payload, not the entire MTD3 rootfs/overlay. Earlier SHA256 check proves backup matches router at time of transfer, not bootloader restorability.
+- Source evidence is pasted owner PowerShell console, not an independent import of the sensitive binary or JSON. RAW backup stays on owner laptop and is NOT a verified sysupgrade/bootloader rescue image. No router contact in this CRC test. flash_authorized=false, release_permitted=false.
