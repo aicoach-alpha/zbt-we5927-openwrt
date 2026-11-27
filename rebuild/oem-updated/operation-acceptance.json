@@ -49,10 +49,10 @@
       "limitations": "Bounded lookup of configured hostname; no provider update or daemon restart; supplemental OEM control, runtime pending."
     },
     "delete_static_dhcp": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.dhcp:status/delete",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Original OEM delete form uses displayed revision, explicit confirmation, one reservation at a time; runtime pending."
+      "evidence": "scripts/uat/test-owner-dhcp-dns.py; scripts/tests/test_owner_dhcp_dns_acceptance.py; scripts/tests/test_oem_dhcp_writes.py#DhcpWrites.test_pool_reservations_and_acl",
+      "limitations": "Delete one selected reservation with revision and confirmation. Native UCI config mutation, shared network locking and byte-exact rollback passed; dnsmasq restart and ubus adapter simulated. Browser and physical DHCP runtime pending."
     },
     "enable_mptcp_set": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -637,10 +637,10 @@
       "limitations": "Enable/disable existing compatible DDNS profile only; full provider configuration and actual update verification pending."
     },
     "set_dhcp_config": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.dhcp:setPool",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Original OEM pool form adapted; native lease duration conversion and revision guard; runtime pending."
+      "evidence": "scripts/uat/test-owner-dhcp-dns.py; scripts/tests/test_owner_dhcp_dns_acceptance.py; scripts/tests/test_oem_dhcp_writes.py#DhcpWrites.test_pool_reservations_and_acl",
+      "limitations": "DHCP pool bounds, lease duration, revision and enable settings. Native UCI config mutation, shared network locking and byte-exact rollback passed; dnsmasq restart and ubus adapter simulated. Browser and physical DHCP runtime pending."
     },
     "set_disk": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -675,7 +675,7 @@
       "state": "FIXTURE_PASS",
       "provider": "veci.v2.interfaces:status/save",
       "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; scripts/tests/test_oem_interface_writes.py#InterfaceWrites.test_lan_preserves_pppoe_and_wan_replacement",
-      "limitations": "Native host UCI/libubox configuration lifecycle and isolated adapter ACL/response fixtures passed. Manual activation only; original OEM browser behavior, physical network, DHCP reservation consistency and actual routing pending."
+      "limitations": "Native host UCI/libubox configuration lifecycle and isolated adapter ACL/response fixtures passed. Manual activation only; original OEM browser behavior, physical network, DHCP reservation consistency and actual routing pending. DHCP pool/reservation compatibility and guest subnet guards now covered by native UCI fixtures; unsupported reservation types fail closed on LAN changes."
     },
     "set_mac_blacklist": {
       "state": "PROTOTYPE",
@@ -768,10 +768,10 @@
       "limitations": "Disable startup of an installed single Samba4 or ksmbd service only. Native mocked init service status and mutation fixtures passed. No activation, share configuration or live restart; adapter write fixture and runtime pending."
     },
     "set_static_dhcp": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.dhcp:add",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Native add only; editing existing lease and custom lease duration not yet supported. JSON transport integration pending."
+      "evidence": "scripts/uat/test-owner-dhcp-dns.py; scripts/tests/test_owner_dhcp_dns_acceptance.py; scripts/tests/test_oem_dhcp_writes.py#DhcpWrites.test_pool_reservations_and_acl",
+      "limitations": "Add a new reservation only; existing reservation editing and custom lease duration not supported. Native UCI config mutation, shared network locking and byte-exact rollback passed; dnsmasq restart and ubus adapter simulated. Browser and physical DHCP runtime pending."
     },
     "set_static_route": {
       "state": "PROTOTYPE",
@@ -794,7 +794,7 @@
       "state": "FIXTURE_PASS",
       "provider": "veci.v2.interfaces:status/save",
       "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; scripts/tests/test_oem_interface_writes.py#InterfaceWrites.test_lan_preserves_pppoe_and_wan_replacement",
-      "limitations": "Native host UCI/libubox configuration lifecycle and isolated adapter ACL/response fixtures passed. Manual activation only; original OEM browser behavior, physical network, DHCP reservation consistency and actual routing pending."
+      "limitations": "Native host UCI/libubox configuration lifecycle and isolated adapter ACL/response fixtures passed. Manual activation only; original OEM browser behavior, physical network, DHCP reservation consistency and actual routing pending. DHCP pool/reservation compatibility and guest subnet guards now covered by native UCI fixtures; unsupported reservation types fail closed on LAN changes."
     },
     "set_wan_config_nocommit": {
       "state": "SOURCE_DISABLED_REVIEWED",
