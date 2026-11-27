@@ -39,8 +39,105 @@ save_option() {
   rm -rf "$tmp"
   trap - EXIT HUP INT TERM
 }
+# Only manage a dedicated STA on an already provisioned, WAN-zoned DHCP
+# network. No network/firewall topology changes or live radio reload.
+uplink=wireless.veci_uplink
+uplink_revision() {
+  digest=$(sha256sum /etc/config/wireless /etc/config/network /etc/config/firewall) || return 1
+  digest=$(printf '%s' "$digest" | sha256sum) || return 1
+  printf '%s' "${digest%% *}"
+}
+uplink_ready() {
+  [ "$(uci -q get network.wwan || :)" = interface ] &&
+  [ "$(uci -q get network.wwan.proto || :)" = dhcp ] &&
+  [ -z "$(uci -q get network.wwan.device || :)" ] &&
+  [ "$(uci -q get firewall.@zone[1].name || :)" = wan ] &&
+  [ "$(uci -q get firewall.@zone[1].input || :)" = REJECT ] || return 1
+  case " $(uci -q get firewall.@zone[1].network || :) " in *" wwan "*) ;; *) return 1;; esac
+  case " $(uci -q get firewall.@zone[0].network || :) " in *" wwan "*) return 1;; esac
+  # No other STA, including anonymous UCI sections.
+  sta=$(uci -q show wireless | sed -nE "s/^wireless\.([^.]*)\.mode='sta'$/\1/p")
+  [ -z "$sta" ] || [ "$sta" = veci_uplink ] || return 1
+  if [ -n "$(uci -q get "$uplink" || :)" ]; then
+    [ "$(uci -q get "$uplink" || :)" = wifi-iface ] &&
+    [ "$(uci -q get "$uplink.device" || :)" = radio0 ] &&
+    [ "$(uci -q get "$uplink.mode" || :)" = sta ] &&
+    [ "$(uci -q get "$uplink.network" || :)" = wwan ] || return 1
+  fi
+}
+uplink_status() {
+  ready=0; exists=0; enabled=0
+  if uplink_ready; then ready=1; fi
+  if [ "$(uci -q get "$uplink" || :)" = wifi-iface ]; then
+    exists=1
+    case "$(uci -q get "$uplink.disabled" || :)" in 0) enabled=1;; 1) ;; *) ready=0;; esac
+  fi
+  set +u
+  . /usr/share/libubox/jshn.sh
+  json_init; json_add_boolean ok 1
+  json_add_string revision "$(uplink_revision)"
+  json_add_boolean eligible "$ready"; json_add_boolean configured "$exists"
+  json_add_boolean enabled "$enabled"
+  json_add_string ssid "$(uci -q get "$uplink.ssid" || :)"
+  json_add_boolean connection_verified 0
+  json_dump
+}
+uplink_save() {
+  uplink_ready || fail wwan_topology_unavailable
+  for cfg in network firewall wireless; do
+    changes=$(uci -q changes "$cfg") || fail config_unavailable
+    [ -z "$changes" ] || fail pending_changes
+  done
+  request=$(head -c 1025)
+  [ "${#request}" -le 1024 ] || fail invalid_request
+  set +u
+  . /usr/share/libubox/jshn.sh
+  json_load "$request" || fail invalid_request
+  json_get_var expected revision; json_get_var confirm confirmation
+  json_get_var action action; json_get_var name ssid; json_get_var secret password
+  [ "$expected" = "$(uplink_revision)" ] || fail stale_configuration
+  case "$action:$confirm" in save:SAVE_UPLINK_DISABLED|enable:ENABLE_UPLINK_NEXT_BOOT|disable:DISABLE_UPLINK_NEXT_BOOT) ;; *) fail confirmation_required;; esac
+  tmp=$(mktemp -d /tmp/veci2-uplink.XXXXXX) || fail stage_failed
+  trap 'rm -rf "$tmp"' EXIT
+  change() { uci -q -t "$tmp" "$@"; }
+  if [ "$action" = save ]; then
+    [ -z "$(uci -q get "$uplink" || :)" ] || [ "$(uci -q get "$uplink.disabled" || :)" = 1 ] || fail disable_profile_first
+    [ "${#name}" -ge 1 ] && [ "${#name}" -le 32 ] && [ "${#secret}" -ge 8 ] && [ "${#secret}" -le 63 ] || fail invalid_credentials
+    # Restricted printable subset prevents UCI batch grammar injection.
+    case "$name$secret" in *[!a-zA-Z0-9._@%+=,:!/?#~\ -]*) fail unsupported_credential_characters;; esac
+    {
+      printf 'set %s=wifi-iface\n' "$uplink"
+      for pair in device=radio0 mode=sta network=wwan encryption=psk2 disabled=1; do printf 'set %s.%s\n' "$uplink" "$pair"; done
+      printf "set %s.ssid='%s'\n" "$uplink" "$name"
+      printf "set %s.key='%s'\n" "$uplink" "$secret"
+    } | change batch >/dev/null 2>&1 || fail stage_failed
+  else
+    [ "$(uci -q get "$uplink" || :)" = wifi-iface ] || fail profile_unavailable
+    if [ "$action" = enable ]; then
+      [ "$(uci -q get "$uplink.encryption" || :)" = psk2 ] || fail unsupported_encryption
+      secret=$(uci -q get "$uplink.key" || :)
+      [ "${#secret}" -ge 8 ] && [ "${#secret}" -le 63 ] || fail invalid_credentials
+      [ -n "$(uci -q get "$uplink.ssid" || :)" ] || fail invalid_ssid
+      change set "$uplink.disabled=0" || fail stage_failed
+    else change set "$uplink.disabled=1" || fail stage_failed; fi
+  fi
+  unset secret request
+  [ "$expected" = "$(uplink_revision)" ] || fail stale_configuration
+  for cfg in network firewall wireless; do
+    changes=$(uci -q changes "$cfg") || fail config_unavailable
+    [ -z "$changes" ] || fail pending_changes
+  done
+  change commit wireless || fail commit_failed
+  uplink_status
+}
 case "${1:-}:${2:-}" in
-  list:*) echo '{"status":{},"info":{},"survey":{},"setChannel":{"channel":"String"},"power":{},"setPower":{"dbm":"String","expected":"String","confirmation":"String"},"setAuth":{"mode":"String","key_hex":"String"},"setAccess":{"mode":"String","addresses":"String"},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"},"activationStatus":{},"activateAp":{"confirmation":"String"}}'; exit 0 ;;
+  list:*) echo '{"status":{},"uplinkStatus":{},"saveUplink":{"revision":"String","confirmation":"String","action":"String","ssid":"String","password":"String"},"info":{},"survey":{},"setChannel":{"channel":"String"},"power":{},"setPower":{"dbm":"String","expected":"String","confirmation":"String"},"setAuth":{"mode":"String","key_hex":"String"},"setAccess":{"mode":"String","addresses":"String"},"setVisibility":{"action":"String"},"setSsid":{"ssid_hex":"String"},"setAutoChannel":{"action":"String"},"activationStatus":{},"activateAp":{"confirmation":"String"}}'; exit 0 ;;
+  call:uplinkStatus|call:saveUplink)
+    exec 8>/var/lock/veci2-ipv6.lock; flock -n 8 || fail network_busy
+    exec 9<"$0"; flock -n 9 || fail wifi_busy
+    check_ap
+    if [ "$2" = uplinkStatus ]; then uplink_status; else uplink_save; fi
+    exit 0 ;;
   call:activationStatus|call:activateAp)
     check_ap
     if [ "$2" = activationStatus ]; then
