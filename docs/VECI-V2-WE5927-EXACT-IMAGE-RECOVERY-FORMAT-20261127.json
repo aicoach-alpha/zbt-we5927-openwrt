@@ -1,0 +1,96 @@
+{
+  "schema": "we5927-offline-recovery-format-parity.v1",
+  "method": "exact-size and SHA256, uImage CRC32, SquashFS superblock, trailer marker inventory",
+  "sources": {
+    "vendor_reference": {
+      "size_bytes": 7471108,
+      "sha256": "80529b8e9c31d686eb7f63a1517d6dbcf781f26cb4aceb7b8b1ff27c2d51d1f9",
+      "uimage": {
+        "magic": "27051956",
+        "payload_bytes": 1184708,
+        "header_crc32": "PASS",
+        "data_crc32": "PASS",
+        "os_arch_type_comp": [
+          5,
+          5,
+          2,
+          3
+        ]
+      },
+      "squashfs": {
+        "offset": 1184772,
+        "major": 4,
+        "minor": 0,
+        "bytes_used": 6263516,
+        "block_size": 262144
+      },
+      "trailer": {
+        "bytes_after_squashfs": 22820,
+        "class": "OEM_STYLE_DEADC0DE_TERMINATOR",
+        "deadc0de_offsets": [
+          7450624,
+          7454720,
+          7471104
+        ],
+        "has_openwrt_fwx0_marker": false,
+        "has_ucert_marker": false,
+        "ends_with_deadc0de": true
+      },
+      "within_exact_mtd3_size": true,
+      "image_source_verified_by_sha256": true,
+      "bootloader_http_acceptance": "NOT_VERIFIED",
+      "physical_recovery_test": "NOT_RUN",
+      "rescue_image_approved": false
+    },
+    "signed_veci_sysupgrade": {
+      "size_bytes": 5899090,
+      "sha256": "3adc815e77a7c9b0e25f742601eb2dc94423aad540b26efa86423821a667abb1",
+      "uimage": {
+        "magic": "27051956",
+        "payload_bytes": 1959204,
+        "header_crc32": "PASS",
+        "data_crc32": "PASS",
+        "os_arch_type_comp": [
+          5,
+          5,
+          2,
+          3
+        ]
+      },
+      "squashfs": {
+        "offset": 1959268,
+        "major": 4,
+        "minor": 0,
+        "bytes_used": 3904380,
+        "block_size": 1048576
+      },
+      "trailer": {
+        "bytes_after_squashfs": 35442,
+        "class": "OPENWRT_METADATA_SIGNATURE_TRAILER",
+        "deadc0de_offsets": [
+          5898240
+        ],
+        "has_openwrt_fwx0_marker": true,
+        "has_ucert_marker": true,
+        "ends_with_deadc0de": false
+      },
+      "within_exact_mtd3_size": true,
+      "image_source_verified_by_sha256": true,
+      "bootloader_http_acceptance": "NOT_VERIFIED",
+      "physical_recovery_test": "NOT_RUN",
+      "rescue_image_approved": false
+    }
+  },
+  "both_valid_uimage_crc": true,
+  "both_have_squashfs_4_0": true,
+  "same_outer_uimage_and_squashfs_structure": true,
+  "same_trailer_format": false,
+  "recovery_image_format_in_bootloader": "UNKNOWN",
+  "upload_to_uboot_webfailsafe_safe_as_test": false,
+  "format_does_not_prove_bootloader_compatibility": true,
+  "owner_router_touched": false,
+  "flash_authorized": false,
+  "release_permitted": false,
+  "blocking_reason": "WEB_FAILSAFE_UPLOAD_CAN_TRIGGER_FLASH; UBOOT_HANDLER_ACCEPTANCE_NOT_TESTED",
+  "next_evidence": "offline bootloader HTTP handler/static parser analysis or approved real physical recovery proof"
+}
