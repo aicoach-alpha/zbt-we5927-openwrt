@@ -207,6 +207,21 @@
       "scope": "Optional per-device same-day UTC deny schedule; eight slots; no global switch",
       "state": "SOURCE_INTEGRATED_NOT_UAT",
       "limitations": "Schedule validation fixture only; actual time-based rule enforcement and established flow behavior pending"
+    },
+    "openvpn_startup": {
+      "provider": "veci.v2.addon",
+      "methods": [
+        "openvpnStatus",
+        "setOpenvpnStartup"
+      ],
+      "scope": "Existing certificate-based native client only; explicit startup toggle",
+      "state": "SOURCE_INTEGRATED_NOT_UAT",
+      "limitations": "Optional package absent from base image; no import or live tunnel verification"
+    },
+    "smb_inventory": {
+      "provider": "Linux process and OpenWrt service inventory",
+      "scope": "Read only; no password disclosure or share management",
+      "state": "FIXTURE_PASS_NOT_UAT"
     }
   },
   "remaining": [

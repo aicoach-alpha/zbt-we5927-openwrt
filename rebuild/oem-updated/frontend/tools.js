@@ -37,6 +37,7 @@ function clearSession() {
   resetOptional();
   resetAcl();
   resetParent();
+  resetVpn();
   resetUplink();
   pppoeRevision="";el("pppoe-profile").reset();el("pppoe-save").disabled=true;el("pppoe-result").textContent="";
   ttlRevision='';el('ttl-form').reset();el('ttl-save').disabled=true;el('ttl-result').textContent='';
@@ -564,3 +565,40 @@ async function changeParent(action){
 el('parent-form').onsubmit=e=>{e.preventDefault();changeParent('save');};
 el('parent-toggle').onclick=()=>changeParent('toggle');
 el('parent-delete').onclick=()=>changeParent('delete');
+
+let vpnProfile=null;
+function resetVpn(){
+  vpnProfile=null;el('vpn-toggle').disabled=true;el('vpn-result').textContent='';el('smb-result').textContent='';
+}
+el('vpn-refresh').onclick=async()=>{
+  const token=sid,b=el('vpn-refresh');if(!token||b.disabled)return;
+  b.disabled=true;vpnProfile=null;el('vpn-toggle').disabled=true;
+  try{
+    const x=await oem('get_openvpn_msg',undefined,token);
+    if(sid!==token)return;
+    el('vpn-result').textContent='Configuration: '+x.state+'; TLS profile eligible: '+x.eligible+'; tunnel unverified.';
+    if(!['enabled','disabled'].includes(x.state)||!/^[0-9a-f]{64}$/.test(x.revision||''))return;
+    vpnProfile=x;el('vpn-toggle').disabled=x.state==='disabled'&&x.eligible!=='true';
+    el('vpn-toggle').textContent=x.state==='enabled'?'Disable at next boot':'Enable at next boot';
+  }catch(e){if(sid===token)el('vpn-result').textContent=e.message;}
+  finally{b.disabled=false;}
+};
+el('vpn-toggle').onclick=async()=>{
+  const token=sid,x=vpnProfile;if(!token||!x)return;
+  const enable=x.state==='disabled';
+  if(!window.confirm('Save OpenVPN startup preference for next manual activation?'))return;
+  vpnProfile=null;el('vpn-toggle').disabled=true;
+  try{
+    await oem('set_openvpn',{revision:x.revision,enabled:enable?'1':'0',confirmation:enable?'ENABLE_OPENVPN_NEXT_BOOT':'DISABLE_OPENVPN_NEXT_BOOT'},token);
+    if(sid===token)el('vpn-result').textContent='Startup saved. Refresh before any further change.';
+  }catch(e){if(sid===token)el('vpn-result').textContent=e.message;}
+};
+el('smb-refresh').onclick=async()=>{
+  const token=sid,b=el('smb-refresh');if(!token||b.disabled)return;
+  b.disabled=true;
+  try{
+    const x=await oem('get_samba_info',undefined,token);
+    if(sid===token)el('smb-result').textContent='Package: '+x.state+'; process: '+x.runtime+'; shares unverified.';
+  }catch(e){if(sid===token)el('smb-result').textContent=e.message;}
+  finally{b.disabled=false;}
+};

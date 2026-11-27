@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus|veci.v2.firewall:ttlStatus|veci.v2.firewall:parentStatus) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus|veci.v2.firewall:ttlStatus|veci.v2.firewall:parentStatus|veci.v2.addon:openvpnStatus) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -557,10 +557,39 @@ case "$1" in
         formatted="$(printf '%s\n' "$logs" | awk 'NF>=5 {d=$2" "$3" "$4; sub(/^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +/,""); gsub(/"/,"\047"); printf "%s system: \"%s\"\n",d,$0}')"
         json_add_string data "$formatted"
         ;;
+    get_samba_info)
+        # Inventory only; no public mount, password or share contents.
+        packages=absent
+        if [ -x /etc/init.d/samba4 ] || [ -x /etc/init.d/ksmbd ]; then packages=installed; fi
+        service=unknown
+        if [ "$packages" = installed ]; then
+            if pidof smbd >/dev/null 2>&1 || pidof ksmbd.mountd >/dev/null 2>&1; then service=process_present; else service=process_not_observed; fi
+        fi
+        success "optional SMB service inventory"
+        json_add_string state "$packages"; json_add_string runtime "$service"
+        json_add_string smb_username ""; json_add_string smb_passwd ""; json_add_string smb_addr ""
+        json_add_string any_samba_disabled unknown
+        json_add_string configuration_supported 0
+        json_add_string share_verified false
+        ;;
     get_openvpn_msg)
+        native="$(native_read veci.v2.addon openvpnStatus)" || error "OpenVPN status unavailable"
+        state="$(field '@.state')" || error "OpenVPN state unavailable"
+        case "$state" in absent|unconfigured|disabled|enabled) ;; *) error "invalid OpenVPN state";; esac
+        if [ "$state" = absent ] || [ "$state" = unconfigured ]; then
+            success "optional OpenVPN profile unavailable"
+            json_add_string state "$state"; json_add_string enabled ""
+            json_add_string eligible false; json_add_string revision "$(field '@.revision' || true)"
+            for name in remote port dev_type proto client nobind verb comp_lzo ca cert key; do json_add_string "$name" ""; done
+            exit 0
+        fi
         [ "$(get openvpn.sample_client)" = openvpn ] || error "OpenVPN client profile unavailable"
         [ -z "$(get openvpn.sample_client.config || true)" ] || error "external OpenVPN profile"
         success "OpenVPN client settings"
+        json_add_string state "$state"
+        json_add_string revision "$(field '@.revision')"
+        json_add_string eligible "$(field '@.eligible')"
+        json_add_string tunnel_verified false
         for name in enabled remote port dev_type proto client nobind verb comp_lzo; do
             value="$(get "openvpn.sample_client.$name" || true)"
             case "$name:$value" in enabled:) value=0 ;; port:) value=1194 ;; dev_type:) value=tun ;; esac

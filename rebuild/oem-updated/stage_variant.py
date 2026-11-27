@@ -417,6 +417,10 @@ def stage(image, out):
             '<label>MAC<input id="parent-mac" maxlength="17"></label><label>Block start UTC<input id="parent-start" type="time" required></label><label>Block end UTC<input id="parent-stop" type="time" required></label>'
             '<label>Days (UTC)<select id="parent-days" multiple required><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></label>'
             '<label><input id="parent-enabled" type="checkbox">Enable schedule</label><button id="parent-save" disabled>Save schedule</button><button id="parent-toggle" type="button" disabled>Change enabled state</button><button id="parent-delete" type="button" disabled>Delete schedule</button></form></article>'
+            '<article><h2>Optional OpenVPN client / storage</h2><p>OpenVPN requires an installed, preconfigured native TLS client. No key upload or automatic network restart. SMB inventory only; no public share setup.</p>'
+            '<button id="vpn-refresh" type="button">Read OpenVPN</button><p id="vpn-result" role="status"></p>'
+            '<button id="vpn-toggle" type="button" disabled>Change OpenVPN startup</button>'
+            '<button id="smb-refresh" type="button">Read SMB availability</button><p id="smb-result" role="status"></p></article>'
             + backup_panel +
             '<article><h2>Firmware verification (no install)</h2><form id="firmware-form">'
             '<label>Firmware BIN<input id="firmware-image" type="file" accept=".bin" required></label>'

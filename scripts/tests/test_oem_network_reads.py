@@ -120,6 +120,44 @@ esac
         path.write_text("bad")
         self.assertNotEqual(self.invoke("get_mptcp_info").returncode,0)
 
+    def test_optional_smb_inventory_no_credentials(self):
+        adapter=self.d/"adapter"
+        adapter.write_text(adapter.read_text().replace("/etc/init.d/samba4",str(self.d/"samba4")).replace("/etc/init.d/ksmbd",str(self.d/"ksmbd")))
+        self.cmd("pidof",'#!/bin/sh\nexit 1\n')
+        r=self.invoke("get_samba_info")
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn("state=absent",r.stdout)
+        self.assertIn("runtime=unknown",r.stdout)
+        self.cmd("samba4",'#!/bin/sh\nexit 0\n')
+        r=self.invoke("get_samba_info")
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn("state=installed",r.stdout)
+        self.assertIn("runtime=process_not_observed",r.stdout)
+        self.assertIn("smb_passwd=\n",r.stdout)
+        self.assertIn("share_verified=false",r.stdout)
+        self.cmd("pidof",'#!/bin/sh\necho 123\n')
+        self.assertIn("runtime=process_present",self.invoke("get_samba_info").stdout)
+
+    def test_optional_openvpn_profile_status(self):
+        self.cmd("ubus",'#!/bin/sh\nprintf "%s" "$NATIVE"\n')
+        self.cmd("uci", """#!/bin/sh
+case "$3" in
+ openvpn.sample_client) echo openvpn;;
+ openvpn.sample_client.enabled) echo 0;;
+ openvpn.sample_client.remote) echo vpn.example;;
+ openvpn.sample_client.key) echo secret_private_key;;
+ *) exit 1;;
+esac
+""")
+        for state in ("absent","unconfigured","disabled"):
+            r=self.invoke("get_openvpn_msg",NATIVE=json.dumps({"ok":True,"state":state,"revision":"a"*64,"eligible":False}))
+            self.assertEqual(r.returncode,0,r.stderr)
+            self.assertIn("state="+state,r.stdout)
+            self.assertIn("eligible=false",r.stdout)
+            self.assertNotIn("secret_private_key",r.stdout)
+        r=self.invoke("get_openvpn_msg",NATIVE='{"ok":false}')
+        self.assertNotEqual(r.returncode,0)
+
     def test_signal_native_and_no_subscriber_id(self):
         r=self.invoke("get_module_signal")
         self.assertEqual(r.returncode,0,r.stderr)

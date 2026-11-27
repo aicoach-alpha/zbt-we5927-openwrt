@@ -263,10 +263,10 @@
       "limitations": "Configured timezone only; full picker mapping pending."
     },
     "get_openvpn_msg": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "UCI openvpn.sample_client (public settings)",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Optional add-on; runtime integration pending. Status indicates a running process only."
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_optional_openvpn_profile_status",
+      "limitations": "Native provider response translation fixture; actual package, TLS profile eligibility and browser integration pending."
     },
     "get_openvpn_status": {
       "state": "PROTOTYPE",
@@ -335,7 +335,10 @@
       "limitations": "OEM browser and named/anonymous redirect inventory review pending."
     },
     "get_samba_info": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "OpenWrt Samba4/ksmbd service inventory",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_optional_smb_inventory_no_credentials",
+      "limitations": "Service inventory only; no actual share or configuration verification. Packages not selected in default image; storage and SMB configuration pending."
     },
     "get_ss_dns": {
       "state": "UNIMPLEMENTED"
@@ -652,7 +655,10 @@
       "limitations": "NTP server addresses only; timezone and enable flags remain unchanged, browser integration pending."
     },
     "set_openvpn": {
-      "state": "UNIMPLEMENTED"
+      "state": "PROTOTYPE",
+      "provider": "veci.v2.addon:setOpenvpnStartup",
+      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
+      "limitations": "Existing native certificate-based client profile startup toggle only; package and secure TLS profile required. No key upload, configuration import or network restart. Successful native write, tunnel and original OEM form pending."
     },
     "set_parents_ctrl_rule": {
       "state": "PROTOTYPE",
