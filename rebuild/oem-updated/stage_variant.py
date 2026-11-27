@@ -34,7 +34,7 @@ REPLACEMENTS = (
 MAKEFILE = """include $(TOPDIR)/rules.mk
 PKG_NAME:=oem-updated-ui-dev
 PKG_VERSION:=0.1
-PKG_RELEASE:=7
+PKG_RELEASE:=8
 include $(INCLUDE_DIR)/package.mk
 define Package/oem-updated-ui-dev
   SECTION:=admin
@@ -227,6 +227,18 @@ def stage(image, out):
             ('var e=this.arr_to_obj(this.values,["enabled","remote","port","ca","cert","key"]);console.log(e),this.proxy_req("post","/webapi?op=set_openvpn",e,this.get_openvpn,!0)',
              'this.$message.warning("OpenVPN configuration is read-only in this version.")'),
         ])
+        # Stock backup used a public path and logged a base64 copy of the archive.
+        # Keep its OEM menu entry and use the existing authenticated backup tools.
+        backup_name = "chunk-153df413.d4aab695.js"
+        stock = (files / "www/assets/js" / backup_name).read_text()
+        start = stock.index("var i=function(){var e=this,t=e.$createElement")
+        end = stock.index(',c=l,r=(a("0de8")', start)
+        component = stock[start:end]
+        if sha(component.encode()) != "fef7551e59956a1f824ad9cd561a5e66b22472c02e006529a6bff80bd4b57c9f":
+            raise ValueError("OEM backup component changed")
+        backup_view = (HERE / "frontend/backup-view.js").read_text().strip()
+        edit_chunk(backup_name, [(component, "var i=" + backup_view +
+            ',o=[],l={created:function(){this.$bus.emit("changeTab",1)}}')])
         voice_name = "chunk-2d0d6200.6fca3f4f.js"
         voice = (files / "www/assets/js" / voice_name).read_text()
         start = voice.index("var i=function")

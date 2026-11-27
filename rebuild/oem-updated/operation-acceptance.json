@@ -844,22 +844,22 @@
     "sysupgrade_backup": {
       "state": "PROTOTYPE",
       "provider": "shared veci2-backup native CGI",
-      "evidence": "rebuild/oem-updated/backend/webapi",
-      "limitations": "Authenticated POST streams private archive; OEM download button transport not yet adapted, actual backup pending."
+      "evidence": "rebuild/oem-updated/backend/webapi; rebuild/oem-updated/frontend/backup-view.js",
+      "limitations": "Stock menu opens the authenticated native backup panel. Archive export, inspection and restore on the target image await integrated acceptance."
     },
     "sysupgrade_backup_execute": {
       "state": "PROTOTYPE",
       "provider": "Existing VeCI native authenticated CGI",
       "replacement_route": "POST /cgi-bin/veci2-restore?apply",
-      "evidence": "rebuild/oem-updated/stage_variant.py; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Replacement route staged; requires native expiring ticket and explicit UI confirmation. Actual restore and connectivity UAT pending."
+      "evidence": "rebuild/oem-updated/stage_variant.py; rebuild/oem-updated/frontend/tools.js; rebuild/oem-updated/frontend/backup-view.js",
+      "limitations": "Stock menu opens the authenticated native backup panel. Archive export, inspection and restore on the target image await integrated acceptance."
     },
     "sysupgrade_backup_upload": {
       "state": "PROTOTYPE",
       "provider": "Existing VeCI native authenticated CGI",
       "replacement_route": "POST /cgi-bin/veci2-restore?inspect",
-      "evidence": "rebuild/oem-updated/stage_variant.py; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Replacement route staged; original OEM form still needs replacement. Native inspection checks digest and board. Runtime acceptance pending."
+      "evidence": "rebuild/oem-updated/stage_variant.py; rebuild/oem-updated/frontend/tools.js; rebuild/oem-updated/frontend/backup-view.js",
+      "limitations": "Stock menu opens the authenticated native backup panel. Archive export, inspection and restore on the target image await integrated acceptance."
     },
     "sysupgrade_execute": {
       "state": "UNIMPLEMENTED",

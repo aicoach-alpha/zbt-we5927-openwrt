@@ -65,6 +65,10 @@ el('login').addEventListener('submit', async e => {
     sid=answer.ubus_rpc_session;
     el('login').reset(); el('login').hidden=true; el('tools').hidden=false;
     el('login-result').textContent='';
+    const target = location.hash.slice(1);
+    if (['backup-export', 'backup-restore-file', 'reset-check'].includes(target)) {
+      el(target).focus();
+    }
     globalThis.VeciSmsCenter.activate();
     await globalThis.VeciSmsCenter.refresh();
     await globalThis.VeciDnsSettings.refresh();
