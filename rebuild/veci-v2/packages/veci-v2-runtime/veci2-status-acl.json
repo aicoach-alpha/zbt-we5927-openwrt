@@ -53,7 +53,8 @@
       "ubus": {
         "veci.v2.firewall": [
           "status",
-          "ttlStatus"
+          "ttlStatus",
+          "aclStatus"
         ]
       }
     },
@@ -66,7 +67,8 @@
           "setDefaults",
           "setOffload",
           "setMacBlock",
-          "setTtl"
+          "setTtl",
+          "saveAcl"
         ]
       }
     }
