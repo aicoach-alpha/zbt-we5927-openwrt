@@ -228,6 +228,12 @@
       "scope": "Existing named N2N and Shadowsocks DNS/redirect/tunnel public profile inventory; no credentials or mutation",
       "state": "FIXTURE_PASS_NOT_UAT",
       "limitations": "Package availability, native runtime and OEM original form compatibility pending"
+    },
+    "mesh_inventory": {
+      "provider": "Native iw",
+      "scope": "Passive mesh interface and observed station counts",
+      "state": "FIXTURE_PASS_NOT_UAT",
+      "limitations": "No mesh provisioning or connectivity proof"
     }
   },
   "remaining": [

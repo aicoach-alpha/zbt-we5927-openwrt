@@ -139,6 +139,75 @@ esac
         self.cmd("pidof",'#!/bin/sh\necho 123\n')
         self.assertIn("runtime=process_present",self.invoke("get_samba_info").stdout)
 
+    def test_uplink_read_and_stale_link_redaction(self):
+        self.cmd("uci", """#!/bin/sh
+case "$2:$3" in
+ show:wireless)
+   case "${PROFILE:-named}" in
+    none) :;;
+    anonymous) echo "wireless.@wifi-iface[1].mode='sta'";;
+    multiple) printf '%s\n' "wireless.sta.mode='sta'" "wireless.other.mode='sta'";;
+    *) echo "wireless.sta.mode='sta'";;
+   esac;;
+ get:wireless.sta.device) echo radio0;;
+ get:wireless.sta.network) echo "${BIND:-wwan}";;
+ get:wireless.sta.disabled) echo "${DISABLED:-0}";;
+ get:wireless.sta.ssid) echo Example;;
+ get:wireless.sta.encryption) echo psk2;;
+ get:wireless.sta.key) echo secret-passphrase;;
+ *) exit 1;;
+esac
+""")
+        self.cmd("ubus",'#!/bin/sh\nprintf "%s" "$NATIVE"\n')
+        self.cmd("cat", """#!/bin/sh
+case "$1" in
+ */rx_bytes) echo 123;;
+ */tx_bytes) echo 456;;
+ *) exit 1;;
+esac
+""")
+        live={"up":True,"proto":"dhcp","l3_device":"wlan0","ipv4-address":[{"address":"192.0.2.2"}],"uptime":10}
+        for op in ("get_wifi_apclient_config","get_wifi_apclient_status"):
+            r=self.invoke(op,NATIVE=json.dumps(live))
+            self.assertEqual(r.returncode,0,r.stderr)
+            for value in ("ssid=Example","enabled=1","apclient_ip=192.0.2.2","apclient_rx=123","apclient_tx=456"):
+                self.assertIn(value,r.stdout)
+            self.assertNotIn("secret-passphrase",r.stdout)
+            for kwargs,state in (({"DISABLED":"1"},live),({},dict(live,up=False)),({},dict(live,proto="static")),({"PROFILE":"none"},live)):
+                r=self.invoke(op,NATIVE=json.dumps(state),**kwargs)
+                self.assertEqual(r.returncode,0,r.stderr)
+                self.assertNotIn("192.0.2.2",r.stdout)
+            for kwargs in ({"PROFILE":"anonymous"},{"PROFILE":"multiple"},{"BIND":"lan"}):
+                self.assertNotEqual(self.invoke(op,**kwargs).returncode,0)
+
+    def test_mesh_driver_inventory(self):
+        self.cmd("iw", """#!/bin/sh
+case "$*" in
+ "dev")
+   [ "${FAIL_IW:-0}" = 0 ] || exit 1
+   printf '%s\n' "phy#0" " Interface wlan0" "  type AP"
+   [ "${MESH:-0}" = 0 ] || printf '%s\n' " Interface mesh0" "  type mesh point"
+   exit 0;;
+ "dev mesh0 station dump")
+   [ "${FAIL_PEERS:-0}" = 0 ] || exit 1
+   printf '%s\n' "Station aa:bb:cc:dd:ee:ff (on mesh0)" "Station aa:bb:cc:dd:ee:01 (on mesh0)";;
+ *) exit 1;;
+esac
+""")
+        r=self.invoke("get_mesh_topology")
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn("interface_count=0",r.stdout)
+        self.assertIn("state=no_mesh_interface",r.stdout)
+        r=self.invoke("get_mesh_topology",MESH="1")
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn("interface=mesh0",r.stdout)
+        self.assertIn("observed_station_count=2",r.stdout)
+        self.assertIn("topology_verified=false",r.stdout)
+        self.assertNotIn("aa:bb",r.stdout)
+        r=self.invoke("get_mesh_topology",MESH="1",FAIL_PEERS="1")
+        self.assertIn("observed_station_count=\n",r.stdout)
+        self.assertNotEqual(self.invoke("get_mesh_topology",FAIL_IW="1").returncode,0)
+
     def test_n2n_inventory_and_link_state(self):
         self.cmd("uci", """#!/bin/sh
 case "$2:$3" in

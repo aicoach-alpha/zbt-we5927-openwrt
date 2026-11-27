@@ -25,13 +25,22 @@
       "state": "UNIMPLEMENTED"
     },
     "config_ss_redir": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Legacy vendor Shadowsocks configuration not supported; native optional addon provisioning pending.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_tunnel_mesh_and_arbitrary_url_upgrade_refused",
+      "limitations": "Explicit refusal fixture passed; original UI handling and release review pending. Not a functional implementation."
     },
     "config_ss_tunnel_dns": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Legacy vendor Shadowsocks configuration not supported; native optional addon provisioning pending.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_tunnel_mesh_and_arbitrary_url_upgrade_refused",
+      "limitations": "Explicit refusal fixture passed; original UI handling and release review pending. Not a functional implementation."
     },
     "config_ss_tunnel_server": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Legacy vendor Shadowsocks configuration not supported; native optional addon provisioning pending.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_tunnel_mesh_and_arbitrary_url_upgrade_refused",
+      "limitations": "Explicit refusal fixture passed; original UI handling and release review pending. Not a functional implementation."
     },
     "ddns_detection": {
       "state": "PROTOTYPE",
@@ -219,7 +228,10 @@
       "limitations": "Native owned LAN-to-WAN MAC rule, LAN neighbour picker; old OEM form not yet adapted."
     },
     "get_mesh_topology": {
-      "state": "UNIMPLEMENTED"
+      "state": "FIXTURE_PASS",
+      "provider": "Native iw driver mesh inventory",
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_mesh_driver_inventory",
+      "limitations": "Passive interface/station counts only. No configuration or actual peer connectivity verification; mesh package not selected in base configuration. OEM original form pending."
     },
     "get_module_signal": {
       "state": "FIXTURE_PASS",
@@ -422,16 +434,16 @@
       "state": "PROTOTYPE"
     },
     "get_wifi_apclient_config": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "OpenWrt wireless UCI and netifd",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Read-only single native STA profile, no key disclosure; STA setup not implemented. Runtime acceptance pending."
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_uplink_read_and_stale_link_redaction",
+      "limitations": "Named single STA inventory and DHCP WWAN counter fixtures passed; credentials omitted and stale link data cleared. Native write, real association, physical connectivity and original OEM form pending."
     },
     "get_wifi_apclient_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "OpenWrt netifd and native counters",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Actual WWAN address and counters when available; association status and live BSSID not verified; no Wi-Fi uplink write."
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_uplink_read_and_stale_link_redaction",
+      "limitations": "Named single STA inventory and DHCP WWAN counter fixtures passed; credentials omitted and stale link data cleared. Native write, real association, physical connectivity and original OEM form pending."
     },
     "get_wifi_client": {
       "state": "PROTOTYPE",
@@ -486,7 +498,10 @@
       "state": "PROTOTYPE"
     },
     "mesh_botton": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Legacy vendor mesh script retired; native mesh provisioning pending.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_tunnel_mesh_and_arbitrary_url_upgrade_refused",
+      "limitations": "Explicit refusal fixture passed; original UI handling and release review pending. Not a functional implementation."
     },
     "online_upgrade_apply": {
       "state": "UNIMPLEMENTED"
@@ -853,7 +868,10 @@
       "limitations": "Fixed LTE HTTPS diagnostic via existing authenticated native provider; arbitrary URL download not supported. Existing supplementary internet-check UI uses the same provider. Legacy original wget form, shell execution on target, and runtime acceptance pending."
     },
     "url_upgrade": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Arbitrary URL installation retired; pinned signed update path required and release-gated.",
+      "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_tunnel_mesh_and_arbitrary_url_upgrade_refused",
+      "limitations": "Explicit refusal fixture passed; original UI handling and release review pending. Not a functional implementation."
     }
   },
   "additional_gates": {

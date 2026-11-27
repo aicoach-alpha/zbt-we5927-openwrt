@@ -39,6 +39,7 @@ function clearSession() {
   resetParent();
   resetVpn();
   el("tunnel-result").textContent="";
+  el("mesh-result").textContent="";
   resetUplink();
   pppoeRevision="";el("pppoe-profile").reset();el("pppoe-save").disabled=true;el("pppoe-result").textContent="";
   ttlRevision='';el('ttl-form').reset();el('ttl-save').disabled=true;el('ttl-result').textContent='';
@@ -618,4 +619,15 @@ el('tunnel-refresh').onclick=async()=>{
     }
     if(sid===token)el('tunnel-result').textContent=rows.join('\n');
   }finally{b.disabled=false;}
+};
+
+el('mesh-refresh').onclick=async()=>{
+  const token=sid,b=el('mesh-refresh');if(!token||b.disabled)return;
+  b.disabled=true;el('mesh-result').textContent='';
+  try{
+    const x=await oem('get_mesh_topology',undefined,token);
+    if(!Array.isArray(x.data))throw Error('Mesh inventory unavailable');
+    if(sid===token)el('mesh-result').textContent=x.data.length?x.data.map(r=>r.interface+': '+(r.observed_station_count||'unknown')+' observed stations').join('\n')+'\nTopology unverified.':'No mesh interface observed.';
+  }catch(e){if(sid===token)el('mesh-result').textContent=e.message;}
+  finally{b.disabled=false;}
 };

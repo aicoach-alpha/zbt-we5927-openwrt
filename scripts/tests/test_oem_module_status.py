@@ -96,6 +96,17 @@ esac
         identity = self.run_script("gateway", QUERY_STRING="op=get_imei")
         self.assertIn("ADAPTER_CALLED:get_imei", identity.stdout)
 
+    def test_legacy_tunnel_mesh_and_arbitrary_url_upgrade_refused(self):
+        for op in ("config_ss_redir","config_ss_tunnel_dns","config_ss_tunnel_server","mesh_botton","url_upgrade"):
+            for method in ("GET","POST"):
+                with self.subTest(op=op,method=method):
+                    args=dict(QUERY_STRING="op="+op,REQUEST_METHOD=method)
+                    result=self.run_script("gateway",**args)
+                    self.assertIn("not supported",result.stdout)
+                    self.assertNotIn("ADAPTER_CALLED",result.stdout)
+                    denied=self.run_script("gateway",HTTP_X_OEM_SESSION="",**args)
+                    self.assertIn("access denied",denied.stdout)
+
     def test_legacy_topology_storage_mptcp_write_refused(self):
         for op in ("set_port","set_disk","enable_mptcp_set"):
             for method in ("GET","POST"):

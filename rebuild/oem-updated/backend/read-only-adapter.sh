@@ -557,6 +557,37 @@ case "$1" in
         formatted="$(printf '%s\n' "$logs" | awk 'NF>=5 {d=$2" "$3" "$4; sub(/^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +/,""); gsub(/"/,"\047"); printf "%s system: \"%s\"\n",d,$0}')"
         json_add_string data "$formatted"
         ;;
+    get_mesh_topology)
+        # Passive driver inventory, no WPS button, arbitrary script or scan.
+        command -v iw >/dev/null 2>&1 || error "native Wi-Fi inventory unavailable"
+        inventory="$(timeout 4 iw dev)" || error "native Wi-Fi inventory failed"
+        names="$(printf '%s\n' "$inventory" | awk '
+          $1=="Interface" { name=$2; next }
+          $1=="type" && $2=="mesh" && $3=="point" && NF==3 { print name }
+        ')"
+        success "native mesh interface inventory"
+        json_add_array data
+        count=0
+        for dev in $names; do
+            count=$((count+1)); [ "$count" -le 8 ] || error "mesh inventory exceeds limit"
+            case "$dev" in ''|.|..|-*|*[!a-zA-Z0-9_.-]*) error "invalid mesh interface";; esac
+            peers=""
+            if dump="$(timeout 3 iw dev "$dev" station dump 2>/dev/null)"; then
+                peers="$(printf '%s\n' "$dump" | awk '$1=="Station" {n++} END{print n+0}')"
+            fi
+            json_add_object ""
+            json_add_string interface "$dev"
+            json_add_string type mesh_point
+            json_add_string observed_station_count "$peers"
+            json_add_string peer_connectivity_verified false
+            json_close_object
+        done
+        json_close_array
+        json_add_int interface_count "$count"
+        if [ "$count" = 0 ]; then json_add_string state no_mesh_interface; else json_add_string state mesh_interface_observed; fi
+        json_add_string configuration_supported 0
+        json_add_string topology_verified false
+        ;;
     get_n2n|get_n2n_status)
         # Public profile/link inventory only; never return community keys.
         config="$(uci -q show network)" || error "network inventory unavailable"
@@ -982,12 +1013,14 @@ case "$1" in
     get_wifi_apclient_config|get_wifi_apclient_status)
         # The legacy apcli0 driver is not present. Inventory native STA
         # sections without returning credentials or creating a second WAN.
-        sections="$(uci -q show wireless | sed -nE "s/^wireless\.([a-zA-Z0-9_]+)\.mode='sta'$/\1/p")"
+        inventory="$(uci -q show wireless)" || error "wireless inventory unavailable"
+        sections="$(printf '%s\n' "$inventory" | sed -nE "s/^wireless\.([^.]*)\.mode='sta'$/\1/p")"
         set -- $sections
         [ "$#" -le 1 ] || error "multiple Wi-Fi uplinks unsupported"
         sta="${1:-}"
         enabled=0; ssid=""; bssid=""; address=""; rx=""; tx=""; uptime=""
         if [ -n "$sta" ]; then
+            case "$sta" in *[!a-zA-Z0-9_]*) error "unnamed or invalid STA profile";; esac
             [ "$(get "wireless.$sta.device")" = radio0 ] || error "unsupported STA radio"
             [ "$(get "wireless.$sta.network")" = wwan ] || error "unsupported STA network binding"
             disabled="$(get "wireless.$sta.disabled" || true)"
@@ -995,7 +1028,7 @@ case "$1" in
             ssid="$(get "wireless.$sta.ssid" || true)"
             bssid="$(get "wireless.$sta.bssid" || true)"
             state="$(ubus -t 3 call network.interface.wwan status '{}' || true)"
-            if [ "$enabled" = 1 ] && [ "$(printf '%s' "$state" | jsonfilter -e '@.up' || true)" = true ]; then
+            if [ "$enabled" = 1 ] && [ "$(printf '%s' "$state" | jsonfilter -e '@.up' || true)" = true ] && [ "$(printf '%s' "$state" | jsonfilter -e '@.proto' || true)" = dhcp ]; then
                 address="$(printf '%s' "$state" | jsonfilter -e '@["ipv4-address"][0].address' || true)"
                 uptime="$(printf '%s' "$state" | jsonfilter -e '@.uptime' || true)"
                 dev="$(printf '%s' "$state" | jsonfilter -e '@.l3_device' || true)"
