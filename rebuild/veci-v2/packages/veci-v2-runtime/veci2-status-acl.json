@@ -54,7 +54,8 @@
         "veci.v2.firewall": [
           "status",
           "ttlStatus",
-          "aclStatus"
+          "aclStatus",
+          "parentStatus"
         ]
       }
     },
@@ -68,7 +69,8 @@
           "setOffload",
           "setMacBlock",
           "setTtl",
-          "saveAcl"
+          "saveAcl",
+          "saveParent"
         ]
       }
     }
