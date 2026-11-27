@@ -137,7 +137,14 @@
             <h2>Guest Wi-Fi — Isolasi</h2>
             <button id="guest-status-read" type="button">Periksa konfigurasi guest</button>
             <p id="guest-status-result" role="status"></p>
-            <p class="notice">Audit konfigurasi saja; belum menjadi bukti isolasi runtime.</p>
+            <p class="notice">Guest WPA2 native opsional, nonaktif secara default. Subnet 10.20.0.0/24. Tidak memerlukan captive portal. Perubahan berlaku setelah aktivasi manual; isolasi runtime belum diuji.</p>
+            <form id="guest-native-form" autocomplete="off">
+              <label>Nama Wi-Fi tamu<input id="guest-native-ssid" maxlength="32" required></label>
+              <label>Passphrase WPA2<input id="guest-native-key" type="password" minlength="8" maxlength="63" autocomplete="new-password" required></label>
+              <button id="guest-native-save" disabled>Siapkan profil nonaktif</button>
+            </form>
+            <button id="guest-native-enable" type="button" disabled>Aktifkan pada boot berikutnya</button>
+            <button id="guest-native-disable" type="button" disabled>Nonaktifkan pada boot berikutnya</button>
           </article>
           <article class="panel" data-group="wifi">
             <details id="wifi-extra"><summary>Klien, keamanan dan kanal Wi-Fi</summary>

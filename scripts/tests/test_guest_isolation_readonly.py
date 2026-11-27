@@ -1,4 +1,4 @@
-"""Guest inspector is read-only and reports configuration vs runtime accurately."""
+"""Guest inspection remains read-only; native writes have an explicit ACL."""
 import json,os,subprocess,tempfile,unittest
 from pathlib import Path
 
@@ -7,10 +7,10 @@ SCRIPT=ROOT/"rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-check"
 ACL=ROOT/"rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-acl.json"
 
 class GuestIsolationReadonly(unittest.TestCase):
-    def test_access_methods_are_read_only(self):
+    def test_separate_read_and_explicit_write_methods(self):
         acl=json.loads(ACL.read_text())["veci-v2-guest-inspect"]
         self.assertEqual(acl["read"]["ubus"],{"veci.v2.guest":["status"]})
-        self.assertEqual(acl["write"]["ubus"],{})
+        self.assertEqual(acl["write"]["ubus"],{"veci.v2.guest":["provisionNative","setNativeStartup"]})
         code=SCRIPT.read_text()
         for forbidden in ("uci set ", "uci commit ", "wifi reload", "ifdown", "sysupgrade", "AT+CFUN"):
             self.assertNotIn(forbidden,code)
