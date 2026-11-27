@@ -1,5 +1,5 @@
 #!/bin/sh
-# Receive-only SMS on W907. No SMS send/delete/automatic polling or message logging.
+# Explicit owner SMS operations on W907; no automatic polling or message logging.
 set -eu
 umask 077
 LC_ALL=C
@@ -7,7 +7,7 @@ export LC_ALL
 CFG=veci_sms.main
 error_json() {
     case "$1" in
-        disabled|modem_port_unavailable|at_tool_unavailable|modem_busy|modem_error|invalid_modem_response|unsupported_method|invalid_state|save_failed) why="$1" ;;
+        disabled|modem_port_unavailable|at_tool_unavailable|modem_busy|modem_error|invalid_modem_response|unsupported_method|invalid_state|save_failed|rollback_failed) why="$1" ;;
         *) why='unavailable' ;;
     esac
     printf '{"ok":false,"error":"%s"}\n' "$why"
@@ -31,18 +31,33 @@ get_config() {
   fi
 }
 
-set_enabled() {
-    input="$(head -c 256)" || { error_json invalid_state; return; }
+set_enabled() (
+    input="$(head -c 257)" || { error_json invalid_state; return; }
+    [ "${#input}" -le 256 ] || { error_json invalid_state; return; }
     state="$(printf '%s' "$input" | jsonfilter -e '@.state' 2>/dev/null)" || state=''
-    case "$state" in
-        on) value=1 ;;
-        off) value=0 ;;
-        *) error_json invalid_state; return ;;
-    esac
-    uci -q set "$CFG.enabled=$value" || { error_json save_failed; return; }
-    uci -q commit veci_sms || { error_json save_failed; return; }
+    case "$state" in on) value=1;; off) value=0;; *) error_json invalid_state; return;; esac
+    exec 8>"$RATE_LOCK"
+    flock -n -x 8 || { error_json modem_busy; return; }
+    cfg=/etc/config/veci_sms
+    [ -f "$cfg" ] && [ ! -L "$cfg" ] || { error_json save_failed; return; }
+    pending=$(uci -q changes veci_sms) || { error_json save_failed; return; }
+    [ -z "$pending" ] || { error_json save_failed; return; }
+    old=$(uci -q get "$CFG.enabled") || { error_json save_failed; return; }
+    case "$old" in 0|1) ;; *) error_json invalid_state; return;; esac
+    if [ "$old" = "$value" ]; then get_config; return; fi
+    digest=$(sha256sum "$cfg") || { error_json save_failed; return; }
+    tmp=$(mktemp -d /tmp/veci-sms-config.XXXXXX) || { error_json save_failed; return; }
+    trap 'rm -rf "$tmp"' EXIT
+    cp -p "$cfg" "$tmp/original" || { error_json save_failed; return; }
+    uci -q -t "$tmp" set "$CFG.enabled=$value" || { error_json save_failed; return; }
+    pending=$(uci -q changes veci_sms) || { error_json save_failed; return; }
+    [ -z "$pending" ] && [ "$(sha256sum "$cfg")" = "$digest" ] || { error_json save_failed; return; }
+    if ! uci -q -t "$tmp" commit veci_sms || [ "$(uci -q get "$CFG.enabled" || :)" != "$value" ]; then
+        cp -p "$tmp/original" "$cfg" || { error_json rollback_failed; return; }
+        error_json save_failed; return
+    fi
     get_config
-}
+)
 # Bind only known AT interface 1.4, or one explicitly configured fallback.
 # W907 function 1.5 / ttyUSB3 must never be probed.
 
@@ -292,7 +307,7 @@ case "$1" in
         case "$2" in
             getConfig) get_config ;;
             setEnabled) set_enabled ;;
-            listMessages) read_inbox ;;
+            listMessages) (flock -n -x 8 || { error_json modem_busy; exit 0; }; read_inbox) 8>"$RATE_LOCK" ;;
             deleteMessage) delete_message ;;
             sendMessage) send_message ;;
             getSent) get_sent ;;
