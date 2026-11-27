@@ -29,9 +29,9 @@ lan_host() {
 }
 [ "$#" -ge 1 ] || fail unsupported_method
 case "$1" in
-  list) echo '{"status":{},"addForward":{"from_port":"Integer","to_port":"Integer","protocol":"String","destination":"String","confirmation":"String"},"deleteForward":{"name":"String","confirmation":"String"},"setDmz":{"destination":"String","confirmation":"String"},"setDefaults":{"drop_invalid":"String","syn_flood":"String","revision":"String","confirmation":"String"},"setOffload":{"enabled":"String","revision":"String","confirmation":"String"},"setMacBlock":{"addresses":"String","revision":"String","confirmation":"String"},"aclStatus":{},"saveAcl":{"slot":"String","mac":"String","enabled":"String","action":"String","revision":"String","confirmation":"String"},"ttlStatus":{},"setTtl":{"enabled":"String","ttl":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
+  list) echo '{"status":{},"addForward":{"from_port":"Integer","to_port":"Integer","protocol":"String","destination":"String","confirmation":"String"},"deleteForward":{"name":"String","confirmation":"String"},"setDmz":{"destination":"String","confirmation":"String"},"setDefaults":{"drop_invalid":"String","syn_flood":"String","revision":"String","confirmation":"String"},"setOffload":{"enabled":"String","revision":"String","confirmation":"String"},"setMacBlock":{"addresses":"String","revision":"String","confirmation":"String"},"parentStatus":{},"saveParent":{"slot":"String","mac":"String","enabled":"String","action":"String","start_time":"String","stop_time":"String","weekdays":"String","revision":"String","confirmation":"String"},"aclStatus":{},"saveAcl":{"slot":"String","mac":"String","enabled":"String","action":"String","revision":"String","confirmation":"String"},"ttlStatus":{},"setTtl":{"enabled":"String","ttl":"String","revision":"String","confirmation":"String"}}'; exit 0 ;;
   call) [ "$#" -ge 2 ] || fail unsupported_method
-    case "$2" in status|addForward|deleteForward|setDmz|setDefaults|setOffload|setMacBlock|aclStatus|saveAcl|ttlStatus|setTtl) ;; *) fail unsupported_method ;; esac ;;
+    case "$2" in status|addForward|deleteForward|setDmz|setDefaults|setOffload|setMacBlock|parentStatus|saveParent|aclStatus|saveAcl|ttlStatus|setTtl) ;; *) fail unsupported_method ;; esac ;;
   *) fail unsupported_method ;;
 esac
 [ "$(cat /tmp/sysinfo/board_name)" = zbtlink,zbt-we5927 ] || fail unsupported_board
@@ -187,7 +187,7 @@ acl_status() {
   json_add_string revision "${digest%% *}"
   json_add_array rules
   for slot in 1 2 3 4 5 6 7 8; do
-    n="veci_acl_$slot"
+    n="${prefix:-veci_acl}_$slot"
     [ -n "$(uci -q get "firewall.$n" || :)" ] || continue
     acl_owned "$n" || fail foreign_acl_slot
     mac=$(uci -q get "firewall.$n.src_mac" || :)
@@ -196,11 +196,37 @@ acl_status() {
     flag=$(uci -q get "firewall.$n.enabled" || :)
     case "$flag" in 0|1) ;; *) fail invalid_acl_state;; esac
     json_add_object ""; json_add_string slot "$slot"; json_add_string mac "$mac"
-    json_add_string enabled "$flag"; json_close_object
+    json_add_string enabled "$flag"
+    if [ "${prefix:-veci_acl}" = veci_parent ]; then
+      start=$(uci -q get "firewall.$n.start_time" || :)
+      stop=$(uci -q get "firewall.$n.stop_time" || :)
+      days=$(uci -q get "firewall.$n.weekdays" || :)
+      [ "$(uci -q get "firewall.$n.utc_time" || :)" = 1 ] || fail invalid_schedule
+      valid_schedule "$start" "$stop" "$days" || fail invalid_schedule
+      json_add_string start_time "$start"; json_add_string stop_time "$stop"
+      json_add_string weekdays "$days"; json_add_string timezone UTC
+    fi
+    json_close_object
   done
   json_close_array; json_add_boolean runtime_verified 0; json_dump
 }
-if [ "$2" = aclStatus ]; then exec 9<"$0"; flock -n 9 || fail busy; acl_status; exit 0; fi
+valid_schedule() {
+  # Explicit UTC, one same-day block interval; overnight needs two slots.
+  printf '%s\n' "$1" "$2" | awk -F: '
+    NF!=3 || $1 !~ /^[0-9][0-9]$/ || $2 !~ /^[0-9][0-9]$/ || $3!="00" || $1>23 || $2>59 {bad=1}
+    NR==1 {a=$1*60+$2} NR==2 {b=$1*60+$2}
+    END {exit (bad || NR!=2 || a>=b)}' || return 1
+  [ -n "$3" ] || return 1
+  seen=" "
+  for day in $3; do
+    case "$day" in Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) ;; *) return 1;; esac
+    case "$seen" in *" $day "*) return 1;; esac
+    seen="$seen$day "
+  done
+}
+prefix=veci_acl
+case "$2" in parentStatus|saveParent) prefix=veci_parent;; esac
+if [ "$2" = aclStatus ] || [ "$2" = parentStatus ]; then exec 9<"$0"; flock -n 9 || fail busy; acl_status; exit 0; fi
 if [ "$2" = status ]; then status; exit 0; fi
 request=$(head -c 513)
 [ "$(printf %s "$request" | wc -c)" -le 512 ] || fail request_too_large
@@ -212,7 +238,7 @@ tmp=$(mktemp -d /tmp/veci2-firewall.XXXXXX) || fail tmp_failed
 trap 'rm -rf "$tmp"' EXIT
 trap 'exit 1' HUP INT TERM
 cp /etc/config/firewall "$tmp/previous" || fail backup_failed
-if [ "$2" = setDefaults ] || [ "$2" = setOffload ] || [ "$2" = setMacBlock ] || [ "$2" = saveAcl ]; then
+if [ "$2" = setDefaults ] || [ "$2" = setOffload ] || [ "$2" = setMacBlock ] || [ "$2" = saveAcl ] || [ "$2" = saveParent ]; then
   digest=$(sha256sum /etc/config/firewall) || fail config_unavailable
   expected=$(jsonfilter -s "$request" -e '@.revision') || fail invalid_request
   [ "$expected" = "${digest%% *}" ] || fail stale_configuration
@@ -225,14 +251,18 @@ if [ "$2" = setDefaults ] || [ "$2" = setOffload ] || [ "$2" = setMacBlock ] || 
     case "$drop:$syn" in 0:0|0:1|1:0|1:1) ;; *) fail invalid_flag;; esac
     uci -q -t "$tmp" set "firewall.@defaults[0].drop_invalid=$drop" &&
     uci -q -t "$tmp" set "firewall.@defaults[0].synflood_protect=$syn" || fail stage_failed
-  elif [ "$2" = saveAcl ]; then
+  elif [ "$2" = saveAcl ] || [ "$2" = saveParent ]; then
     slot=$(jsonfilter -s "$request" -e '@.slot') || fail invalid_request
     action=$(jsonfilter -s "$request" -e '@.action') || fail invalid_request
     case "$slot" in [1-8]) ;; *) fail invalid_slot;; esac
-    n="veci_acl_$slot"
+    n="${prefix}_$slot"
     existing=$(uci -q get "firewall.$n" || :)
     [ -z "$existing" ] || acl_owned "$n" || fail foreign_acl_slot
-    case "$action:$confirm" in save:SAVE_LAN_ACL|delete:DELETE_LAN_ACL) ;; *) fail confirmation_required;; esac
+    if [ "$2" = saveParent ]; then
+      case "$action:$confirm" in save:SAVE_PARENT_SCHEDULE|delete:DELETE_PARENT_SCHEDULE) ;; *) fail confirmation_required;; esac
+    else
+      case "$action:$confirm" in save:SAVE_LAN_ACL|delete:DELETE_LAN_ACL) ;; *) fail confirmation_required;; esac
+    fi
     if [ "$action" = delete ]; then
       [ -n "$existing" ] || fail unknown_acl_slot
       uci -q -t "$tmp" delete "firewall.$n" || fail stage_failed
@@ -243,11 +273,23 @@ if [ "$2" = setDefaults ] || [ "$2" = setOffload ] || [ "$2" = setMacBlock ] || 
       mac=$(printf '%s' "$mac" | tr A-F a-f)
       [ "$mac" != 00:00:00:00:00:00 ] || fail invalid_mac
       case "$enabled" in 0|1) ;; *) fail invalid_flag;; esac
+      if [ "$2" = saveParent ]; then
+        start=$(jsonfilter -s "$request" -e '@.start_time') || fail invalid_request
+        stop=$(jsonfilter -s "$request" -e '@.stop_time') || fail invalid_request
+        days=$(jsonfilter -s "$request" -e '@.weekdays') || fail invalid_request
+        case "$days" in *[!a-zA-Z\ ]*) fail invalid_schedule;; esac
+        valid_schedule "$start" "$stop" "$days" || fail invalid_schedule
+      fi
       if [ -n "$existing" ]; then uci -q -t "$tmp" delete "firewall.$n" || fail stage_failed; fi
       uci -q -t "$tmp" set "firewall.$n=rule" || fail stage_failed
       for pair in "name=VeCI_ACL_$n" src=lan dest=wan proto=all family=any target=REJECT "src_mac=$mac" "enabled=$enabled"; do
         uci -q -t "$tmp" set "firewall.$n.$pair" || fail stage_failed
       done
+      if [ "$2" = saveParent ]; then
+        for pair in "start_time=$start" "stop_time=$stop" "weekdays=$days" utc_time=1; do
+          uci -q -t "$tmp" set "firewall.$n.$pair" || fail stage_failed
+        done
+      fi
       if [ "$enabled" = 1 ]; then
         uci -q -t "$tmp" set 'firewall.@defaults[0].flow_offloading=0' &&
         uci -q -t "$tmp" set 'firewall.@defaults[0].flow_offloading_hw=0' || fail stage_failed
@@ -291,11 +333,13 @@ if [ "$2" = setDefaults ] || [ "$2" = setOffload ] || [ "$2" = setMacBlock ] || 
     if [ "$enabled" = 1 ] && { [ -e "$ttl_file" ] || [ -L "$ttl_file" ]; }; then fail ttl_requires_offload_disabled; fi
     if [ "$enabled" = 1 ]; then
       for slot in 1 2 3 4 5 6 7 8; do
-        n="veci_acl_$slot"
+        for group in veci_acl veci_parent; do
+        n="${group}_$slot"
         if [ -n "$(uci -q get "firewall.$n" || :)" ]; then
           acl_owned "$n" || fail foreign_acl_slot
           [ "$(uci -q get "firewall.$n.enabled" || :)" = 0 ] || fail acl_requires_offload_disabled
         fi
+        done
       done
     fi
     # Software offload only. Do not enable an unverified hardware path.
@@ -358,4 +402,4 @@ if ! uci -q -t "$tmp" commit firewall || ! fw4 check >/dev/null 2>&1 || ! /etc/i
   /etc/init.d/firewall reload >/dev/null 2>&1 || fail rollback_failed
   fail firewall_apply_failed_rollback_attempted
 fi
-if [ "$2" = saveAcl ]; then acl_status; else status; fi
+if [ "$2" = saveAcl ] || [ "$2" = saveParent ]; then acl_status; else status; fi
