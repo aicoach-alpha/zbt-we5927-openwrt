@@ -80,6 +80,32 @@ case "$op" in
     set_imei) err -4 "Modem identity is read-only on WE5927-2SIM" ;;
     getWiFi5|setWiFi5|setWiFi5_nocommit|get_wifi_guest5|set_wifi_guest5)
         err -4 "5 GHz radio unavailable on WE5927-2SIM" ;;
+    test_wget)
+        # Fixed native LTE HTTPS diagnostic, not an arbitrary URL downloader.
+        [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
+        permit="$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"scope\":\"ubus\",\"object\":\"veci.v2\",\"function\":\"internetCheck\"}" | jsonfilter -e '@.access')" || err -1 "native diagnostic permission unavailable"
+        [ "$permit" = true ] || err -1 "native diagnostic permission denied"
+        exec 9>/var/lock/oem-internet-check.lock
+        flock -n 9 || err -4 "internet diagnostic busy"
+        native="$(ubus -t 17 call veci.v2 internetCheck '{}')" || err -4 "native diagnostic unavailable"
+        field() { printf '%s' "$native" | jsonfilter -e "$1"; }
+        [ "$(field '@.source')" = usb0_https ] || err -4 "unexpected diagnostic source"
+        verified="$(field '@.verified')" || err -4 "invalid native result"
+        case "$verified" in true|false) ;; *) err -4 "invalid native result";; esac
+        reason="$(field '@.reason')" || err -4 "invalid native result"
+        case "$reason" in
+            verified_public_https_and_dns|hostname_dns_or_endpoint_unavailable|lte_interface_unavailable|public_and_modem_unavailable) ;;
+            modem_connected_public_unavailable_check_quota) reason=modem_connected_public_unavailable ;;
+            *) err -4 "unexpected native diagnostic result";;
+        esac
+        [ "$verified:$reason" != true:verified_public_https_and_dns ] || [ "$(field '@.https_code')" = 200 ] || err -4 "invalid native verification"
+        case "$verified:$reason" in true:verified_public_https_and_dns|false:hostname_dns_or_endpoint_unavailable|false:lte_interface_unavailable|false:public_and_modem_unavailable|false:modem_connected_public_unavailable) ;; *) err -4 "inconsistent native result";; esac
+        json_init; json_add_string code 1; json_add_string reason "$reason"
+        json_add_string source usb0_https
+        json_add_boolean verified "$(if [ "$verified" = true ]; then echo 1; else echo 0; fi)"
+        json_add_string data "Fixed LTE HTTPS diagnostic: $reason"
+        json_add_boolean arbitrary_url_supported 0
+        reply "$(json_dump)" ;;
     test_ping|test_nslookup|test_traceroute|site_survey)
         [ "${REQUEST_METHOD:-}" = GET ] || err -4 "method refused"
         data="$(/usr/libexec/oem-updated/diagnostics-adapter "$op" "$host" "$version" "$session")" || err -4 "diagnostic unavailable"
