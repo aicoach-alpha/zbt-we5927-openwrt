@@ -22,7 +22,9 @@
       "state": "UNIMPLEMENTED"
     },
     "change_password_nocommit": {
-      "state": "UNIMPLEMENTED"
+      "state": "SOURCE_DISABLED_REVIEWED",
+      "provider": "Verified factory GUI has no deferred password request. Passwords may not be staged in the retired network wizard. Explicit password rotation is tracked separately as change_password.",
+      "evidence": "scripts/tests/test_oem_module_status.py#test_legacy_wizard_staging_refused; rebuild/oem-updated/stage_variant.py"
     },
     "config_ss_redir": {
       "state": "SOURCE_DISABLED_REVIEWED",

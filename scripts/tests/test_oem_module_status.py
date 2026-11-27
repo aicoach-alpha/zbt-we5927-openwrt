@@ -140,7 +140,7 @@ esac
                     self.assertIn("access denied",denied.stdout)
 
     def test_legacy_wizard_staging_refused(self):
-        for op in ("set_wan_config_nocommit","setWiFi2_nocommit","guide_commit"):
+        for op in ("set_wan_config_nocommit","setWiFi2_nocommit","change_password_nocommit","guide_commit"):
             for method in ("GET","POST"):
                 with self.subTest(op=op,method=method):
                     args=dict(QUERY_STRING="op="+op,REQUEST_METHOD=method)

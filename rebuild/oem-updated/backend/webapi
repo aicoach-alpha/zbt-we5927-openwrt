@@ -78,7 +78,7 @@ permit="$(ubus -t 3 call session access "{\"ubus_rpc_session\":\"$session\",\"sc
 case "$op" in
     activate_ngrokc|get_cloud_login|set_cloud_login|get_ac_info|set_ac_info|get_ac_switch|set_ac_switch)
         err -4 "Proprietary OEM cloud management is not supported; use authenticated local management" ;;
-    set_wan_config_nocommit|setWiFi2_nocommit|guide_commit)
+    set_wan_config_nocommit|setWiFi2_nocommit|change_password_nocommit|guide_commit)
         err -4 "Legacy wizard staging is not supported; use explicit network or Wi-Fi save controls" ;;
     config_ss_redir|config_ss_tunnel_dns|config_ss_tunnel_server)
         err -4 "Legacy Shadowsocks configuration not supported; native addon provisioning required" ;;
