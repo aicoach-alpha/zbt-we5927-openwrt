@@ -1,0 +1,58 @@
+name: WE5927 Windows read-only MTD3 binary stream backup contract
+
+on:
+  push:
+    branches:
+      - feat/veci-v2-native-gui-refresh-20261126
+    paths:
+      - 'scripts/veci-we5927-current-mtd3-stream-backup-20261127.ps1'
+      - 'scripts/tests/test_we5927_current_mtd3_stream_backup_20261127.py'
+      - '.github/workflows/veci-we5927-current-mtd3-stream-ps51.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-ps51-binary-stdout:
+    runs-on: windows-2022
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Windows PowerShell 5.1 script and binary stdout 0x00-0xFF fixture
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $scriptPath=(Resolve-Path 'scripts/veci-we5927-current-mtd3-stream-backup-20261127.ps1').Path
+          $tokens=$null
+          $parseErrors=$null
+          $ast=[System.Management.Automation.Language.Parser]::ParseFile($scriptPath,[ref]$tokens,[ref]$parseErrors)
+          if($parseErrors.Count -gt 0){
+            $parseErrors | Format-List | Out-String | Write-Host
+            throw 'POWERSHELL_51_SCRIPT_PARSE_FAILED'
+          }
+          Write-Host 'WIN_PS51_SCRIPT_PARSE=PASS'
+          $func=$ast.Find({ param($node)
+              $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+              $node.Name -eq 'Copy-BinaryStdoutToFile'
+            }, $true)
+          if($null -eq $func){throw 'BINARY_STREAM_FUNCTION_MISSING'}
+          # Dot-source only the pure stream copier from AST, never invoke router workflow.
+          . ([scriptblock]::Create($func.Extent.Text))
+          $fixture=Join-Path $env:RUNNER_TEMP 'we5927-binary-stream-ps51-fixture.bin'
+          $wanted=[byte[]](0..255)
+          [System.IO.File]::WriteAllBytes($fixture,$wanted)
+          $args='-NoProfile -NonInteractive -Command "[Console]::OpenStandardOutput().Write(([byte[]](0..255)),0,256)"'
+          $output=Join-Path $env:RUNNER_TEMP 'we5927-binary-stream-copied.bin'
+          Copy-BinaryStdoutToFile -Executable ((Get-Command powershell.exe).Source) -Arguments $args -Path $output
+          $actual=[System.IO.File]::ReadAllBytes($output)
+          if($actual.Length -ne $wanted.Length){throw 'BINARY_STREAM_LENGTH_MISMATCH'}
+          for($i=0;$i -lt $wanted.Length;$i++){
+            if($actual[$i] -ne $wanted[$i]){throw ('BINARY_BYTE_MISMATCH_{0}' -f $i)}
+          }
+          Write-Host 'WIN_PS51_RAW_STDOUT_ALL_256_BINARY_VALUES=PASS'
+          Write-Host 'ROUTER_NOT_CONTACTED=YES'
+      - name: Check strict fail-closed read-only contract
+        shell: powershell
+        run: |
+          python -m unittest discover -s scripts/tests -p test_we5927_current_mtd3_stream_backup_20261127.py -v
