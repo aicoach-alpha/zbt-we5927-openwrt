@@ -9,6 +9,10 @@ op="$1"; host="$2"; version="$3"; session="$4"
 case "$session" in ''|*[!0-9a-f]*|00000000000000000000000000000000) fail "invalid session";; esac
 [ "${#session}" = 32 ] || fail "invalid session"
 case "$version" in 4|6) ;; *) fail "invalid IP version";; esac
+# One bounded diagnostic at a time, avoid competing scans/probes on 64 MiB target.
+exec 9>/var/lock/oem-diagnostics.lock
+flock -n 9 || fail "diagnostic busy"
+
 if [ "$op" = site_survey ]; then
     json_init; json_add_string ubus_rpc_session "$session"; json_add_string scope ubus
     json_add_string object veci.v2.wifi; json_add_string function survey
@@ -24,6 +28,7 @@ if [ "$op" = site_survey ]; then
     while [ "$i" -lt 100 ]; do
         bssid="$(field "@.networks[$i].bssid" || true)"
         [ -n "$bssid" ] || break
+        printf "%s\n" "$bssid" | grep -Eiq '^[0-9a-f]{2}(:[0-9a-f]{2}){5}$' || fail "invalid BSSID"
         freq="$(field "@.networks[$i].frequency_mhz")" || fail "frequency unavailable"
         case "$freq" in *[!0-9]*|'') fail "invalid frequency";; esac
         if [ "$freq" = 2484 ]; then channel=14
@@ -45,13 +50,18 @@ fi
 # Domain or IP literal only; never accept flags, URLs or shell fragments.
 case "$host" in ''|-*|.*|*[!a-zA-Z0-9.:-]*) fail "invalid host";; esac
 [ "${#host}" -le 253 ] || fail "host too long"
+command -v timeout >/dev/null 2>&1 || fail "diagnostic timeout unavailable"
 rc=0
 case "$op" in
     test_ping)
+        if [ "$version" = 4 ]; then tool=ping; else tool=ping6; fi
+        command -v "$tool" >/dev/null 2>&1 || fail "diagnostic applet unavailable"
         if [ "$version" = 4 ]; then output="$(timeout 10 ping -c 4 -W 2 "$host" 2>&1)" || rc=$?
         else output="$(timeout 10 ping6 -c 4 -W 2 "$host" 2>&1)" || rc=$?; fi;;
-    test_nslookup) output="$(timeout 10 nslookup "$host" 2>&1)" || rc=$?;;
+    test_nslookup) command -v nslookup >/dev/null 2>&1 || fail "diagnostic applet unavailable"; output="$(timeout 10 nslookup "$host" 2>&1)" || rc=$?;;
     test_traceroute)
+        if [ "$version" = 4 ]; then tool=traceroute; else tool=traceroute6; fi
+        command -v "$tool" >/dev/null 2>&1 || fail "diagnostic applet unavailable"
         if [ "$version" = 4 ]; then output="$(timeout 15 traceroute -m 5 -q 1 -w 2 "$host" 2>&1)" || rc=$?
         else output="$(timeout 15 traceroute6 -m 5 -q 1 -w 2 "$host" 2>&1)" || rc=$?; fi;;
     *) fail "unsupported diagnostic";;
