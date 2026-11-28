@@ -906,7 +906,8 @@ case "$1" in
             [ "$(status_field '@.board_supported')" = true ] || error "unsupported board"
             ap="$(status_field '@.wifi_ap_enabled')" || error "AP status unavailable"
             case "$ap" in true) wifi=1;; false) wifi=0;; *) wifi="";; esac
-            route="$(ip -4 route show default | awk 'NR==1{for(i=1;i<NF;i++)if($i=="dev"){print $(i+1);exit}}')"
+            routes="$(ip -4 route show default)" || error "default route inventory unavailable"
+            route="$(printf '%s\n' "$routes" | awk '$1=="default"{n++;for(i=1;i<NF;i++)if($i=="dev"){dev=$(i+1);break}} END{if(n==1)print dev;else if(n>1)print "ambiguous"}')"
             case "$route" in usb0) internet=4g;; '') internet=none;; eth0.2|pppoe-wan) internet=ether;; *) internet=unknown;; esac
             lan="$(ubus -t 3 call network.interface.lan status '{}' | jsonfilter -e '@.up')" || error "LAN state unavailable"
             case "$lan" in true) lan=1;; false) lan=0;; *) error "invalid LAN state";; esac
@@ -914,16 +915,19 @@ case "$1" in
             json_add_string lan "$lan"; json_add_string wifi2 "$wifi"; json_add_string wifi5 0
         fi
         json_add_array port
-        i=0
+        i=0; seen=" "
         while [ "$i" -lt 5 ]; do
             port="$(field "@.ports[$i].port" || true)"
             [ -n "$port" ] || break
             case "$port" in 0|1|2|3|4) ;; *) error "invalid switch port";; esac
+            case "$seen" in *" $port "*) error "duplicate switch port";; esac
+            seen="$seen$port "
             link="$(field "@.ports[$i].link")" || error "link status unavailable"
             case "$link" in up) link=1;; down) link=0;; unknown) link="";; *) error "invalid link state";; esac
             json_add_object ""; json_add_string port "$port"; json_add_string status "$link"; json_close_object
             i=$((i+1))
         done
+        [ "$i" = 5 ] && [ -z "$(field '@.ports[5].port' || true)" ] || error "incomplete or oversized switch inventory"
         json_close_array
         if [ "$1" = get_port ]; then
             json_add_string port_wan ""
@@ -932,7 +936,8 @@ case "$1" in
         ;;
     get_wan_traffic)
         native="$(ubus -t 3 call veci.v2 traffic '{}')" || error "traffic counters unavailable"
-        [ "$(field '@.source')" = kernel_interface_counters ] || error "unexpected counter source"
+        [ "$(field '@.source')" = kernel_interface_counters ] &&
+        [ "$(field '@.interface')" = usb0 ] || error "unexpected counter source"
         rx="$(field '@.rx_bytes')" || error "RX unavailable"
         tx="$(field '@.tx_bytes')" || error "TX unavailable"
         case "$rx:$tx" in *[!0-9:]*|:*|*:) error "invalid counters";; esac
