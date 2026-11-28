@@ -69,10 +69,10 @@
       "limitations": "Managed schedule only; no entry means disabled with suggested time; unmanaged cron jobs not audited; runtime pending."
     },
     "getWiFi2": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.wifi:info/status + OpenWrt UCI",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Primary AP read adapter; Wi-Fi key intentionally omitted; OEM UI mapping and write integration pending."
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_wifi_config_reports_native_uplink_without_key",
+      "limitations": "Primary 2.4GHz configured AP, native uplink enabled state and no stored key; live radio and original UI pending. Isolated fixture acceptance only."
     },
     "getWiFi5": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -80,10 +80,10 @@
       "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "get_4g": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.lte:status",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Native global APN and canonical SIM labels; OEM form integration, SIM selection write and unsupported fields need review."
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_radio_lte_policy_and_masked_identity",
+      "limitations": "Shared APN and configured slot/failover; no modem hardware or per-SIM APN acceptance. Isolated fixture acceptance only."
     },
     "get_4g_log": {
       "state": "PROTOTYPE",
@@ -125,10 +125,10 @@
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "get_days_traffic": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.observability:trafficHistory",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Local trailing 24-hour sampled byte totals and gaps only; RAM history lost on reboot; original seven-day chart not adapted, runtime pending."
+      "evidence": "scripts/tests/test_owner_24x7_observability_native.py#Native24x7Observability.test_traffic_history_gap_and_counter_reset; scripts/tests/test_oem_network_reads.py#NetworkReads.test_traffic_history_is_observed_not_extrapolated",
+      "limitations": "Trailing 24h observed partial byte totals, missing values and discontinuities; not seven-day usage or carrier quota; UI and real device counters pending. Isolated fixture acceptance only."
     },
     "get_ddns": {
       "state": "PROTOTYPE",
@@ -184,10 +184,10 @@
       "evidence": "scripts/tests/test_oem_module_status.py#test_gps_and_voice_require_session_and_refuse_hardware_calls"
     },
     "get_imei": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "we5927-lte status-fast",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Masked cached identifier only; no raw AT, identifier modification or hardware acceptance claim."
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_radio_lte_policy_and_masked_identity",
+      "limitations": "Masked cached identifier only; native modem status simulated. Isolated fixture acceptance only."
     },
     "get_l2tp_msg": {
       "state": "FIXTURE_PASS",
@@ -270,10 +270,10 @@
       "state": "PROTOTYPE"
     },
     "get_netwatchdog": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.lte:status + we5927_lte.main",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Native recovery policy exposed; OEM legacy action picker, writes and V3 parity pending."
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_radio_lte_policy_and_masked_identity",
+      "limitations": "Native monitor interval, host and recovery policy read; physical recovery pending. Isolated fixture acceptance only."
     },
     "get_network_topology": {
       "state": "PROTOTYPE",
@@ -469,10 +469,10 @@
       "evidence": "scripts/tests/test_oem_module_status.py#test_5ghz_board_policy_refuses_all_vendor_forms"
     },
     "get_wifi_power": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.wifi:power",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Configured dBm and live-derived conservative cap. Actual transmit power unverified; OEM legacy selector not yet adapted."
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_radio_lte_policy_and_masked_identity",
+      "limitations": "Configured dBm/auto and reported cap only, not live RF power. Isolated fixture acceptance only."
     },
     "guide_commit": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -545,10 +545,10 @@
       "limitations": "Native mocked request, stale/duplicate/locked cases and pending-reboot verify/restore interlocks passed. Actual reboot, post-reboot recovery and original OEM form pending."
     },
     "refresh_days_traffic": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.observability:trafficHistory",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Read-only refresh of existing sampled history; no forced sample or vendor legacy POST transport. Supplemental OEM interface uses native RPC."
+      "evidence": "scripts/tests/test_owner_24x7_observability_native.py#Native24x7Observability.test_traffic_history_gap_and_counter_reset; scripts/tests/test_oem_network_reads.py#NetworkReads.test_traffic_history_is_observed_not_extrapolated",
+      "limitations": "Read-only refresh of volatile measured intervals; no fabricated backfill. Isolated fixture acceptance only."
     },
     "reset": {
       "state": "UNIMPLEMENTED",
@@ -633,10 +633,10 @@
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "set_ddns": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.addon:setOptionalStartup",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Native disable config and adapter receipt tested; enabling existing validated profile and actual update unverified; no profile provisioning."
+      "evidence": "scripts/tests/test_oem_optional_native.py#OptionalNative.test_ddns_and_openvpn_existing_profile_startup; scripts/tests/test_oem_optional_writes.py",
+      "limitations": "Existing installed profile startup only, HTTPS/provider checks, no credentials returned; actual DNS update and provisioning pending. Isolated fixture acceptance only."
     },
     "set_dhcp_config": {
       "state": "FIXTURE_PASS",
@@ -710,10 +710,10 @@
       "limitations": "Existing NTP client server list, validated hostname and readback; restart and rollback mocked. Isolated fixture only; target applet/service, live networking and original OEM browser UAT pending."
     },
     "set_openvpn": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.addon:setOpenvpnStartup",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Rollback and receipt validation implemented; adapter disable fixture passed, actual native lifecycle and tunnel verification pending."
+      "evidence": "scripts/tests/test_oem_optional_native.py#OptionalNative.test_ddns_and_openvpn_existing_profile_startup; scripts/tests/test_oem_optional_writes.py",
+      "limitations": "Existing simple TLS client startup only, remote and peer-name checks and unreviewed options rejected; synthetic files, no tunnel or real certificate validation, package not present in clean target build. Isolated fixture acceptance only."
     },
     "set_parents_ctrl_rule": {
       "state": "FIXTURE_PASS",
