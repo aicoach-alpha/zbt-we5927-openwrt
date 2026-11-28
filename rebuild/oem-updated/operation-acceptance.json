@@ -131,10 +131,10 @@
       "limitations": "Trailing 24h observed partial byte totals, missing values and discontinuities; not seven-day usage or carrier quota; UI and real device counters pending. Isolated fixture acceptance only."
     },
     "get_ddns": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.addon:ddnsStatus",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Read existing optional native profile, no credentials returned; addon absent on default image, profile editor and UAT pending."
+      "evidence": "scripts/tests/test_oem_optional_reads.py",
+      "limitations": "DDNS installed/absent and configured enabled/disabled profile identity, no credentials returned. Native libubox serialization and isolated provider fixture only; original OEM browser and real runtime pending."
     },
     "get_ddns_log": {
       "state": "FIXTURE_PASS",
@@ -143,10 +143,10 @@
       "limitations": "Bounded redacted recent event classes. Integrated OEM screen and actual ddns-scripts on target pending."
     },
     "get_ddns_stat": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.addon:ddnsStatus",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Configuration/startup state only; provider update success unknown, actual update verification pending."
+      "evidence": "scripts/tests/test_oem_optional_reads.py",
+      "limitations": "DDNS startup state only, update success unknown. Native libubox serialization and isolated provider fixture only; original OEM browser and real runtime pending."
     },
     "get_dhcp_allocation": {
       "state": "FIXTURE_PASS",
@@ -267,7 +267,9 @@
       "limitations": "Existing named profiles only, optional service not provisioned. No credentials or tunnel configuration. Native runtime and original OEM form compatibility pending; inventory is not proof of tunnel or traffic success."
     },
     "get_nat_acceleration": {
-      "state": "PROTOTYPE"
+      "state": "FIXTURE_PASS",
+      "evidence": "scripts/tests/test_oem_policy_reads.py",
+      "limitations": "Native snapshot software/hardware flags and revision, no actual acceleration proof. Native libubox serialization and isolated provider fixture only; original OEM browser and real runtime pending."
     },
     "get_netwatchdog": {
       "state": "FIXTURE_PASS",
@@ -294,22 +296,22 @@
       "limitations": "Native provider response translation fixture; actual package, TLS profile eligibility and browser integration pending."
     },
     "get_openvpn_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "procd service list/openvpn instances",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Optional add-on; runtime integration pending. Status indicates a running process only."
+      "evidence": "scripts/tests/test_oem_optional_reads.py",
+      "limitations": "Procd running process only, no tunnel proof. Native libubox serialization and isolated provider fixture only; original OEM browser and real runtime pending."
     },
     "get_parents_ctrl_rule": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:parentStatus",
-      "evidence": "rebuild/oem-updated/backend; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_acl_slots.py#test_parent_schedule_validation",
-      "limitations": "Eight optional UTC same-day LAN-to-WAN MAC deny schedules, per-rule toggle only. Legacy global switch and original OEM form not mapped. Schedule validation fixture only; actual packet enforcement, established connections, time synchronization, successful commit and rollback UAT pending."
+      "evidence": "scripts/tests/test_oem_policy_reads.py",
+      "limitations": "Owned schedule slots, UTC, duplicate/oversized rejection. Native libubox serialization and isolated provider fixture only; original OEM browser and real runtime pending."
     },
     "get_parents_ctrl_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:parentStatus",
-      "evidence": "rebuild/oem-updated/backend; rebuild/oem-updated/frontend/tools.js; scripts/tests/test_oem_acl_slots.py#test_parent_schedule_validation",
-      "limitations": "Eight optional UTC same-day LAN-to-WAN MAC deny schedules, per-rule toggle only. Legacy global switch and original OEM form not mapped. Schedule validation fixture only; actual packet enforcement, established connections, time synchronization, successful commit and rollback UAT pending."
+      "evidence": "scripts/tests/test_oem_policy_reads.py",
+      "limitations": "Per-rule enabled count and consistent UTC schedule inventory. Native libubox serialization and isolated provider fixture only; original OEM browser and real runtime pending."
     },
     "get_port": {
       "state": "FIXTURE_PASS",
@@ -342,16 +344,16 @@
       "limitations": "Source adapter only; optional plugin and integrated OEM screen pending. Credential fields intentionally empty."
     },
     "get_qos": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.addon:sqmStatus",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Native interface SQM profile, not legacy per-IP bandwidth rules; runtime and original menu mapping pending."
+      "evidence": "scripts/tests/test_oem_optional_reads.py",
+      "limitations": "SQM installed/absent and configured profile with consistent enabled flag. Native libubox serialization and isolated provider fixture only; original OEM browser and real runtime pending."
     },
     "get_qos_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.addon:sqmStatus",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Profile and boot state, actual queue enforcement unverified."
+      "evidence": "scripts/tests/test_oem_optional_reads.py",
+      "limitations": "SQM configuration state, actual shaping unknown. Native libubox serialization and isolated provider fixture only; original OEM browser and real runtime pending."
     },
     "get_redirect_dnat": {
       "state": "PROTOTYPE",
@@ -390,10 +392,10 @@
       "limitations": "Read-only list; per-entry lease time and write integration pending."
     },
     "get_static_route": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.routes:status",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "OEM route editing and policy-rule presentation pending."
+      "evidence": "scripts/tests/test_oem_policy_reads.py",
+      "limitations": "IPv4 configured route read and BusyBox-compatible prefix conversion; policy routing omitted. Native libubox serialization and isolated provider fixture only; original OEM browser and real runtime pending."
     },
     "get_sys_version": {
       "state": "FIXTURE_PASS",
