@@ -8,10 +8,10 @@
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "app_home": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "Native Linux interface counters and default route",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Measured byte rates on current default IPv4 interface, unknown Internet reachability; counter reset and route changes produce gaps. Browser/runtime acceptance pending."
+      "evidence": "scripts/tests/test_oem_network_reads.py#NetworkReads.test_egress_rate_and_route_change",
+      "limitations": "Measured elapsed egress byte rate and default route change gaps; real counters and actual egress pending. Isolated fixture acceptance only."
     },
     "bootflag": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -480,10 +480,10 @@
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_wizard_staging_refused"
     },
     "home_json": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "Existing native OEM read adapters",
-      "evidence": "rebuild/oem-updated/backend/home-adapter.sh",
-      "limitations": "Aggregate original dashboard, bounded single-flight polling, remove vendor random CPU suppression; runtime and all original dashboard data bindings pending."
+      "evidence": "scripts/tests/test_oem_home_parallel.py",
+      "limitations": "Two concurrent fixed readers, safe missing-source fallback; actual target latency and original UI bindings pending. Isolated fixture acceptance only."
     },
     "language_get": {
       "state": "PROTOTYPE"
@@ -636,7 +636,7 @@
       "state": "PROTOTYPE",
       "provider": "veci.v2.addon:setOptionalStartup",
       "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Enable/disable existing compatible DDNS profile only; full provider configuration and actual update verification pending."
+      "limitations": "Native disable config and adapter receipt tested; enabling existing validated profile and actual update unverified; no profile provisioning."
     },
     "set_dhcp_config": {
       "state": "FIXTURE_PASS",
@@ -713,7 +713,7 @@
       "state": "PROTOTYPE",
       "provider": "veci.v2.addon:setOpenvpnStartup",
       "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Existing native certificate-based client profile startup toggle only; package and secure TLS profile required. No key upload, configuration import or network restart. Successful native write, tunnel and original OEM form pending."
+      "limitations": "Rollback and receipt validation implemented; adapter disable fixture passed, actual native lifecycle and tunnel verification pending."
     },
     "set_parents_ctrl_rule": {
       "state": "FIXTURE_PASS",
@@ -740,16 +740,16 @@
       "limitations": "Disable existing named profile startup ONLY. Scope is narrower than original OEM create/edit/enable operation. Isolated native config mutation, rollback and adapter ACL fixtures passed; actual native UCI, browser, package and runtime acceptance pending. Full legacy VPN functionality not implemented."
     },
     "set_qos": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.addon:saveSqm",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Creates or edits disabled owned interface SQM profile only; requires installed addon and existing config file. Explicit enable remains separate. Package availability and runtime pending."
+      "evidence": "scripts/tests/test_oem_optional_native.py; scripts/tests/test_oem_optional_writes.py",
+      "limitations": "Owned disabled SQM profile create/edit with rollback and readback; package presence, actual queue and original form pending. Isolated fixture acceptance only."
     },
     "set_qos_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.addon:setOptionalStartup",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/frontend/tools.js",
-      "limitations": "Explicit enable/disable existing SQM profile, offload must be disabled; no immediate restart. Provisioning and live queue verification pending."
+      "evidence": "scripts/tests/test_oem_optional_native.py; scripts/tests/test_oem_optional_writes.py",
+      "limitations": "Installed SQM next-boot config enable/disable; real service activation and shaping pending. Isolated fixture acceptance only."
     },
     "set_redirect_dnat": {
       "state": "FIXTURE_PASS",
