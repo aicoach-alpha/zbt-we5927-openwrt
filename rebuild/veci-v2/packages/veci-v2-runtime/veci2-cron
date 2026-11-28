@@ -43,6 +43,7 @@ reboot_state() {
 }
 if [ "$2" = rebootStatus ]; then reboot_state; exit 0; fi
 if [ "$2" != status ]; then
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
   request=$(head -c 513)
   [ "${#request}" -le 512 ] || fail invalid_request
   json_load "$request" || fail invalid_request

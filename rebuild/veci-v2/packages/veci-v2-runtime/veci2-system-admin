@@ -1,10 +1,11 @@
 #!/bin/sh
 # Native VeCI system administration for exact board: NTP/log/LED observability.
-set -eu
+set -euf
 umask 077
 fail() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
 valid_host() {
   [ -n "$1" ] && [ "$(printf %s "$1" | wc -c)" -le 253 ] || return 1
+  case "$1" in *[!a-zA-Z0-9.-]*) return 1;; esac
   # Native OpenWrt hostname-only NTP entries; reject empty labels,
   # label boundary '-' and command/control characters in each label.
   printf '%s\n' "$1" | awk -F. '
@@ -170,6 +171,9 @@ if [ -n "$second" ]; then
   [ "$first" != "$second" ] || fail duplicate_ntp
 fi
 exec 9<"$0"; flock -n 9 || fail busy
+[ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
+[ -f /etc/config/system ] && [ ! -L /etc/config/system ] || fail system_state_unknown
+initial=$(sha256sum /etc/config/system) || fail system_state_unknown
 [ "$(uci -q get system.ntp)" = timeserver ] || fail ntp_configuration_missing
 changes=$(uci -q changes system) || fail system_state_unknown
 [ -z "$changes" ] || fail pending_system_changes
@@ -181,7 +185,11 @@ uci -q -t "$tmp" delete system.ntp.server 2>/dev/null || :
 uci -q -t "$tmp" set system.ntp.enabled=1 || fail stage_failed
 uci -q -t "$tmp" add_list "system.ntp.server=$first" || fail stage_failed
 if [ -n "$second" ]; then uci -q -t "$tmp" add_list "system.ntp.server=$second" || fail stage_failed; fi
+changes=$(uci -q changes system) || fail system_state_unknown
+[ -z "$changes" ] && [ "$(sha256sum /etc/config/system)" = "$initial" ] || fail stale_configuration
 if ! uci -q -t "$tmp" commit system ||
+   [ "$(uci -q get system.ntp.enabled || :)" != 1 ] ||
+   [ "$(uci -q get system.ntp.server || :)" != "$first${second:+ $second}" ] ||
    ! /etc/init.d/sysntpd restart >/dev/null 2>&1; then
   cp "$tmp/original" /etc/config/system || fail rollback_failed
   /etc/init.d/sysntpd restart >/dev/null 2>&1 || fail rollback_failed

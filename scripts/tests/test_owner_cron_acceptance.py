@@ -44,8 +44,8 @@ class CronAcceptance(unittest.TestCase):
 
     def test_native_ui_add_edit_remove_confirmation_and_acl(self):
         acl = json.loads((RUNTIME / "veci2-cron-acl.json").read_text())["veci-v2-cron"]
-        self.assertEqual(acl["read"]["ubus"]["veci.v2.cron"], ["status"])
-        self.assertEqual(set(acl["write"]["ubus"]["veci.v2.cron"]), {"add", "save", "remove"})
+        self.assertEqual(acl["read"]["ubus"]["veci.v2.cron"], ["status","rebootStatus"])
+        self.assertEqual(set(acl["write"]["ubus"]["veci.v2.cron"]), {"add", "save", "remove","setReboot"})
         script = r"""
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm');
