@@ -9,7 +9,7 @@ class OptionalNative(unittest.TestCase):
  def setUp(self):
   t=tempfile.TemporaryDirectory();self.addCleanup(t.cleanup);self.d=Path(t.name)
   d=self.d
-  for name in ("config","delta","init","installed","rpcd","net"):(d/name).mkdir()
+  for name in ("config","delta","init","installed","rpcd","net","certs"):(d/name).mkdir()
   (d/"board").write_text("zbtlink,zbt-we5927\n")
   (d/"net/usb0").mkdir()
   (d/"config/sqm").write_text("config queue 'other'\n option enabled '0'\n")
@@ -22,7 +22,7 @@ class OptionalNative(unittest.TestCase):
   self.cmd("rpcd/veci.v2.firewall","#!/bin/sh\nexit 99\n")
   self.cmd("uci",f'#!/bin/sh\nexec "{UCI}" -c "{d}/config" -t "{d}/delta" "$@"\n')
   s=(R/"veci2-addon-profiles").read_text()
-  for a,b in (("/usr/share/veci/apps-installed/","installed/"),("/usr/libexec/rpcd/","rpcd/"),("/etc/init.d/","init/"),("/etc/config/","config/"),("/sys/class/net/","net/"),("/var/lock/veci2-optional-services.lock","lock"),("/var/run/veci2-reboot-requested","pending")):s=s.replace(a,str(d)+"/"+b)
+  for a,b in (("/usr/share/veci/apps-installed/","installed/"),("/usr/libexec/rpcd/","rpcd/"),("/etc/init.d/","init/"),("/etc/config/","config/"),("/usr/sbin/openvpn","openvpn-bin"),("/etc/openvpn/","certs/"),("/sys/class/net/","net/"),("/var/lock/veci2-optional-services.lock","lock"),("/var/run/veci2-reboot-requested","pending")):s=s.replace(a,str(d)+"/"+b)
   (d/"profiles").write_text(s)
   s=(R/"veci2-addon").read_text().replace("/tmp/sysinfo/board_name",str(d/"board")).replace("/usr/libexec/veci2-addon-profiles",str(d/"profiles")).replace("/usr/share/libubox/jshn.sh",str(Path(PREFIX,"share/libubox/jshn.sh")))
   (d/"provider").write_text(s)
@@ -48,3 +48,32 @@ class OptionalNative(unittest.TestCase):
   ddns=dict(service="ddns",enabled="0",revision=self.call("ddnsStatus")["revision"],confirmation="DISABLE_DDNS_NEXT_BOOT")
   self.assertEqual(self.call("setOptionalStartup",**ddns)["state"],"disabled")
   self.assertEqual(self.call("ddnsStatus")["runtime"],"unknown")
+
+ def test_ddns_and_openvpn_existing_profile_startup(self):
+  d=self.d
+  ddns=d/"config/ddns"
+  ddns.write_text("config service 'veci'\n option enabled '0'\n option service_name 'duckdns.org'\n option use_https '1'\n option lookup_host 'fixture.example'\n option domain 'fixture.example'\n option ip_network 'lte'\n option password 'fixture-only'\n")
+  a=dict(service="ddns",enabled="1",confirmation="ENABLE_DDNS_NEXT_BOOT",revision=self.call("ddnsStatus")["revision"])
+  self.assertEqual(self.call("setOptionalStartup",**a)["state"],"enabled")
+  self.assertNotIn("fixture-only",json.dumps(self.call("ddnsStatus")))
+  a.update(enabled="0",confirmation="DISABLE_DDNS_NEXT_BOOT",revision=self.call("ddnsStatus")["revision"])
+  self.assertEqual(self.call("setOptionalStartup",**a)["state"],"disabled")
+  self.cmd("openvpn-bin","#!/bin/sh\nexit 99\n")
+  self.cmd("init/openvpn",'#!/bin/sh\n[ "$1" = enabled ]\n')
+  cfg=d/"config/openvpn"
+  for n in ("ca","cert","key"):(d/"certs"/n).write_text("synthetic fixture")
+  cfg.write_text("config openvpn 'sample_client'\n option enabled '0'\n option client '1'\n option dev_type 'tun'\n option remote_cert_tls 'server'\n option proto 'udp'\n option remote 'fixture.example'\n option port '1194'\n option verify_x509_name 'fixture.example name'\n"+"".join(f" option {n} '{d}/certs/{n}'\n" for n in ("ca","cert","key")))
+  rev=self.call("openvpnStatus")
+  self.assertTrue(rev["eligible"],rev)
+  a=dict(enabled="1",confirmation="ENABLE_OPENVPN_NEXT_BOOT",revision=rev["revision"])
+  before=cfg.read_bytes()
+  cfg.write_bytes(before+b" option up '/fixture/not-run'\n")
+  a["revision"]=self.call("openvpnStatus")["revision"]
+  self.assertEqual(self.call("setOpenvpnStartup",**a)["error"],"secure_profile_required")
+  cfg.write_bytes(before)
+  a["revision"]=self.call("openvpnStatus")["revision"]
+  saved=self.call("setOpenvpnStartup",**a)
+  self.assertEqual(saved["state"],"enabled",saved)
+  self.assertFalse(saved["tunnel_verified"])
+  a.update(enabled="0",confirmation="DISABLE_OPENVPN_NEXT_BOOT",revision=saved["revision"])
+  self.assertEqual(self.call("setOpenvpnStartup",**a)["state"],"disabled")
