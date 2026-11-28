@@ -102,7 +102,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/dashboard_status.txt",
-        "log_sha256": "1a5d8085400c64ba19c96b67d7a8a3f2d176c75c7fb7eff1fbd2c324bd7d70c2"
+        "log_sha256": "35139169ef7a07f0a6b931d2bdbfdc68ab750c91ba45e887db3436d275d203c2"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -114,7 +114,7 @@
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/veci-design.css": "70cd900592f4f6c4b3cc2dbba2c259bed543009b2c7e598fb7cbbfadf5da1670",
         "scripts/tests/test_veci_v2_rebuild.py": "43f915b600518b60513ab0f8e93df031c46a0a3f7dc0c290de6afa165f9384b5",
         "scripts/tests/test_cellular_link_status_truth.py": "74ceb42e0c2181e4b736dcf0f5ad700235728dafffa30f751e4dccdd80f275f5",
-        "scripts/tests/test_veci_v2_contract.py": "92624edde7bbba57ac3ac1e4539f2faab77c7ffeacbdaa85080ab315fbeae87e",
+        "scripts/tests/test_veci_v2_contract.py": "a59f4edb7e2de31b742b2e3bc6719c3dcfd31d1f978de8f7f6c5157923cc708c",
         "scripts/tests/test_veci_v2_dashboard_readiness_20261126.py": "6bcfcae631fb40ebebebc4517c54b05a12c99b0708bf9dc4a978c1f3ca7e8e54"
       },
       "status": "pass",
@@ -715,7 +715,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/sms_inbox.txt",
-        "log_sha256": "707fb71d01d41156d8f1c51d3ce278607cdc36e1e71dc326423b8564988b988e"
+        "log_sha256": "3c1c48144be3148f622cc9beb8b992bf6b983e4755c321d6288e943e7469fe2b"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -727,7 +727,7 @@
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-codec.js": "f4dd195be0995e7bf381f09cffc84d3a0a079f6eb3d6b51ada6cf077bc7a83e0",
         "source/veci-cellular-we5927/files/usr/libexec/veci-sms-parse": "0ce23e1af44ec27759ada6ffd3e121597539cba2da7ef8e3eb11c3ab1c301b03",
         "scripts/tests/test_veci_v2_sms_ui.py": "24d43d4286d2e0d0bb01021f18807d6426b8572d8f35f5f1e383e369d513f884",
-        "scripts/tests/test_veci_v2_contract.py": "92624edde7bbba57ac3ac1e4539f2faab77c7ffeacbdaa85080ab315fbeae87e"
+        "scripts/tests/test_veci_v2_contract.py": "a59f4edb7e2de31b742b2e3bc6719c3dcfd31d1f978de8f7f6c5157923cc708c"
       },
       "status": "pass",
       "test_ids": [
@@ -889,7 +889,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/sms_sent_and_drafts.txt",
-        "log_sha256": "8567a46568029695ea3790fd381176b10556fb56d47a98da47bdbf532f21b683"
+        "log_sha256": "346ff0286688ec6e8c857fb42ed295bb595b7b4edebdcb478d39a101ad176e37"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -903,7 +903,7 @@
         "source/veci-cellular-we5927/files/usr/libexec/veci-sms-drafts": "e5c5d9119a0efaa02f6330626c0ba143f58ed82ba00099836d460f59195fd11c",
         "source/veci-cellular-we5927/files/etc/uci-defaults/97-veci-sms-userdata": "45e64e9a4df460179811d3b8f89b277bd46f1da9a415c3cb6faae6bbe33170f9",
         "scripts/tests/test_veci_v2_sms_ui.py": "24d43d4286d2e0d0bb01021f18807d6426b8572d8f35f5f1e383e369d513f884",
-        "scripts/tests/test_veci_v2_contract.py": "92624edde7bbba57ac3ac1e4539f2faab77c7ffeacbdaa85080ab315fbeae87e"
+        "scripts/tests/test_veci_v2_contract.py": "a59f4edb7e2de31b742b2e3bc6719c3dcfd31d1f978de8f7f6c5157923cc708c"
       },
       "status": "pass",
       "test_ids": [
@@ -1436,7 +1436,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/ui_four_group_navigation.txt",
-        "log_sha256": "5a27dbf4456ca358e3ba5fb2a2a29e9fce8be388f3ca105c5549a8224e461020"
+        "log_sha256": "d2e2bda79f1bb6293687af401553ff2344ecac5fe687778b95288410eb100ab0"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -1444,7 +1444,7 @@
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
         "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/veci-design.css": "70cd900592f4f6c4b3cc2dbba2c259bed543009b2c7e598fb7cbbfadf5da1670",
-        "scripts/tests/test_veci_v2_contract.py": "92624edde7bbba57ac3ac1e4539f2faab77c7ffeacbdaa85080ab315fbeae87e",
+        "scripts/tests/test_veci_v2_contract.py": "a59f4edb7e2de31b742b2e3bc6719c3dcfd31d1f978de8f7f6c5157923cc708c",
         "scripts/tests/test_veci_ui_sessions.py": "a5d9bc884e4837b9501df77ea2903380ea99f471f10606471090d4ff00152b10",
         "scripts/tests/test_owner_controls_native_integration.py": "ac5c01f983a5a621feaff7fb21bb6411bab443fb1751281105908c6bac8d9821",
         "scripts/tests/test_veci_v2_all_native_scripts_bootstrap_20261126.py": "fa84b92c4cde26726489bf58ed797c4943f4037c8f459ff1607f6a594514cfd9",

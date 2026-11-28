@@ -8,6 +8,6 @@ test_ui_requires_explicit_auth_no_persistent_session (test_veci_v2_contract.Feat
 test_lte_wifi_network_sms_are_separate_and_not_fake_pass (test_veci_v2_dashboard_readiness_20261126.DashboardReadiness.test_lte_wifi_network_sms_are_separate_and_not_fake_pass) ... ok
 
 ----------------------------------------------------------------------
-Ran 8 tests in 1.699s
+Ran 8 tests in 0.204s
 
 OK
