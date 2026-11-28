@@ -73,6 +73,33 @@ except (KeyError,IndexError,TypeError,ValueError,StopIteration): sys.exit(1)
         defaults.update(env)
         return subprocess.run(["sh",str(self.d/"adapter"),op],env=dict(os.environ,PATH=str(self.d)+":"+os.environ["PATH"],**defaults),capture_output=True,text=True,timeout=5)
 
+    def test_egress_rate_and_route_change(self):
+        self.cmd("ip", """#!/bin/sh
+if [ -e "$CHANGED" ]; then echo 'default dev eth0.2'; else echo 'default dev usb0'; fi
+""")
+        self.cmd("cut", """#!/bin/sh
+if [ -e "$SAMPLED" ]; then echo 102.00; else echo 100.00; fi
+""")
+        self.cmd("sleep", """#!/bin/sh
+touch "$SAMPLED"
+[ "${CHANGE:-0}" = 0 ] || touch "$CHANGED"
+""")
+        self.cmd("cat", """#!/bin/sh
+case "$1" in
+ */rx_bytes) if [ -e "$SAMPLED" ]; then echo 300; else echo 100; fi;;
+ */tx_bytes) if [ -e "$SAMPLED" ]; then echo 120; else echo 100; fi;;
+ *) exit 1;;
+esac
+""")
+        env=dict(SAMPLED=str(self.d/"sampled"),CHANGED=str(self.d/"changed"))
+        out=self.invoke("app_home",**env)
+        self.assertEqual(out.returncode,0,out.stderr)
+        for expected in ("rx=100","tx=10","internet_status=unknown"):self.assertIn(expected,out.stdout)
+        (self.d/"sampled").unlink()
+        out=self.invoke("app_home",CHANGE="1",**env)
+        self.assertIn("rx=\n",out.stdout)
+        self.assertIn("tx=\n",out.stdout)
+
     def test_initial_version_lan_dhcp_reads(self):
         self.cmd("ubus", """#!/bin/sh
 case "$*" in
