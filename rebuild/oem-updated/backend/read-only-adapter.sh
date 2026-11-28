@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:uplinkStatus|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus|veci.v2.firewall:ttlStatus|veci.v2.firewall:parentStatus|veci.v2.addon:openvpnStatus) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:uplinkStatus|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus|veci.v2.firewall:ttlStatus|veci.v2.firewall:aclStatus|veci.v2.firewall:parentStatus|veci.v2.addon:openvpnStatus) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -1140,35 +1140,40 @@ case "$1" in
         json_add_string management_scope per_rule
         ;;
     get_acl_rule|get_acl_status)
-        # Inspect the actual native firewall rules. No synthetic OEM ACL switch.
-        native="$(native_read veci.v2.firewall status)" || error "firewall unavailable"
+        # Read the same owned slots that the native save/toggle operations edit.
+        native="$(native_read veci.v2.firewall aclStatus)" || error "ACL inventory unavailable"
+        (json_load "$native" && json_get_type typ rules && [ "$typ" = array ]) || error "ACL inventory invalid"
         revision="$(field '@.revision')" || error "firewall revision unavailable"
-        rules="$(uci -q show firewall | sed -nE 's/^firewall\.([a-zA-Z0-9_]+|@rule\[[0-9]+\])=rule$/\1/p')"
-        success "native firewall rule inventory"
+        success "native scoped LAN ACL inventory"
         json_add_string revision "$revision"
-        json_add_string acl_enabled ""
-        json_add_string management_scope read_only_native
+        json_add_string management_scope per_rule
         json_add_string global_acl_switch_supported 0
+        json_add_string runtime_verified false
         json_add_array data
-        count=0
-        for rule in $rules; do
-            count=$((count+1)); [ "$count" -le 128 ] || error "rule inventory exceeds limit"
-            enabled="$(get "firewall.$rule.enabled" || true)"
-            case "$enabled" in ''|1) enabled=1;; 0) ;; *) error "invalid rule state";; esac
+        count=0; active=0; seen=" "
+        while [ "$count" -lt 8 ]; do
+            slot="$(field "@.rules[$count].slot" || true)"
+            [ -n "$slot" ] || break
+            case "$slot" in [1-8]) ;; *) error "invalid ACL slot";; esac
+            case "$seen" in *" $slot "*) error "duplicate ACL slot";; esac
+            seen="$seen$slot "
+            mac="$(field "@.rules[$count].mac")" || error "MAC unavailable"
+            printf '%s\n' "$mac" | grep -Eiq '^[0-9a-f][02468ace](:[0-9a-f]{2}){5}$' || error "invalid ACL MAC"
+            [ "$mac" != 00:00:00:00:00:00 ] || error "invalid ACL MAC"
+            enabled="$(field "@.rules[$count].enabled")" || error "ACL state unavailable"
+            case "$enabled" in 0) ;; 1) active=$((active+1));; *) error "invalid ACL state";; esac
             json_add_object ""
-            json_add_string name "$rule"
-            json_add_string label "$(get "firewall.$rule.name" || true)"
-            for option in proto src src_ip src_port dest dest_ip dest_port target; do
-                json_add_string "$option" "$(get "firewall.$rule.$option" || true)"
-            done
-            dest="$(get "firewall.$rule.dest" || true)"
-            if [ -n "$dest" ]; then json_add_string data_flow forward; else json_add_string data_flow input; fi
-            json_add_string enabled "$enabled"
-            json_add_string editable 0
+            json_add_string name "$slot"; json_add_string slot "$slot"
+            json_add_string src_mac "$mac"; json_add_string enabled "$enabled"
+            json_add_string src lan; json_add_string dest wan; json_add_string target REJECT
+            json_add_string data_flow forward; json_add_string editable 1
             json_close_object
+            count=$((count+1))
         done
+        [ -z "$(field '@.rules[8].slot' || true)" ] || error "ACL inventory oversized"
         json_close_array
-        json_add_int rule_count "$count"
+        json_add_int rule_count "$count"; json_add_int enabled_count "$active"
+        json_add_string acl_enabled "$(if [ "$active" -gt 0 ]; then echo 1; else echo 0; fi)"
         ;;
     get_mptcp_info)
         # Kernel capability is not proof of an aggregated multi-WAN connection.
@@ -1189,9 +1194,12 @@ case "$1" in
     get_ttl)
         native="$(native_read veci.v2.firewall ttlStatus)" || error "TTL policy unavailable"
         local_ttl="$(cat /proc/sys/net/ipv4/ip_default_ttl)" || error "local TTL unavailable"
+        enabled="$(field '@.enabled')" || error "TTL flag unavailable"
+        value="$(field '@.ttl' || true)"
+        case "$enabled" in 0) value="";; 1) case "$value" in ''|0*|*[!0-9]*) error "invalid TTL";; esac; [ "${#value}" -le 3 ] && [ "$value" -le 255 ] || error "invalid TTL";; *) error "invalid TTL flag";; esac
         success "native IPv4 TTL policy"
-        json_add_string ttl_enabled "$(field '@.enabled')"
-        json_add_string ttl_cnt "$(field '@.ttl' || true)"
+        json_add_string ttl_enabled "$enabled"
+        json_add_string ttl_cnt "$value"
         json_add_string revision "$(field '@.revision')"
         json_add_string runtime "$(field '@.runtime')"
         json_add_string scope lan_to_wan_ipv4_forward
