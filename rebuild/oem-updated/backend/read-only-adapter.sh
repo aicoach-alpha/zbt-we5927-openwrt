@@ -318,7 +318,7 @@ case "$1" in
             *.*) ;;
             *[!0-9]*) error "WAN mask invalid";;
             *) [ "$mask" -le 32 ] || error "WAN mask invalid"
-               mask="$(awk -v p="$mask" 'BEGIN {for(i=0;i<4;i++){n=p>8?8:p;if(n<0)n=0;printf "%s%d",i?".":"",256-2^(8-n);p-=n}}')" ;;
+               mask="$(awk -v p="$mask" 'BEGIN {for(i=0;i<4;i++){n=p>8?8:p;if(n<0)n=0;block=1;for(j=n;j<8;j++)block*=2;printf "%s%d",i?".":"",256-block;p-=n}}')" ;;
         esac
         dns="$(get network.wan.dns || true)"
         dns1="$(printf '%s' "$dns" | awk '{print $1}')"
@@ -956,8 +956,14 @@ case "$1" in
         [ "$(field '@.source')" = kernel_sampled_bytes ] || error "unexpected traffic source"
         # Return actual measured intervals and gaps, not invented seven-day
         # totals. The legacy history chart must be adapted to this contract.
+        history_state="$(field '@.state')" || error "history state unavailable"
+        case "$history_state" in unavailable|insufficient_samples|observed_partial) ;; *) error "invalid history state";; esac
+        [ "$(field '@.persistent')" = false ] || error "unexpected persistence"
+        if [ "$history_state" = observed_partial ]; then
+            [ "$(field '@.window_seconds')" = 86400 ] || error "unexpected history window"
+        fi
         success "local traffic history"
-        json_add_string history_state "$(field '@.state')"
+        json_add_string history_state "$history_state"
         json_add_string persistent false
         json_add_string window_seconds 86400
         for key in samples first_epoch last_epoch lte_observed_seconds lan_observed_seconds lte_gaps lan_gaps lte_rx_bytes lte_tx_bytes lan_rx_bytes lan_tx_bytes; do
