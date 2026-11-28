@@ -4,6 +4,6 @@ test_private_sim_and_apn_acl_and_board_safety (test_owner_apn_acceptance.ApnInte
 test_guarded_transport (test_sim_unlock.SimUnlock.test_guarded_transport) ... ok
 
 ----------------------------------------------------------------------
-Ran 4 tests in 10.518s
+Ran 4 tests in 10.239s
 
 OK

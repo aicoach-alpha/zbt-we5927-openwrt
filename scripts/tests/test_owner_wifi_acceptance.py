@@ -86,10 +86,10 @@ exec "{self.uci}" -c "{cfg}" -t "{root}/delta" "$@"
 
     def test_privileged_actions_have_write_acl(self):
         acl = json.loads((PKG/"veci2-status-acl.json").read_text())["veci-v2-wifi"]
-        self.assertEqual(set(acl["read"]["ubus"]["veci.v2.wifi"]), {"status", "info"})
+        self.assertEqual(set(acl["read"]["ubus"]["veci.v2.wifi"]), {"status", "info", "activationStatus"})
         self.assertEqual(set(acl["write"]["ubus"]["veci.v2.wifi"]),
                          {"setVisibility", "setSsid", "setAutoChannel", "setChannel", "survey",
-                          "setAuth", "setAccess"})
+                          "setAuth", "setAccess", "activateAp"})
 
 
 if __name__ == "__main__":

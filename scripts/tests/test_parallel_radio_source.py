@@ -21,7 +21,17 @@ class ScopeIntegration(unittest.TestCase):
         self.assertEqual(RECORD["hardware_uat"],"not_run")
         for item in RECORD["reused_byte_identical_sources"]:
             with self.subTest(path=item["path"]):
-                self.assertEqual(hashlib.sha256((ROOT/item["path"]).read_bytes()).hexdigest(),item["sha256"])
+                # Historical, byte-identical source must match the recorded origin.
+                original=subprocess.check_output(["git","-C",str(ROOT),"show",
+                    item["commit"]+":"+item["path"]],timeout=10)
+                self.assertEqual(hashlib.sha256(original).hexdigest(),item["sha256"])
+                # Explicitly demand committed successors, not mutable worktree
+                # edits or artificially refreshed historical digests.
+                current=ROOT/item["path"]
+                self.assertTrue(current.is_file() and current.stat().st_size>0)
+                committed=subprocess.check_output(["git","-C",str(ROOT),"show",
+                    "HEAD:"+item["path"]],timeout=10)
+                self.assertEqual(current.read_bytes(),committed,"uncommitted radio change: "+item["path"])
     def test_no_duplicate_ui_ids_and_scripts_load_after_main(self):
         import re
         ids=re.findall(r'\bid="([^"]+)"',HTML)

@@ -2,12 +2,42 @@
 """Fail closed: source success is never proof that VeCI v2 can be flashed."""
 import argparse
 import json
+import re
 from pathlib import Path
 import sys
 
 BASE = Path(__file__).resolve().parents[1]
 CONTRACT = BASE / "contracts/veci-v2-rebuild-contract.json"
 
+
+# An evidence receipt is a consistency check, not an independent attestation.
+# Static reconnaissance, a marker, or a bare boolean must never substitute for
+# a verified physical recovery receipt bound to exact hardware and image.
+OWNER_MTD0_SHA = "b2acbf1e762e310d467cfcbae853257a9f63ce311511134bc9d0d5953f835330"
+
+def recovery_blockers(evidence):
+    receipt = evidence.get("physical_recovery_receipt")
+    if not isinstance(receipt, dict):
+        return ["physical_recovery_receipt_missing"]
+    blockers=[]
+    if receipt.get("schema") != "we5927-physical-recovery.v1":
+        blockers.append("physical_recovery_receipt_schema")
+    if receipt.get("board_id") != "ZBT-WE5927-DSIM" or receipt.get("bootloader_sha256") != OWNER_MTD0_SHA:
+        blockers.append("physical_recovery_hardware_binding")
+    candidate=evidence.get("signed_image_sha256")
+    rescue=receipt.get("rescue_image_sha256")
+    digest=lambda x: isinstance(x,str) and re.fullmatch(r"[0-9a-f]{64}",x) is not None and x != "0"*64
+    if not digest(candidate) or receipt.get("signed_candidate_sha256") != candidate or not digest(rescue):
+        blockers.append("physical_recovery_image_binding")
+    if receipt.get("evidence_type") != "physical_test" or receipt.get("result") != "PASS":
+        blockers.append("physical_recovery_not_demonstrated")
+    for key in ("recovery_entry_verified","restore_verified","boot_after_restore_verified",
+                "critical_partitions_unchanged","owner_approved"):
+        if receipt.get(key) is not True:
+            blockers.append("physical_recovery_missing:"+key)
+    if not digest(receipt.get("evidence_sha256")):
+        blockers.append("physical_recovery_evidence_digest_missing")
+    return blockers
 
 def evaluate(contract, evidence):
     blockers = []
@@ -32,6 +62,7 @@ def evaluate(contract, evidence):
     image_bytes = evidence.get("firmware_image_bytes")
     if type(image_bytes) is not int or not 0 < image_bytes <= 7995392 - 1048576:
         blockers.append("raw_image_size_or_headroom")
+    blockers.extend(recovery_blockers(evidence))
     if contract.get("flash_authorized") is not True:
         blockers.append("contract_disallows_flash")
     return sorted(set(blockers))

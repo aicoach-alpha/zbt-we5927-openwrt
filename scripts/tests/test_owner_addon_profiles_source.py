@@ -26,6 +26,9 @@ class AddonProfiles(unittest.TestCase):
         s=(U/'addon-profiles.js').read_text()
         self.assertIn('window.confirm',s)
         self.assertIn('veci.v2.addon',s)
+        self.assertIn('konfigurasi startup, bukan status AP live',s)
+        self.assertIn('tanpa restart radio/network',s)
+
         subprocess.run(['node','--check',str(U/'addon-profiles.js')],check=True)
         html=(U/'index.html').read_text()
         self.assertIn('id="addon-profiles-read"',html)

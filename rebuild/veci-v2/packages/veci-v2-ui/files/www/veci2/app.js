@@ -227,13 +227,58 @@ verifyRelease.addEventListener('click', async () => {
   }
 });
 
+function closeMobileNav() {
+  document.body.classList.remove('veci-nav-open');
+  const toggle = el('mobile-nav-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+function updateShellStatus(id, label, tone = '') {
+  const node = el(id);
+  if (!node) return;
+  node.textContent = label;
+  node.className = tone ? 'state-' + tone : '';
+}
+function updateShortcutSelection(activePage) {
+  for (const button of document.querySelectorAll('.nav-shortcut')) {
+    const current = activePage === button.dataset.targetPage &&
+      document.querySelector('#' + activePage + ' .subnav .subtab.active')?.dataset.group ===
+        button.dataset.targetGroup;
+    button.classList.toggle('active', current);
+    if (current) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+}
+function navigateShortcut(button) {
+  if (!sid) return;
+  const target = button.dataset.targetPage;
+  const group = button.dataset.targetGroup;
+  if (!['overview', 'network', 'sms', 'settings'].includes(target)) return;
+  const exists = document.querySelector('#' + target + ' .subnav .subtab[data-group="' + group + '"]');
+  if (!exists) return;
+  showPage(target);
+  setSubgroup(target, group);
+  if (target === 'overview' && group === 'health') void refreshHealth();
+  if (target === 'overview' && group === 'dashboard') void sampleTraffic();
+  if (target === 'network' && group === 'sim') {
+    void refreshLtePolicy();
+    void refreshLtePathStatus();
+  }
+  closeMobileNav();
+  window.scrollTo?.({top: 0, behavior: 'instant'});
+}
 function showWorkspace() {
+  document.body.classList.add('veci-authenticated');
   globalThis.VeciSmsCenter.activate();
   el('login').hidden = true;
   el('workspace').hidden = false;
   el('logout').hidden = false;
 }
 function showLogin() {
+  closeMobileNav();
+  document.body.classList.remove('veci-authenticated');
+  updateShellStatus('shell-lte-status', 'Belum diverifikasi');
+  updateShellStatus('shell-wifi-status', 'Belum diperiksa');
+  updateShellStatus('shell-router-status', 'Belum diperiksa');
   el('lte-apn').value = '';
   el('lte-apn').disabled = true;
   el('lte-apn-save').disabled = true;
@@ -268,6 +313,9 @@ function showLogin() {
   globalThis.VeciAccess?.reset();
   globalThis.VeciRa?.reset?.();
   globalThis.VeciWifiControls?.reset?.();
+  wifiActivationBusy = false;
+  el('wifi-activate-ap').disabled = true;
+  el('wifi-activate-status').textContent = 'Login diperlukan.';
   globalThis.VeciCron?.reset?.();
   globalThis.VeciWatchdog?.reset?.();
   globalThis.VeciGuestCheck?.reset?.();
@@ -284,6 +332,7 @@ function showLogin() {
   globalThis.VeciSmsCenter.logout();
   globalThis.VeciDnsSettings?.logout?.();
   globalThis.VeciOwnerControls?.logout?.();
+  globalThis.VeciServices?.reset?.();
   sid = '';
   verifiedPackage = '';
   el('logout').hidden = true;
@@ -301,6 +350,7 @@ function setSubgroup(scope, group) {
   }
   for (const panel of (page.querySelectorAll?.(':scope > article[data-group]') || []))
     panel.hidden = panel.dataset.group !== group;
+  if (!page.hidden) updateShortcutSelection(scope);
 }
 function showPage(id) {
   for (const page of document.querySelectorAll('.page'))
@@ -328,9 +378,12 @@ function showPage(id) {
   const [title,summary] = titles[id] || titles.overview;
   el('page-title').textContent = title;
   el('page-summary').textContent = summary;
+  updateShortcutSelection(id);
+  closeMobileNav();
   if (id === 'overview' && document.querySelector?.('#overview .subtab.active')?.dataset.group === 'health')
     void refreshHealth();
   if (id === 'network') {
+    void refreshWifiActivation();
     globalThis.VeciOwnerControls?.refreshNetwork?.();
     refreshNetwork();
     refreshEthernet();
@@ -373,6 +426,15 @@ async function refreshOverview() {
     Number.isFinite(data.memory_available_kb) ?
       Math.round(data.memory_available_kb / 1024) + ' MiB' : 'Unknown'));
   el('status-grid').replaceChildren(...cards);
+  updateShellStatus('shell-lte-status', lteLink === true ?
+    'Jalur modem tersedia · cek HTTPS' : 'Jalur LTE belum siap', lteLink === true ? 'warn' : 'bad');
+  updateShellStatus('shell-wifi-status', data.wifi_ap_enabled === true ?
+    'AP aktif · klien belum diuji' : data.wifi_ap_configured === false ?
+    'AP dinonaktifkan' : 'AP belum terverifikasi',
+    data.wifi_ap_enabled === true ? 'good' : data.wifi_ap_configured === false ? '' : 'warn');
+  updateShellStatus('shell-router-status', data.netifd_count === 1 ?
+    'Netifd normal' : 'Perlu pemeriksaan netifd',
+    data.netifd_count === 1 ? 'good' : 'warn');
   el('path-modem').textContent = data.lte_usb_state === 'carrier_up' ? 'USB modem terhubung' :
     data.lte_usb_state === 'modem_missing' ? 'Modem belum terdeteksi' : 'Status modem perlu diperiksa';
   el('path-router').textContent = lteLink === true ? 'IP dan rute tersedia, internet belum diuji' :
@@ -380,7 +442,29 @@ async function refreshOverview() {
   el('path-clients').textContent = data.wifi_ap_enabled === true ?
     'Wi-Fi aktif, koneksi klien belum diuji' : 'Wi-Fi dan klien belum terverifikasi';
   void verifyInternetLive();
+  void refreshSmsReadiness();
   void sampleTraffic();
+}
+
+// SMS readiness is about declared dependencies, NOT successful delivery.
+// No modem AT commands, no sending and no private message contents here.
+async function refreshSmsReadiness() {
+  const session = sid;
+  if (!session) return;
+  updateShellStatus('shell-sms-status','Memeriksa layanan…','warn');
+  try {
+    const result = await rpc('veci.v2','smsDiagnostics',{},session,8500);
+    if (sid !== session) return;
+    if (result.source !== 'live_read_only') throw Error('Untrusted readiness source');
+    const available = result.provider_registered === true &&
+      result.modem_at_port_present === true && result.config_present === true;
+    updateShellStatus('shell-sms-status', available ?
+      'Layanan tersedia · kirim/terima belum diuji' :
+      'Layanan belum lengkap · perlu diperiksa',
+      available ? 'warn' : 'bad');
+  } catch (error) {
+    if (sid === session) updateShellStatus('shell-sms-status','Status SMS tidak terbaca','warn');
+  }
 }
 
 // The live Internet probe confirms the exact USB0 HTTPS and DNS path rather
@@ -397,7 +481,7 @@ async function verifyInternetLive() {
   badge.textContent = 'Memeriksa koneksi...';
   detail.textContent = 'Memeriksa HTTPS dan DNS melalui LTE';
   try {
-    const result = await rpc('veci.v2','internetCheck',{},session,10000);
+    const result = await rpc('veci.v2','internetCheck',{},session,18000);
     if (sid !== session) return;
     const verified = result.verified === true && result.https_code === 200 &&
       result.dns_verified === true && result.source === 'usb0_https';
@@ -407,6 +491,11 @@ async function verifyInternetLive() {
     const modemButNoInternet = result.source === 'usb0_https' &&
       result.reason === 'modem_connected_public_unavailable_check_quota' &&
       result.modem_http_verified === true;
+    updateShellStatus('shell-lte-status', verified ? 'Online · HTTPS & DNS PASS' :
+      publicWithoutDns ? 'HTTPS aktif · DNS perlu dicek' :
+      modemButNoInternet ? 'Modem aktif · internet gagal' :
+      'Internet belum terverifikasi',
+      verified ? 'good' : 'warn');
     badge.className = verified ? 'indicator good' : 'indicator';
     badge.textContent = verified ? 'Internet LTE aktif' :
       modemButNoInternet ? 'Modem aktif, internet publik gagal' :
@@ -425,6 +514,7 @@ async function verifyInternetLive() {
       publicWithoutDns ? 'HTTPS langsung berhasil' : 'Belum terverifikasi';
   } catch (error) {
     if (sid !== session) return;
+    updateShellStatus('shell-lte-status', 'Pemeriksaan LTE gagal', 'warn');
     badge.textContent = 'Belum terverifikasi';
     detail.textContent = 'Pemeriksaan gagal: ' + String(error.message || 'Unknown');
     const text = card.querySelector('strong');
@@ -613,6 +703,96 @@ async function refreshHealth() {
   } finally { healthBusy=false; }
 }
 
+// A single opt-in activation path. Credential saves never reload radio.
+// Source-only until on-router and browser UAT; never promise external beacon.
+let wifiActivationBusy = false;
+async function refreshWifiActivation() {
+  if (!sid || wifiActivationBusy) return;
+  const current = sid;
+  const button = el('wifi-activate-ap');
+  const status = el('wifi-activate-status');
+  button.disabled = true;
+  try {
+    const data = await rpc('veci.v2.wifi','activationStatus',{},current,8500);
+    if (sid !== current) return;
+    if (data.ok !== true) throw Error(data.error || 'Status aktivasi tidak tersedia');
+    const phase = String(data.phase || 'idle');
+    if (phase === 'prepared_next_reboot') {
+      status.textContent = 'WPA2 AP tersimpan untuk boot berikutnya. Reboot MANUAL lewat LAN diperlukan; belum ada bukti AP berfungsi.';
+    } else if (phase === 'enabled_unverified') {
+      status.textContent = 'Konfigurasi AP aktif. Periksa hostapd, SSID dari HP, DHCP, dan internet; status belum terverifikasi.';
+    } else if (phase.startsWith('failed:')) {
+      status.textContent = 'Aktivasi gagal: ' + phase.slice(7).replace(/_/g, ' ') +
+        '. Konfigurasi dipulihkan; jangan mengulangi tanpa pemeriksaan driver.';
+    } else if (['preflight','saving'].includes(phase)) {
+      status.textContent = 'Aktivasi masih diperiksa: ' + phase +
+        '. Jangan reload radio atau jaringan.';
+    } else if (data.eligible === true) {
+      status.textContent = 'SSID dan WPA2 siap. Menyimpan konfigurasi untuk reboot manual memerlukan konfirmasi.';
+    } else {
+      status.textContent = 'AP sudah disiapkan atau WPA2 belum siap. Simpan keamanan lalu periksa status; jangan memaksa reload.';
+    }
+    button.disabled = data.eligible !== true;
+  } catch (error) {
+    if (sid === current) status.textContent = 'Status aktivasi gagal dibaca: ' +
+      String(error.message || 'unknown') + '. Jangan jalankan ulang otomatis.';
+  }
+}
+globalThis.VeciWifiActivation = {refresh:refreshWifiActivation};
+async function requestWifiActivation() {
+  if (!sid || wifiActivationBusy) return;
+  const button = el('wifi-activate-ap');
+  if (button.disabled) return;
+  if (!window.confirm(
+    'Siapkan WPA2 AP untuk boot berikutnya? Tidak ada network reload, ' +
+    'radio restart atau reboot otomatis. ' +
+    'Reboot manual terpisah lewat kabel LAN diperlukan sesudahnya.'
+  )) return;
+  wifiActivationBusy = true;
+  button.disabled = true;
+  const current = sid;
+  const status = el('wifi-activate-status');
+  status.textContent = 'Menyimpan konfigurasi AP untuk reboot manual...';
+  try {
+    const response = await rpc('veci.v2.wifi','activateAp',
+      {confirmation:'PREPARE_WPA2_AP_NEXT_BOOT'},current,10000);
+    if (sid !== current) return;
+    if (response.ok !== true || response.queued !== true)
+      throw Error(response.error || 'Permintaan ditolak');
+    status.textContent = 'Permintaan diterima. Tidak ada aktivasi radio otomatis; memeriksa hasil simpan...';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (sid !== current) return;
+      let outcome;
+      try { outcome = await rpc('veci.v2.wifi','activationStatus',{},current,8500); }
+      catch (error) {
+        status.textContent = 'Koneksi GUI terputus saat aktivasi. Jangan mengulangi perintah; periksa router lewat kabel LAN.';
+        return;
+      }
+      if (sid !== current) return;
+      if (outcome.ok !== true) throw Error(outcome.error || 'Status tidak tersedia');
+      const phase = String(outcome.phase || 'idle');
+      if (phase === 'prepared_next_reboot') {
+        status.textContent = 'Konfigurasi AP tersimpan. Reboot MANUAL diperlukan. Setelah itu uji SSID, WPA2, DHCP, DNS dan internet.';
+        return;
+      }
+      if (phase.startsWith('failed:')) {
+        status.textContent = 'Aktivasi gagal: ' + phase.slice(7).replace(/_/g, ' ') +
+          '. Jangan coba ulang; periksa driver dan koneksi LAN secara manual.';
+        return;
+      }
+      status.textContent = 'Persiapan: ' + phase + ' — tidak ada reload atau reboot otomatis.';
+    }
+    status.textContent = 'Hasil penyimpanan belum terkonfirmasi. Jangan kirim permintaan kedua.';
+  } catch (error) {
+    if (sid === current) status.textContent = 'Aktivasi tidak terkonfirmasi: ' +
+      String(error.message || 'unknown') + '. Periksa status sebelum bertindak lagi.';
+  } finally {
+    wifiActivationBusy = false;
+    if (sid === current) void refreshWifiActivation();
+  }
+}
+
 let visibilityRequest = 0;
 let configuredVisible = null;
 let savingVisibility = false;
@@ -645,18 +825,24 @@ async function refreshVisibility(method = 'status', params = {}) {
       autoChannel.disabled = data.configured_channel === 'auto';
     }
     button.textContent = configuredVisible ? 'Sembunyikan SSID' : 'Tampilkan SSID';
-    if (typeof data.ssid_hex === 'string' && /^(?:[0-9a-f]{2}){0,32}$/.test(data.ssid_hex)) {
-      const bytes = Uint8Array.from(data.ssid_hex.match(/../g) || [], byte => parseInt(byte, 16));
+    // Prefer JSON-escaped SSID; no optional hexdump binary is needed.
+    // Accept legacy hex output from older images for rolling upgrades.
+    if (typeof data.ssid === 'string' ||
+        (typeof data.ssid_hex === 'string' && /^(?:[0-9a-f]{2}){0,32}$/.test(data.ssid_hex))) {
       try {
-        const stored = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(bytes);
-        if (/[\x00-\x1f\x7f]/.test(stored)) throw Error();
+        const stored = typeof data.ssid === 'string' ? data.ssid :
+          new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(
+            Uint8Array.from(data.ssid_hex.match(/../g) || [], byte => parseInt(byte, 16)));
+        const bytes = new TextEncoder().encode(stored);
+        if (!bytes.length || bytes.length > 32 ||
+            bytes.some(byte => byte < 32 || byte === 127)) throw Error();
         name.value = stored;
+        name.disabled = false;
+        saveName.disabled = false;
       } catch {
         name.value = '';
-        status.textContent += ' Nama saat ini tidak dapat ditampilkan sebagai teks.';
+        status.textContent += ' Nama Wi-Fi tidak valid untuk diedit.';
       }
-      name.disabled = false;
-      saveName.disabled = false;
     }
     button.disabled = false;
   } catch (error) {
@@ -960,8 +1146,24 @@ document.addEventListener('DOMContentLoaded', () => {
         await refreshOverview();
     } catch (error) { notify(error.message); }
   });
+  el('wifi-activate-ap').addEventListener('click', () => void requestWifiActivation());
   for (const tab of document.querySelectorAll('.tab'))
     tab.addEventListener('click', () => showPage(tab.dataset.page));
+  for (const shortcut of document.querySelectorAll('[data-target-page][data-target-group]'))
+    shortcut.addEventListener('click', () => navigateShortcut(shortcut));
+  el('mobile-nav-toggle').addEventListener('click', () => {
+    if (!sid) return;
+    const opened = document.body.classList.toggle('veci-nav-open');
+    el('mobile-nav-toggle').setAttribute('aria-expanded', opened ? 'true' : 'false');
+  });
+  el('mobile-nav-dismiss').addEventListener('click', closeMobileNav);
+  el('mobile-nav-backdrop').addEventListener('click', closeMobileNav);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && document.body.classList.contains('veci-nav-open')) {
+      closeMobileNav();
+      el('mobile-nav-toggle').focus();
+    }
+  });
   for (const groupButton of document.querySelectorAll('.subnav .subtab'))
     groupButton.addEventListener('click', () => {
       if (!sid) return;

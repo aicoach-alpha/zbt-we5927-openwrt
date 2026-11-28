@@ -187,7 +187,8 @@
       "ubus": {
         "veci.v2.wifi": [
           "status",
-          "info"
+          "info",
+          "activationStatus"
         ]
       }
     },
@@ -200,7 +201,8 @@
           "survey",
           "setChannel",
           "setAccess",
-          "setAuth"
+          "setAuth",
+          "activateAp"
         ]
       }
     }

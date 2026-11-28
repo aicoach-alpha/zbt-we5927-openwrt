@@ -1,0 +1,31 @@
+{
+  "schema": "veci-we5927-owner-reported-physical-preflight.v1",
+  "reported_from": "Owner-pasted Windows PowerShell output",
+  "independently_verified_transcript_uploaded": false,
+  "date_local": "2026-11-27",
+  "source_commit": "f87e7ec5fec2c437d65fd95e7139bff90eb3019a",
+  "signed_image_sha256": "3adc815e77a7c9b0e25f742601eb2dc94423aad540b26efa86423821a667abb1",
+  "image_bytes": 5899090,
+  "router_lan_ip": "192.168.1.1",
+  "owner_reported_checks": {
+    "local_sha256": "PASS",
+    "initial_hardware_preflight": "PASS",
+    "configuration_backup_downloaded_and_archive_validated": "PASS",
+    "router_tmpfs_uploaded_sha256": "PASS",
+    "signature_with_installed_trust_anchor": "PASS",
+    "board_metadata": "PASS",
+    "sysupgrade_test_only": "PASS",
+    "temp_files_cleared": "PASS"
+  },
+  "configuration_backup_bytes": 7452,
+  "full_mtd_recovery_backup_proven": false,
+  "wifi_connected_client_mt76_regression": "NOT_TESTED_ON_CANDIDATE",
+  "lte_sms_postflash_uat": "NOT_TESTED",
+  "recovery_and_rollback_validated": "NOT_PROVEN",
+  "physical_72h_stability": "NOT_TESTED",
+  "physical_flash_performed": false,
+  "flash_authorized": false,
+  "release_permitted": false,
+  "applies_to_later_commits": false,
+  "note": "Owner permission for hardware VERIFY ONLY is separate from any future flash authorization."
+}

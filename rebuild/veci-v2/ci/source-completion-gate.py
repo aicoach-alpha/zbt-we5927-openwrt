@@ -9,6 +9,7 @@ import hashlib
 import json
 import re
 import sys
+import runpy
 
 BASE = Path(__file__).resolve().parents[1]
 CONTRACT = BASE / "contracts/veci-v2-rebuild-contract.json"
@@ -102,6 +103,18 @@ def audit(contract: dict, evidence: dict) -> list[str]:
                     hashlib.sha256(log.read_bytes()).hexdigest() != receipt.get("log_sha256") or
                     not receipt_passed(log, record["test_ids"])):
                 issues.append("invalid_source_test_receipt:" + name)
+    # Historical receipts can never authorize an image while a confirmed
+    # critical source defect remains unresolved. Registry validation is
+    # independent of (and additional to) exact source-hash/receipt checks.
+    bug_gate = BASE / "ci/bug-regression-gate.py"
+    if not bug_gate.is_file() or bug_gate.is_symlink():
+        issues.append("missing_bug_registry_gate")
+    else:
+        report = runpy.run_path(str(bug_gate))["audit"]()
+        if not report.get("ok"):
+            issues.append("bug_registry_invalid")
+        for bug_id in report.get("known_source_open", []):
+            issues.append("known_source_bug_unresolved:" + bug_id)
     return sorted(set(issues))
 
 

@@ -16,7 +16,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/addon_enable_disable.txt",
-        "log_sha256": "169a04e95968e88244e553032156b025b8ec670b13c3b7b7139f1ff1400c8ae6"
+        "log_sha256": "7e591ec1d232878772f6df1bf454486711ee4060a5091f9a74c4106b53c411e8"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -25,13 +25,14 @@
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-addon-acl.json": "103231537cd3a66f384cf1dbae3ec84883bbfb0e8ca32d8652ec3348b5a687e3",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services": "147f548b37c3fd33b40abc22c9ca5d3c297a4df69ef0348f0d7c1f7a6f47ab28",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services-acl.json": "f7152b5a56e12ba5fa6f2ac6cde0c2a3484d5fdf1edb20b3cd1a96cf848af42b",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/addon-profiles.js": "86b7665430879d7394585326bfbfc188cc8a5d8ab1e35b0bd2a09ba8e34df202",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js": "58462393bfc28fba3c619b78224d4e3e085d672b749642a913a6017366b94be2",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/addon-profiles.js": "599c616aef052040778e648f1005e8904ca28b34ac0d3cd638b170f63bd1803b",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js": "55c2351d49679db1ac110752042b02e1007929cc414ae662c25028e50f989b03",
         "rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk": "240e4043e57e7c5853b767dc26e01ccfcd88fc116eefde3892846c6c947aa2fc",
         "scripts/tests/test_owner_addon_lifecycle_native.py": "acb1810f08c94a4b061dbbc50b38ef1cf8da004fdaaa60e133cd601b3225d7d3",
-        "scripts/tests/test_owner_addon_profiles_source.py": "dda0d700bf971ddda07f8dc64bfd9dd631e698b569e78f78b30c95f39d5c3660",
+        "scripts/tests/test_owner_addon_profiles_source.py": "5150bf8faad75986adeafa6d9a5690bd9c670fc4b35a4114bcf1f850ffc5040a",
         "scripts/uat/test-owner-addon-services-host.py": "6681d72b81152b1ff778fcf524f9fc00410ddf25c206461ab88cd7c8fee5b461",
-        "scripts/uat/test-addon-profiles-host.py": "a0b6348c2459da13dc6e937479796c04875ba06862ddc35e18977e285162a46d"
+        "scripts/uat/test-addon-profiles-host.py": "a0b6348c2459da13dc6e937479796c04875ba06862ddc35e18977e285162a46d",
+        "scripts/tests/test_veci_v2_services_addon_dom_20261126.py": "63bb655b6b4e8550a9a407808e2d3d1fab845c6fcb813d73a2e1ef374fee38ca"
       },
       "status": "pass",
       "test_ids": [
@@ -39,13 +40,15 @@
         "test_existing_wireguard_guest_voucher_native_uci_switches",
         "test_acl_ui_and_no_duplicate_modem_control",
         "test_existing_daemon_reused",
-        "test_read_and_write_acl_exact_and_guarded"
+        "test_read_and_write_acl_exact_and_guarded",
+        "test_both_existing_menus_have_single_live_handler_path"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_addon_lifecycle_native.py",
         "scripts/tests/test_owner_addon_profiles_source.py",
         "scripts/uat/test-owner-addon-services-host.py",
-        "scripts/uat/test-addon-profiles-host.py"
+        "scripts/uat/test-addon-profiles-host.py",
+        "scripts/tests/test_veci_v2_services_addon_dom_20261126.py"
       ]
     },
     "addon_signed_package_manager": {
@@ -61,14 +64,14 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/addon_signed_package_manager.txt",
-        "log_sha256": "73949887b57b69ecbcaafd5269788834150b932e9178dd7807e4a7a5456419d9"
+        "log_sha256": "fb030c13f505dfc98282a72f8f2dbb3e4c495566338915245106760ae2a8c8f6"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk": "240e4043e57e7c5853b767dc26e01ccfcd88fc116eefde3892846c6c947aa2fc",
         "rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk-acl.json": "899e1380f23f9ab64d32cd5fd7803c2f49a4c0f391cb57eb50d61a19f2b8f858",
         "rebuild/veci-v2/packages/veci-v2-package-manager/Makefile": "2f6152a1548a5b1ed912c841ed251fc901ca592731c2a6471bca9d705be28cc4",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status": "546c97c5d89f2cb02c36fc7c8d45a2a95a5bf72080942cd2d0adfe4317ef74d8",
         "scripts/tests/test_veci_v2_rebuild.py": "43f915b600518b60513ab0f8e93df031c46a0a3f7dc0c290de6afa165f9384b5",
         "scripts/tests/test_veci_compiled_apk_gate.py": "1f233652beff112f49a789b4c23a9e5075a5f1fb8cab925ae6b716afe7d51985"
@@ -91,25 +94,28 @@
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
         "rebuild/veci-v2/packages/veci-v2-runtime/Makefile",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html"
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/veci-design.css"
       ],
       "receipt": {
         "kind": "executed_source_tests",
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/dashboard_status.txt",
-        "log_sha256": "907dadc57fd6fbc6896ec21b649defb0418bb3706f2d14238ab19848c87be33e"
+        "log_sha256": "35139169ef7a07f0a6b931d2bdbfdc68ab750c91ba45e887db3436d275d203c2"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status": "546c97c5d89f2cb02c36fc7c8d45a2a95a5bf72080942cd2d0adfe4317ef74d8",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/veci-design.css": "70cd900592f4f6c4b3cc2dbba2c259bed543009b2c7e598fb7cbbfadf5da1670",
         "scripts/tests/test_veci_v2_rebuild.py": "43f915b600518b60513ab0f8e93df031c46a0a3f7dc0c290de6afa165f9384b5",
         "scripts/tests/test_cellular_link_status_truth.py": "74ceb42e0c2181e4b736dcf0f5ad700235728dafffa30f751e4dccdd80f275f5",
-        "scripts/tests/test_veci_v2_contract.py": "dee31211d7e7409206ed4f70b96a8ccf03db1dd65171cf284804900ff8f80021"
+        "scripts/tests/test_veci_v2_contract.py": "a59f4edb7e2de31b742b2e3bc6719c3dcfd31d1f978de8f7f6c5157923cc708c",
+        "scripts/tests/test_veci_v2_dashboard_readiness_20261126.py": "6bcfcae631fb40ebebebc4517c54b05a12c99b0708bf9dc4a978c1f3ca7e8e54"
       },
       "status": "pass",
       "test_ids": [
@@ -119,12 +125,14 @@
         "test_lte_default_device_route_and_failed_queries",
         "test_lte_monitor_only_reports_recent_known_stages",
         "test_provider_exposes_independent_link_and_verification",
-        "test_ui_requires_explicit_auth_no_persistent_session"
+        "test_ui_requires_explicit_auth_no_persistent_session",
+        "test_lte_wifi_network_sms_are_separate_and_not_fake_pass"
       ],
       "test_source_files": [
         "scripts/tests/test_veci_v2_rebuild.py",
         "scripts/tests/test_cellular_link_status_truth.py",
-        "scripts/tests/test_veci_v2_contract.py"
+        "scripts/tests/test_veci_v2_contract.py",
+        "scripts/tests/test_veci_v2_dashboard_readiness_20261126.py"
       ]
     },
     "dhcp_dns_static_leases": {
@@ -143,17 +151,17 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/dhcp_dns_static_leases.txt",
-        "log_sha256": "658955b63131024572b3728f68011980ae6a7b23671488e4b70f4df0c731abd1"
+        "log_sha256": "72b5d7fbbb725ac3cadfdf8754b8609646d5b992398cb21e73d8530feeaf94a5"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-dns": "bd260fa658cb7d7447681c5497f254536b91b0ddcf4f7682abf2b8da36499fc5",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-static-leases": "5d02efb184d880db0d0d1f8a4755d38e7062daffb12e0db0c6fd989eaea92d18",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lan-bounds": "df8c812e57e3e1c9243e591df61cdc7b683570ecca76d13bbcf0632c85e9d88f",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/dns-settings.js": "39d2c75630d3ab3bd1f1dd7af21462eff0675757d60693f4f27d5f24dd1f11fa",
         "scripts/tests/test_owner_dhcp_dns_acceptance.py": "a06a08f6f3d46575271ba04adecd2038ee1cb6acaffd6fa21612bbc1f659637f",
         "scripts/uat/test-owner-dhcp-dns.py": "0a61034d4640bc9a231a4baa75074c8f7eef222ade20b2884abe1b41ed48836a"
@@ -180,14 +188,14 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/ethernet_port_status.txt",
-        "log_sha256": "c45d48a18ea4b8cebec6d6d73139ae0967da7742e5f3f0ae13bc00b742df8ad1"
+        "log_sha256": "a8ed1d0e7b924acd8f86016b7d6da0592135ac5e30b9d5b5aebbbec7955b3cd7"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status": "546c97c5d89f2cb02c36fc7c8d45a2a95a5bf72080942cd2d0adfe4317ef74d8",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "scripts/tests/test_veci_v2_rebuild.py": "43f915b600518b60513ab0f8e93df031c46a0a3f7dc0c290de6afa165f9384b5"
       },
       "status": "pass",
@@ -213,15 +221,15 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/firewall_zones_nat.txt",
-        "log_sha256": "a7c003bd383c4646252dcfde15176a9bf726236ff0e1a19b94aea3e4967ef440"
+        "log_sha256": "dc0e52ef794ef8133e884bbe9c0e11930f641db48c0999d9aa01d509fea44696"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-firewall": "17b444fc4539969fc4ca2fc55eb554333602f6f4655d6950dd02669d8ca7433c",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/owner-controls.js": "c5572c2fb4b7175ecdb29f49dda59a28f4282532a7856ffe2639b7795456e465",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "scripts/tests/test_owner_firewall_native_acceptance.py": "bbd395e6e6a3dd2686640ec06d7d4bd0ae081823fc7a6de543d010e9de65a06f",
         "scripts/tests/test_owner_firewall_source.py": "aec5fb2444ec3ba5c0b4b0a2cd69707e5fdd94461a98b93608b98885947f5f21"
       },
@@ -257,18 +265,18 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/firmware_24x7_observability.txt",
-        "log_sha256": "3ba70c490399982b6a44c8c3c19bc1f0ad59052e88fe79cc586ad1438d50efd8"
+        "log_sha256": "1e42260eb3c522a3b85f9d4706a1c1872565aaa10a9fe30598d75a37f51caaec"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-observe": "dd28f7a357feca0ad793091b79ac342d6f5785c6be90493b10ba3c48949c85c2",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-observe-rpc": "a1aa1dbf7bf3eb23cf66706e728103d36fdfc951e8c693d8ae9ca65c8c781632",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-observe-rpc": "9ff9212f980ba8e2a447354da8f50336d42ca189df1bd28132625a656cee1592",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-observe-acl.json": "a550d78b83f15c2695687f2b1411d19daf715dcac5785b6975a80eec2adf089a",
         "rebuild/veci-v2/packages/veci-v2-runtime/files/etc/init.d/veci2-observe": "3d692a3f4ecad588732a61543ece7aba1becb98c35ced541145ef001e008e4be",
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/observability.js": "61785ed1185a90d5784d896aaf437547c50b8eb8fa6e79c20b1e4b67e2d0ba6e",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
         "scripts/veci-link-wired-monitor.py": "64e0a06afe538d2457214f18db93d8f3e652634d5ba2c7198dd7d9f3764819f4",
         "scripts/veci-link-analyze.py": "6281c674bed086582e8bec28a4c917f3448b2be7fb84acc1a443f084bc5911af",
         "scripts/tests/test_owner_24x7_observability_native.py": "b54a29613ead7852518d3037fc55a31ba5b24208b6a96a0e1eaaace0a7b0340f",
@@ -302,7 +310,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/firmware_gpio_hardware_watchdog.txt",
-        "log_sha256": "36d4533066e9a9b3037bca3e417f023528954c1379392e25df56bb21ac02263b"
+        "log_sha256": "e924159b6b5977062697f44d113c424ab280454a734f003a0d8197a9d490d1e1"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -310,7 +318,7 @@
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-gpio-watchdog": "2c90358adf9d9f932f7c9e2df0eb76236c5803012ee277a7d7054722af7813f4",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-watchdog-status": "1901f508aa0206072be0c902698c36350b92a930042a7be02c41e3413bba75ba",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-watchdog-acl.json": "160bd2f1bae39c1faa3a8bd818ba51bb981834a887d9227140931be213cdf9f4",
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
         "scripts/tests/test_owner_board_hardware_acceptance.py": "f1b9d2f3be838308029b1ae8ae625b93e71844a01f7fb47b5bb339a91c8e1ed5",
         "scripts/tests/test_gpio_watchdog_registration.py": "79146d0ac5a29e90bebd1e38ecd9a41b5bef128061c0b38a5e5ca1411301e1b3"
       },
@@ -340,15 +348,15 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/firmware_network_watchdog.txt",
-        "log_sha256": "edb3715b254d85be004d8ba75feae3a7c31d54fc15977d9d9755b755456df111"
+        "log_sha256": "00ef5081a32cb77b666f29a353e75f3c2fc31033fa0990a6d859282b308b98eb"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "source/we5927-lte/files/usr/sbin/we5927-lte": "f5c0fd829404bb155401a69b8ce5680c22597849c3932c585c33d21c581843b4",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lte-policy": "36097d7b884c13b25a7ff7720360aa4954770e31a39b2f0560ab3a2b77465dd2",
+        "source/we5927-lte/files/usr/sbin/we5927-lte": "bcca58415d00777d3f15a5ecf18426777d126e3ec7e891b447e890f7d7c611b4",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lte-policy": "f5f608760fae69f93327e81f08ab1216065c82dc156efb761286312d6bd8ed8b",
         "source/we5927-lte/Makefile": "3b3ec53bdf38ea96733cd6ef7d82f77cfa96454791a499467e68bae82d4cfa05",
         "source/we5927-lte/files/etc/config/we5927_lte": "a4a212ca925e1b7bc491c37ff2dc467f37d400384968d275444d90802d9cc09a",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/monitor-settings.js": "957cb8871f872ed7d7bfe9ab80864fd8f966452c833452bc50c2f864e641bd26",
         "scripts/tests/test_lte_dhcp_recovery_cooldown.py": "52609bd8b8118fb0c35573225bce34606aff5e5776d9a9b24bd2fffd9079c4e2",
         "scripts/tests/test_lte_recovery_guard.py": "5abfb104ad72e615c0e03a966b2d2bfd49c875e957dd494746c61fecb3957d0f",
@@ -385,17 +393,17 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/guest_wifi_isolation.txt",
-        "log_sha256": "e1c980d0b930a4238ce30750d749b46af76785ca461af29e6eb4e6995355ebc0"
+        "log_sha256": "3f4dd21d44317859e944f981fb9a02dab1dc6ce0ffaa0475965d1324649ad0e8"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "source/veci-app-guest/Makefile": "dd96980a987d8dd27b81dd3be964c7a950ceb05238d3dfed908702357384a0fa",
         "source/veci-app-guest/files/usr/libexec/rpcd/veci.app.guest": "8675ec104d36cda743b12851306b7a7a5b68b899927a66aab753676c6df87679",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-check": "e118d4c03804513bd1998c4e8dde0323811362239075dc309c63648e342868a9",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-check": "7e20c0826cc7e65ae54ded29fe3486977a263a98ead4e85e7deeabd1739a84d1",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-acl.json": "11a3da690607e9d87b7c7c99ad9b54e1941d1308b206250fc081b1c6e103a189",
         "source/veci-app-guest/files/www/veci-apps/guest.js": "6d0965f809d67c3cf9e2bd07dcbdbc99c0275e220d4c4ad0a2e5d64fef86b126",
         "scripts/tests/test_owner_guest_native_acceptance.py": "78630ec009bd5bd5ae06870263b116a1620cf095afa62368b681006a2874f93c",
-        "scripts/tests/test_guest_isolation_readonly.py": "37415fe7076a9c52496eec6c8660dcaa905bb5de23517835e0205e15f5034ce5",
+        "scripts/tests/test_guest_isolation_readonly.py": "064d6a761112851b2905b59beb185af6f3493cf117d29e13461239a3f0a55733",
         "scripts/tests/test_guest_startup_guard.py": "a541802b0a65a4103b70480f685b223a3011630077c439a869c9b11f96b2f89b"
       },
       "status": "pass",
@@ -405,7 +413,8 @@
         "test_configuration_states_using_fake_uci",
         "test_provision_does_not_restart_wifi_network",
         "test_failed_provision_rolls_back_without_wifi_reload",
-        "test_inactive_guest_cleanup_does_not_restart_network"
+        "test_inactive_guest_cleanup_does_not_restart_network",
+        "test_guest_gui_does_not_claim_staged_ap_is_live"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_guest_native_acceptance.py",
@@ -427,15 +436,15 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/interface_wan_lan.txt",
-        "log_sha256": "9d5d96368fc31b9ad097ed155e25b45f463d2f078e1ee02b8c534c95d1b07cb3"
+        "log_sha256": "2d5fe74ef490cab5fe9758119f1b1848cce869e1fb4abe0c1a2da4e0acfdb045"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-interfaces": "7670dd1f87114c6ed7e14923571661e3ef66905d8a633120a29f34779466905e",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-interfaces-acl.json": "8fee0e3f099ff74cc8184c2033edb8cffcc4731a69eb869ce57cc5c5878ac45d",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/interfaces.js": "541709f9314fea9bfbf70783b41a4334d5269fd6f17b2f853a02eaa3c7063510",
         "scripts/tests/test_owner_interfaces_acceptance.py": "1ca33c6592ee974936fa1434869eae1ff03643bcae34b2734ad52441b9b98d04",
         "scripts/uat/test-interfaces-host.py": "15b7aa0a220c556d7e64e0df9135595af9fab2a01994089ac0e75b5565037d02"
@@ -468,7 +477,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/ipv6_ra_dhcpv6.txt",
-        "log_sha256": "8d74a3b3bfcdbf5ad0eb2a02def26a7441c6a537e8f855a397b2e9123f9ed1e4"
+        "log_sha256": "7556fbc7060c1bfe94f2bc9b4773ab0711c49b813a512174c15c6e1fde69158d"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -479,9 +488,9 @@
         "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6": "038862684426c507120a1e40b22d2f7016fcc57da08ce542c53bd73667c7329b",
         "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra": "0c1797aabfd2c7e343e42afe5d96dae74e418bc2d3a637e1b010be264369c273",
         "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json": "eb74a43c6b3cb8364ee7ada9c910c7840f5b6d08314b1821020ea7158c89a455",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/ipv6-ra.js": "0b0a010ed70e4f5b430c81b981f1cac8cd9a5865adc3d75f39a3fc8b3a032ac6",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "scripts/tests/test_owner_ipv6_native_acceptance.py": "6626c148d389271f9071142e06b3c0897602a5ddac40bb5a75f78db777dbe0d7",
         "scripts/tests/test_veci_v2_ipv6_simple_menu.py": "af915af07a85e972b567e979d147fbfecdb7f52b5c0316e6f57157706b790f55",
         "scripts/uat/test-ipv6-host.py": "843c519daec13a118c42d42a3b284b358897c726d9dbc70433c26f45b584b235"
@@ -510,13 +519,13 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/lte_apn_pin_puk.txt",
-        "log_sha256": "5d9aa64271b851e991dd0eb6046a024a0989964d5da222c6844a6321b26f3e56"
+        "log_sha256": "8f5b75c5d805118ad5941e4ee5617a837851dca098c5fd65bb54d5b4a1dcb54f"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lte-policy": "36097d7b884c13b25a7ff7720360aa4954770e31a39b2f0560ab3a2b77465dd2",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-lte-policy": "f5f608760fae69f93327e81f08ab1216065c82dc156efb761286312d6bd8ed8b",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-sim-lock": "a2f03d9677296a92c03feca65108cd42a2ac243be6e045d7dc358d807567337b",
-        "source/we5927-lte/files/usr/sbin/we5927-lte": "f5c0fd829404bb155401a69b8ce5680c22597849c3932c585c33d21c581843b4",
+        "source/we5927-lte/files/usr/sbin/we5927-lte": "bcca58415d00777d3f15a5ecf18426777d126e3ec7e891b447e890f7d7c611b4",
         "source/we5927-lte/src/we5927-at.c": "9b8c075c7f68a160eccf70ff7b3c7aff3f4a4f1f21917dcd01472c2ca990c469",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sim-lock.js": "4cca0ead3b84a747a3c0c542371207f2a2a88a879a000ec57c3f7b435c678469",
         "scripts/tests/test_owner_apn_acceptance.py": "1c024a50780b36a8cb0a26bcd118bd0aaa8ac5eb9107ea613e033a1d274c0706",
@@ -547,17 +556,17 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/lte_dual_sim_manual.txt",
-        "log_sha256": "c0f4dd1c85a397ba981f51f2580fb9a0e27f2ef9b83ff20d8adcc4520916337e"
+        "log_sha256": "83df42f4ad3b86fd40a36930a34834a46a1497a6701215b4f4d42dc4107398af"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-sim-manual": "7393e6c0dae38674e2494ecb44ee5e0e68feaabf87d20fe5d6b0d0976937e9d6",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "source/we5927-lte/files/usr/sbin/we5927-lte": "f5c0fd829404bb155401a69b8ce5680c22597849c3932c585c33d21c581843b4",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-sim-manual": "0f096a5806ea0d59fafe2f453f83dd39a7c31ab8cce9ceadb8fa91099d91b7a4",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "source/we5927-lte/files/usr/sbin/we5927-lte": "bcca58415d00777d3f15a5ecf18426777d126e3ec7e891b447e890f7d7c611b4",
         "source/we5927-lte/files/etc/config/we5927_lte": "a4a212ca925e1b7bc491c37ff2dc467f37d400384968d275444d90802d9cc09a",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/owner-controls.js": "c5572c2fb4b7175ecdb29f49dda59a28f4282532a7856ffe2639b7795456e465",
-        "scripts/tests/test_owner_manual_sim_native_acceptance.py": "5b201a6565b46e00d0cb08e527aea97c006fc657d7eac5d06e98f9978f12ee84",
-        "scripts/tests/test_lte_sim_switch_failure.py": "eb44eb6b43e37ed2848a181a2da85cfbd79884b7a688499db4e10fa5a0b675de",
+        "scripts/tests/test_owner_manual_sim_native_acceptance.py": "4889c19285a91e6085d254071970d919d70816f4127fa0b2f2229ed065f71576",
+        "scripts/tests/test_lte_sim_switch_failure.py": "92f8e220a47cd35e252f9f76a231865980869068982688f594e7621573f8f7e7",
         "scripts/tests/test_owner_manual_sim_source.py": "3215c19eccb8e560a2377a64cb46725ca73be002a34c73fc49646457c7c04fc1"
       },
       "status": "pass",
@@ -587,11 +596,11 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/lte_rndis_data.txt",
-        "log_sha256": "251762e251eaf3e169b0808a59f63c2b45aef91855913721ed1eb0b4a6229497"
+        "log_sha256": "1d0b7800a86ec69c6be5794269d741e1b02445e5c968c9a5c03fb88fda732545"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "source/we5927-lte/files/usr/sbin/we5927-lte": "f5c0fd829404bb155401a69b8ce5680c22597849c3932c585c33d21c581843b4",
+        "source/we5927-lte/files/usr/sbin/we5927-lte": "bcca58415d00777d3f15a5ecf18426777d126e3ec7e891b447e890f7d7c611b4",
         "source/we5927-lte/files/etc/config/we5927_lte": "a4a212ca925e1b7bc491c37ff2dc467f37d400384968d275444d90802d9cc09a",
         "source/we5927-lte/Makefile": "3b3ec53bdf38ea96733cd6ef7d82f77cfa96454791a499467e68bae82d4cfa05",
         "scripts/tests/test_lte_rndis_identity.py": "9ad4841bf6921c609da2a6c8ca36577aa16b5b5acfae73a6ab06d6d6b15c1560",
@@ -628,15 +637,15 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/port_forward_dmz.txt",
-        "log_sha256": "89e35b177cbac8b1c942c73856a73ef1214374472a56b712cef1af4d02cf9ad8"
+        "log_sha256": "69677ae944cd1a349cb5c62612cf1422e3b46b53ae37d620dfbecfa3576e3176"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-firewall": "17b444fc4539969fc4ca2fc55eb554333602f6f4655d6950dd02669d8ca7433c",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/owner-controls.js": "c5572c2fb4b7175ecdb29f49dda59a28f4282532a7856ffe2639b7795456e465",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "scripts/tests/test_owner_firewall_native_acceptance.py": "bbd395e6e6a3dd2686640ec06d7d4bd0ae081823fc7a6de543d010e9de65a06f",
         "scripts/tests/test_owner_firewall_source.py": "aec5fb2444ec3ba5c0b4b0a2cd69707e5fdd94461a98b93608b98885947f5f21"
       },
@@ -665,16 +674,16 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/router_login_and_permissions.txt",
-        "log_sha256": "ad78eb9c06e76ac0f391edb207024d2e7ae031d55640bfcec3deed5869ac0f55"
+        "log_sha256": "c8c1e35b2c08378ade0763d23a68b90a6707fbcbda8deb2a35e04ff53d1f1a8f"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "scripts/tests/test_owner_auth_acceptance.py": "1d68c5167d7bae2beada22fdbadbdfbdfbbf1b230599c8a93deccda793b37263",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "scripts/tests/test_owner_auth_acceptance.py": "4464bc0d258709f3561d93a8539df25cf7e50af5c1a62ef5214f19918b1e79a9",
         "scripts/tests/test_veci_ui_sessions.py": "a5d9bc884e4837b9501df77ea2903380ea99f471f10606471090d4ff00152b10",
-        "scripts/tests/fixtures/veci_ui_sessions.js": "7dad9e27ed14f1a1e4144d669e84c63899155d6d1d10bca8288421dbca0d23eb"
+        "scripts/tests/fixtures/veci_ui_sessions.js": "3ee5f0e7e6dc42f74329223f16ad0ecb8d9b0132cfd3ab599eee533effeb2c40"
       },
       "status": "pass",
       "test_ids": [
@@ -706,7 +715,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/sms_inbox.txt",
-        "log_sha256": "8eec1c2f3fd8d43dd8b7dc3e92ee724842ebc62366d3e5f969ef96d3eb6c8431"
+        "log_sha256": "3c1c48144be3148f622cc9beb8b992bf6b983e4755c321d6288e943e7469fe2b"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -718,7 +727,7 @@
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/sms-codec.js": "f4dd195be0995e7bf381f09cffc84d3a0a079f6eb3d6b51ada6cf077bc7a83e0",
         "source/veci-cellular-we5927/files/usr/libexec/veci-sms-parse": "0ce23e1af44ec27759ada6ffd3e121597539cba2da7ef8e3eb11c3ab1c301b03",
         "scripts/tests/test_veci_v2_sms_ui.py": "24d43d4286d2e0d0bb01021f18807d6426b8572d8f35f5f1e383e369d513f884",
-        "scripts/tests/test_veci_v2_contract.py": "dee31211d7e7409206ed4f70b96a8ccf03db1dd65171cf284804900ff8f80021"
+        "scripts/tests/test_veci_v2_contract.py": "a59f4edb7e2de31b742b2e3bc6719c3dcfd31d1f978de8f7f6c5157923cc708c"
       },
       "status": "pass",
       "test_ids": [
@@ -743,7 +752,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/sms_multipart_pdu.txt",
-        "log_sha256": "17c6f808553e0d680e243b4c4fc7a79c78c2f3698ec8087056922d56f86f6839"
+        "log_sha256": "074453976b7955da01a19b0bada09ec285741aabf1b5a709d6c35183a64fe373"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -781,7 +790,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/sms_security_and_storage.txt",
-        "log_sha256": "b9f970689e8445dca03997ff489672362aa2b7b767a632df35f79640b97df389"
+        "log_sha256": "63d9438edacf639e1344a96208961b05699367e98cba8a5654c551d3b9f06197"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -829,7 +838,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/sms_send_and_delete.txt",
-        "log_sha256": "fd8c19d35dbc58766ccf7741027e3155902b9b11a3b4573b6e0700a08df5f13f"
+        "log_sha256": "fe91278cae5803c0e4165b3005ec5cebe5a781d7d57d49b62a2e8207363b8cdc"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -880,7 +889,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/sms_sent_and_drafts.txt",
-        "log_sha256": "8567a46568029695ea3790fd381176b10556fb56d47a98da47bdbf532f21b683"
+        "log_sha256": "346ff0286688ec6e8c857fb42ed295bb595b7b4edebdcb478d39a101ad176e37"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -894,7 +903,7 @@
         "source/veci-cellular-we5927/files/usr/libexec/veci-sms-drafts": "e5c5d9119a0efaa02f6330626c0ba143f58ed82ba00099836d460f59195fd11c",
         "source/veci-cellular-we5927/files/etc/uci-defaults/97-veci-sms-userdata": "45e64e9a4df460179811d3b8f89b277bd46f1da9a415c3cb6faae6bbe33170f9",
         "scripts/tests/test_veci_v2_sms_ui.py": "24d43d4286d2e0d0bb01021f18807d6426b8572d8f35f5f1e383e369d513f884",
-        "scripts/tests/test_veci_v2_contract.py": "dee31211d7e7409206ed4f70b96a8ccf03db1dd65171cf284804900ff8f80021"
+        "scripts/tests/test_veci_v2_contract.py": "a59f4edb7e2de31b742b2e3bc6719c3dcfd31d1f978de8f7f6c5157923cc708c"
       },
       "status": "pass",
       "test_ids": [
@@ -921,16 +930,16 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/static_routes_policy.txt",
-        "log_sha256": "d24fd81ccc94b3121b57b6deeb94cbe70b218cb7a63a413f22018e11dd8c4c40"
+        "log_sha256": "42c168f292efcecd6c84df8ec15d71eab272b7c8ee69169e667625c61eeb045f"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-routes": "aab2b4b592e71d96f34cc856bab6d47c75c41fc26661f9b193b179619bfc981b",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-routes-acl.json": "f4ceaff61b58e31ac7c93484055d88bce670da1799fdd1aa81ea0b38257efa18",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/routes.js": "a6ee9fb3134c3012fe1e9531b58f7ef0aa0c60886cb9bda83c403ee948034849",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "scripts/tests/test_owner_routes_acceptance.py": "abfa936334f48d9677b083a92bcc1ed62e1342298315ea6139f840f2c4d5f903",
         "scripts/uat/test-routes-host.py": "53c03356230d969a861067085040081f501cde012e991b3d7b4605155c051c14"
       },
@@ -958,16 +967,16 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_access_ssh_https.txt",
-        "log_sha256": "3ca7365d1ba577047dc46cc7e96b35ec174ff4f01a2c8e4aecf22751454c81c3"
+        "log_sha256": "4fe70d108890b659879be09c9953a08b4d76be1f7376ced5b15a9c35abebe30a"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-access": "39151ca7f60d0ecf54d63180a3b2f0973e96c2064f3f6626ee652e9e96e6c7e6",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-access-acl.json": "b4fc281f04faff5b23ea912bd2ee06cd946b1cf8f4ec674cfe737818a80525b5",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/access.js": "1c51b4c95a651b9373fa23c6e5fef39299bd9c6dd73a80451aefe5c0753c3e77",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
         "scripts/tests/test_owner_access_acceptance.py": "218572960927bd122cd8bda101e1b1a49ef69c1810abcc32bd55196e91e2e9c9",
         "scripts/tests/fixtures/uci_access_sandbox.py": "dbb03ce1e5fdeea0ae9b3aed1a3677d8249336c137d5a036abd5314056a3a116",
         "scripts/uat/test-access-host.py": "e7a66da6a9298c0d95774507d3826872180b79b2a920bbb7068102a4062d8f3d"
@@ -999,19 +1008,19 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_backup_restore.txt",
-        "log_sha256": "4c22672143327d80a8b5230f772de6af045d65c2dc4c0ef06e21661a8132898d"
+        "log_sha256": "793a9770e23f90d014eefa3ad315007317d2a624d1c9fd8fd5d4cc3a567e6b5f"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-restore-check": "3027dfb2ed673e91614d05678c2071e53afebf9319e87515eb1f7453d841894f",
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-restore-check": "e47273983ae8bb1a6764632c606afd1197b3120a659322c3ae26deeb50941a25",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-backup": "daf2ac646604f9d6fce15ad3970b81896cbac4b73719bfce5c30c745b8a2b417",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-restore": "73ddfb40efced8e6ad105ef0fe723078e3093e0f6b99e289616d71c0850e8bc2",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/backup.js": "6ab4a2c37925a3071511f84c1ccf0f42105ac7be23fb63f837d8ae6af961dd11",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
-        "scripts/tests/test_owner_backup_restore_native.py": "0ee790d6fbf1f5d185f3e2d892f764a3f4dac3a267cc40b711229ac353be36dd",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
+        "scripts/tests/test_owner_backup_restore_native.py": "0937eac9efa7854332211e8c5a147d0bc173129c8e08c3afed01dafad956b4b7",
         "scripts/tests/test_veci_backup_export.py": "c4456f3062d4d0ae1c4a1aa8e84fe0b376f15727970e0ef370ec9efa171a2091"
       },
       "status": "pass",
@@ -1042,13 +1051,13 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_cron_scheduler.txt",
-        "log_sha256": "72df52a47721e0b57f97abf755b16d24b3a87dd31171b4914258226f789fa56f"
+        "log_sha256": "7b1e85bc9466470b26e721fe6d5572cfe6d442276b5b9df20558585023c4abcc"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron": "d1706d00734f6da8c8e4027714534959eb84a3d5767fcbe939b4a3ac61457f75",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron.awk": "be4c2710980e11d33dff11a166a8ee7d45a37a712dc746badcc8166a6991b595",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-cron-acl.json": "d4e060792c436f88a3c87a6d489fcf710c41eb7b3118e3af6993a8edc7aebbfc",
@@ -1085,7 +1094,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_ipv6_guarded_settings_toggle.txt",
-        "log_sha256": "ce4ccd1a5810b5715a2bf98a5ef76e7bfd000b87ca0413a304aea6ccc13100d2"
+        "log_sha256": "ed00adad493a34e4978a1165c9dc2382c34ffbb6ef35dfc0d49d17408a9d5df6"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -1096,9 +1105,9 @@
         "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ipv6": "038862684426c507120a1e40b22d2f7016fcc57da08ce542c53bd73667c7329b",
         "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/libexec/rpcd/veci2-ra": "0c1797aabfd2c7e343e42afe5d96dae74e418bc2d3a637e1b010be264369c273",
         "rebuild/veci-v2/packages/veci-v2-ipv6/files/usr/share/rpcd/acl.d/veci-v2-ipv6.json": "eb74a43c6b3cb8364ee7ada9c910c7840f5b6d08314b1821020ea7158c89a455",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "scripts/tests/test_owner_ipv6_native_acceptance.py": "6626c148d389271f9071142e06b3c0897602a5ddac40bb5a75f78db777dbe0d7",
         "scripts/tests/test_veci_v2_ipv6_simple_menu.py": "af915af07a85e972b567e979d147fbfecdb7f52b5c0316e6f57157706b790f55",
         "scripts/uat/test-ipv6-host.py": "843c519daec13a118c42d42a3b284b358897c726d9dbc70433c26f45b584b235"
@@ -1130,7 +1139,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_ipv6_off_by_default.txt",
-        "log_sha256": "702dc7b30b08c95bde2a72a607c2c5cc1ea2f873f27804fc2fd30ebf5a1667fd"
+        "log_sha256": "2366a4467f3ea4aafe901c1499dc1460c8d0418ac6168eb4f716e59a999ee581"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -1168,7 +1177,7 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_leds_buttons.txt",
-        "log_sha256": "d13dd05da4683e30a4ecb907b151e31c126d09f3b9f0511b15b4601ed494a229"
+        "log_sha256": "5c2c4b463cb8bcb44b0a95de6d48fba0822a36adf14499c7efd4eade6d025d50"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
@@ -1198,15 +1207,15 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_logs_diagnostics.txt",
-        "log_sha256": "eddca3a0f743c4000d6153e7d23dc1bf52a6424c7ba2a499d5f14f0777aa46de"
+        "log_sha256": "a286a31c9e97575a071a9881db184ba2d7d9b9607c9d91f146986d716c435dcb"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin": "3ae3ea5adffcf19bd73a864daa47baf0c6a4f270db02b4711675af0e5c16e5b3",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/owner-controls.js": "c5572c2fb4b7175ecdb29f49dda59a28f4282532a7856ffe2639b7795456e465",
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
-        "scripts/tests/test_owner_system_diagnostics_native.py": "b076df18a4f83ce7819fa1f876038a08cf7d249cc2f77180636935e202bafd69",
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
+        "scripts/tests/test_owner_system_diagnostics_native.py": "676aae2b4760f64d81c91922a0aa4a67d418f4e22d8b5e2afbeed0679c76384c",
         "scripts/tests/test_owner_system_admin_source.py": "979321c1a52b8fb89a7c0af50a90a5efa97a5245bf39108e48a7b75c12ec415f"
       },
       "status": "pass",
@@ -1237,19 +1246,20 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_manual_sysupgrade.txt",
-        "log_sha256": "37bafc5cbd2d6560d4f8e7a67da49025fc761198390b425e3e1f5f24c878b471"
+        "log_sha256": "52cabb10a87ae47de18b8c870a77be146b6cb30e1608b456a0c6a2f4f38e49a9"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-verify-image": "4c674c92aba523f35af0501315fb7e817a0039c0b0bc30305525736732bff19d",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-update-policy": "90eb2f545a7c2377e48365bb5bfe046b1eb104476d4d49e08f53598136f1218e",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "758d44c9af27b7bb235c66856fafb039d00fc9371d82d6a8a50a7644b1dc76d2",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "dcebdf3557a76d75b2427c0cd73bb90f1d62250335a54cd72b855fae71372344",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
         "scripts/tests/test_verify_veci_image.py": "2c3e1ba1e16bb1567a3de2e042e44fd58d21e512ad2787969bc5078c20ead5de",
         "scripts/tests/test_veci_update_policy.py": "d989fb51592d63731d0b7c3eecd9a51e099385339da91894d2b05c0c5f401db6",
-        "scripts/tests/test_veci_single_firmware_update_ui.py": "3cfd99b13f701935003dd473f779b7c0c77e801d5515234dff25b8801d6ce396"
+        "scripts/tests/test_veci_single_firmware_update_ui.py": "3cfd99b13f701935003dd473f779b7c0c77e801d5515234dff25b8801d6ce396",
+        "scripts/tests/test_veci_upgrade_receipt.py": "8fd1dcb6ef585c569156ff65dfcfcbf76a545a06e0f7bb37547b55d8b42d270c"
       },
       "status": "pass",
       "test_ids": [
@@ -1259,12 +1269,14 @@
         "test_wrong_board_refused",
         "test_missing_trust_anchor_refused",
         "test_saved_policy_controls_both_apply_paths",
-        "test_updates_only_in_updates_page"
+        "test_updates_only_in_updates_page",
+        "test_manual_and_release_identity"
       ],
       "test_source_files": [
         "scripts/tests/test_verify_veci_image.py",
         "scripts/tests/test_veci_update_policy.py",
-        "scripts/tests/test_veci_single_firmware_update_ui.py"
+        "scripts/tests/test_veci_single_firmware_update_ui.py",
+        "scripts/tests/test_veci_upgrade_receipt.py"
       ]
     },
     "system_services_startup": {
@@ -1278,22 +1290,25 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_services_startup.txt",
-        "log_sha256": "153ed4ee75fec0a4737ab81b6ca4c72b7957bd5df33565f34e920ad2f0ace8d6"
+        "log_sha256": "f82ce54c1c32efdc383fe4d4db730293005b2a59c952f34519a8588df6cf1522"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services": "147f548b37c3fd33b40abc22c9ca5d3c297a4df69ef0348f0d7c1f7a6f47ab28",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-services-acl.json": "f7152b5a56e12ba5fa6f2ac6cde0c2a3484d5fdf1edb20b3cd1a96cf848af42b",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js": "58462393bfc28fba3c619b78224d4e3e085d672b749642a913a6017366b94be2",
-        "scripts/tests/test_owner_services_acceptance.py": "faa7cdcd68e987204cf944eb7abd5f7a1f71d5ed026f7c0afcc887a013a02881"
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/services.js": "55c2351d49679db1ac110752042b02e1007929cc414ae662c25028e50f989b03",
+        "scripts/tests/test_owner_services_acceptance.py": "faa7cdcd68e987204cf944eb7abd5f7a1f71d5ed026f7c0afcc887a013a02881",
+        "scripts/tests/test_veci_v2_services_addon_dom_20261126.py": "63bb655b6b4e8550a9a407808e2d3d1fab845c6fcb813d73a2e1ef374fee38ca"
       },
       "status": "pass",
       "test_ids": [
         "test_real_provider_lifecycle_in_sandbox",
-        "test_no_unrestricted_lte_network_or_ssh_boot_changes"
+        "test_no_unrestricted_lte_network_or_ssh_boot_changes",
+        "test_both_existing_menus_have_single_live_handler_path"
       ],
       "test_source_files": [
-        "scripts/tests/test_owner_services_acceptance.py"
+        "scripts/tests/test_owner_services_acceptance.py",
+        "scripts/tests/test_veci_v2_services_addon_dom_20261126.py"
       ]
     },
     "system_signed_github_ota": {
@@ -1309,18 +1324,19 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_signed_github_ota.txt",
-        "log_sha256": "c6b6f4c5c45b057580c4d844f7617a103b0162dc2b13a95d6a5022d651f2efc8"
+        "log_sha256": "589b2b05cf7057abfa78249df8a3d0500f6f60de6858910b171dffc82fb57a2d"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-verify-image": "4c674c92aba523f35af0501315fb7e817a0039c0b0bc30305525736732bff19d",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-update-policy": "90eb2f545a7c2377e48365bb5bfe046b1eb104476d4d49e08f53598136f1218e",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "758d44c9af27b7bb235c66856fafb039d00fc9371d82d6a8a50a7644b1dc76d2",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "dcebdf3557a76d75b2427c0cd73bb90f1d62250335a54cd72b855fae71372344",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
         "rebuild/veci-v2/ci/stage-v2-source.sh": "864a4a69bbd012645934a5b4db0e6fd928ed972ed58019bc9ca0e02606a16e32",
         "scripts/tests/test_veci_v2_firmware_channel.py": "619af3d633cea9fd0f7763e0d821b5b854dd21a2f1199c15f1b8ed433d1e93e8",
         "scripts/tests/test_verify_veci_image.py": "2c3e1ba1e16bb1567a3de2e042e44fd58d21e512ad2787969bc5078c20ead5de",
-        "scripts/tests/test_veci_single_firmware_update_ui.py": "3cfd99b13f701935003dd473f779b7c0c77e801d5515234dff25b8801d6ce396"
+        "scripts/tests/test_veci_single_firmware_update_ui.py": "3cfd99b13f701935003dd473f779b7c0c77e801d5515234dff25b8801d6ce396",
+        "scripts/tests/test_veci_upgrade_receipt.py": "8fd1dcb6ef585c569156ff65dfcfcbf76a545a06e0f7bb37547b55d8b42d270c"
       },
       "status": "pass",
       "test_ids": [
@@ -1328,12 +1344,14 @@
         "test_wrong_release_refused",
         "test_wrong_board_refused",
         "test_missing_verifier_refused_even_with_key_file",
-        "test_updates_failures_distinguish_no_network_from_bad_manifest"
+        "test_updates_failures_distinguish_no_network_from_bad_manifest",
+        "test_manual_and_release_identity"
       ],
       "test_source_files": [
         "scripts/tests/test_veci_v2_firmware_channel.py",
         "scripts/tests/test_verify_veci_image.py",
-        "scripts/tests/test_veci_single_firmware_update_ui.py"
+        "scripts/tests/test_veci_single_firmware_update_ui.py",
+        "scripts/tests/test_veci_upgrade_receipt.py"
       ]
     },
     "system_time_ntp": {
@@ -1346,12 +1364,12 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_time_ntp.txt",
-        "log_sha256": "33ce4f0aae34f5619b2e9434d0b582cb72f9255790f8eb95911066c0b1fdfb17"
+        "log_sha256": "8a90d4b674671390e75c2f1990d192ad0bab6826005b7e546b3a321b8cc8237b"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-system-admin": "3ae3ea5adffcf19bd73a864daa47baf0c6a4f270db02b4711675af0e5c16e5b3",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
         "scripts/tests/test_owner_ntp_acceptance.py": "e4bc64b625ed62e1d723f2b33fbf4285875f502f71a34a2051eb04da83c819d3"
       },
       "status": "pass",
@@ -1377,15 +1395,15 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_update_policy.txt",
-        "log_sha256": "0646e9f1ddf7e4f10d40fd38735a3a90f668c8d43f327f3b4e3c55dd742f4a7e"
+        "log_sha256": "6232f22dc9937f1f50a4aa656edebcb636e68a1aa2d068a7d5c98e4b063b303f"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-update-policy": "90eb2f545a7c2377e48365bb5bfe046b1eb104476d4d49e08f53598136f1218e",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-verify-image": "4c674c92aba523f35af0501315fb7e817a0039c0b0bc30305525736732bff19d",
         "rebuild/veci-v2/packages/veci-v2-runtime/update-policy.default": "5cbd4963ad40386508a15657dc46eca771d7d830cc90b8833adf0453020c247c",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "758d44c9af27b7bb235c66856fafb039d00fc9371d82d6a8a50a7644b1dc76d2",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-verify": "dcebdf3557a76d75b2427c0cd73bb90f1d62250335a54cd72b855fae71372344",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/update-policy.js": "af5f344dcfc37c1aed7e1a0cfe54f3c85659cb7db5b4ec6390166cb7b8af5b1c",
         "scripts/tests/test_veci_update_policy.py": "d989fb51592d63731d0b7c3eecd9a51e099385339da91894d2b05c0c5f401db6",
         "scripts/tests/test_owner_verify_only_default.py": "2c59532168fc38387c43f3d88bd0b35e18ae22823f5432f5d7f904ac7044836a",
@@ -1410,35 +1428,43 @@
       "implementation_files": [
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile"
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/veci-design.css"
       ],
       "receipt": {
         "kind": "executed_source_tests",
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/ui_four_group_navigation.txt",
-        "log_sha256": "93a12a20acc69af821b86611da116c8c9ff4932f4ad3565eadd4c340da5ff3d5"
+        "log_sha256": "d2e2bda79f1bb6293687af401553ff2344ecac5fe687778b95288410eb100ab0"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
-        "scripts/tests/test_veci_v2_contract.py": "dee31211d7e7409206ed4f70b96a8ccf03db1dd65171cf284804900ff8f80021",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/veci-design.css": "70cd900592f4f6c4b3cc2dbba2c259bed543009b2c7e598fb7cbbfadf5da1670",
+        "scripts/tests/test_veci_v2_contract.py": "a59f4edb7e2de31b742b2e3bc6719c3dcfd31d1f978de8f7f6c5157923cc708c",
         "scripts/tests/test_veci_ui_sessions.py": "a5d9bc884e4837b9501df77ea2903380ea99f471f10606471090d4ff00152b10",
-        "scripts/tests/test_owner_controls_native_integration.py": "ac5c01f983a5a621feaff7fb21bb6411bab443fb1751281105908c6bac8d9821"
+        "scripts/tests/test_owner_controls_native_integration.py": "ac5c01f983a5a621feaff7fb21bb6411bab443fb1751281105908c6bac8d9821",
+        "scripts/tests/test_veci_v2_all_native_scripts_bootstrap_20261126.py": "fa84b92c4cde26726489bf58ed797c4943f4037c8f459ff1607f6a594514cfd9",
+        "scripts/tests/test_veci_v2_gui_all_acl_20261126.py": "0fea745e74f9a806e02f0ed2e1dafc4eb39c3e39f4fd404804a9d45df3cbb295"
       },
       "status": "pass",
       "test_ids": [
         "test_ui_requires_explicit_auth_no_persistent_session",
         "test_login_permissions_and_logout",
         "test_gui_hooks_valid_and_authenticated",
-        "test_group_navigation_remains_simple"
+        "test_group_navigation_remains_simple",
+        "test_actual_script_order_loads_without_missing_dom_controls",
+        "test_every_direct_rpc_has_method_and_permission"
       ],
       "test_source_files": [
         "scripts/tests/test_veci_v2_contract.py",
         "scripts/tests/test_veci_ui_sessions.py",
-        "scripts/tests/test_owner_controls_native_integration.py"
+        "scripts/tests/test_owner_controls_native_integration.py",
+        "scripts/tests/test_veci_v2_all_native_scripts_bootstrap_20261126.py",
+        "scripts/tests/test_veci_v2_gui_all_acl_20261126.py"
       ]
     },
     "wifi_ap_2g": {
@@ -1450,40 +1476,49 @@
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js"
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-activate"
       ],
       "receipt": {
         "kind": "executed_source_tests",
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/wifi_ap_2g.txt",
-        "log_sha256": "ae67012419536069220ba4187c2865684d35bb4451f3993842c00692e1f828dd"
+        "log_sha256": "3f819db47b9c48c0ac7a1176721727a960b8f13f4c579c140276b1f704129bcf"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi": "3d09cb331241e208a6502136f0d03e47364daceb2fc7bfffb4500e2d7bc93555",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "0fe50a2af635734887cf285e8ebdb00d0d2f43bf586237e8455fc8fae375ebaa",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "695621488b7f3efc84ffee358fecff5fea01880d59b2e8efa6078ae0750ea672",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
-        "scripts/tests/test_owner_wifi_acceptance.py": "9e9dee2b2948a732c4e6b6fbfa1f8280db5fc523c696266a59fad7b15b2bba7b",
-        "scripts/uat/test-wifi-name-host.py": "4e254bd8d16406914e7dd2e80deafe2a2852d7f5bf67cddbb6b117f7a5baefa0",
-        "scripts/uat/test-wifi-controls-host.py": "d0afd2db2a52a0576fbca1ec9560ea66262bb920c539237d9381b5bbc6284023"
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi": "8ec1da484b8dab5389f3819b80c399ea9476bcc8feb2d5ff6c925d420f3d5d2c",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "980587245612c4c21ea721a64bd53da024e862614e0b67d211d78758525c57b0",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "e323fcee46941a23f959cbc938a1468c478e9409055c5829b3a13df7cb552a71",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-activate": "7b1a2929b9e88a58e025866404b0b53d8b29702e631d74a7180410e21a5670fa",
+        "scripts/tests/test_owner_wifi_acceptance.py": "bcbf947c56b66dd86780e9ea7c37aaa0dc4b609b927e0a1680062cb9d754388f",
+        "scripts/uat/test-wifi-name-host.py": "706d9092644e5ef2fddb662dc4426a9ba076f73680167c109ddf0fe68ecbacee",
+        "scripts/uat/test-wifi-controls-host.py": "fe63d50bdb89e22f23ef23eb525099688dbacd0586b3a001d9eba35438bb8df4",
+        "scripts/tests/test_veci_v2_connectivity_menu_regression_20261126.py": "74127550323c8e4bbdbd6855ccfc9db1be82afbbfcd98c0302d766a54ebe2f8b",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py": "b2a5c7b7b83dff0355014713ac17dab80bd95d2afde620e92dbb5e8decbd4a27"
       },
       "status": "pass",
       "test_ids": [
         "test_primary_ap_native_uci",
         "test_channel_survey_acl_and_auth_native_uci",
         "test_incompatible_band_and_failed_commit_preserve_configuration",
-        "test_privileged_actions_have_write_acl"
+        "test_privileged_actions_have_write_acl",
+        "test_activation_has_acl_and_one_shot_fail_closed",
+        "test_real_ui_render_handles_five_distinct_cases",
+        "test_dual_source_is_read_only_and_never_equates_zero_to_disconnected"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_wifi_acceptance.py",
         "scripts/uat/test-wifi-name-host.py",
-        "scripts/uat/test-wifi-controls-host.py"
+        "scripts/uat/test-wifi-controls-host.py",
+        "scripts/tests/test_veci_v2_connectivity_menu_regression_20261126.py",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py"
       ]
     },
     "wifi_clients_access_control": {
@@ -1502,33 +1537,37 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/wifi_clients_access_control.txt",
-        "log_sha256": "99e210199e7bbcd8a82186bc48eed725613a958bc74c320517df9aa98ef52384"
+        "log_sha256": "7912d425e6715abbcebd03bb677b540b1f99d430e3a69b3ef3fbaf74d6d9d493"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi": "3d09cb331241e208a6502136f0d03e47364daceb2fc7bfffb4500e2d7bc93555",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "0fe50a2af635734887cf285e8ebdb00d0d2f43bf586237e8455fc8fae375ebaa",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "695621488b7f3efc84ffee358fecff5fea01880d59b2e8efa6078ae0750ea672",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
-        "scripts/tests/test_owner_wifi_acceptance.py": "9e9dee2b2948a732c4e6b6fbfa1f8280db5fc523c696266a59fad7b15b2bba7b",
-        "scripts/uat/test-wifi-name-host.py": "4e254bd8d16406914e7dd2e80deafe2a2852d7f5bf67cddbb6b117f7a5baefa0",
-        "scripts/uat/test-wifi-controls-host.py": "d0afd2db2a52a0576fbca1ec9560ea66262bb920c539237d9381b5bbc6284023"
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi": "8ec1da484b8dab5389f3819b80c399ea9476bcc8feb2d5ff6c925d420f3d5d2c",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "980587245612c4c21ea721a64bd53da024e862614e0b67d211d78758525c57b0",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "e323fcee46941a23f959cbc938a1468c478e9409055c5829b3a13df7cb552a71",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
+        "scripts/tests/test_owner_wifi_acceptance.py": "bcbf947c56b66dd86780e9ea7c37aaa0dc4b609b927e0a1680062cb9d754388f",
+        "scripts/uat/test-wifi-name-host.py": "706d9092644e5ef2fddb662dc4426a9ba076f73680167c109ddf0fe68ecbacee",
+        "scripts/uat/test-wifi-controls-host.py": "fe63d50bdb89e22f23ef23eb525099688dbacd0586b3a001d9eba35438bb8df4",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py": "b2a5c7b7b83dff0355014713ac17dab80bd95d2afde620e92dbb5e8decbd4a27"
       },
       "status": "pass",
       "test_ids": [
         "test_primary_ap_native_uci",
         "test_channel_survey_acl_and_auth_native_uci",
         "test_incompatible_band_and_failed_commit_preserve_configuration",
-        "test_privileged_actions_have_write_acl"
+        "test_privileged_actions_have_write_acl",
+        "test_real_ui_render_handles_five_distinct_cases",
+        "test_dual_source_is_read_only_and_never_equates_zero_to_disconnected"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_wifi_acceptance.py",
         "scripts/uat/test-wifi-name-host.py",
-        "scripts/uat/test-wifi-controls-host.py"
+        "scripts/uat/test-wifi-controls-host.py",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py"
       ]
     },
     "wifi_survey_channel": {
@@ -1547,33 +1586,37 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/wifi_survey_channel.txt",
-        "log_sha256": "881e3149a34b1412717df4fca36b3cbd7583b41331a9fabedd110033bf242e17"
+        "log_sha256": "a4fb1dad5b774997c392b3c6cc8a367339f276922a94358f26a576c11f4e698a"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "39768e11564206cffee114d1f893c69950684e947b23da3aeb07245407c3949d",
-        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "448d3409ec96fc157bec691f1eb4aca40c7a1780cefd633097c506357735fcb2",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "0094712d8cb5c03cf23b516b7136c1a3a29382074970ca0fb54e601344311deb",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi": "3d09cb331241e208a6502136f0d03e47364daceb2fc7bfffb4500e2d7bc93555",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "0fe50a2af635734887cf285e8ebdb00d0d2f43bf586237e8455fc8fae375ebaa",
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "f504a5e3399dccf258cd714bd817a8ce00299749f32a115373864fbbab42026b",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "695621488b7f3efc84ffee358fecff5fea01880d59b2e8efa6078ae0750ea672",
-        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "d747e60552da53fb64181267caba906782ec8f7a01dc19f660523a199c3c4a7f",
-        "scripts/tests/test_owner_wifi_acceptance.py": "9e9dee2b2948a732c4e6b6fbfa1f8280db5fc523c696266a59fad7b15b2bba7b",
-        "scripts/uat/test-wifi-name-host.py": "4e254bd8d16406914e7dd2e80deafe2a2852d7f5bf67cddbb6b117f7a5baefa0",
-        "scripts/uat/test-wifi-controls-host.py": "d0afd2db2a52a0576fbca1ec9560ea66262bb920c539237d9381b5bbc6284023"
+        "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
+        "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi": "8ec1da484b8dab5389f3819b80c399ea9476bcc8feb2d5ff6c925d420f3d5d2c",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-wifi-controls": "980587245612c4c21ea721a64bd53da024e862614e0b67d211d78758525c57b0",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/wifi-controls.js": "e323fcee46941a23f959cbc938a1468c478e9409055c5829b3a13df7cb552a71",
+        "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/app.js": "445ca0c230037e6bf2427afc10ebf8028dec162069970468b514d4e5183870cf",
+        "scripts/tests/test_owner_wifi_acceptance.py": "bcbf947c56b66dd86780e9ea7c37aaa0dc4b609b927e0a1680062cb9d754388f",
+        "scripts/uat/test-wifi-name-host.py": "706d9092644e5ef2fddb662dc4426a9ba076f73680167c109ddf0fe68ecbacee",
+        "scripts/uat/test-wifi-controls-host.py": "fe63d50bdb89e22f23ef23eb525099688dbacd0586b3a001d9eba35438bb8df4",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py": "b2a5c7b7b83dff0355014713ac17dab80bd95d2afde620e92dbb5e8decbd4a27"
       },
       "status": "pass",
       "test_ids": [
         "test_primary_ap_native_uci",
         "test_channel_survey_acl_and_auth_native_uci",
         "test_incompatible_band_and_failed_commit_preserve_configuration",
-        "test_privileged_actions_have_write_acl"
+        "test_privileged_actions_have_write_acl",
+        "test_real_ui_render_handles_five_distinct_cases",
+        "test_dual_source_is_read_only_and_never_equates_zero_to_disconnected"
       ],
       "test_source_files": [
         "scripts/tests/test_owner_wifi_acceptance.py",
         "scripts/uat/test-wifi-name-host.py",
-        "scripts/uat/test-wifi-controls-host.py"
+        "scripts/uat/test-wifi-controls-host.py",
+        "scripts/tests/test_veci_v2_wifi_client_observation_20261126.py"
       ]
     }
   }

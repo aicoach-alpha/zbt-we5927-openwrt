@@ -101,9 +101,18 @@ done
 # Archives built on another device must never replace these exact board settings.
 tar -xzOf "$archive" etc/config/we5927_lte > "$tmp/lte" 2>/dev/null ||
   tar -xzOf "$archive" ./etc/config/we5927_lte > "$tmp/lte" 2>/dev/null || exit 1
-grep -Eq "^[[:space:]]*option[[:space:]]+usb_vid[[:space:]]+['\"]?05c6['\"]?[[:space:]]*$" "$tmp/lte" || exit 1
-grep -Eq "^[[:space:]]*option[[:space:]]+usb_pid[[:space:]]+['\"]?902e['\"]?[[:space:]]*$" "$tmp/lte" || exit 1
-grep -Eq "^[[:space:]]*option[[:space:]]+sim_gpio[[:space:]]+['\"]?46['\"]?[[:space:]]*$" "$tmp/lte" || exit 1
-grep -Eq "^[[:space:]]*option[[:space:]]+sim1_value[[:space:]]+['\"]?1['\"]?[[:space:]]*$" "$tmp/lte" || exit 1
-grep -Eq "^[[:space:]]*option[[:space:]]+sim2_value[[:space:]]+['\"]?0['\"]?[[:space:]]*$" "$tmp/lte" || exit 1
+# Parse the effective values of the exact named modem section using UCI,
+# isolated from the device's live config, override and staged delta directories.
+mkdir "$tmp/config" "$tmp/override" "$tmp/delta" || exit 1
+mv "$tmp/lte" "$tmp/config/we5927_lte" || exit 1
+read_config() {
+  uci -q -s -c "$tmp/config" -C "$tmp/override" -t "$tmp/delta" get "$1"
+}
+[ "$(read_config we5927_lte.main)" = modem ] || exit 1
+for pair in usb_vid:05c6 usb_pid:902e sim_gpio:46 sim1_value:1 sim2_value:0; do
+  key=${pair%%:*}
+  expected=${pair#*:}
+  actual=$(read_config "we5927_lte.main.$key") || exit 1
+  [ "$actual" = "$expected" ] || exit 1
+done
 echo VALIDATED_EXACT_BOARD_CONFIG_BACKUP

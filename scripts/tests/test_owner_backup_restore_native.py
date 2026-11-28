@@ -2,7 +2,7 @@
 
 Never invokes real sysupgrade -r: the fake records would-be restores only.
 """
-import hashlib,io,json,os,subprocess,tarfile,tempfile,unittest
+import hashlib,io,json,os,shutil,subprocess,tarfile,tempfile,unittest
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -27,6 +27,9 @@ class RestoreSourceAcceptance(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         t=Path(temp.name)
         self.t=t
+        native_uci=os.environ.get("VECI_HOST_UCI") or shutil.which("uci")
+        self.assertTrue(native_uci and Path(native_uci).is_file(), "native UCI required")
+        (t/"uci").symlink_to(Path(native_uci).resolve())
         self.board=t/"board";self.board.write_text("zbtlink,zbt-we5927\n")
         self.receipt=t/"receipt"
         self.restored=t/"restored.log"
@@ -116,6 +119,11 @@ esac
     def test_rejects_wrong_board_traversal_symlinks_and_unknown_entries(self):
         candidates=[
            self.pack([("etc/config/we5927_lte",LTE.replace(b"05c6",b"1234")),("etc/config/network",NETWORK)]),
+           self.pack([("etc/config/we5927_lte",LTE+b" option sim_gpio '99'\n"),("etc/config/network",NETWORK)]),
+           self.pack([("etc/config/we5927_lte",LTE.replace(b"'main'",b"'other'")),("etc/config/network",NETWORK)]),
+           self.pack([("etc/config/we5927_lte",LTE.replace(b"config modem",b"config other")),("etc/config/network",NETWORK)]),
+           self.pack([("etc/config/we5927_lte",LTE+b" list usb_vid 'ffff'\n"),("etc/config/network",NETWORK)]),
+
            self.pack([("etc/config/we5927_lte",LTE),("../etc/passwd",b"bad")]),
            self.pack([("etc/config/we5927_lte",LTE),("/etc/config/network",NETWORK)]),
            self.pack([("etc/config/we5927_lte",LTE),("etc/config/network",("link","../../etc/shadow"))]),

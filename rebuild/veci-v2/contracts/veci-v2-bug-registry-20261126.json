@@ -1,0 +1,744 @@
+{
+  "schema": "veci_v2_defects_v1",
+  "board": "zbtlink,zbt-we5927",
+  "firmware_target": "OpenWrt 25.12.6",
+  "reviewed_on": "2026-11-26",
+  "scope": "known and reproducible defects plus unresolved acceptance gaps, not exhaustive discovery proof",
+  "source_status_values": [
+    "source_fixed",
+    "source_open",
+    "requires_hardware_verification",
+    "requires_ci_verification",
+    "mitigation_only"
+  ],
+  "hardware_status_values": [
+    "not_tested",
+    "pass_new_candidate"
+  ],
+  "current_owner_hardware_evidence": "rebuild/veci-v2/contracts/owner-physical-evidence-20261126.json",
+  "module_contract": "rebuild/veci-v2/contracts/veci-v2-rebuild-contract.json",
+  "source_evidence": "rebuild/veci-v2/contracts/owner-final-source-evidence.json",
+  "bugs": [
+    {
+      "id": "WIFI-001",
+      "kind": "confirmed_bug",
+      "area": "wifi",
+      "severity": "critical",
+      "summary": "Global netifd reload during Wi-Fi enable could interrupt LTE and hang MT76",
+      "root_cause": "Previous native AP helper called network reload even though hardware field logs forbid it",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g",
+        "lte_rndis_data"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_connectivity_menu_regression_20261126.py",
+        "test_owner_wifi_router_repair_20261124.py"
+      ],
+      "protection": "WiFi prepare helper has no network reload, radio up/down or reboot; UCI-only and manual reboot"
+    },
+    {
+      "id": "WIFI-002",
+      "kind": "confirmed_bug",
+      "area": "wifi",
+      "severity": "high",
+      "summary": "Fresh flash leaves AP disabled with encryption none; missing secure onboarding",
+      "root_cause": "Firstboot intentionally secures AP but GUI previously lacked safe WPA2 completion path",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_connectivity_menu_regression_20261126.py",
+        "test_owner_wifi_acceptance.py"
+      ],
+      "protection": "WPA2 configuration plus explicit next-boot preparation; external phone test still required"
+    },
+    {
+      "id": "WIFI-003",
+      "kind": "confirmed_bug",
+      "area": "wifi",
+      "severity": "critical",
+      "summary": "mt76 MCU timeout/hung AP can stop connectivity",
+      "root_cause": "Hardware driver/radio reconfiguration hangs have occurred; kernel fix and long-run recovery not proven",
+      "source_state": "requires_hardware_verification",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g",
+        "firmware_network_watchdog"
+      ],
+      "regression_test_files": [
+        "test_wifi_guardian_observe_only.py",
+        "test_owner_wifi_readonly_triage_20261124.py",
+        "test_mt76_client_evidence_readonly_20261126.py"
+      ],
+      "protection": "Source mitigates trigger: AP activation is UCI-only with no global network reload, wifi down/up, modem power-cycle or automatic restart; mt76 MCU timeout/root cause is NOT proven fixed. LAB compilation permitted after real source tests, but firmware release/physical flash needs driver UAT and recovery proof.",
+      "live_production_passive_evidence": {
+        "evidence_path": "rebuild/veci-v2/contracts/owner-mt76-production-passive-20261126.json",
+        "status": "PASS_READ_ONLY_IDLE_35_OF_35",
+        "new_mt76_errors": 0,
+        "connected_clients_observed": 0,
+        "driver_root_cause_resolved": false,
+        "new_candidate_verified": false,
+        "station_dump_failure_excluded": false,
+        "third_diagnostic": {
+          "iw_exit": 0,
+          "iw_stations": 0,
+          "hostapd_get_clients_exit": 0,
+          "authorized_count": 0,
+          "active_client_test_proven": false,
+          "hostapd_clients": 0,
+          "client_count_parser": "native_libubox_jshn"
+        },
+        "fourth_diagnostic": {
+          "five_samples": 5,
+          "iw_exit_all": 0,
+          "iw_clients_each_sample": 0,
+          "hostapd_exit_all": 0,
+          "hostapd_clients_each_sample": 0,
+          "phone_connected_during_sample": "UNCONFIRMED",
+          "mt76_root_cause_resolved": false
+        },
+        "fifth_diagnostic": {
+          "read_only_lte_wifi_pass": "5/5",
+          "iw_hostapd_counter_match": "5/5",
+          "positive_client_samples": "0/5",
+          "new_mt76_errors": 0,
+          "associated_client_uat": "NOT_PROVEN",
+          "candidate_hardware_uat": "NOT_RUN"
+        },
+        "owner_confirms_wifi_internet": "YES_SEPARATE_REPORT_NOT_CONCURRENT_WITH_SAMPLES",
+        "next_action": "Compare client BSSID with current primary AP and observe association concurrently under traffic; no forced reconnect or network reload",
+        "ap_identity_check": {
+          "ssid": "VeCI-WE5927",
+          "interface": "phy0-ap0",
+          "mode": "AP",
+          "phy": "phy0",
+          "channel": 1,
+          "phone_bssid_match": "UNCONFIRMED",
+          "driver_root_cause_resolved": false
+        }
+      }
+    },
+    {
+      "id": "WIFI-004",
+      "kind": "confirmed_bug",
+      "area": "wifi",
+      "severity": "medium",
+      "summary": "SSID status depended on hexdump not included on minimal router",
+      "root_cause": "Optional binary dependency in RPC status path",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_connectivity_menu_regression_20261126.py"
+      ],
+      "protection": "Use libubox JSON escaping, allow legacy hex response in frontend"
+    },
+    {
+      "id": "WIFI-005",
+      "kind": "confirmed_bug",
+      "area": "wifi",
+      "severity": "medium",
+      "summary": "Unspecified radio0.disabled was incorrectly considered disabled by PowerShell v2",
+      "root_cause": "Script demanded literal 0 instead of accepting absent UCI default",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g"
+      ],
+      "regression_test_files": [
+        "test_owner_wifi_router_repair_20261124.py"
+      ],
+      "protection": "Allow unset or 0 for radio; keep AP fail-closed until WPA2 ready"
+    },
+    {
+      "id": "WIFI-006",
+      "kind": "confirmed_bug",
+      "area": "ui",
+      "severity": "medium",
+      "summary": "Main Wi-Fi controls were placed in Network Overview instead of Wi-Fi",
+      "root_cause": "Mismatched HTML data-group and menu location",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "ui_four_group_navigation",
+        "wifi_ap_2g"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_connectivity_menu_regression_20261126.py",
+        "test_veci_v2_native_gui_refresh_20261126.py"
+      ],
+      "protection": "Menu-to-control and DOM IDs tested"
+    },
+    {
+      "id": "WIFI-007",
+      "kind": "risk",
+      "area": "wifi",
+      "severity": "high",
+      "summary": "Configuration rollback cannot recover a hung MT76 kernel state",
+      "root_cause": "UCI backup restores persistent settings but cannot safely force driver reset on sole router",
+      "source_state": "mitigation_only",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g",
+        "firmware_network_watchdog"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_connectivity_menu_regression_20261126.py",
+        "test_wifi_guardian_single_alert.py"
+      ],
+      "protection": "No automatic runtime reload; owner-controlled recovery and test after reboot"
+    },
+    {
+      "id": "LTE-001",
+      "kind": "observed_failure",
+      "area": "lte",
+      "severity": "critical",
+      "summary": "Earlier flash had no IP on usb0 or gateway and no internet",
+      "root_cause": "Modem RNDIS and netifd startup timing, route management and APN readiness",
+      "source_state": "requires_hardware_verification",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "lte_rndis_data",
+        "firmware_network_watchdog"
+      ],
+      "regression_test_files": [
+        "test_lte_rndis_identity.py",
+        "test_lte_coldboot_phase.py",
+        "test_lte_https_interface.py"
+      ],
+      "protection": "Current router SIM1 + HTTPS204 works; new binary coldboot UAT not done"
+    },
+    {
+      "id": "LTE-002",
+      "kind": "confirmed_bug",
+      "area": "lte",
+      "severity": "high",
+      "summary": "SIM absent was surfaced as APN configuration failure on manual SIM2 trial",
+      "root_cause": "Manual SIM switch applied APN without first proving CPIN READY",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "lte_dual_sim_manual",
+        "lte_apn_pin_puk"
+      ],
+      "regression_test_files": [
+        "test_lte_sim_switch_failure.py",
+        "test_owner_lte_sim_missing_cme_20261126.py"
+      ],
+      "protection": "SIM readiness required before APN/PDP"
+    },
+    {
+      "id": "LTE-003",
+      "kind": "confirmed_bug",
+      "area": "lte",
+      "severity": "high",
+      "summary": "Manual SIM rollback risked additional power cycle and an unclear status",
+      "root_cause": "Owner manager already attempts verified single rollback; wrapper could repeat it",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "lte_dual_sim_manual"
+      ],
+      "regression_test_files": [
+        "test_owner_sim_failure_rollback_20261126.py",
+        "test_veci_v2_connectivity_menu_regression_20261126.py"
+      ],
+      "protection": "Single canonical LTE manager, explicit rollback verified/unverified"
+    },
+    {
+      "id": "LTE-004",
+      "kind": "confirmed_bug",
+      "area": "lte",
+      "severity": "high",
+      "summary": "Re-selecting the already active SIM could hard-cycle a working modem",
+      "root_cause": "Manual CLI path always started selected modem",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "lte_dual_sim_manual"
+      ],
+      "regression_test_files": [
+        "test_owner_sim_failure_rollback_20261126.py"
+      ],
+      "protection": "Exact same slot no-op"
+    },
+    {
+      "id": "LTE-005",
+      "kind": "validation_gap",
+      "area": "lte",
+      "severity": "high",
+      "summary": "GPIO46 selector polarity only proven for SIM1, not a functioning SIM2",
+      "root_cause": "Single router; SIM2 field trial was absent/not registered",
+      "source_state": "requires_hardware_verification",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "lte_dual_sim_manual"
+      ],
+      "regression_test_files": [
+        "test_owner_manual_sim_source.py",
+        "test_lte_sim_switch_failure.py"
+      ],
+      "protection": "No SIM2 hardware PASS without inserted SIM and live registration"
+    },
+    {
+      "id": "LTE-006",
+      "kind": "risk",
+      "area": "lte",
+      "severity": "high",
+      "summary": "Concurrent modem AT commands may block USB transport and SMS",
+      "root_cause": "Modem command channel is shared, not independently scalable",
+      "source_state": "requires_hardware_verification",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "lte_rndis_data",
+        "sms_inbox"
+      ],
+      "regression_test_files": [
+        "test_sms_port_transaction.py",
+        "test_lte_at_port_identity.py"
+      ],
+      "protection": "One shared modem manager/port lock and bounded response; live stability pending"
+    },
+    {
+      "id": "UI-001",
+      "kind": "confirmed_bug",
+      "area": "ui",
+      "severity": "high",
+      "summary": "Add-on menu calls were sent to wrong services RPC methods",
+      "root_cause": "Frontend used veci.v2.services for addonProfiles and mutations; implementation belongs to veci.v2.addon",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "addon_enable_disable",
+        "system_services_startup"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_connectivity_menu_regression_20261126.py",
+        "test_owner_addon_profiles_source.py"
+      ],
+      "protection": "One canonical startup provider and distinct addon profiles owner; both exercised against real HTML IDs by Node VM"
+    },
+    {
+      "id": "UI-002",
+      "kind": "confirmed_bug",
+      "area": "ui",
+      "severity": "medium",
+      "summary": "Mobile navigation UI caused browser session regression test failure",
+      "root_cause": "Fixture lacked body.classList used by new navigation",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "router_login_and_permissions",
+        "ui_four_group_navigation"
+      ],
+      "regression_test_files": [
+        "test_veci_ui_sessions.py",
+        "test_veci_v2_native_gui_refresh_20261126.py"
+      ],
+      "protection": "Authenticated login/logout/browser DOM regression"
+    },
+    {
+      "id": "UI-003",
+      "kind": "validation_gap",
+      "area": "ui",
+      "severity": "high",
+      "summary": "Every interactive menu has not yet passed end-to-end browser UAT",
+      "root_cause": "Static handlers and RPC methods may exist while actual device actions still fail",
+      "source_state": "requires_hardware_verification",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "ui_four_group_navigation",
+        "system_services_startup",
+        "addon_enable_disable"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_connectivity_menu_regression_20261126.py",
+        "test_veci_v2_native_gui_refresh_20261126.py",
+        "test_veci_v2_all_native_scripts_bootstrap_20261126.py"
+      ],
+      "protection": "Runtime browser E2E must check each visible action and real backend effect"
+    },
+    {
+      "id": "SMS-001",
+      "kind": "validation_gap",
+      "area": "sms",
+      "severity": "high",
+      "summary": "SMS object registered while feature disabled/not proven for inbox and send",
+      "root_cause": "Backend availability does not prove actual modem SMS read and delivery",
+      "source_state": "requires_hardware_verification",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "sms_inbox",
+        "sms_send_and_delete",
+        "sms_sent_and_drafts"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_sms_ui.py",
+        "test_sms_port_transaction.py"
+      ],
+      "protection": "Real modem send/receive/read/delete with permission and privacy checks"
+    },
+    {
+      "id": "REL-001",
+      "kind": "confirmed_bug",
+      "area": "release",
+      "severity": "critical",
+      "summary": "31 source module receipts have outdated SHA256 and release source gate blocks build",
+      "root_cause": "New implementation and tests changed without evidence renewal",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "system_manual_sysupgrade",
+        "ui_four_group_navigation"
+      ],
+      "regression_test_files": [
+        "test_owner_source_evidence_integrity.py",
+        "test_owner_final_build_block.py"
+      ],
+      "protection": "Renewed actual native CI source receipts for all 39 active modules, 175 scoped test executions, commit e275946043ceebce061a97042041620c0a80edf7, GitHub workflow run 45758892212; exact log and source hashes independently verified",
+      "source_evidence": {
+        "commit": "e275946043ceebce061a97042041620c0a80edf7",
+        "workflow_run_id": 45758892212,
+        "scoped_test_executions": 175,
+        "modules_accepted": 39,
+        "evidence_origin": "GitHub_Actions_native_UCI_libubox",
+        "hardware_pass": false
+      }
+    },
+    {
+      "id": "REL-002",
+      "kind": "confirmed_bug",
+      "area": "release",
+      "severity": "high",
+      "summary": "Final SquashFS feature audit did not require new Wi-Fi activation helper",
+      "root_cause": "One manifest entry checked RPC provider but not its installed helper",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g",
+        "system_manual_sysupgrade"
+      ],
+      "regression_test_files": [
+        "test_owner_final_rom_content.py",
+        "test_veci_v2_connectivity_menu_regression_20261126.py"
+      ],
+      "protection": "Exact ROM SHA256 mapping includes helper binary"
+    },
+    {
+      "id": "REL-003",
+      "kind": "validation_gap",
+      "area": "release",
+      "severity": "critical",
+      "summary": "Exact f87e7ec5 signed image trust and sysupgrade -T preflight passed on owner router; restoration and post-flash acceptance pending",
+      "root_cause": "Source-only evidence cannot prove device compatibility; exact candidate verify-only hardware preflight was subsequently executed but not a release or recovery acceptance",
+      "source_state": "requires_hardware_verification",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "system_manual_sysupgrade",
+        "system_signed_github_ota"
+      ],
+      "regression_test_files": [
+        "test_finalize_sysupgrade_no_fake_metadata.py",
+        "test_verify_veci_image.py"
+      ],
+      "protection": "Owner-pasted on-router verify-only receipt confirms signed SHA, installed trust and sysupgrade -T for f87e7ec5. Do not promote to pass_new_candidate: a preflight does not prove successful flash, boot, rollback, WiFi/LTE/SMS, or 72h reliability.",
+      "candidate_preflight": {
+        "source_commit": "f87e7ec5fec2c437d65fd95e7139bff90eb3019a",
+        "signed_sha256": "3adc815e77a7c9b0e25f742601eb2dc94423aad540b26efa86423821a667abb1",
+        "receipt": "docs/VECI-V2-WE5927-PHYSICAL-PREFLIGHT-f87e7ec5-20261127.json",
+        "signature_with_installed_trust": "owner_reported_pass",
+        "sysupgrade_test_only": "owner_reported_pass",
+        "flash_or_reboot": "not_performed",
+        "rollback_and_restore": "not_verified",
+        "live_new_firmware_uat": "not_performed"
+      }
+    },
+    {
+      "id": "REL-004",
+      "kind": "validation_gap",
+      "area": "release",
+      "severity": "critical",
+      "summary": "72-hour LTE and Wi-Fi reliability not tested on the new firmware",
+      "root_cause": "Current short check and source simulation cannot prove soak stability",
+      "source_state": "requires_hardware_verification",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "firmware_24x7_observability",
+        "firmware_network_watchdog"
+      ],
+      "regression_test_files": [
+        "test_veci_link_monitor.py",
+        "test_wifi_guardian_observe_only.py"
+      ],
+      "protection": "72-hour time series with independent LAN/Wi-Fi/LTE checks"
+    },
+    {
+      "id": "REL-005",
+      "kind": "validation_gap",
+      "area": "ci",
+      "severity": "medium",
+      "summary": "Host native UCI/libubox regression suite cannot run on current andre-nas image",
+      "root_cause": "json-c development headers missing; GitHub CI installs pinned dependencies",
+      "source_state": "requires_ci_verification",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "system_access_ssh_https",
+        "router_login_and_permissions"
+      ],
+      "regression_test_files": [
+        "test_native_host_uci_provisioning_guard_20261126.py"
+      ],
+      "protection": "Require GitHub CI actual native suite result, not skipped test"
+    },
+    {
+      "id": "REL-006",
+      "kind": "validation_gap",
+      "area": "release",
+      "severity": "high",
+      "summary": "All 39 modules have source declarations but zero new-binary hardware acceptances",
+      "root_cause": "Physical acceptance contract is separate from source feature inventory",
+      "source_state": "requires_hardware_verification",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "dashboard_status",
+        "router_login_and_permissions",
+        "interface_wan_lan",
+        "dhcp_dns_static_leases",
+        "ipv6_ra_dhcpv6",
+        "firewall_zones_nat",
+        "port_forward_dmz",
+        "static_routes_policy",
+        "wifi_ap_2g",
+        "wifi_survey_channel",
+        "wifi_clients_access_control",
+        "ethernet_port_status",
+        "lte_rndis_data",
+        "lte_dual_sim_manual",
+        "lte_apn_pin_puk",
+        "sms_inbox",
+        "sms_sent_and_drafts",
+        "sms_send_and_delete",
+        "sms_multipart_pdu",
+        "sms_security_and_storage",
+        "system_services_startup",
+        "system_cron_scheduler",
+        "system_logs_diagnostics",
+        "system_time_ntp",
+        "system_leds_buttons",
+        "system_access_ssh_https",
+        "system_backup_restore",
+        "system_manual_sysupgrade",
+        "system_signed_github_ota",
+        "system_update_policy",
+        "addon_signed_package_manager",
+        "addon_enable_disable",
+        "firmware_network_watchdog",
+        "firmware_gpio_hardware_watchdog",
+        "firmware_24x7_observability",
+        "guest_wifi_isolation",
+        "system_ipv6_off_by_default",
+        "system_ipv6_guarded_settings_toggle",
+        "ui_four_group_navigation"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_contract.py",
+        "test_we5927_hardware_release_gates.py"
+      ],
+      "protection": "Per-module physical UAT must pass without bypass"
+    },
+    {
+      "id": "TOOL-001",
+      "kind": "confirmed_bug",
+      "area": "test_tool",
+      "severity": "medium",
+      "summary": "Windows PowerShell SSH stderr/CR could falsely abort router diagnostics",
+      "root_cause": "PowerShell native stream handling and remote CR command transport",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "ui_four_group_navigation"
+      ],
+      "regression_test_files": [
+        "test_owner_wifi_router_repair_20261124.py"
+      ],
+      "protection": "Isolated SSH exit status, stdout sentinel and POSIX newline-safe remote script"
+    },
+    {
+      "id": "TOOL-002",
+      "kind": "confirmed_bug",
+      "area": "test_tool",
+      "severity": "medium",
+      "summary": "Firmware diagnostics assumed timeout/od/base64 were always available on BusyBox",
+      "root_cause": "Minimal router lacks some standalone CLI binaries",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g"
+      ],
+      "regression_test_files": [
+        "test_owner_wifi_router_repair_20261124.py",
+        "test_owner_wifi_readonly_triage_20261124.py"
+      ],
+      "protection": "Use verified BusyBox applets, kernel CSPRNG UUID or native libubox; fail closed"
+    },
+    {
+      "id": "UI-004",
+      "kind": "confirmed_bug",
+      "area": "ui",
+      "severity": "high",
+      "summary": "Services JS bound missing addon-read DOM ID and failed initialization",
+      "root_cause": "Old service module constructed both startup and addon panels, but Add-on UI had migrated to addon-profiles-read; null.addEventListener threw before service init",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "system_services_startup",
+        "addon_enable_disable",
+        "ui_four_group_navigation"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_services_addon_dom_20261126.py",
+        "test_veci_v2_connectivity_menu_regression_20261126.py",
+        "test_veci_v2_all_native_scripts_bootstrap_20261126.py"
+      ],
+      "protection": "Single services owner binds startup-read; addon-profiles.js binds addon-profiles-read; actual DOM mock loads both modules and clicks buttons"
+    },
+    {
+      "id": "UI-006",
+      "kind": "confirmed_bug",
+      "area": "device_identity",
+      "severity": "medium",
+      "summary": "Release contract labeled WE2825-2SIM despite physical router being ZBT-WE5927-DSIM",
+      "root_cause": "Legacy board_display survived migration to WE5927; board_id and target remained correct",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "dashboard_status",
+        "ui_four_group_navigation"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_contract.py"
+      ],
+      "protection": "Board display WE5927-2SIM while canonical supported device stays zbtlink,zbt-we5927; no device-tree changes"
+    },
+    {
+      "id": "TOOL-003",
+      "kind": "confirmed_bug",
+      "area": "test_tool",
+      "severity": "medium",
+      "summary": "CI SSID test invoked Ubuntu dash even though libubox jshn requires BusyBox ash features",
+      "root_cause": "Host fixture executed provider shebang using /bin/sh (dash); real router uses BusyBox ash, so host test falsely failed with exit 2",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g",
+        "wifi_survey_channel"
+      ],
+      "regression_test_files": [
+        "test_owner_wifi_acceptance.py",
+        "test_veci_v2_connectivity_menu_regression_20261126.py"
+      ],
+      "protection": "Always invoke exact BusyBox ash in native host tests; CI latest run passed actual SSID and Wi-Fi UCI test"
+    },
+    {
+      "id": "TOOL-004",
+      "kind": "confirmed_bug",
+      "area": "test_tool",
+      "severity": "low",
+      "summary": "Login/logout GUI regression fixture hardcoded RPC count and broke with new read-only SMS health check",
+      "root_cause": "Test expected exactly six calls; new permitted read-only diagnostic introduced another before logout",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "router_login_and_permissions",
+        "dashboard_status",
+        "ui_four_group_navigation"
+      ],
+      "regression_test_files": [
+        "test_veci_ui_sessions.py"
+      ],
+      "protection": "Verify exactly one session destroy and no unauthorized writes, rather than forbidding additional safe read-only telemetry"
+    },
+    {
+      "id": "TOOL-005",
+      "kind": "confirmed_bug",
+      "area": "diagnostics",
+      "severity": "medium",
+      "summary": "Earlier MT76 production station counter swallowed iw errors and could incorrectly report zero clients",
+      "root_cause": "Pipeline iw station dump stderr to /dev/null plus grep -c lost the iw exit code; hostapd JSON wildcard output returned UNKNOWN",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g",
+        "firmware_24x7_observability"
+      ],
+      "regression_test_files": [
+        "test_mt76_client_evidence_readonly_20261126.py"
+      ],
+      "protection": "Separate read-only iw exit/hostapd ubus result, parse client map with native jshn, return UNKNOWN on parser failure and never claim active-client PASS from an empty station list. Keep physical MT76 driver UAT pending."
+    },
+    {
+      "id": "WIFI-008",
+      "kind": "confirmed_bug",
+      "area": "wifi",
+      "severity": "medium",
+      "summary": "Native VeCI Wi-Fi client panel interpreted iw empty station table as definitive no connected clients without corroborating hostapd",
+      "root_cause": "Wi-Fi info used iw station dump alone; zero, iw failure, hostapd inconsistency were not visibly distinguished",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "wifi_ap_2g",
+        "wifi_clients_access_control",
+        "wifi_survey_channel"
+      ],
+      "regression_test_files": [
+        "test_veci_v2_wifi_client_observation_20261126.py",
+        "test_owner_wifi_acceptance.py"
+      ],
+      "protection": "New read-only source counts iw and native jshn hostapd in separate subshell, exposes observed/zero_observed/mismatch/unavailable and renders non-definitive client status. Native UCI and Node UI tests cover each case. No radio or modem mutators; physical correctness remains pending."
+    },
+    {
+      "id": "GUEST-001",
+      "kind": "confirmed_bug",
+      "area": "guest_wifi",
+      "severity": "medium",
+      "summary": "Guest Wi-Fi UI reported enabled from saved UCI alone without proving live AP status",
+      "root_cause": "Guest configuration inventory and addon status had no separate on-air hostapd/iw observation; applying next-boot configuration looked like an immediate runtime activation",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "guest_wifi_isolation",
+        "addon_enable_disable"
+      ],
+      "regression_test_files": [
+        "test_guest_isolation_readonly.py",
+        "test_owner_addon_profiles_source.py"
+      ],
+      "protection": "Reuse existing guest inspector and addon toggle, no parallel control or radio reload. Read-only netifd guest interface discovery, iw AP mode and hostapd ENABLED check; report ap_running_unverified, not_observed or unavailable independently from configured startup flag, and never imply firewall/client isolation has been tested."
+    },
+    {
+      "id": "UPGRADE-PIPE-001",
+      "kind": "confirmed_bug",
+      "area": "firmware_upgrade",
+      "severity": "high",
+      "summary": "BusyBox manual upload and OTA verify lost request bytes or held the verifier lock after the CGI completed",
+      "root_cause": "BusyBox head buffered beyond the fixed stdin headers, and timeout subprocesses inherited the shared verifier lock.",
+      "source_state": "source_fixed",
+      "candidate_hardware": "not_tested",
+      "affected_modules": [
+        "system_manual_sysupgrade",
+        "system_signed_github_ota"
+      ],
+      "regression_test_files": [
+        "test_veci_upgrade_receipt.py",
+        "test_veci_manual_upload_timeout.py"
+      ],
+      "protection": "Use exact-length dd reads, close the lock descriptor in timed transfers and bind receipt to tag, asset, size and digest. Verified on BusyBox pipes with inert artifacts and installer."
+    }
+  ]
+}

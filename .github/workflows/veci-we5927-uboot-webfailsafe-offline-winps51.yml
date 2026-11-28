@@ -1,0 +1,70 @@
+name: WE5927 U-Boot web failsafe offline-only audit Windows 5.1
+
+on:
+  push:
+    branches:
+      - feat/veci-v2-native-gui-refresh-20261126
+    paths:
+      - 'scripts/veci-we5927-uboot-webfailsafe-offline-audit-20261127.ps1'
+      - 'scripts/tests/test_we5927_uboot_webfailsafe_offline_audit_20261127.py'
+      - '.github/workflows/veci-we5927-uboot-webfailsafe-offline-winps51.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-ps51-static-uboot:
+    runs-on: windows-2022
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell 5.1 parse and pure ASCII marker scanner on synthetic MTD0
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $path=(Resolve-Path 'scripts/veci-we5927-uboot-webfailsafe-offline-audit-20261127.ps1').Path
+          $tokens=$null; $parseErrors=$null
+          $ast=[System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$parseErrors)
+          if($parseErrors.Count -gt 0){
+            $parseErrors | Format-List | Out-String | Write-Host
+            throw 'POWERSHELL_51_PARSER_FAILED'
+          }
+          Write-Host 'WINDOWS_PS51_UBOOT_AUDITOR_SYNTAX=PASS'
+          $func=$ast.Find({ param($node)
+              $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+              $node.Name -eq 'Find-AsciiMarker'
+            },$true)
+          if($null -eq $func){throw 'ASCII_MARKER_SCANNER_MISSING'}
+          . ([scriptblock]::Create($func.Extent.Text))
+          $sample=New-Object byte[] 196608
+          for($i=0;$i -lt $sample.Length;$i++){$sample[$i]=255}
+          $testStrings=@(
+            'U-Boot', 'HTTP server is starting for update',
+            'HTTP server is ready', 'Entr Web failsafe mode',
+            'If you press the RESET button will automatically enter the Update mode',
+            'name="firmware"', 'Update for MT76x8',
+            'HTTP upload is done! Upgrading', 'tftpboot'
+          )
+          $offset=2048
+          foreach($needle in $testStrings){
+            $bytes=[System.Text.Encoding]::ASCII.GetBytes($needle)
+            [Array]::Copy($bytes,0,$sample,$offset,$bytes.Length)
+            if((Find-AsciiMarker -Bytes $sample -Needle $needle) -ne $offset){
+              throw ('ASCII_MARKER_OFFSET_WRONG: '+$needle)
+            }
+            $offset+=512
+          }
+          if((Find-AsciiMarker -Bytes $sample -Needle 'definitely absent!') -ne -1){
+            throw 'FALSE_POSITIVE_NONEXISTENT_MARKER'
+          }
+          if((Find-AsciiMarker -Bytes $sample -Needle 'http SERVER IS READY') -lt 0){
+            throw 'CASE_INSENSITIVE_ASCII_MATCH_FAILED'
+          }
+          Write-Host 'WINDOWS_PS51_SYNTHETIC_9_MARKERS_AND_NEGATIVE_CASE=PASS'
+          Write-Host 'NO_REAL_BOOTLOADER_FILE_USED=YES'
+          Write-Host 'NO_ROUTER_CONTACT_OR_FLASH=YES'
+      - name: Verify safety contract and exact historical MTD0 verification
+        shell: powershell
+        run: |
+          python -m unittest discover -s scripts/tests -p test_we5927_uboot_webfailsafe_offline_audit_20261127.py -v

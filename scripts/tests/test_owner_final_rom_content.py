@@ -29,6 +29,23 @@ class CompleteRomSourceMap(unittest.TestCase):
         self.assertEqual(len(module.FEATURES),39)
         self.assertNotIn("lte_ussd",module.FEATURES)
         self.assertEqual(module.check(self.rom),[])
+    def test_receipt_binds_each_mapped_payload_to_bytes(self):
+        receipt = []
+        self.assertEqual(module.check(self.rom, receipt), [])
+        self.assertEqual({item["module"] for item in receipt}, set(module.FEATURES))
+        self.assertEqual(len(receipt), sum(map(len, module.FEATURES.values())))
+        for item in receipt:
+            self.assertEqual(item["sha256"], hashlib.sha256((self.rom/item["rom"]).read_bytes()).hexdigest())
+
+    def test_mapped_directory_must_remain_inside_extracted_rom(self):
+        with tempfile.TemporaryDirectory() as outside:
+            config = self.rom/"etc/config"
+            external = pathlib.Path(outside)/"config"
+            config.rename(external)
+            config.symlink_to(external, target_is_directory=True)
+            self.assertIn("ROM_PATH_ESCAPES_ROOT:system_ipv6_off_by_default:etc/config/veci2_ipv6",
+                          module.check(self.rom))
+
     def test_any_missing_runtime_sends_fail_closed(self):
         target=self.rom/"usr/libexec/rpcd/veci.v2.observability"
         self.assertTrue(target.is_file())

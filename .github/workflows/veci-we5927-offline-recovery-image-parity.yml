@@ -1,0 +1,28 @@
+name: WE5927 offline OEM vs signed VeCI recovery format gate
+
+on:
+  push:
+    branches:
+      - feat/veci-v2-native-gui-refresh-20261126
+    paths:
+      - 'scripts/ci/we5927_recovery_image_format_gate_20261127.py'
+      - 'scripts/tests/test_we5927_recovery_format_gate_20261127.py'
+      - 'docs/VECI-V2-WE5927-EXACT-IMAGE-RECOVERY-FORMAT-20261127.json'
+      - '.github/workflows/veci-we5927-offline-recovery-image-parity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-flash-format-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test actual parser against real synthetic raw images and enforce release block
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p test_we5927_recovery_format_gate_20261127.py -v
+          echo 'ROUTER_NOT_CONTACTED=YES; FLASH_AUTHORIZED=NO; RELEASE_PERMITTED=NO'

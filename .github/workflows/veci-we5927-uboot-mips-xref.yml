@@ -1,0 +1,67 @@
+name: WE5927 offline U-Boot MIPS xref reconnaissance
+on:
+  push:
+    branches:
+      - feat/veci-v2-native-gui-refresh-20261126
+    paths:
+      - 'scripts/ci/we5927_uboot_mips_xref_20261127.py'
+      - 'scripts/tests/test_we5927_uboot_mips_xref_20261127.py'
+      - 'scripts/ci/we5927_uboot_pointer_table_20261127.py'
+      - 'scripts/tests/test_we5927_uboot_pointer_table_20261127.py'
+      - 'scripts/ci/we5927_uboot_pic_got_20261127.py'
+      - 'scripts/tests/test_we5927_uboot_pic_got_20261127.py'
+      - 'scripts/ci/we5927_uboot_message_sink_20261127.py'
+      - 'scripts/tests/test_we5927_uboot_message_sink_20261127.py'
+      - 'scripts/ci/we5927_uboot_return_branch_20261127.py'
+      - 'scripts/tests/test_we5927_uboot_return_branch_20261127.py'
+      - 'scripts/ci/we5927_uboot_mode_wrapper_20261128.py'
+      - 'scripts/tests/test_we5927_uboot_mode_wrapper_20261128.py'
+      - 'scripts/ci/we5927_recovery_nor_model_20261128.py'
+      - 'scripts/tests/test_we5927_recovery_nor_model_20261128.py'
+      - 'scripts/ci/we5927_shared_recovery_model_20261128.py'
+      - 'scripts/tests/test_we5927_shared_recovery_model_20261128.py'
+      - 'scripts/ci/we5927_exact_candidate_crypto_20261128.py'
+      - 'scripts/tests/test_we5927_exact_candidate_crypto_20261128.py'
+      - 'scripts/ci/we5927_recovery_power_cut_20261128.py'
+      - 'scripts/tests/test_we5927_recovery_power_cut_20261128.py'
+      - 'scripts/ci/we5927_recovery_bundle_20261128.py'
+      - 'scripts/tests/test_we5927_recovery_bundle_20261128.py'
+      - 'scripts/ci/we5927_recovery_retry_20261128.py'
+      - 'scripts/tests/test_we5927_recovery_retry_20261128.py'
+      - 'scripts/ci/we5927_recovery_dirty_tail_20261128.py'
+      - 'scripts/tests/test_we5927_recovery_dirty_tail_20261128.py'
+      - 'scripts/ci/we5927_cross_variant_verifier_20261128.py'
+      - 'scripts/tests/test_we5927_cross_variant_verifier_20261128.py'
+      - 'scripts/verify_veci_image.py'
+      - 'scripts/ci/we5927_recovery_image_format_gate_20261127.py'
+      - 'scripts/tests/test_we5927_recovery_format_gate_20261127.py'
+      - '.github/workflows/veci-we5927-uboot-mips-xref.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-xref-only:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_mips_xref_20261127.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_pointer_table_20261127.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_pic_got_20261127.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_message_sink_20261127.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_return_branch_20261127.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_uboot_mode_wrapper_20261128.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_recovery_nor_model_20261128.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_shared_recovery_model_20261128.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_exact_candidate_crypto_20261128.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_recovery_power_cut_20261128.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_recovery_bundle_20261128.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_recovery_retry_20261128.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_recovery_dirty_tail_20261128.py -v
+      - run: python -m unittest discover -s scripts/tests -p test_we5927_cross_variant_verifier_20261128.py -v

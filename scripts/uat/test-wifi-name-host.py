@@ -22,7 +22,10 @@ with tempfile.TemporaryDirectory() as tmp:
     board = root / "board"
     board.write_text("zbtlink,zbt-we5927\n")
     provider = root / "provider"
-    provider.write_text((RUNTIME / "veci2-wifi").read_text().replace("/tmp/sysinfo/board_name", str(board)))
+    jshn = Path(os.environ["VECI_LIBUBOX_PREFIX"]) / "share/libubox/jshn.sh"
+    provider.write_text((RUNTIME / "veci2-wifi").read_text()
+        .replace("/tmp/sysinfo/board_name", str(board))
+        .replace("/usr/share/libubox/jshn.sh", str(jshn)))
     provider.chmod(0o700)
     commands = {
         "uci": f'#!/bin/sh\nexec "{uci}" -c "{root}/config" -t "{root}/delta" "$@"\n',
@@ -35,18 +38,23 @@ with tempfile.TemporaryDirectory() as tmp:
     env = dict(os.environ, PATH=f"{root}:" + os.environ["PATH"])
 
     def call(method, **params):
-        p = subprocess.run([provider, "call", method], input=json.dumps(params), text=True,
-                           env=env, capture_output=True, check=True)
+        # OpenWrt runs /bin/sh via BusyBox ash. libubox jshn.sh uses
+        # ash-specific [[ ]], let and parameter replacement; Ubuntu /bin/sh
+        # is dash, which fails with exit=2 even though router behavior is valid.
+        p = subprocess.run(["busybox", "ash", str(provider), "call", method], input=json.dumps(params), text=True,
+                           env=env, capture_output=True, check=False, timeout=8)
+        if p.returncode:
+            raise AssertionError(f"WiFi RPC {method} exit={p.returncode}; stderr={p.stderr!r}; stdout={p.stdout!r}")
         return json.loads(p.stdout)
 
     def config_value(key):
         return subprocess.check_output([root / "uci", "get", "wireless." + key], env=env)[:-1]
 
-    assert call("status")["ssid_hex"] == b"Old".hex()
+    assert call("status")["ssid"] == "Old"
     for name in ("Kantor 2", "é" * 16, " A'\"$;\\ akhir "):
         raw = name.encode()
         result = call("setSsid", ssid_hex=raw.hex())
-        assert result == {"ok": True, "configured_visible": False, "ssid_hex": raw.hex(), "configured_channel": "6"}, result
+        assert result == {"ok": True, "configured_visible": False, "ssid": name, "configured_channel": "6"}, result
         assert config_value("default_radio0.ssid") == raw
         assert config_value("guest.ssid") == b"Guest"
         assert config_value("default_radio0.encryption") == b"psk2"

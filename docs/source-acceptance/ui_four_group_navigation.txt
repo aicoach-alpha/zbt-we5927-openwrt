@@ -2,8 +2,10 @@ test_ui_requires_explicit_auth_no_persistent_session (test_veci_v2_contract.Feat
 test_login_permissions_and_logout (test_veci_ui_sessions.UiSessions.test_login_permissions_and_logout) ... ok
 test_gui_hooks_valid_and_authenticated (test_owner_controls_native_integration.NativeOwnerControlsIntegration.test_gui_hooks_valid_and_authenticated) ... ok
 test_group_navigation_remains_simple (test_owner_controls_native_integration.NativeOwnerControlsIntegration.test_group_navigation_remains_simple) ... ok
+test_actual_script_order_loads_without_missing_dom_controls (test_veci_v2_all_native_scripts_bootstrap_20261126.NativeGuiBootstrap.test_actual_script_order_loads_without_missing_dom_controls) ... ok
+test_every_direct_rpc_has_method_and_permission (test_veci_v2_gui_all_acl_20261126.NativeGuiRpcAcl.test_every_direct_rpc_has_method_and_permission) ... ok
 
 ----------------------------------------------------------------------
-Ran 4 tests in 2.195s
+Ran 6 tests in 0.131s
 
 OK

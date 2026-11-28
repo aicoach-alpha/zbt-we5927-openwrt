@@ -21,7 +21,7 @@ permissions:
 jobs:
   v2-contract:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,6 +41,29 @@ jobs:
           test -x "$VECI_HOST_UCI"
           test -x "$VECI_LIBUBOX_PREFIX/bin/jshn"
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+          # After a full green native suite, rerun the exact scoped methods
+          # for ALL 39 modules and preserve their original unittest transcripts.
+          # These are proposed evidence, NEVER auto-applied or rubber-stamped.
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/ci/renew-source-acceptance.py --output "$RUNNER_TEMP/veci-source-proof"
+          # All known bugs are registered and mapped to 39 active modules.
+          # This audits the catalog, not hardware/firmware readiness.
+          mkdir -p test-evidence
+          python3 rebuild/veci-v2/ci/bug-regression-gate.py --gate register | tee test-evidence/veci-v2-defect-audit.json
+          # Source and release gates MUST remain closed until actual accepted evidence.
+          set +e
+          python3 rebuild/veci-v2/ci/bug-regression-gate.py --gate source > /tmp/veci-known-bugs.json
+          bug_exit=$?
+          set -e
+          python3 - "$bug_exit" <<'PYBUG'
+          import json,sys
+          audit=json.load(open("/tmp/veci-known-bugs.json"))
+          code=int(sys.argv[1])
+          assert audit["ok"], audit["errors"]
+          # Match real gate result; later legitimate closure can pass without
+          # rewriting the workflow or weakening release and hardware gates.
+          assert code == (0 if audit["source_build_permitted"] else 3)
+          print("SOURCE_BUG_GATE="+("READY" if code==0 else "BLOCKED_WITH_EVIDENCE"))
+          PYBUG
           for script in rebuild/veci-v2/packages/veci-v2-runtime/veci2-status \
                         rebuild/veci-v2/packages/veci-v2-package-manager/veci2-apk \
                         rebuild/veci-v2/ci/stage-v2-source.sh \
@@ -72,6 +95,17 @@ jobs:
           assert x['hardware_accepted'] == 0
           print('FLASH_PERMISSION=DENIED_AS_DESIGNED')
           PY
+
+      - name: Retain defect audit even if source regression fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veci-v2-source-and-defect-evidence
+          path: |
+            test-evidence/
+            ${{ runner.temp }}/veci-source-proof/
+          if-no-files-found: warn
+          retention-days: 30
 
   v2-exact-source:
     needs: v2-contract

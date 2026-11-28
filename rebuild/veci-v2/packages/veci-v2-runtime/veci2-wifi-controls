@@ -66,8 +66,22 @@ advanced_write() (
   change commit wireless || fail save_failed
   printf '{"ok":true,"saved":true}\n'
 )
+hostapd_station_count() (
+  # Parse in a subshell so jshn json_load cannot destroy response JSON.
+  # Emit only a number, not client MAC addresses.
+  local keys
+  set +u
+  set -f
+  . /usr/share/libubox/jshn.sh || exit 1
+  json_load "$1" || exit 1
+  json_select clients || exit 1
+  json_get_keys keys || exit 1
+  set -- $keys
+  printf '%s\n' "$#"
+)
 advanced_info() {
-  local mode mac list enc channel chans stations
+  local mode mac list enc channel chans stations iw_count hp_count hp_data client_state ap_mac field count
+  iw_count=unknown; hp_count=unknown; client_state=unavailable
   set +u # jshn reads unset dynamic JSON variables.
   . /usr/share/libubox/jshn.sh
   json_init
@@ -88,13 +102,48 @@ advanced_info() {
       for channel in $chans; do json_add_int '' "$channel"; done
       json_close_array
     fi
-    if stations=$(timeout 4 iw dev "$wlan" station dump); then
+    if stations=$(timeout 4 iw dev "$wlan" station dump 2>/dev/null); then
+      iw_count=$(printf '%s\n' "$stations" | awk '$1=="Station" {c++} END {print c+0}')
       json_add_array clients
       for mac in $(printf '%s\n' "$stations" | awk '$1=="Station" {print $2}'); do
         valid_mac "$mac" && json_add_string '' "$mac"
       done
       json_close_array
     fi
+    if hp_data=$(timeout 4 ubus -S -t 3 call "hostapd.$wlan" get_clients '{}' 2>/dev/null); then
+      hp_count=$(hostapd_station_count "$hp_data" 2>/dev/null) || hp_count=unknown
+    fi
+  fi
+  case "$iw_count:$hp_count" in
+    unknown:*|*:unknown) client_state=unavailable ;;
+    *)
+      if [ "$iw_count" = "$hp_count" ]; then
+        if [ "$iw_count" -eq 0 ]; then
+          client_state=zero_observed
+        else
+          client_state=observed
+        fi
+      else
+        client_state=mismatch
+      fi ;;
+  esac
+  json_add_object client_observation
+  json_add_string state "$client_state"
+  case "$iw_count" in unknown) ;; *) json_add_int iw_count "$iw_count" ;; esac
+  case "$hp_count" in unknown) ;; *) json_add_int hostapd_count "$hp_count" ;; esac
+  json_close_object
+  # Operational snapshot: read-only sysfs counters, NOT a client-traffic test.
+  if [ -n "$wlan" ]; then
+    json_add_object ap_snapshot
+    json_add_string interface "$wlan"
+    ap_mac=$(cat "/sys/class/net/$wlan/address" 2>/dev/null || :)
+    if valid_mac "$ap_mac"; then json_add_string bssid "$ap_mac"; fi
+    for field in rx_bytes tx_bytes; do
+      count=$(cat "/sys/class/net/$wlan/statistics/$field" 2>/dev/null || :)
+      case "$count" in ''|*[!0-9]*) ;; *) json_add_string "$field" "$count" ;; esac
+    done
+    json_add_string attribution "interface_totals_not_proof_of_associated_client"
+    json_close_object
   fi
   json_dump
 }

@@ -2,6 +2,6 @@ test_existing_dns_dhcp_native_uci_lock_and_rollback (test_owner_dhcp_dns_accepta
 test_existing_native_rpc_gui_acl_and_no_lte_mutations (test_owner_dhcp_dns_acceptance.ExistingDnsDhcpIntegration.test_existing_native_rpc_gui_acl_and_no_lte_mutations) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 13.892s
+Ran 2 tests in 6.222s
 
 OK

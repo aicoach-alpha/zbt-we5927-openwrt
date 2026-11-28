@@ -36,7 +36,8 @@ FEATURES={
  "firewall_zones_nat":[(RTL+"veci2-firewall","usr/libexec/rpcd/veci.v2.firewall")],
  "port_forward_dmz":[(RTL+"veci2-firewall","usr/libexec/rpcd/veci.v2.firewall")],
  "static_routes_policy":[(RTL+"veci2-routes","usr/libexec/rpcd/veci.v2.routes")],
- "wifi_ap_2g":[(RTL+"veci2-wifi","usr/libexec/rpcd/veci.v2.wifi")],
+ "wifi_ap_2g":[(RTL+"veci2-wifi","usr/libexec/rpcd/veci.v2.wifi"),
+                (RTL+"veci2-wifi-activate","usr/libexec/veci2-wifi-activate")],
  "wifi_survey_channel":[(RTL+"veci2-wifi-controls","usr/libexec/veci2-wifi-controls")],
  "wifi_clients_access_control":[(RTL+"veci2-wifi-controls","usr/libexec/veci2-wifi-controls")],
  "ethernet_port_status":[(RTL+"veci2-status","usr/libexec/rpcd/veci.v2")],
@@ -82,6 +83,21 @@ FEATURES={
  "ui_four_group_navigation":[(UI+"veci2/index.html","www/veci2/index.html")]
 }
 
+# The live HTML is the authoritative list of native JS/CSS assets. A firmware
+# must include EVERY first-party file referenced by the GUI, not merely the
+# entrypoint. Missing CSS or one JS file caused silent broken menus previously.
+# This adds no dependencies and never claims an external browser UAT passed.
+INDEX=(ROOT/UI/"veci2/index.html")
+REFERENCED_ASSETS=re.findall(
+    r'(?:src|href)="/veci2/([a-zA-Z0-9_.-]+[.](?:js|css))"',
+    INDEX.read_text(),
+)
+if len(REFERENCED_ASSETS) != len(set(REFERENCED_ASSETS)) or len(REFERENCED_ASSETS)<20:
+    raise RuntimeError("VECI_GUI_ASSET_MANIFEST_INVALID")
+FEATURES["ui_four_group_navigation"].extend(
+    (UI+"veci2/"+asset,"www/veci2/"+asset) for asset in REFERENCED_ASSETS
+)
+
 def _squashfs_digest(path: Path) -> str:
     """Hash ROM bytes without changing the sensitive permissions in the image.
 
@@ -110,13 +126,14 @@ def _squashfs_digest(path: Path) -> str:
         return digest
 
 
-def check(rom:Path)->list[str]:
+def check(rom:Path, verified=None)->list[str]:
     errors=[]
     ids=[x["id"] for x in json.loads(CONTRACT.read_text())["required_core"]]
     if len(ids)!=39 or len(set(ids))!=39 or "lte_ussd" in ids or set(ids)!=set(FEATURES):
         return ["FEATURE_MAP_NOT_EXACTLY_39_ACTIVE"]
     if not rom.is_dir() or rom.is_symlink():
         return ["INVALID_IMAGE_ROOT"]
+    root = rom.resolve()
     checked=0
     for name in ids:
         entries=FEATURES.get(name,[])
@@ -128,6 +145,13 @@ def check(rom:Path)->list[str]:
             checked+=1
             if not src.is_file() or src.is_symlink():
                 errors.append("MISSING_SOURCE:"+name+":"+relative_source)
+                continue
+            try:
+                inside_rom = dst.resolve().is_relative_to(root)
+            except (OSError, RuntimeError):
+                inside_rom = False
+            if not inside_rom:
+                errors.append("ROM_PATH_ESCAPES_ROOT:"+name+":"+relative_rom)
                 continue
             if not dst.is_file() or dst.is_symlink() or dst.stat().st_size!=src.stat().st_size:
                 errors.append("ROM_MISSING_OR_WRONG_SIZE:"+name+":"+relative_rom)
@@ -142,6 +166,9 @@ def check(rom:Path)->list[str]:
                 continue
             if expected_digest != image_digest:
                 errors.append("ROM_DIFFERENT_FROM_VERIFIED_SOURCE:"+name+":"+relative_rom)
+            elif verified is not None:
+                verified.append({"module":name, "source":relative_source,
+                                 "rom":relative_rom, "sha256":image_digest})
     for forbidden in ("www/cgi-bin/luci","www/luci-static","usr/share/luci"):
         if (rom/forbidden).exists():
             errors.append("LUCI_PRESENT:"+forbidden)
@@ -151,9 +178,14 @@ def check(rom:Path)->list[str]:
     return errors
 
 if __name__=="__main__":
-    if len(sys.argv)!=2:
-        raise SystemExit("usage: check-all-core-rom.py <extracted-final-squashfs>")
-    problems=check(Path(sys.argv[1]))
+    if len(sys.argv) not in (2, 3):
+        raise SystemExit("usage: check-all-core-rom.py <extracted-final-squashfs> [new-receipt.json]")
+    verified = []
+    problems=check(Path(sys.argv[1]), verified)
     if problems:
         print("\n".join(problems),file=sys.stderr)
         raise SystemExit(3)
+    if len(sys.argv)==3:
+        with Path(sys.argv[2]).open("x") as receipt:
+            json.dump({"schema": 1, "payloads": verified}, receipt, indent=2, sort_keys=True)
+            receipt.write("\n")

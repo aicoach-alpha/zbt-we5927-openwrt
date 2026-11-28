@@ -1,7 +1,8 @@
 test_real_provider_lifecycle_in_sandbox (test_owner_services_acceptance.NativeServiceAcceptance.test_real_provider_lifecycle_in_sandbox) ... ok
 test_no_unrestricted_lte_network_or_ssh_boot_changes (test_owner_services_acceptance.NativeServiceAcceptance.test_no_unrestricted_lte_network_or_ssh_boot_changes) ... ok
+test_both_existing_menus_have_single_live_handler_path (test_veci_v2_services_addon_dom_20261126.ServicesAddonDom.test_both_existing_menus_have_single_live_handler_path) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 6.484s
+Ran 3 tests in 2.999s
 
 OK

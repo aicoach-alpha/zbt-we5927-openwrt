@@ -23,6 +23,10 @@ with tempfile.TemporaryDirectory() as temp:
     phy = root / 'sys/wlan0/phy80211/name'
     phy.parent.mkdir(parents=True)
     phy.write_text('phy0\n')
+    (root/'sys/wlan0/address').write_text('02:fe:dc:ba:98:76\n')
+    (root/'sys/wlan0/statistics').mkdir()
+    (root/'sys/wlan0/statistics/rx_bytes').write_text('123456789\n')
+    (root/'sys/wlan0/statistics/tx_bytes').write_text('987654321\n')
     helper = root / 'controls'
     helper.write_text((pkg / 'veci2-wifi-controls').read_text()
                       .replace('/sys/class/net/', str(root / 'sys') + '/')
@@ -32,12 +36,33 @@ with tempfile.TemporaryDirectory() as temp:
                         .replace('/usr/libexec/veci2-wifi-controls', str(helper)))
     scripts = {
         'uci': f'#!/bin/sh\nexec "{uci}" -c "{config}" -t "{root}/delta" "$@"\n',
-        'ubus': '#!/bin/sh\necho radio\n',
-        'jsonfilter': '#!/usr/bin/env python3\nimport json,sys\nprint("wlan0" if sys.argv[2]=="radio" else json.loads(sys.argv[2])[sys.argv[4][2:]])\n',
+        'ubus': """#!/bin/sh
+case "$*" in
+  *'hostapd.wlan0 get_clients'*)
+    if [ "$HOSTAPD_FAIL" = 1 ]; then exit 1; fi
+    if [ "$EMPTY_HOSTAPD" = 1 ]; then
+      printf '%s\\n' '{"clients":{}}'
+    else
+      printf '%s\\n' '{"clients":{"02:12:34:56:78:9a":{"authorized":true}}}'
+    fi ;;
+  *'network.wireless status'*)
+    printf '%s\\n' '{"radio0":{"interfaces":[{"section":"default_radio0","ifname":"wlan0"}]}}' ;;
+  *) exit 1 ;;
+esac
+""",
+        'jsonfilter': """#!/usr/bin/env python3
+import json,sys
+value=sys.argv[sys.argv.index('-s')+1]
+expr=sys.argv[sys.argv.index('-e')+1]
+if 'ifname' in expr:
+    print('wlan0')
+else:
+    print(json.loads(value)[expr[2:]])
+""",
         'iw': """#!/bin/sh
 case "$*" in
   'phy phy0 info') printf '%s\\n' '* 2412 MHz [1] (20.0 dBm)' '* 2437 MHz [6] (20.0 dBm)' '* 2462 MHz [11] (disabled)' ;;
-  'dev wlan0 station dump') echo 'Station 02:12:34:56:78:9a (on wlan0)' ;;
+  'dev wlan0 station dump') [ "$EMPTY_IW" = 1 ] || echo 'Station 02:12:34:56:78:9a (on wlan0)' ;;
   'dev wlan0 scan passive') printf '%s\\n' 'BSS 02:12:34:56:78:9a(on wlan0)' ' freq: 2437' ' signal: -54.00 dBm' ' SSID: nearby "one"' ;;
   *) exit 1 ;;
 esac
@@ -57,6 +82,24 @@ esac
         return subprocess.check_output([root / 'uci', 'get', 'wireless.' + key], env=env, text=True).strip()
     info = call('info')
     assert info['channels'] == [1, 6] and info['clients'] == ['02:12:34:56:78:9a'], info
+    assert info['client_observation'] == {'state':'observed','iw_count':1,'hostapd_count':1}, info
+    assert info['ap_snapshot'] == {
+        'interface':'wlan0','bssid':'02:fe:dc:ba:98:76',
+        'rx_bytes':'123456789','tx_bytes':'987654321',
+        'attribution':'interface_totals_not_proof_of_associated_client',
+    }, info
+    env['EMPTY_HOSTAPD'] = '1'
+    mismatch = call('info')
+    assert mismatch['client_observation'] == {'state':'mismatch','iw_count':1,'hostapd_count':0}, mismatch
+    env['EMPTY_IW'] = '1'
+    zero = call('info')
+    assert zero['clients'] == [] and zero['client_observation'] == {'state':'zero_observed','iw_count':0,'hostapd_count':0}, zero
+    env['EMPTY_IW'] = '0'
+    env['EMPTY_HOSTAPD'] = '0'
+    env['HOSTAPD_FAIL'] = '1'
+    unavailable = call('info')
+    assert unavailable['client_observation'] == {'state':'unavailable','iw_count':1}, unavailable
+    env['HOSTAPD_FAIL'] = '0'
     assert call('survey')['networks'][0]['ssid'] == 'nearby "one"'
     assert call('setChannel', channel='11')['error'] == 'channel_unavailable'
     assert call('setChannel', channel='6')['saved'] and value('radio0.channel') == '6'

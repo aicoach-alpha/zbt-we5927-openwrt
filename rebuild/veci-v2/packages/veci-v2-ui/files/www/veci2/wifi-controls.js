@@ -10,8 +10,33 @@
     fixed.channel.replaceChildren();
     for (const channel of data.channels || []) fixed.channel.add(new Option(String(channel), String(channel)));
     fixed.channel.selectedIndex = -1;
-    el('station-list').textContent = Array.isArray(data.clients) ?
-      (data.clients.join(', ') || 'Belum ada klien terhubung.') : 'Status klien belum tersedia.';
+    const observed = data.client_observation || {};
+    const stationList = el('station-list');
+    switch (observed.state) {
+      case 'observed':
+        stationList.textContent = Array.isArray(data.clients) && data.clients.length
+          ? data.clients.join(', ') : 'Klien terasosiasi terdeteksi; daftar belum tersedia.';
+        break;
+      case 'zero_observed':
+        stationList.textContent = '0 klien terdeteksi saat pemeriksaan (iw dan hostapd). ' +
+          'Jika perangkat tetap online, periksa BSSID AP yang digunakan.';
+        break;
+      case 'mismatch':
+        stationList.textContent = 'Peringatan: jumlah klien berbeda antara driver dan hostapd. ' +
+          'Status asosiasi perlu diperiksa.';
+        break;
+      default:
+        stationList.textContent = 'Status asosiasi belum dapat diverifikasi (iw/hostapd).';
+    }
+    const snapshot = data.ap_snapshot || {};
+    const details = [];
+    if (snapshot.interface) details.push('AP: ' + snapshot.interface);
+    if (snapshot.bssid) details.push('BSSID: ' + snapshot.bssid);
+    if (/^[0-9]+$/.test(snapshot.rx_bytes || '') && /^[0-9]+$/.test(snapshot.tx_bytes || '')) {
+      details.push('RX/TX kumulatif: ' + snapshot.rx_bytes + ' / ' + snapshot.tx_bytes + ' byte');
+    }
+    if (details.length) stationList.textContent += '\n' + details.join(' · ') +
+      '\nCounter RX/TX mencakup broadcast; bukan bukti klien aktif atau internet berhasil.';
   }
   async function run(method = 'info', args = {}) {
     const session = sid;
@@ -36,6 +61,7 @@
         render(info);
       }
       status.textContent = method.startsWith('set') ? 'Tersimpan untuk Wi-Fi berikutnya dimulai.' : '';
+      if (method === 'setAuth') void globalThis.VeciWifiActivation?.refresh?.();
     } catch (error) {
       if (gen === generation && sid === session) status.textContent = error.message;
     } finally {

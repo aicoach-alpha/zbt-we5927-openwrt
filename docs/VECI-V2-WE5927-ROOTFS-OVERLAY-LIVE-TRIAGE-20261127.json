@@ -1,0 +1,28 @@
+{
+  "schema": "we5927-owner-reported-rootfs-overlay-live-triage.v1",
+  "source": "Owner-pasted Windows PowerShell triage output",
+  "date_local": "2026-11-27T12:21:10+07:00",
+  "script_source_sha256": "71a798be4ee26dd75c398f3fb6383c91edf7d991dcbaa8903ed5d7746a803336",
+  "report_path_on_owner_windows": "D:/Report_CCB/WE5927-ROOTFS-OVERLAY-TRIAGE-20261127_122110.json",
+  "raw_json_verified": false,
+  "rootfs_data_matches_mtd3_tail": "HASH_MATCH",
+  "current_versus_backups": {
+    "NOV23": {
+      "kernel": "DIFFERENT",
+      "pre_overlay": "DIFFERENT",
+      "overlay_tail": "DIFFERENT"
+    },
+    "NOV25": {
+      "kernel": "DIFFERENT",
+      "pre_overlay": "DIFFERENT",
+      "overlay_tail": "DIFFERENT"
+    }
+  },
+  "meaning": "current kernel and immutable-parent-before-overlay bytes differ from both historical MTD3 images; not solely rootfs_data drift; not proof of damage",
+  "live_router_modified": false,
+  "rollback_to_exact_current_base_image_proven": false,
+  "bootloader_restore_test": "NOT_TESTED",
+  "signed_candidate_sha256": "3adc815e77a7c9b0e25f742601eb2dc94423aad540b26efa86423821a667abb1",
+  "flash_authorized": false,
+  "release_permitted": false
+}

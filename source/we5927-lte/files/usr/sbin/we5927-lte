@@ -1293,8 +1293,15 @@ case "$1" in
 			1:1|2:2) ;;
 			*) log "SIM switch refused: original selector/config mismatch"; exit 3 ;;
 		esac
+        # A same-slot command must never power-cycle an already working modem.
+        if [ "$2" = "$old_slot" ]; then
+            log "SIM$old_slot already selected; LTE left untouched"
+            exit 0
+        fi
 		set_sim "$2" || exit $?
-		if start_selected_sim manual; then
+        # Before applying APN/PDP, verify that the new SIM is readable.
+        # Previously an absent SIM surfaced as a misleading APN error.
+		if start_selected_sim require_ready; then
 			:
 		else
 			switch_rc=$?

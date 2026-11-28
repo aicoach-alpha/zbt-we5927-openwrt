@@ -8,6 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://raw.githubusercontent.com/aicoach-alpha/zbt-we5927-openwrt/app-feed/channel-stable.json https://speed.cloudflare.com; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'">
   <title>VeCI v2 — Pusat Kendali Router</title>
   <link rel="stylesheet" href="/veci2/app.css">
+  <link rel="stylesheet" href="/veci2/veci-design.css">
   <script src="/veci2/sms-codec.js" defer></script>
   <script src="/veci2/sms-center.js" defer></script>
   <script src="/veci2/speed-test.js" defer></script>
@@ -34,7 +35,7 @@
   <div class="layout">
     <header class="header">
       <div class="brand"><span class="mark">V</span><div><strong>VeCI <span>v2</span></strong><small>WE5927-DSIM · Router Management</small></div></div>
-      <button id="logout" class="quiet" type="button" hidden>Keluar</button>
+      <div class="header-actions"><span class="header-device">ZBT-WE5927 <span aria-hidden="true">·</span> VeCI Native</span><button id="logout" class="quiet" type="button" hidden>Keluar</button><button id="mobile-nav-toggle" class="mobile-nav-toggle" type="button" aria-controls="veci-primary-nav" aria-expanded="false" aria-label="Buka menu navigasi">☰ <span>Menu</span></button></div>
     </header>
     <main>
       <section id="login" class="login-view" aria-label="Login router">
@@ -50,12 +51,33 @@
       </section>
       <section id="workspace" hidden>
         <div class="intro"><div><span class="eyebrow">VECI CONTROL CENTER / WE5927</span><h1 id="page-title">Beranda</h1><p id="page-summary">Status internet, router, Wi-Fi, dan trafik langsung.</p></div><div class="intro-actions"><span class="live-label"><span class="live-dot"></span> Data langsung dari router</span><button id="refresh" type="button">Perbarui status</button></div></div>
-        <nav class="tabs" aria-label="Menu utama VeCI">
-          <span class="menu-caption">MENU UTAMA</span>
+        <button id="mobile-nav-backdrop" class="mobile-nav-backdrop" type="button" aria-label="Tutup menu navigasi" tabindex="-1"></button>
+        <nav class="tabs" id="veci-primary-nav" aria-label="Menu utama VeCI">
+          <div class="nav-topline"><span class="menu-caption">NAVIGASI</span><button type="button" id="mobile-nav-dismiss" class="nav-dismiss" aria-label="Tutup menu">×</button></div>
           <button class="tab active" type="button" data-page="overview">Beranda</button>
+          <div class="nav-shortcuts">
+            <button class="nav-shortcut" type="button" data-target-page="overview" data-target-group="health">Kesehatan router</button>
+          </div>
+          <span class="menu-caption nav-section-label">KONEKSI</span>
           <button class="tab" type="button" data-page="network">Koneksi</button>
+          <div class="nav-shortcuts">
+            <button class="nav-shortcut" type="button" data-target-page="network" data-target-group="sim">LTE &amp; SIM</button>
+            <button class="nav-shortcut" type="button" data-target-page="network" data-target-group="wifi">Wi-Fi</button>
+            <button class="nav-shortcut" type="button" data-target-page="network" data-target-group="lan">LAN &amp; DHCP</button>
+            <button class="nav-shortcut" type="button" data-target-page="network" data-target-group="lte">Pemantauan LTE</button>
+          </div>
+          <span class="menu-caption nav-section-label">KOMUNIKASI</span>
           <button class="tab" type="button" data-page="sms">SMS Center</button>
+          <div class="nav-shortcuts">
+            <button class="nav-shortcut" type="button" data-target-page="sms" data-target-group="diagnostics">Diagnostik SMS</button>
+          </div>
+          <span class="menu-caption nav-section-label">ADMINISTRASI</span>
           <button class="tab" type="button" data-page="settings">Pengaturan</button>
+          <div class="nav-shortcuts">
+            <button class="nav-shortcut" type="button" data-target-page="settings" data-target-group="network">DNS &amp; IPv6</button>
+            <button class="nav-shortcut" type="button" data-target-page="settings" data-target-group="security">Keamanan &amp; akses</button>
+            <button class="nav-shortcut" type="button" data-target-page="settings" data-target-group="firmware">Firmware &amp; addon</button>
+          </div>
           <div class="sidebar-info">
             <span class="sidebar-device">ZBT-WE5927 · Dual SIM</span>
             <span class="sidebar-prompt">Kelola router dengan aman. Data hanya diambil dari perangkat Anda.</span>
@@ -70,6 +92,12 @@
             <button type="button" class="subtab active" data-group="dashboard">Dashboard &amp; trafik</button>
             <button type="button" class="subtab" data-group="health">Kesehatan jaringan</button>
           </nav>
+          <div class="connectivity-summary" role="group" aria-label="Status sistem dari router">
+            <div class="connectivity-summary-item"><span class="status-bullet" aria-hidden="true"></span><div><span class="summary-key">Internet LTE</span><strong id="shell-lte-status">Belum diverifikasi</strong></div></div>
+            <div class="connectivity-summary-item"><span class="status-bullet" aria-hidden="true"></span><div><span class="summary-key">Wi-Fi utama</span><strong id="shell-wifi-status">Belum diperiksa</strong></div></div>
+            <div class="connectivity-summary-item"><span class="status-bullet" aria-hidden="true"></span><div><span class="summary-key">Layanan jaringan</span><strong id="shell-router-status">Belum diperiksa</strong></div></div>
+            <div class="connectivity-summary-item"><span class="status-bullet" aria-hidden="true"></span><div><span class="summary-key">SMS modem</span><strong id="shell-sms-status">Belum diperiksa</strong></div></div>
+          </div>
           <article class="dashboard-home" data-group="dashboard">
           <div class="connection-hero">
             <div><span class="eyebrow">JARINGAN SELULER</span><h2>Koneksi internet dan perangkat</h2>
@@ -83,6 +111,13 @@
             <span class="topology-link" aria-hidden="true">→</span>
             <div class="topology-node"><span class="topology-icon" aria-hidden="true">▣</span><div><strong>Wi-Fi &amp; LAN</strong><small id="path-clients">Memeriksa koneksi lokal…</small></div></div>
           </div>
+          <nav class="quick-navigation" aria-label="Akses cepat pengaturan router">
+            <button class="quick-link" type="button" data-target-page="network" data-target-group="sim"><span class="quick-symbol" aria-hidden="true">▤</span><span><strong>LTE &amp; SIM</strong><small>Operator, APN dan koneksi</small></span><span class="quick-chevron" aria-hidden="true">›</span></button>
+            <button class="quick-link" type="button" data-target-page="network" data-target-group="wifi"><span class="quick-symbol" aria-hidden="true">◉</span><span><strong>Wi-Fi</strong><small>SSID, keamanan dan klien</small></span><span class="quick-chevron" aria-hidden="true">›</span></button>
+            <button class="quick-link" type="button" data-target-page="network" data-target-group="lan"><span class="quick-symbol" aria-hidden="true">◇</span><span><strong>LAN &amp; DHCP</strong><small>Perangkat dan alamat lokal</small></span><span class="quick-chevron" aria-hidden="true">›</span></button>
+            <button class="quick-link" type="button" data-target-page="sms" data-target-group="messages"><span class="quick-symbol" aria-hidden="true">✉</span><span><strong>SMS Center</strong><small>Baca dan kirim pesan</small></span><span class="quick-chevron" aria-hidden="true">›</span></button>
+          </nav>
+          <div class="section-heading dashboard-section-heading"><div><span class="eyebrow">RINGKASAN PERANGKAT</span><h2>Status sistem</h2><p>Data asli router. Hasil belum diperiksa ditampilkan apa adanya.</p></div></div>
           <div id="status-grid" class="grid"></div>
           <section class="traffic-panel" aria-label="Grafik trafik jaringan">
             <div class="traffic-head"><div><span class="eyebrow">STATISTIK LANGSUNG</span><h2>Trafik LTE</h2><p>Grafik berdasarkan byte RX/TX yang benar-benar dihitung oleh kernel OpenWrt.</p></div><div class="traffic-legend"><span>● Unduh</span><span>● Unggah</span></div></div>
@@ -153,6 +188,25 @@
             <button id="monitor-save" type="button" disabled>Simpan interval</button>
             <p id="monitor-result" role="status"></p>
           </article>
+          <article class="panel wifi-primary-panel" data-group="wifi">
+            <div class="section-heading"><div><span class="eyebrow">WIRELESS 2.4 GHZ</span><h2>Wi-Fi utama</h2><p>Kelola SSID, keamanan WPA2 dan kanal. Pengaturan disimpan terpisah dari aktivasi radio.</p></div></div>
+            <p id="wifi-ap-live-status" class="notice" role="status">Status AP belum diperiksa.</p>
+            <h3>Wi-Fi utama</h3>
+            <form id="wifi-name-form">
+              <label>Nama jaringan (SSID, 1–32 byte) <input id="wifi-name" required maxlength="32" autocomplete="off" disabled></label>
+              <button id="wifi-name-save" type="submit" disabled>Simpan nama</button>
+            </form>
+            <button id="wifi-channel-auto" type="button" disabled>Gunakan kanal otomatis 2,4 GHz</button>
+            <p id="wifi-visibility-status" role="status"></p>
+            <button id="wifi-visibility-change" type="button" disabled>Ubah visibilitas</button>
+            <section class="wifi-activation-action" aria-label="Aktivasi Access Point">
+              <h3>Persiapan aktivasi Wi-Fi WPA2</h3>
+              <p>Setelah SSID dan WPA2 tersimpan, langkah ini hanya menyimpan status AP untuk boot berikutnya. Tidak menjalankan network reload, restart radio, atau modem. Aktivasi membutuhkan reboot manual terpisah melalui koneksi LAN kabel.</p>
+              <button id="wifi-activate-ap" type="button" disabled>Siapkan AP untuk reboot manual</button>
+              <p id="wifi-activate-status" role="status">Memeriksa kesiapan Wi-Fi...</p>
+              <p class="notice">Konfigurasi tersimpan bukan bukti AP menyala. Setelah reboot manual, wajib uji beacon SSID, autentikasi WPA2, DHCP, DNS, dan internet dari perangkat klien.</p>
+            </section>
+          </article>
           <article class="panel" data-group="wifi">
             <h2>Guest Wi-Fi — Isolasi</h2>
             <button id="guest-status-read" type="button">Periksa konfigurasi guest</button>
@@ -205,14 +259,6 @@
             <div id="network-status" class="grid" aria-live="polite"></div>
             <p>Kontrol reconnect, APN dan SIM berada pada submenu LTE &amp; SIM.</p>
             <button id="lte-open-controls" class="quiet" type="button">Buka pengaturan LTE &amp; SIM</button>
-            <h3>Wi-Fi utama</h3>
-            <form id="wifi-name-form">
-              <label>Nama jaringan (SSID, 1–32 byte) <input id="wifi-name" required maxlength="32" autocomplete="off" disabled></label>
-              <button id="wifi-name-save" type="submit" disabled>Simpan nama</button>
-            </form>
-            <button id="wifi-channel-auto" type="button" disabled>Gunakan kanal otomatis 2,4 GHz</button>
-            <p id="wifi-visibility-status" role="status"></p>
-            <button id="wifi-visibility-change" type="button" disabled>Ubah visibilitas</button>
             <details><summary>Alamat IPv4 LAN dan WAN Ethernet</summary>
               <button type="button" id="interface-read">Baca konfigurasi</button>
               <form id="interface-form"><fieldset name="controls" disabled>

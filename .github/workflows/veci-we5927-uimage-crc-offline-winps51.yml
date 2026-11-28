@@ -1,0 +1,89 @@
+name: WE5927 legacy uImage CRC offline Windows 5.1
+
+on:
+  push:
+    branches:
+      - feat/veci-v2-native-gui-refresh-20261126
+    paths:
+      - 'scripts/veci-we5927-uimage-offline-integrity-20261127.ps1'
+      - 'scripts/tests/build_we5927_uimage_crc_fixtures_20261127.py'
+      - 'scripts/tests/test_we5927_uimage_offline_integrity_20261127.py'
+      - '.github/workflows/veci-we5927-uimage-crc-offline-winps51.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-crc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python independently verifies valid/corrupt uImage fixture CRCs
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p test_we5927_uimage_offline_integrity_20261127.py -v
+
+  windows-ps51:
+    runs-on: windows-2022
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse script, generate fully offline synthetic MTD3 files
+        shell: powershell
+        run: |
+          $tokens=$null
+          $parseErrors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'scripts/veci-we5927-uimage-offline-integrity-20261127.ps1').Path,
+            [ref]$tokens,[ref]$parseErrors) | Out-Null
+          if($parseErrors.Count -gt 0){
+            $parseErrors | Format-List | Out-String | Write-Host
+            throw 'POWERSHELL_51_PARSER_FAILED'
+          }
+          Write-Host 'WINDOWS_PS51_UIMAGE_SCRIPT_SYNTAX=PASS'
+          python scripts/tests/build_we5927_uimage_crc_fixtures_20261127.py --output $env:RUNNER_TEMP
+      - name: Run uImage CRC verifier against valid and tampered 8MB files (no router)
+        shell: powershell
+        run: |
+          $script=(Resolve-Path 'scripts/veci-we5927-uimage-offline-integrity-20261127.ps1').Path
+          $valid=Join-Path $env:RUNNER_TEMP 'synthetic-we5927-none.bin'
+          $validReceipt=[IO.Path]::ChangeExtension($valid,'.json')
+          $goodOutput=@(& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script -ImagePath $valid -ReceiptPath $validReceipt 2>&1)
+          if($LASTEXITCODE -ne 0){ throw ('POSITIVE_FIXTURE_EXIT_FAILED: '+($goodOutput -join ' ')) }
+          if($goodOutput -notcontains 'UIMAGE_HEADER_CRC32=PASS' -or
+             $goodOutput -notcontains 'UIMAGE_DATA_CRC32=PASS' -or
+             $goodOutput -notcontains 'UIMAGE_METADATA=LINUX_MIPS_KERNEL' -or
+             $goodOutput -notcontains 'UIMAGE_LEGACY_CHECKSUMS=PASS'){
+            throw ('POSITIVE_FIXTURE_INCOMPLETE: '+($goodOutput -join ' '))
+          }
+          Write-Host 'WINDOWS_PS51_UIMAGE_POSITIVE_CRC=PASS'
+          foreach($variant in @('header','payload','magic')){
+            $image=Join-Path $env:RUNNER_TEMP ("synthetic-we5927-$variant.bin")
+            $receipt=[IO.Path]::ChangeExtension($image,'.json')
+            # Under Windows PowerShell 5.1, native stderr redirected with 2>&1
+            # becomes a PowerShell ErrorRecord. For intentionally invalid
+            # samples, capture it without the parent runner's Stop preference.
+            $priorErrorPreference=$ErrorActionPreference
+            try {
+              $ErrorActionPreference='Continue'
+              $badOutput=@(& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script -ImagePath $image -ReceiptPath $receipt 2>&1)
+              $badExit=$LASTEXITCODE
+            } finally {
+              $ErrorActionPreference=$priorErrorPreference
+            }
+            if($badExit -eq 0){throw "INVALID_IMAGE_ACCEPTED_$variant"}
+            $must = switch($variant) {
+              'header' {'STOP=UIMAGE_HEADER_CRC32_MISMATCH'}
+              'payload' {'STOP=UIMAGE_DATA_CRC32_MISMATCH'}
+              'magic' {'BAD_UIMAGE_MAGIC'}
+            }
+            if(($badOutput -join ' ') -notmatch [regex]::Escape($must)){
+              throw ("WRONG_NEGATIVE_REJECTION_$variant "+($badOutput -join ' '))
+            }
+            Write-Host ("WINDOWS_PS51_UIMAGE_REJECT_{0}=PASS" -f $variant.ToUpperInvariant())
+          }
+          Write-Host 'ROUTER_NOT_CONTACTED=YES'
+          # Intentional negative cases leave LASTEXITCODE nonzero in PS5.1;
+          # all tests have passed and any unexpected failure above throws.
+          exit 0

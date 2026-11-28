@@ -11,6 +11,8 @@ PREFIX=Path(os.environ.get("VECI_LIBUBOX_PREFIX") or "/missing-native-libubox")
 
 class ReadonlyNativeDiagnostics(unittest.TestCase):
     def setUp(self):
+        if not (PREFIX/"share/libubox/jshn.sh").is_file() or not (PREFIX/"bin/jshn").is_file():
+            self.skipTest("real native libubox/jshn host dependency unavailable; CI provisions it")
         self.temp=tempfile.TemporaryDirectory(prefix="veci-system-diag-")
         self.addCleanup(self.temp.cleanup)
         t=Path(self.temp.name)
