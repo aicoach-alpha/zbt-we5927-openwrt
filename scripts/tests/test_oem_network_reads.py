@@ -147,6 +147,31 @@ esac
             self.assertIn("history_state=unavailable",out.stdout)
             self.assertIn("lte_rx_bytes=\n",out.stdout)
 
+    def test_guest_and_pppoe_read_state(self):
+        self.cmd("ubus", """#!/bin/sh
+case "$4:$5" in
+ veci.v2.guest:status) printf '%s' "$GUEST";;
+ veci.v2.interfaces:pppoeStatus) printf '%s' "$PPPOE";;
+ *) exit 1;;
+esac
+""")
+        self.cmd("uci", """#!/bin/sh
+[ "$3" = wireless.veci_guest.ssid ] && echo GuestLab
+""")
+        for state in ("disconnected","connecting","pending_activation","not_configured","connected"):
+            out=self.invoke("get_pppoe_status",PPPOE=json.dumps(dict(ok=True,state=state,revision="a"*64,ipv4="192.0.2.10")))
+            self.assertEqual(out.returncode,0,out.stderr)
+            self.assertIn("ipv4="+("192.0.2.10" if state=="connected" else "")+"\n",out.stdout)
+            self.assertIn("internet_verified=false",out.stdout)
+        self.assertNotEqual(self.invoke("get_pppoe_status",PPPOE=json.dumps(dict(ok=True,state="connected",revision="a"*64,ipv4="0.0.0.0"))).returncode,0)
+        guest=dict(ok=True,installed=True,configured=True,enabled_configured=False,mode="native",revision="a"*64)
+        for enabled in (False,True):
+            out=self.invoke("get_wifi_guest",GUEST=json.dumps(guest|dict(enabled_configured=enabled)))
+            self.assertEqual(out.returncode,0,out.stderr)
+            self.assertIn("guest_enabled="+str(int(enabled)),out.stdout)
+            self.assertIn("isolation_verified=unknown",out.stdout)
+        self.assertNotEqual(self.invoke("get_wifi_guest",GUEST=json.dumps(guest|dict(configured=False,enabled_configured=True))).returncode,0)
+
     def test_egress_rate_and_route_change(self):
         self.cmd("ip", """#!/bin/sh
 if [ -e "$CHANGED" ]; then echo 'default dev eth0.2'; else echo 'default dev usb0'; fi
