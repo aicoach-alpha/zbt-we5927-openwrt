@@ -289,6 +289,9 @@ case "$op" in
         json_init; json_add_string action "$action"; json_add_string revision "$revision"
         json_add_string confirmation "$confirmation"
         rpc veci.v2.interfaces pppoeAction "$(json_dump)"
+        [ "$(native_field '@.requested')" = true ] &&
+        [ "$(native_field '@.state')" = pending_verification ] &&
+        [ "$(native_field '@.internet_verified')" = false ] || fail "PPPoE request unconfirmed"
         json_init; json_add_string code 1; json_add_string reason "Ethernet PPPoE action requested"
         json_add_string apply_state pending_verification
         json_dump; exit 0

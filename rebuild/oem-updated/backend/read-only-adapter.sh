@@ -414,7 +414,13 @@ case "$1" in
         json_add_string pppoe_status "$status"
         json_add_string state "$state"
         json_add_string revision "$(field '@.revision')"
-        json_add_string ipv4 "$(field '@.ipv4' || true)"
+        address=""
+        if [ "$state" = connected ]; then
+            address="$(field '@.ipv4')" || error "connected address unavailable"
+            printf '%s\n' "$address" | awk -F. 'NF!=4{exit 1}{for(i=1;i<=4;i++)if($i !~ /^[0-9]+$/ || $i>255)exit 1}' || error "invalid connected address"
+            [ "$address" != 0.0.0.0 ] || error "invalid connected address"
+        fi
+        json_add_string ipv4 "$address"
         json_add_string internet_verified false
         ;;
     get_4g)
