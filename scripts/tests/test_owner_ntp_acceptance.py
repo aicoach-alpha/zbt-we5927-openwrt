@@ -100,7 +100,7 @@ print(v)
         program=root/"provider"
         content=SOURCE.replace("/tmp/sysinfo/board_name",str(board))
         content=content.replace("/usr/share/libubox/jshn.sh",str(shim))
-        content=content.replace("/etc/config/system",str(cfg))
+        content=content.replace("/etc/config/system",str(cfg)).replace("/var/run/veci2-reboot-requested",str(root/"reboot-pending"))
         content=content.replace("/etc/init.d/sysntpd",str(ntp))
         program.write_text(content)
         env={**os.environ,
@@ -125,10 +125,13 @@ print(v)
         for change in [{"confirmation":""},{"second":"0.id.pool.ntp.org"},
                        {"first":"../etc/shadow"},{"first":"a b"},
                        {"first":"bad..host"},{"first":"x"*254},
-                       {"first":"bad-.example"},{"first":"a.-bad"}]:
+                       {"first":"bad-.example"},{"first":"a.-bad"},{"first":"valid.example\nother.example"}]:
             data=good|change
             self.assertFalse(call("setNtp",**data)["ok"],data)
             self.assertEqual(cfg.read_bytes(),original)
+        (root/"reboot-pending").touch()
+        self.assertEqual(call("setNtp",**good)["error"],"reboot_pending")
+        (root/"reboot-pending").unlink()
         pending.touch()
         self.assertEqual(call("setNtp",**good)["error"],"pending_system_changes")
         pending.unlink()
@@ -145,10 +148,10 @@ print(v)
 
     def test_uci_acl_and_no_radio_lte_modification(self):
         acl=json.loads((RUNTIME/"veci2-status-acl.json").read_text())["veci-v2-system"]
-        self.assertEqual(acl["write"]["ubus"]["veci.v2.system"],["setNtp"])
+        self.assertEqual(acl["write"]["ubus"]["veci.v2.system"],["setNtp","rebootNow"])
         self.assertIn("ntp",acl["read"]["ubus"]["veci.v2.system"])
         self.assertIn("flock -n 9",SOURCE)
-        for forbidden in ("ifdown","ifup","wifi reload","AT+CFUN","sysupgrade"):
+        for forbidden in ("ifdown","ifup","wifi reload","AT+CFUN"):
             self.assertNotIn(forbidden,SOURCE)
         subprocess.run(["busybox","ash","-n",str(RUNTIME/"veci2-system-admin")],check=True)
 

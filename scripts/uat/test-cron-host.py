@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory() as tmp:
     tab, board, provider = (root / name for name in ("root", "board", "provider"))
     board.write_text("zbtlink,zbt-we5927\n")
     source = (runtime / "veci2-cron").read_text()
-    for old, new in {"/usr/bin/crontab":root / "crontab", "/etc/crontabs/root":tab, "/tmp/sysinfo/board_name":board,
+    for old, new in {"/var/run/veci2-reboot-requested":root/"reboot-pending", "/usr/bin/crontab":root / "crontab", "/etc/crontabs/root":tab, "/tmp/sysinfo/board_name":board,
             "/usr/libexec/veci2-cron.awk":runtime / "veci2-cron.awk",
             "/usr/share/libubox/jshn.sh":prefix / "share/libubox/jshn.sh"}.items():
         source = source.replace(old, str(new))
@@ -84,6 +84,17 @@ with tempfile.TemporaryDirectory() as tmp:
     tab.symlink_to(board)
     assert call("add", **new)["error"]=="unsupported_layout" and board.read_text()=="zbtlink,zbt-we5927\n"
     tab.unlink()
+    initial=call("rebootStatus")
+    assert initial["enabled"]=="0"
+    args=dict(enabled="0",hour="4",minute="15",weekdays="1,3,5",revision=initial["revision"],confirmation="DISABLE_SCHEDULED_REBOOT")
+    install.write_text('#!/bin/sh\ncp "$1" "$SPOOL"\n')
+    (root/"reboot-pending").touch()
+    assert call("setReboot",**args)["error"]=="reboot_pending"
+    (root/"reboot-pending").unlink()
+    saved=call("setReboot",**args)
+    assert saved["enabled"]=="0" and saved["hour"]=="4" and saved["minute"]=="15"
+    assert tab.read_text().startswith("# VeCI paused:")
+    assert call("setReboot",**args)["error"]=="stale_configuration"
     print("PASS add/remove lifecycle, private OEM records, unknown task, stale revision, busy, post-install rollback, absent spool rollback, concurrent writer and symlink protection")
     board.write_text("other\n")
     assert call("status")["error"] == "unsupported_board"
