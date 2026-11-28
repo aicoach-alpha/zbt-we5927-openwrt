@@ -132,6 +132,21 @@ esac
         self.assertIn("imei=***********2345",out.stdout)
         self.assertNotIn("123456789012345",out.stdout)
 
+    def test_traffic_history_is_observed_not_extrapolated(self):
+        self.cmd("ubus", """#!/bin/sh
+[ "$4:$5" = veci.v2.observability:trafficHistory ] && printf '%s' "$HISTORY"
+""")
+        history=dict(ok=True,source="kernel_sampled_bytes",persistent=False,window_seconds=86400,state="observed_partial",samples=4,lte_rx_bytes=40,lte_tx_bytes=50,lte_gaps=1,lan_rx_bytes=None,lan_tx_bytes=None)
+        for op in ("get_days_traffic","refresh_days_traffic"):
+            out=self.invoke(op,HISTORY=json.dumps(history))
+            self.assertEqual(out.returncode,0,out.stderr)
+            for v in ("window_seconds=86400","lte_rx_bytes=40","lte_gaps=1","lan_rx_bytes=\n","persistent=false"):self.assertIn(v,out.stdout)
+            for patch in (dict(source="operator_quota"),dict(persistent=True),dict(window_seconds=604800),dict(state="complete")):
+                self.assertNotEqual(self.invoke(op,HISTORY=json.dumps(history|patch)).returncode,0)
+            out=self.invoke(op,HISTORY=json.dumps(dict(ok=True,source="kernel_sampled_bytes",persistent=False,state="unavailable")))
+            self.assertIn("history_state=unavailable",out.stdout)
+            self.assertIn("lte_rx_bytes=\n",out.stdout)
+
     def test_egress_rate_and_route_change(self):
         self.cmd("ip", """#!/bin/sh
 if [ -e "$CHANGED" ]; then echo 'default dev eth0.2'; else echo 'default dev usb0'; fi
