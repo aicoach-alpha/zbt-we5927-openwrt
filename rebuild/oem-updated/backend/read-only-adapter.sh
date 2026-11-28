@@ -792,14 +792,23 @@ case "$1" in
         # shell-sourced shared cache. On counter reset, rate is unknown.
         rx_rate=""; tx_rate=""
         if [ "$up" = true ]; then
+            t1="$(cut -d' ' -f1 /proc/uptime)"
             sleep 1
             next_rx="$(cat "/sys/class/net/$dev/statistics/rx_bytes" 2>/dev/null || true)"
             next_tx="$(cat "/sys/class/net/$dev/statistics/tx_bytes" 2>/dev/null || true)"
+            t2="$(cut -d' ' -f1 /proc/uptime)"
+            next_state="$(ubus -t 3 call "network.interface.$network" status '{}' || true)"
+            next_up="$(printf '%s' "$next_state" | jsonfilter -e '@.up' || true)"
+            next_dev="$(printf '%s' "$next_state" | jsonfilter -e '@.l3_device' || printf '%s' "$next_state" | jsonfilter -e '@.device' || true)"
+            if [ "$next_up:$next_dev" = "true:$dev" ]; then
             case "$next_rx:$next_tx" in *[!0-9:]*|:*|*:) ;; *)
-                rx_rate="$(awk -v a="$rx" -v b="$next_rx" 'BEGIN{if(b>=a)printf "%.0f",b-a}')"
-                tx_rate="$(awk -v a="$tx" -v b="$next_tx" 'BEGIN{if(b>=a)printf "%.0f",b-a}')"
+                rx_rate="$(awk -v a="$rx" -v b="$next_rx" -v t="$t1" -v u="$t2" 'BEGIN{if(length(a)<=15&&length(b)<=15&&b>=a&&u>t&&u-t<=5)printf "%.0f",(b-a)/(u-t)}')"
+                tx_rate="$(awk -v a="$tx" -v b="$next_tx" -v t="$t1" -v u="$t2" 'BEGIN{if(length(a)<=15&&length(b)<=15&&b>=a&&u>t&&u-t<=5)printf "%.0f",(b-a)/(u-t)}')"
                 rx="$next_rx"; tx="$next_tx";;
             esac
+            else
+                address=""; ipv6=""; uptime=""; rx=""; tx=""
+            fi
         fi
         success "get interface status success"
         json_add_object data
@@ -873,7 +882,8 @@ case "$1" in
             case "$value" in 0|1|'') ;; *) error "invalid firewall option";; esac
             json_add_string "$option" "$value"
         done
-        json_add_string prohibit_wan_ping "$input"
+        # WAN input policy alone does not prove ICMP-specific filtering.
+        json_add_string prohibit_wan_ping ""
         json_add_string wan_input "$wan"
         json_close_object
         ;;
@@ -890,7 +900,7 @@ case "$1" in
             ap="$(status_field '@.wifi_ap_enabled')" || error "AP status unavailable"
             case "$ap" in true) wifi=1;; false) wifi=0;; *) wifi="";; esac
             route="$(ip -4 route show default | awk 'NR==1{for(i=1;i<NF;i++)if($i=="dev"){print $(i+1);exit}}')"
-            case "$route" in usb0) internet=4g;; '') internet=none;; *) internet=ether;; esac
+            case "$route" in usb0) internet=4g;; '') internet=none;; eth0.2|pppoe-wan) internet=ether;; *) internet=unknown;; esac
             lan="$(ubus -t 3 call network.interface.lan status '{}' | jsonfilter -e '@.up')" || error "LAN state unavailable"
             case "$lan" in true) lan=1;; false) lan=0;; *) error "invalid LAN state";; esac
             json_add_string internet "$internet"; json_add_string internet_verified unknown
