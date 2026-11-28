@@ -56,22 +56,24 @@ traffic_history() {
     echo '{"ok":true,"source":"kernel_sampled_bytes","state":"unavailable","persistent":false}'; return 0;
   }
   now=$(digits "$(date +%s)")
+  [ "$now" -gt 0 ] || { echo '{"ok":true,"source":"kernel_sampled_bytes","state":"unavailable","persistent":false}'; return 0; }
   # Only count adjacent monotonic samples in the trailing 24h window.
   # Counter resets, missing devices, clock jumps and missed samples are gaps.
   # Never extrapolate a missing interval or claim seven days of history.
   awk -v now="$now" '
     function valid(x){return x~/^[0-9]+$/ && length(x)<=15}
     function pair(a,b,c,d){return valid(a)&&valid(b)&&valid(c)&&valid(d)&&c>=a&&d>=b}
-    NF==6 && valid($1) && valid($2) && $1>=now-86400 && $1<=now {
+    {
+      if(NF!=6 || !valid($1) || !valid($2) || $1<now-86400 || $1>now){if(n) discontinuity=1;next}
       if(!n++) first=$1; last=$1
       if(n>1){
         dt=$1-t; du=$2-u
-        if(dt>=1&&dt<=65&&du>=1&&du<=65&&dt-du<=5&&du-dt<=5){
+        if(!discontinuity&&dt>=1&&dt<=65&&du>=1&&du<=65&&dt-du<=5&&du-dt<=5){
           if(pair(r,x,$3,$4)){rx+=$3-r;tx+=$4-x;lte_seconds+=du}else lte_gaps++
           if(pair(l,y,$5,$6)){lr+=$5-l;lt+=$6-y;lan_seconds+=du}else lan_gaps++
         }else{lte_gaps++;lan_gaps++}
       }
-      t=$1;u=$2;r=$3;x=$4;l=$5;y=$6
+      discontinuity=0;t=$1;u=$2;r=$3;x=$4;l=$5;y=$6
     }
     END{
       printf "{\"ok\":true,\"source\":\"kernel_sampled_bytes\",\"persistent\":false,\"window_seconds\":86400,\"samples\":%d",n

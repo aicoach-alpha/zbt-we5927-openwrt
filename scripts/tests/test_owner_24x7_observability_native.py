@@ -98,6 +98,30 @@ print(data.get("epoch_s",""))
         self.assertEqual(self.call("status")["sample"]["state"],"unknown")
         self.assertFalse(any(k in json.dumps(third) for k in ("internet_ok","internet_ready","root_cause")))
         self.assertEqual(self.call("status")["hardware_uat"],"not_run")
+    def test_traffic_history_gap_and_counter_reset(self):
+        import time
+        self.path.mkdir()
+        now=int(time.time())
+        records=[(now-120,100,100,200,10,20),(now-90,130,130,240,20,30),
+                 (now-60,160,5,6,30,40),(now-30,190,15,16,40,50)]
+        log=self.path/"traffic.tsv"
+        log.write_text("".join("\t".join(map(str,r))+"\n" for r in records))
+        result=self.call("traffic-history")
+        self.assertEqual(result["lte_rx_bytes"],40)
+        self.assertEqual(result["lte_tx_bytes"],50)
+        self.assertEqual(result["lte_gaps"],1)
+        self.assertEqual(result["lan_observed_seconds"],90)
+        self.assertFalse(result["persistent"])
+        # A malformed intervening record must not be bridged.
+        lines=log.read_text().splitlines()
+        log.write_text("\n".join(lines[:1]+["bad record"]+lines[1:])+"\n")
+        result=self.call("traffic-history")
+        self.assertEqual(result["lte_rx_bytes"],10)
+        self.assertEqual(result["lte_gaps"],2)
+        self.assertEqual(result["lan_gaps"],1)
+        log.unlink()
+        self.assertEqual(self.call("traffic-history")["state"],"unavailable")
+
     def test_privacy_bounded_tmpfs_and_root_only_permissions(self):
         self.call("once")
         data=(self.path/"samples.jsonl")
@@ -136,10 +160,11 @@ print(data.get("epoch_s",""))
         self.assertIn("/usr/libexec/veci2-observe daemon",init)
         self.assertIn("START=85",init)
         acl=json.loads(ACL.read_text())["veci-v2-observability"]
-        self.assertEqual(acl["read"]["ubus"]["veci.v2.observability"],["status"])
+        self.assertEqual(acl["read"]["ubus"]["veci.v2.observability"],["status","trafficHistory"])
         self.assertEqual(acl["write"]["ubus"],{})
         rpc=RPC.read_text()
-        self.assertIn("timeout 3 /usr/libexec/veci2-observe status",rpc)
+        self.assertIn('timeout 3 /usr/libexec/veci2-observe "$action"',rpc)
+        self.assertIn("call:trafficHistory) action=traffic-history",rpc)
         pkg=(RUNTIME/"Makefile").read_text()
         for fragment in ("veci2-observe-rpc", "veci2-observe-acl.json",
                          "files/etc/init.d/veci2-observe", "/usr/libexec/veci2-observe",
