@@ -723,6 +723,7 @@ case "$1" in
     get_openvpn_status)
         inventory="$(ubus -t 3 call service list '{"name":"openvpn"}')" || error "service inventory unavailable"
         json_load "$inventory" || error "invalid service inventory"
+        if json_get_type type openvpn; then [ "$type" = object ] || error "invalid OpenVPN inventory"; fi
         running=0
         if json_select openvpn && json_select instances; then
             json_get_keys instances
@@ -735,6 +736,7 @@ case "$1" in
         fi
         success "OpenVPN service process status"
         json_add_string openvpn_status "$running"
+        json_add_string tunnel_verified false
         ;;
     get_pptp_msg|get_l2tp_msg|get_pptp_sl_status|get_l2tp_sl_status|get_pptp_status|get_l2tp_status)
         case "$1" in get_pptp_*) tunnel=pptp ;; *) tunnel=l2tp ;; esac
@@ -1229,10 +1231,13 @@ case "$1" in
         native="$(native_read veci.v2.addon ddnsStatus)" || error "DDNS profile unavailable"
         state="$(field '@.state')" || error "DDNS state unavailable"
         case "$state" in absent|unconfigured|enabled|disabled) ;; *) error "invalid DDNS state";; esac
+        [ "$(field '@.service')" = ddns ] || error "unexpected service"
+        flag="$(field '@.enabled')" || error "service flag unavailable"
+        case "$state:$flag" in absent:0|unconfigured:0|disabled:0|enabled:1) ;; *) error "inconsistent service state";; esac
         success "native DDNS profile inventory"
         json_add_string state "$state"
         json_add_string revision "$(field '@.revision' || true)"
-        json_add_string enabled "$(field '@.enabled')"
+        json_add_string enabled "$flag"
         json_add_string services "$(field '@.service_name' || true)"
         json_add_string domain "$(field '@.domain' || true)"
         json_add_string lookup_host "$(field '@.lookup_host' || true)"
@@ -1247,10 +1252,13 @@ case "$1" in
         native="$(native_read veci.v2.addon sqmStatus)" || error "SQM profile unavailable"
         state="$(field '@.state')" || error "SQM state unavailable"
         case "$state" in absent|unconfigured|enabled|disabled) ;; *) error "invalid SQM state";; esac
+        [ "$(field '@.service')" = sqm ] || error "unexpected service"
+        flag="$(field '@.enabled')" || error "service flag unavailable"
+        case "$state:$flag" in absent:0|unconfigured:0|disabled:0|enabled:1) ;; *) error "inconsistent service state";; esac
         success "native SQM profile inventory"
         json_add_string state "$state"
         json_add_string revision "$(field '@.revision' || true)"
-        json_add_string qos_enabled "$(field '@.enabled')"
+        json_add_string qos_enabled "$flag"
         json_add_string scope interface_sqm
         json_add_string service_startup "$(field '@.service_startup' || true)"
         json_add_string runtime unknown
