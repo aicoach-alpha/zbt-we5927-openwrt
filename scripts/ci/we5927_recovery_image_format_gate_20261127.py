@@ -25,7 +25,10 @@ class FormatGateError(ValueError):
 
 
 def analyze_image(path, expected_sha):
-    binary = Path(path).read_bytes()
+    with Path(path).open('rb') as f:
+        return analyze_bytes(f.read(MTD3_LIMIT+1), expected_sha)
+
+def analyze_bytes(binary, expected_sha):
     size = len(binary)
     if not (SQUASHFS_MIN_SUPERBLOCK + 64 <= size <= MTD3_LIMIT):
         raise FormatGateError("IMAGE_SIZE_OUT_OF_FLASH_BOUNDS")
