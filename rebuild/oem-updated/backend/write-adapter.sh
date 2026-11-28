@@ -323,6 +323,10 @@ case "$op" in
         json_add_string minute "$minute"; json_add_string weekdays "$weekdays"
         json_add_string revision "$revision"; json_add_string confirmation "$confirm"
         rpc veci.v2.cron setReboot "$(json_dump)"
+        [ "$(native_field '@.enabled')" = "$enabled" ] &&
+        [ "$(native_field '@.hour')" = "$hour" ] &&
+        [ "$(native_field '@.minute')" = "$minute" ] &&
+        [ "$(native_field '@.weekdays')" = "$weekdays" ] || fail "schedule unconfirmed"
         ;;
     set_wifi_client)
         mac="$(read_field '@.macaddr')" || fail "MAC required"
@@ -499,6 +503,9 @@ case "$op" in
         [ "$timezone" = "$(uci -q get 'system.@system[0].timezone')" ] || fail "timezone change not supported"
         json_init; json_add_string first "$first"; json_add_string second "$second"; json_add_string confirmation SET_NTP
         rpc veci.v2.system setNtp "$(json_dump)"
+        [ "$(native_field '@.enabled')" = 1 ] &&
+        [ "$(native_field '@.servers[0]')" = "$first" ] &&
+        [ "$(native_field '@.servers[1]' || true)" = "$second" ] || fail "NTP configuration unconfirmed"
         ;;
     set_dmz)
         enabled="$(read_field '@.enabled')" || fail "DMZ flag required"
