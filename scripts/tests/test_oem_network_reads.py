@@ -73,6 +73,35 @@ except (KeyError,IndexError,TypeError,ValueError,StopIteration): sys.exit(1)
         defaults.update(env)
         return subprocess.run(["sh",str(self.d/"adapter"),op],env=dict(os.environ,PATH=str(self.d)+":"+os.environ["PATH"],**defaults),capture_output=True,text=True,timeout=5)
 
+    def test_radio_lte_policy_and_masked_identity(self):
+        self.cmd("ubus", """#!/bin/sh
+case "$4:$5" in
+ veci.v2.lte:status) printf '%s' "$LTE";;
+ veci.v2.wifi:power) printf '%s' "$POWER";;
+ *) exit 1;;
+esac
+""")
+        self.cmd("uci", """#!/bin/sh
+case "$3" in
+ we5927_lte.main.ping_host) echo 1.1.1.1;;
+ we5927_lte.main.fail_threshold) echo 3;;
+ *) exit 1;;
+esac
+""")
+        state=dict(ok=True,configured_apn="lab.example",configured_slot=2,auto_failover=True,monitor_interval=60)
+        for op,wanted in (("get_4g",["apn=lab.example","sim_set=SIM2","apn_scope=shared"]),("get_netwatchdog",["detect_itv=60","action=lte_recovery"])):
+            out=self.invoke(op,LTE=json.dumps(state))
+            self.assertEqual(out.returncode,0,out.stderr)
+            for v in wanted:self.assertIn(v,out.stdout)
+        self.assertNotEqual(self.invoke("get_4g",LTE=json.dumps(state|dict(configured_slot=3))).returncode,0)
+        out=self.invoke("get_wifi_power",POWER=json.dumps(dict(ok=True,configured="15",safe_max_dbm="20")))
+        self.assertIn("configured=15",out.stdout)
+        self.assertIn("live_power_verified=false",out.stdout)
+        self.assertNotEqual(self.invoke("get_wifi_power",POWER=json.dumps(dict(ok=True,configured="99"))).returncode,0)
+        out=self.invoke("get_imei",MODEM=json.dumps(dict(imei="123456789012345")))
+        self.assertIn("imei=***********2345",out.stdout)
+        self.assertNotIn("123456789012345",out.stdout)
+
     def test_egress_rate_and_route_change(self):
         self.cmd("ip", """#!/bin/sh
 if [ -e "$CHANGED" ]; then echo 'default dev eth0.2'; else echo 'default dev usb0'; fi

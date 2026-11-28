@@ -21,7 +21,7 @@ success() {
 # Fixed native service allowlist: no arbitrary user-supplied RPC dispatch.
 native_read() {
     case "$1:$2" in
-        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus|veci.v2.firewall:ttlStatus|veci.v2.firewall:parentStatus|veci.v2.addon:openvpnStatus) ;;
+        veci.v2.system:ntp|veci.v2.dhcp:status|veci.v2.firewall:status|veci.v2.interfaces:status|veci.v2.wifi:info|veci.v2.wifi:uplinkStatus|veci.v2.wifi:status|veci.v2.lte:status|veci.v2.system:logs|veci.v2.routes:status|veci.v2.guest:status|veci.v2.updatepolicy:status|veci.v2.observability:trafficHistory|veci.v2.wifi:power|veci.v2.cron:rebootStatus|veci.v2.interfaces:pppoeStatus|veci.v2.addon:ddnsStatus|veci.v2.addon:sqmStatus|veci.v2.firewall:ttlStatus|veci.v2.firewall:parentStatus|veci.v2.addon:openvpnStatus) ;;
         *) return 1;;
     esac
     result="$(ubus -t 3 call "$1" "$2" '{}')" || return 1
@@ -363,7 +363,8 @@ case "$1" in
         case "$channel" in auto) channel=0;; [1-9]|1[0-4]) ;; *) error "Wi-Fi channel invalid";; esac
         radio_disabled="$(get wireless.radio0.disabled || true)"
         ap_disabled="$(get wireless.default_radio0.disabled || true)"
-        case "$radio_disabled:$ap_disabled" in *[!01:]*) error "Wi-Fi enabled state invalid";; esac
+        case "$radio_disabled" in ''|0|1) ;; *) error "Wi-Fi enabled state invalid";; esac
+        case "$ap_disabled" in ''|0|1) ;; *) error "Wi-Fi enabled state invalid";; esac
         enabled=1
         [ "$radio_disabled" != 1 ] && [ "$ap_disabled" != 1 ] || enabled=0
         ht="$(get wireless.radio0.htmode)" || error "Wi-Fi width unavailable"
@@ -375,6 +376,11 @@ case "$1" in
         if [ -n "$iface" ]; then
             case "$iface" in -*|*[!A-Za-z0-9_.-]*) error "Wi-Fi interface invalid";; esac
             bssid="$(cat "/sys/class/net/$iface/address" 2>/dev/null || true)"
+        fi
+        uplink_enabled=""
+        uplink_state="$(native_read veci.v2.wifi uplinkStatus || true)"
+        if [ -n "$uplink_state" ]; then
+            case "$(printf '%s' "$uplink_state" | jsonfilter -e '@.enabled' || true)" in true) uplink_enabled=1;; false) uplink_enabled=0;; esac
         fi
         success "getWiFi2 success"
         json_add_string enabled "$enabled"
@@ -393,7 +399,8 @@ case "$1" in
         # Never disclose stored Wi-Fi keys through periodic read requests.
         json_add_string key ""
         json_add_string macfilter "$access"
-        json_add_string ApCliEnable "0"
+        json_add_string ApCliEnable "$uplink_enabled"
+        json_add_string uplink_connection_verified false
         json_add_string channel_disabled "0"
         json_add_array maclist
         for mac in $macs; do json_add_string "" "$mac"; done
@@ -982,6 +989,9 @@ case "$1" in
         native="$(native_read veci.v2.wifi power)" || error "power provider unavailable"
         power="$(field '@.configured')" || error "power unavailable"
         cap="$(field '@.safe_max_dbm' || true)"
+        case "$power" in auto|[1-9]|1[0-9]|20) ;; *) error "invalid power";; esac
+        case "$cap" in ''|null|[1-9]|1[0-9]|20) ;; *) error "invalid power cap";; esac
+        [ "$cap" != null ] || cap=""
         success "get native Wi-Fi power success"
         json_add_string wifi_power native
         json_add_string configured "$power"
