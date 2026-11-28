@@ -73,6 +73,36 @@ except (KeyError,IndexError,TypeError,ValueError,StopIteration): sys.exit(1)
         defaults.update(env)
         return subprocess.run(["sh",str(self.d/"adapter"),op],env=dict(os.environ,PATH=str(self.d)+":"+os.environ["PATH"],**defaults),capture_output=True,text=True,timeout=5)
 
+    def test_wifi_config_reports_native_uplink_without_key(self):
+        self.cmd("ubus", """#!/bin/sh
+case "$4:$5" in
+ veci.v2.wifi:info) echo '{"ok":true,"encryption":"psk2","access":"disable","addresses":[]}' ;;
+ veci.v2.wifi:status) echo '{"ok":true,"configured_visible":true,"configured_channel":"auto"}';;
+ veci.v2.wifi:uplinkStatus) printf '%s' "$UPLINK";;
+ network.wireless:status) echo '{}';;
+ *) exit 1;;
+esac
+""")
+        self.cmd("uci", """#!/bin/sh
+case "$3" in
+ wireless.radio0.htmode) echo HT20;;
+ wireless.default_radio0.ssid) echo Lab;;
+ wireless.radio0.disabled) echo "${RADIO:-0}";;
+ wireless.default_radio0.disabled) echo 0;;
+ wireless.default_radio0.key) echo NEVER_RETURN_FIXTURE;;
+ *) exit 1;;
+esac
+""")
+        for value,expected in ((True,"1"),(False,"0")):
+            out=self.invoke("getWiFi2",UPLINK=json.dumps(dict(ok=True,enabled=value)))
+            self.assertEqual(out.returncode,0,out.stderr)
+            self.assertIn("ApCliEnable="+expected,out.stdout)
+            self.assertIn("key=\n",out.stdout)
+            self.assertNotIn("NEVER_RETURN_FIXTURE",out.stdout)
+        out=self.invoke("getWiFi2",UPLINK='{"ok":false}')
+        self.assertIn("ApCliEnable=\n",out.stdout)
+        self.assertNotEqual(self.invoke("getWiFi2",RADIO="10").returncode,0)
+
     def test_radio_lte_policy_and_masked_identity(self):
         self.cmd("ubus", """#!/bin/sh
 case "$4:$5" in
