@@ -44,7 +44,7 @@ config interface 'lte'
     script = root / "provider"
     script.write_text((pkg / "veci2-interfaces").read_text().replace(
         "/etc/config/network", str(network)).replace("/tmp/sysinfo/board_name", str(board))
-        .replace("/etc/board.json", str(board_json)).replace("/sys/class/net/",str(fake_dev)+"/")
+        .replace("/var/run/veci2-reboot-requested",str(root/"reboot-pending")).replace("/etc/board.json", str(board_json)).replace("/sys/class/net/",str(fake_dev)+"/")
         .replace("/etc/config/dhcp",str(dhcp)).replace("/var/lock/veci2-dhcp.lock",str(dhcp_lock))
         .replace("/var/lock/veci2-ipv6.lock", str(lock)).replace("/usr/share/libubox/jshn.sh", str(jshn)))
     uci = root / "uci"
@@ -66,6 +66,54 @@ print(json.load(open(sys.argv[2]))["network"]["wan"]["device"])
         return subprocess.check_output([uci, "get", "network." + key], text=True).strip()
     initial = call("status")
     assert initial["lan_mask"] == "255.255.255.0" and initial["wan_mode"] == "dhcp"
+    # All ubus actions are confined to a disposable shim, no live netifd.
+    u=root/"ubus"
+    u.write_text("""#!/bin/sh
+case "$*" in
+ "-t 3 call network.interface.wan status {}") cat "$LIVE";;
+ "-t 5 call network.interface.wan down {}"|"-t 5 call network.interface.wan up {}") printf '%s\n' "$*" >> "$ACTIONS";;
+ *) exit 99;;
+esac
+""")
+    u.chmod(0o700)
+    live=root/"live.json";actions=root/"actions"
+    env.update(LIVE=str(live),ACTIONS=str(actions))
+    filt.write_text("""#!/usr/bin/env python3
+import json,sys,re
+try:
+ if sys.argv[1]=="-i": data=json.load(open(sys.argv[2]));q=sys.argv[4]
+ else: data=json.load(sys.stdin);q=sys.argv[2]
+ for a,b,c in re.findall(r'\.([a-zA-Z0-9_]+)|\["([^"]+)"\]|\[(\d+)\]',q):
+  data=data[a or b] if a or b else data[int(c)]
+ print(str(data).lower() if isinstance(data,bool) else data)
+except (KeyError,IndexError,TypeError,ValueError):sys.exit(1)
+""")
+    live.write_text(json.dumps(dict(proto="dhcp",up=True,pending=False,device="eth0.2")))
+    assert call("pppoeStatus")["state"]=="not_configured"
+    original=network.read_bytes()
+    subprocess.run([uci,"set","network.wan.proto=pppoe"],check=True)
+    subprocess.run([uci,"commit","network"],check=True)
+    snapshot=network.read_bytes()
+    rev=call("status")["revision"]
+    payload=dict(revision=rev,action="disconnect",confirmation="DISCONNECT_ETHERNET_PPPOE")
+    assert call("pppoeStatus")["state"]=="pending_activation"
+    assert call("pppoeAction",payload)["error"]=="pending_activation"
+    live.write_text(json.dumps(dict(proto="pppoe",up=True,pending=False,device="eth0.2",**{"ipv4-address":[{"address":"192.0.2.10"}]})))
+    assert call("pppoeStatus")["state"]=="connected"
+    assert call("pppoeAction",payload|dict(revision="stale"))["error"]=="stale_configuration"
+    (root/"reboot-pending").touch()
+    assert call("pppoeAction",payload)["error"]=="reboot_pending"
+    (root/"reboot-pending").unlink()
+    assert not actions.exists()
+    assert call("pppoeAction",payload)["state"]=="pending_verification"
+    assert call("pppoeAction",payload|dict(action="reconnect",confirmation="RECONNECT_ETHERNET_PPPOE"))["requested"]
+    assert actions.read_text().splitlines()==["-t 5 call network.interface.wan down {}","-t 5 call network.interface.wan down {}","-t 5 call network.interface.wan up {}"]
+    assert network.read_bytes()==snapshot
+    live.write_text(json.dumps(dict(proto="pppoe",up=False,pending=False,device="eth0.2",**{"ipv4-address":[{"address":"192.0.2.10"}]})))
+    assert call("pppoeStatus")["ipv4"]==""
+    network.write_bytes(original)
+    print("PASS PPPoE state and scoped action request fixtures")
+
     args = dict(revision=initial["revision"], confirm="SAVE_NETWORK", lan="192.168.2.1",
                 lan_mask="24", wan_mode="static", wan="10.1.1.2", wan_mask="255.255.255.0", gateway="10.1.1.1")
     before = network.read_bytes()
