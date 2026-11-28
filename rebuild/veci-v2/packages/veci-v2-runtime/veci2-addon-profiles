@@ -280,6 +280,20 @@ openvpn_profile() {
   [ "$(uci -q get openvpn.sample_client.dev_type || :)" = tun ] &&
   [ "$(uci -q get openvpn.sample_client.remote_cert_tls || :)" = server ] || return 0
   case "$(uci -q get openvpn.sample_client.proto || :)" in udp|udp4|tcp-client|tcp4-client) ;; *) return 0;; esac
+  # Only an explicitly reviewed simple TLS client profile is eligible for
+  # startup. Unknown options (including hooks and external config) fail closed.
+  profile=$(uci -q show openvpn.sample_client) || return 0
+  for field in $(printf '%s\n' "$profile" | cut -d= -f1); do
+    case "$field" in openvpn.sample_client|openvpn.sample_client.enabled|openvpn.sample_client.client|openvpn.sample_client.dev_type|openvpn.sample_client.remote_cert_tls|openvpn.sample_client.proto|openvpn.sample_client.ca|openvpn.sample_client.cert|openvpn.sample_client.key|openvpn.sample_client.remote|openvpn.sample_client.port|openvpn.sample_client.dev|openvpn.sample_client.nobind|openvpn.sample_client.persist_key|openvpn.sample_client.persist_tun|openvpn.sample_client.verb|openvpn.sample_client.verify_x509_name|openvpn.sample_client.auth_nocache|openvpn.sample_client.resolv_retry|openvpn.sample_client.data_ciphers) ;; *) return 0;; esac
+  done
+  remote=$(uci -q get openvpn.sample_client.remote || :)
+  case "$remote" in ''|-*|.*|*[!a-zA-Z0-9.-]*) return 0;; esac
+  [ "${#remote}" -le 253 ] || return 0
+  port=$(uci -q get openvpn.sample_client.port || :)
+  case "$port" in ''|0*|*[!0-9]*) return 0;; esac
+  [ "${#port}" -le 5 ] && [ "$port" -le 65535 ] || return 0
+  peer=$(uci -q get openvpn.sample_client.verify_x509_name || :)
+  [ "$peer" = "$remote name" ] || return 0
   for item in ca cert key; do
     path=$(uci -q get "openvpn.sample_client.$item" || :)
     case "$path" in /etc/openvpn/*) ;; *) return 0;; esac
