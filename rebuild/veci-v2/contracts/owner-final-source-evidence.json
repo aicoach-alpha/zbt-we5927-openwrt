@@ -1008,11 +1008,11 @@
         "exit_code": 0,
         "hardware_uat": "not_run",
         "log_file": "docs/source-acceptance/system_backup_restore.txt",
-        "log_sha256": "d257fd06fae13843e915fe8c3c9b653ae2edb5d34dc81fd0f6daedd4bb2a9b2b"
+        "log_sha256": "793a9770e23f90d014eefa3ad315007317d2a624d1c9fd8fd5d4cc3a567e6b5f"
       },
       "scope": "source_verified_no_hardware_uat",
       "source_sha256": {
-        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-restore-check": "3027dfb2ed673e91614d05678c2071e53afebf9319e87515eb1f7453d841894f",
+        "rebuild/veci-v2/packages/veci-v2-runtime/veci2-restore-check": "e47273983ae8bb1a6764632c606afd1197b3120a659322c3ae26deeb50941a25",
         "rebuild/veci-v2/packages/veci-v2-runtime/Makefile": "4d12859a80959bddc6fa9451142125f4bad7ccc1c30a9f4c7ce522f9cc6a8639",
         "rebuild/veci-v2/packages/veci-v2-runtime/veci2-status-acl.json": "edbf20bd8fde4a42706e7b3a83760eae133e601426523bdbe308c1ea4af4dd4a",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/cgi-bin/veci2-backup": "daf2ac646604f9d6fce15ad3970b81896cbac4b73719bfce5c30c745b8a2b417",
@@ -1020,7 +1020,7 @@
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/backup.js": "6ab4a2c37925a3071511f84c1ccf0f42105ac7be23fb63f837d8ae6af961dd11",
         "rebuild/veci-v2/packages/veci-v2-ui/files/www/veci2/index.html": "031d722c945ecbd2e726e0d54a9d1ec20744a79c1de5a21ddd79f4fdd83bf62b",
         "rebuild/veci-v2/packages/veci-v2-ui/Makefile": "290a63b381f1c4614fe628e0de6559ec7469d8913ea4ac1604578f33a2f04358",
-        "scripts/tests/test_owner_backup_restore_native.py": "0ee790d6fbf1f5d185f3e2d892f764a3f4dac3a267cc40b711229ac353be36dd",
+        "scripts/tests/test_owner_backup_restore_native.py": "0937eac9efa7854332211e8c5a147d0bc173129c8e08c3afed01dafad956b4b7",
         "scripts/tests/test_veci_backup_export.py": "c4456f3062d4d0ae1c4a1aa8e84fe0b376f15727970e0ef370ec9efa171a2091"
       },
       "status": "pass",
