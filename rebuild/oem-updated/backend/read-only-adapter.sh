@@ -970,6 +970,8 @@ case "$1" in
         json_add_string reason "No verified OEM release catalog available"
         json_add_string update_policy "$mode"
         json_add_string release_status unverified
+        json_add_boolean install_allowed 0
+        json_add_boolean catalog_verified 0
         ;;
     get_days_traffic|refresh_days_traffic)
         native="$(native_read veci.v2.observability trafficHistory)" || error "traffic history unavailable"
