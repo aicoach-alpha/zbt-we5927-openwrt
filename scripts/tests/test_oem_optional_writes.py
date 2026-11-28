@@ -49,10 +49,12 @@ else:sys.exit(99)
          ("set_qos_status",dict(revision=rev,confirmation="ENABLE_SQM_NEXT_BOOT",qos_enabled="1")),
          ("set_qos_status",dict(revision=rev,confirmation="DISABLE_SQM_NEXT_BOOT",qos_enabled="0")),
          ("set_ddns",dict(revision=rev,confirmation="DISABLE_DDNS_NEXT_BOOT",enabled="0")),
+         ("set_ddns",dict(revision=rev,confirmation="ENABLE_DDNS_NEXT_BOOT",enabled="1")),
+         ("set_openvpn",dict(revision=rev,confirmation="ENABLE_OPENVPN_NEXT_BOOT",enabled="1")),
          ("set_openvpn",dict(revision=rev,confirmation="DISABLE_OPENVPN_NEXT_BOOT",enabled="0"))]
         for op,body in cases:
             self.assertEqual(self.call(op,body)["code"],"1",(op,body))
             self.assertEqual(self.call(op,body,MISMATCH="1")["code"],"-4")
             self.assertEqual(self.call(op,body|{"confirmation":"wrong"})["code"],"-4")
         self.assertEqual(self.call(cases[0][0],cases[0][1],DENY="1")["code"],"-4")
-        self.assertEqual(len((self.d/"calls").read_text().splitlines()),10)
+        self.assertEqual(len((self.d/"calls").read_text().splitlines()),14)
