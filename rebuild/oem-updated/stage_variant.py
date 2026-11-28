@@ -320,6 +320,17 @@ def stage(image, out):
             ('console.log(e),this.proxy_req("post","/webapi?op=delete_static_dhcp",e,(function(t){"1"==t.code&&a.get_static_dhcp()}),!0)',
              'if(e.maclist.length!==1){a.$message.error("Select one reservation at a time.");return}if(!/^[0-9a-f]{64}$/.test(a._reservationRevision||"")){a.$message.error("Refresh reservation list.");return}window.confirm("Delete selected DHCP reservation?")&&(e.revision=a._reservationRevision,e.confirmation="DELETE_RESERVATION",a._reservationRevision="",a.$req.post("/webapi?op=delete_static_dhcp",e).then(function(r){if(!r||r.code!=="1")throw Error("Delete rejected");return a.get_static_dhcp()}).catch(function(){a.$message.error("Delete not confirmed; refresh. Select one reservation at a time.")}))'),
         ))
+        # Replace the legacy seven-day chart with the actual volatile native
+        # 24-hour observation contract, preserving the original navigation.
+        traffic_name = "chunk-2d0dac93.ea499f5a.js"
+        traffic = (files / "www/assets/js" / traffic_name).read_text()
+        start = traffic.index("var n=function(){")
+        end = traffic.index(",m=Object(c[", start)
+        old = traffic[start:end]
+        if sha(old.encode()) != "82bf7c13f0cdff7a476d635a1b519c363bd694f16324d0d5d6f4c34e178ce769":
+            raise ValueError("OEM traffic component changed")
+        view = (HERE / "frontend/traffic-view.js").read_text().strip()
+        edit_chunk(traffic_name, [(old, "var p=" + view + ',n=p.render,e=[],c=a("2877")')])
         routed = route_oem_cgi(files / "www")
         if routed < 100:
             raise ValueError("incomplete OEM CGI route inventory")
