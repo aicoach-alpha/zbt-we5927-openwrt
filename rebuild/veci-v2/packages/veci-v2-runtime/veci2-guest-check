@@ -30,6 +30,7 @@ no_pending() {
 locks() {
   exec 6>/var/lock/veci2-ipv6.lock; flock -n 6 || fail network_busy
   exec 7</usr/libexec/rpcd/veci.v2.wifi; flock -n 7 || fail wifi_busy
+  exec 5>/tmp/veci2-wifi-activation.lock; flock -n 5 || fail activation_busy
   exec 8>>/var/lock/veci2-dhcp.lock; flock -n 8 || fail dhcp_busy
   exec 9</usr/libexec/rpcd/veci.v2.firewall; flock -n 9 || fail firewall_busy
 }
@@ -214,7 +215,7 @@ native_write() {
   for c in $targets; do
     if ! change commit "$c"; then rollback || fail rollback_failed; fail commit_failed; fi
   done
-  if ! native_valid || ! fw4 check >/dev/null 2>&1; then
+  if ! native_valid || [ "$(get wireless.veci_guest.disabled)" != "${disabled:-1}" ] || ! fw4 check >/dev/null 2>&1; then
     rollback || fail rollback_failed
     fail validation_failed_rollback
   fi
