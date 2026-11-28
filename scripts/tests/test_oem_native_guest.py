@@ -42,7 +42,7 @@ json_add_null() { printf '%s=null\\n' "$1"; }
 json_dump() { :; }
 """)
         s=(R/"veci2-guest-check").read_text()
-        for old,new in (("/etc/config/","config/"),("/tmp/sysinfo/board_name","board"),("/usr/libexec/rpcd/veci.v2.wifi","wifi-rpc"),("/usr/libexec/rpcd/veci.v2.firewall","fw-rpc"),("/usr/libexec/rpcd/veci.app.guest","legacy-app"),("/usr/share/libubox/jshn.sh","jshn"),("/var/lock/veci2-ipv6.lock","network.lock"),("/var/lock/veci2-dhcp.lock","dhcp.lock"),("/var/run/veci2-reboot-requested","reboot-pending")):
+        for old,new in (("/etc/config/","config/"),("/tmp/sysinfo/board_name","board"),("/usr/libexec/rpcd/veci.v2.wifi","wifi-rpc"),("/usr/libexec/rpcd/veci.v2.firewall","fw-rpc"),("/usr/libexec/rpcd/veci.app.guest","legacy-app"),("/usr/share/libubox/jshn.sh","jshn"),("/var/lock/veci2-ipv6.lock","network.lock"),("/var/lock/veci2-dhcp.lock","dhcp.lock"),("/var/run/veci2-reboot-requested","reboot-pending"),("/tmp/veci2-wifi-activation.lock","activation.lock")):
             s=s.replace(old,str(self.d)+"/"+new)
         (self.d/"rpc").write_text(s)
         self.env=dict(os.environ,HOST_UCI=UCI,TEST_CFG=str(self.cfg),TEST_DELTA=str(self.delta),PATH=str(self.d)+":"+os.environ["PATH"])
@@ -63,6 +63,10 @@ json_dump() { :; }
         return self.call("provisionNative",**args)
     def test_provision_and_toggle_with_native_uci(self):
         self.assertIn("native_eligible=1",self.call("status").stdout)
+        import fcntl
+        with (self.d/"activation.lock").open("w") as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            self.assertIn("activation_busy",self.provision().stdout)
         r=self.provision()
         self.assertIn("configured=1",r.stdout,r.stderr)
         self.assertIn("enabled_configured=0",r.stdout,r.stderr)
