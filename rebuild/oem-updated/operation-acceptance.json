@@ -102,16 +102,16 @@
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "get_acl_rule": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "OpenWrt firewall UCI + native firewall status",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Read-only native rules inventory, no legacy rule editing or global switch; original ACL table mapping and runtime pending."
+      "evidence": "scripts/tests/test_oem_firewall_reads.py",
+      "limitations": "Owned per-rule slot inventory; original OEM browser mapping and packet enforcement pending. Isolated fixture acceptance only."
     },
     "get_acl_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "OpenWrt firewall UCI + native firewall status",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Actual native rule count and revision; no global legacy ACL toggle, UI mapping pending."
+      "evidence": "scripts/tests/test_oem_firewall_reads.py",
+      "limitations": "Owned enabled-slot counts, not global ACL switch; runtime enforcement pending. Isolated fixture acceptance only."
     },
     "get_arp": {
       "state": "FIXTURE_PASS",
@@ -276,10 +276,10 @@
       "limitations": "Native monitor interval, host and recovery policy read; physical recovery pending. Isolated fixture acceptance only."
     },
     "get_network_topology": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2:ethernetPorts/status + netifd",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Native link states; default route is not proof of public internet, physical port ordering pending."
+      "evidence": "scripts/tests/test_oem_topology_reads.py",
+      "limitations": "Default route source, ambiguous route handling, native AP and LAN status; no Internet verification or physical topology claim. Isolated fixture acceptance only."
     },
     "get_ntp": {
       "state": "FIXTURE_PASS",
@@ -312,16 +312,16 @@
       "limitations": "Eight optional UTC same-day LAN-to-WAN MAC deny schedules, per-rule toggle only. Legacy global switch and original OEM form not mapped. Schedule validation fixture only; actual packet enforcement, established connections, time synchronization, successful commit and rollback UAT pending."
     },
     "get_port": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2:ethernetPorts",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Exact switch indexes; physical port order not yet verified, no port remapping."
+      "evidence": "scripts/tests/test_oem_topology_reads.py",
+      "limitations": "Five distinct switch indexes and explicit unknown links; physical port order and target swconfig pending. Isolated fixture acceptance only."
     },
     "get_pppoe_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.interfaces:pppoeStatus",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Distinguishes configured protocol, pending activation, connecting, disconnected and assigned IPv4. Public Internet not verified; physical acceptance pending."
+      "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; scripts/tests/test_oem_guest_pppoe_writes.py; scripts/tests/test_oem_network_reads.py#NetworkReads.test_guest_and_pppoe_read_state",
+      "limitations": "Configured/live PPPoE state and stale address clearing; actual Ethernet session pending. Isolated fixture acceptance only."
     },
     "get_pptp_msg": {
       "state": "FIXTURE_PASS",
@@ -408,10 +408,10 @@
       "limitations": "CPU and memory measured; primary Wi-Fi station count only; full guest client coverage and browser acceptance pending."
     },
     "get_ttl": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.firewall:ttlStatus + local IPv4 sysctl",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Separates configured forwarding policy, live rule observation and local stack TTL; packet verification pending."
+      "evidence": "scripts/tests/test_oem_firewall_reads.py",
+      "limitations": "Configured IPv4 TTL and native reported runtime state; real packet TTL pending. Isolated fixture acceptance only."
     },
     "get_voice": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -431,10 +431,10 @@
       "limitations": "Bounded live sampling; browser and actual interface acceptance pending."
     },
     "get_wan_traffic": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2:traffic",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Canonical USB modem counters; OEM vendor operation was empty, history and UI mapping pending."
+      "evidence": "scripts/tests/test_oem_topology_reads.py",
+      "limitations": "Exact usb0 counters only, no other WAN aggregation; live counter acceptance pending. Isolated fixture acceptance only."
     },
     "get_web_msg": {
       "state": "PROTOTYPE"
@@ -458,10 +458,10 @@
       "limitations": "Primary station inventory with scoped MAC block state and revision. Signal/rate remain unavailable; browser and runtime pending."
     },
     "get_wifi_guest": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.guest:status",
-      "evidence": "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-check; scripts/tests/test_oem_native_guest.py; rebuild/oem-updated/backend",
-      "limitations": "Native clean-install WPA2 provisioning and manual startup toggle use actual host UCI fixture with isolated routes and mocked fw4 check. Default disabled; captive portal remains optional. Physical isolation, actual fw4 compilation, OEM original form and runtime acceptance pending."
+      "evidence": "scripts/tests/test_oem_native_guest.py; scripts/tests/test_oem_guest_pppoe_writes.py; scripts/tests/test_oem_network_reads.py#NetworkReads.test_guest_and_pppoe_read_state",
+      "limitations": "Native configured and enabled state, no verified isolation. Isolated fixture acceptance only."
     },
     "get_wifi_guest5": {
       "state": "SOURCE_DISABLED_REVIEWED",
@@ -527,16 +527,16 @@
       "limitations": "Bounded Ethernet-only discovery via native pppoe-discovery. Original OEM button adapted to authenticated POST. Actual device mapping and access concentrator discovery pending."
     },
     "pppoe_disconnect": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.interfaces:pppoeAction",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/stage_variant.py",
-      "limitations": "Explicit confirmation and network revision; scoped to existing PPPoE Ethernet WAN. No LTE reset. Physical disconnect and browser acceptance pending."
+      "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; scripts/tests/test_oem_guest_pppoe_writes.py",
+      "limitations": "Ethernet-only pending request, native UCI and mocked netifd; real disconnect pending. Isolated fixture acceptance only."
     },
     "pppoe_reconnect": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.interfaces:pppoeAction",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh; rebuild/oem-updated/stage_variant.py",
-      "limitations": "Scoped Ethernet down/up request, not proof of session establishment. Device mapping, disconnected netifd layout, and live reconnection acceptance pending."
+      "evidence": "scripts/uat/test-interfaces-host.py; scripts/tests/test_owner_interfaces_acceptance.py; scripts/tests/test_oem_guest_pppoe_writes.py",
+      "limitations": "Ethernet-only down/up pending request, native UCI and mocked netifd; actual reconnect pending. Isolated fixture acceptance only."
     },
     "reboot": {
       "state": "PROTOTYPE",
@@ -816,10 +816,10 @@
       "limitations": "Individual block/unblock in owned LAN-to-WAN list. Native UCI configuration lifecycle, rollback, ownership/offload guards and isolated adapter receipts passed. fw4 and reload simulated; established flows, actual nft enforcement, clock sync and browser UAT pending."
     },
     "set_wifi_guest": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.guest:setNativeStartup / veci.v2.addon:setPortalStartup",
-      "evidence": "rebuild/veci-v2/packages/veci-v2-runtime/veci2-guest-check; scripts/tests/test_oem_native_guest.py; rebuild/oem-updated/backend",
-      "limitations": "Native clean-install WPA2 provisioning and manual startup toggle use actual host UCI fixture with isolated routes and mocked fw4 check. Default disabled; captive portal remains optional. Physical isolation, actual fw4 compilation, OEM original form and runtime acceptance pending."
+      "evidence": "scripts/tests/test_oem_native_guest.py; scripts/tests/test_oem_guest_pppoe_writes.py",
+      "limitations": "Native disabled-first provisioning and next-boot toggle, AP activation interlock and scoped legacy portal adapter; actual radio isolation and original form pending. Isolated fixture acceptance only."
     },
     "set_wifi_guest5": {
       "state": "SOURCE_DISABLED_REVIEWED",
