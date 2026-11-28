@@ -569,8 +569,8 @@
     "setAutoreboot": {
       "state": "PROTOTYPE",
       "provider": "veci.v2.cron:setReboot",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "Explicit opt-in, revision guarded and owned cron record; existing cron jobs preserved. Actual scheduled reboot acceptance pending."
+      "evidence": "scripts/tests/test_owner_cron_acceptance.py; scripts/uat/test-cron-host.py; scripts/tests/test_oem_system_writes.py",
+      "limitations": "Disabled schedule, maintenance interlock, rollback and adapter receipt tested; enable path and actual daemon scheduling pending. No reboot executed."
     },
     "setWiFi2": {
       "state": "FIXTURE_PASS",
@@ -704,10 +704,10 @@
       "limitations": "Interval CAS only; host and global reset edits rejected; original form pending. Native UCI and isolated RPC fixtures passed. Administrative RPC locking only; autonomous LTE manager concurrency, actual USB/GPIO, recovery and browser UAT pending."
     },
     "set_ntp": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.system:setNtp",
-      "evidence": "rebuild/oem-updated/backend/write-adapter.sh",
-      "limitations": "NTP server addresses only; timezone and enable flags remain unchanged, browser integration pending."
+      "evidence": "scripts/tests/test_owner_ntp_acceptance.py; scripts/tests/test_oem_system_writes.py",
+      "limitations": "Existing NTP client server list, validated hostname and readback; restart and rollback mocked. Isolated fixture only; target applet/service, live networking and original OEM browser UAT pending."
     },
     "set_openvpn": {
       "state": "PROTOTYPE",
@@ -838,10 +838,10 @@
       "evidence": "rebuild/oem-updated/backend/webapi; scripts/tests/test_oem_module_status.py#test_legacy_cloud_and_bootflag_refused"
     },
     "site_survey": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.wifi:survey",
-      "evidence": "rebuild/oem-updated/backend/diagnostics-adapter.sh",
-      "limitations": "2.4 GHz only, native RPC permission and passive scan; MT76 hardware acceptance and browser encryption presentation pending."
+      "evidence": "scripts/tests/test_oem_diagnostics_adapter.py",
+      "limitations": "Native survey ACL, BSSID and 2.4GHz channel mapping. Isolated fixture only; target applet/service, live networking and original OEM browser UAT pending."
     },
     "sysupgrade_backup": {
       "state": "PROTOTYPE",
@@ -876,22 +876,22 @@
       "limitations": "Replacement route staged, verify-only; original vendor upload route is not exposed. Signature/board checks and physical verification pending."
     },
     "test_nslookup": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "OpenWrt nslookup",
-      "evidence": "rebuild/oem-updated/backend/diagnostics-adapter.sh",
-      "limitations": "Bounded host-only diagnostic; actual DNS and OEM query integration pending."
+      "evidence": "scripts/tests/test_oem_diagnostics_adapter.py",
+      "limitations": "Bounded hostname DNS diagnostic command contract. Isolated fixture only; target applet/service, live networking and original OEM browser UAT pending."
     },
     "test_ping": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "OpenWrt ping/ping6",
-      "evidence": "rebuild/oem-updated/backend/diagnostics-adapter.sh",
-      "limitations": "Bounded host-only diagnostic; target applet and OEM query integration pending."
+      "evidence": "scripts/tests/test_oem_diagnostics_adapter.py",
+      "limitations": "Bounded IPv4/IPv6 ping command contract. Isolated fixture only; target applet/service, live networking and original OEM browser UAT pending."
     },
     "test_traceroute": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "OpenWrt traceroute/traceroute6",
-      "evidence": "rebuild/oem-updated/backend/diagnostics-adapter.sh",
-      "limitations": "Bounded five-hop diagnostic; applet dependencies and browser integration pending."
+      "evidence": "scripts/tests/test_oem_diagnostics_adapter.py",
+      "limitations": "Bounded IPv4/IPv6 five-hop traceroute command contract. Isolated fixture only; target applet/service, live networking and original OEM browser UAT pending."
     },
     "test_wget": {
       "state": "PROTOTYPE",
