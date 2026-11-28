@@ -35,19 +35,22 @@
     },
     "configuration_backup": {
       "provider": "native veci2-backup",
-      "route": "POST /cgi-bin/veci2-backup"
+      "route": "POST /cgi-bin/veci2-backup",
+      "state": "NATIVE_EXPORT_FIXTURE_PASS_NOT_UAT"
     },
     "configuration_restore": {
       "provider": "native veci2-restore",
       "phases": [
         "inspect",
         "apply"
-      ]
+      ],
+      "state": "NATIVE_INSPECT_AND_MOCK_RESTORE_FIXTURE_PASS_NOT_UAT"
     },
     "firmware_verification": {
       "provider": "native veci2-verify",
       "route": "POST /cgi-bin/oem-verify",
-      "install_allowed": false
+      "install_allowed": false,
+      "catalog_verified": false
     },
     "dhcp_pool": {
       "provider": "veci.v2.dhcp",
@@ -63,7 +66,11 @@
         "trafficHistory"
       ],
       "scope": "local trailing 24 hours, RAM only, not quota",
-      "state": "SOURCE_INTEGRATED_NOT_UAT"
+      "state": "ORIGINAL_MENU_SOURCE_STAGED_NOT_UAT",
+      "evidence": [
+        "scripts/tests/test_oem_traffic_view.py"
+      ],
+      "limitations": "Observed partial 24-hour counters only. Missing values preserved; no persistent history or operator quota."
     },
     "guest_wifi": {
       "provider": "veci.v2.guest / veci.v2.addon",
@@ -289,7 +296,7 @@
   "remaining": [
     "integrate OEM navigation and legacy forms",
     "hardware and browser acceptance",
-    "legacy seven-day chart adaptation / persistent history policy",
-    "guest Wi-Fi activation without legacy network reload"
+    "guest Wi-Fi activation without legacy network reload",
+    "traffic history original menu live browser acceptance; persistent history not implemented"
   ]
 }

@@ -127,8 +127,8 @@
     "get_days_traffic": {
       "state": "FIXTURE_PASS",
       "provider": "veci.v2.observability:trafficHistory",
-      "evidence": "scripts/tests/test_owner_24x7_observability_native.py#Native24x7Observability.test_traffic_history_gap_and_counter_reset; scripts/tests/test_oem_network_reads.py#NetworkReads.test_traffic_history_is_observed_not_extrapolated",
-      "limitations": "Trailing 24h observed partial byte totals, missing values and discontinuities; not seven-day usage or carrier quota; UI and real device counters pending. Isolated fixture acceptance only."
+      "evidence": "scripts/tests/test_owner_24x7_observability_native.py#Native24x7Observability.test_traffic_history_gap_and_counter_reset; scripts/tests/test_oem_network_reads.py#NetworkReads.test_traffic_history_is_observed_not_extrapolated; scripts/tests/test_oem_traffic_view.py",
+      "limitations": "Trailing 24h observed partial byte totals, missing values and discontinuities; not seven-day usage or carrier quota; UI and real device counters pending. Isolated fixture acceptance only. Original traffic page now staged with observed 24-hour native contract; live browser UAT pending."
     },
     "get_ddns": {
       "state": "FIXTURE_PASS",
@@ -161,10 +161,10 @@
       "limitations": "Isolated adapter read fixture passed; native runtime and browser acceptance pending."
     },
     "get_disk": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "OpenWrt df and procfs",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Overlay and tmpfs inventory only; no external storage provisioning or public mounts. OEM legacy UI mapping pending."
+      "evidence": "scripts/tests/test_oem_monitor_reads.py",
+      "limitations": "Exact overlay/tmp mount inventory, df bounds, missing mount rejection; synthetic filesystem snapshots. Isolated fixture acceptance only."
     },
     "get_dmz": {
       "state": "FIXTURE_PASS",
@@ -214,10 +214,10 @@
       "limitations": "Isolated adapter read fixture passed; native runtime and browser acceptance pending."
     },
     "get_lan_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "netifd network.interface.lan + kernel counters",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Bounded live sampling; browser and actual interface acceptance pending."
+      "evidence": "scripts/tests/test_oem_monitor_reads.py",
+      "limitations": "Down interface without device, stale address clearing, unknown rates; live sample fixtures and actual netifd pending. Isolated fixture acceptance only."
     },
     "get_log_list": {
       "state": "PROTOTYPE",
@@ -404,10 +404,10 @@
       "limitations": "Isolated adapter read fixture passed; native runtime and browser acceptance pending."
     },
     "get_system_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "Linux procfs + veci.v2.wifi:info",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "CPU and memory measured; primary Wi-Fi station count only; full guest client coverage and browser acceptance pending."
+      "evidence": "scripts/tests/test_oem_monitor_reads.py",
+      "limitations": "Measured CPU delta, memory, uptime, load and primary AP client count; synthetic proc snapshots only. Isolated fixture acceptance only."
     },
     "get_ttl": {
       "state": "FIXTURE_PASS",
@@ -427,10 +427,10 @@
       "limitations": "Native DHCP/static/PPPoE read status and bounded default-route selection; no PPPoE secret returned. PPPoE profile creation and physical WAN acceptance pending."
     },
     "get_wan_status": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "netifd network.interface.wan + kernel counters",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Bounded live sampling; browser and actual interface acceptance pending."
+      "evidence": "scripts/tests/test_oem_monitor_reads.py",
+      "limitations": "Down interface without device, stale address clearing and unknown rates; physical WAN sampling pending. Isolated fixture acceptance only."
     },
     "get_wan_traffic": {
       "state": "FIXTURE_PASS",
@@ -517,10 +517,10 @@
       "limitations": "Installation locked. Shared manual/OTA receipt and pending-reboot interlock fixtures passed with mock installer. Actual signed apply and release acceptance remain UNIMPLEMENTED."
     },
     "online_upgrade_check": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "veci.v2.updatepolicy:status",
-      "evidence": "rebuild/oem-updated/backend/read-only-adapter.sh",
-      "limitations": "Fail-closed no verified OEM release catalog; does not implement actual OTA discovery."
+      "evidence": "scripts/tests/test_oem_verify_boundary.py",
+      "limitations": "Unverified OEM catalog explicitly noninstallable; no OTA URL, manual and verify_only policy both fail closed. Isolated fixture acceptance only."
     },
     "pppoe_detection": {
       "state": "PROTOTYPE",
@@ -549,8 +549,8 @@
     "refresh_days_traffic": {
       "state": "FIXTURE_PASS",
       "provider": "veci.v2.observability:trafficHistory",
-      "evidence": "scripts/tests/test_owner_24x7_observability_native.py#Native24x7Observability.test_traffic_history_gap_and_counter_reset; scripts/tests/test_oem_network_reads.py#NetworkReads.test_traffic_history_is_observed_not_extrapolated",
-      "limitations": "Read-only refresh of volatile measured intervals; no fabricated backfill. Isolated fixture acceptance only."
+      "evidence": "scripts/tests/test_owner_24x7_observability_native.py#Native24x7Observability.test_traffic_history_gap_and_counter_reset; scripts/tests/test_oem_network_reads.py#NetworkReads.test_traffic_history_is_observed_not_extrapolated; scripts/tests/test_oem_traffic_view.py",
+      "limitations": "Read-only refresh of volatile measured intervals; no fabricated backfill. Isolated fixture acceptance only. Original traffic page now staged with observed 24-hour native contract; live browser UAT pending."
     },
     "reset": {
       "state": "UNIMPLEMENTED",
@@ -846,24 +846,24 @@
       "limitations": "Native survey ACL, BSSID and 2.4GHz channel mapping. Isolated fixture only; target applet/service, live networking and original OEM browser UAT pending."
     },
     "sysupgrade_backup": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "shared veci2-backup native CGI",
-      "evidence": "rebuild/oem-updated/backend/webapi; rebuild/oem-updated/frontend/backup-view.js",
-      "limitations": "Stock menu opens the authenticated native backup panel. Archive export, inspection and restore on the target image await integrated acceptance."
+      "evidence": "scripts/tests/test_veci_backup_export.py",
+      "limitations": "Replacement native private export archive, HTTPS grant checks and digest, isolated fake sysupgrade; OEM gateway and target UAT pending. Isolated fixture acceptance only."
     },
     "sysupgrade_backup_execute": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "Existing VeCI native authenticated CGI",
       "replacement_route": "POST /cgi-bin/veci2-restore?apply",
-      "evidence": "rebuild/oem-updated/stage_variant.py; rebuild/oem-updated/frontend/tools.js; rebuild/oem-updated/frontend/backup-view.js",
-      "limitations": "Stock menu opens the authenticated native backup panel. Archive export, inspection and restore on the target image await integrated acceptance."
+      "evidence": "scripts/tests/test_owner_backup_restore_native.py",
+      "limitations": "Replacement native two-phase restore receipt and mocked restore only; no actual restore performed. Isolated fixture acceptance only."
     },
     "sysupgrade_backup_upload": {
-      "state": "PROTOTYPE",
+      "state": "FIXTURE_PASS",
       "provider": "Existing VeCI native authenticated CGI",
       "replacement_route": "POST /cgi-bin/veci2-restore?inspect",
-      "evidence": "rebuild/oem-updated/stage_variant.py; rebuild/oem-updated/frontend/tools.js; rebuild/oem-updated/frontend/backup-view.js",
-      "limitations": "Stock menu opens the authenticated native backup panel. Archive export, inspection and restore on the target image await integrated acceptance."
+      "evidence": "scripts/tests/test_owner_backup_restore_native.py",
+      "limitations": "Replacement native inspect route, exact board and archive validation; target and browser pending. Isolated fixture acceptance only."
     },
     "sysupgrade_execute": {
       "state": "UNIMPLEMENTED",
