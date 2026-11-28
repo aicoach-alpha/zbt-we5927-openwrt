@@ -225,6 +225,8 @@ case "$op" in
         json_init; json_add_string revision "$revision"; json_add_string confirmation "$confirmation"
         json_add_string enabled "$enabled"
         rpc veci.v2.addon setOpenvpnStartup "$(json_dump)"
+        [ "$(native_field '@.enabled')" = "$enabled" ] || fail "OpenVPN startup unconfirmed"
+        case "$enabled:$(native_field '@.state')" in 1:enabled|0:disabled) ;; *) fail "OpenVPN state unconfirmed";; esac
         json_init; json_add_string code 1; json_add_string reason "OpenVPN startup saved; manual activation required"
         json_add_string state "$(native_field '@.state')"; json_dump; exit 0
         ;;
@@ -238,6 +240,10 @@ case "$op" in
             json_add_string "$key" "$value"
         done
         rpc veci.v2.addon saveSqm "$(json_dump)"
+        [ "$(native_field '@.state')" = disabled ] && [ "$(native_field '@.enabled')" = 0 ] || fail "SQM disabled profile unconfirmed"
+        for key in interface download upload qdisc script; do
+            [ "$(native_field "@.$key")" = "$(read_field "@.$key")" ] || fail "SQM profile unconfirmed"
+        done
         json_init; json_add_string code 1; json_add_string reason "SQM profile saved disabled"
         json_add_string apply_state pending_manual_activation; json_dump; exit 0
         ;;
@@ -258,6 +264,8 @@ case "$op" in
         json_init; json_add_string service "$service"; json_add_string enabled "$enabled"
         json_add_string revision "$revision"; json_add_string confirmation "$confirmation"
         rpc veci.v2.addon setOptionalStartup "$(json_dump)"
+        [ "$(native_field '@.service')" = "$service" ] && [ "$(native_field '@.enabled')" = "$enabled" ] || fail "optional startup unconfirmed"
+        case "$enabled:$(native_field '@.state')" in 1:enabled|0:disabled) ;; *) fail "optional state unconfirmed";; esac
         json_init; json_add_string code 1; json_add_string reason "profile startup setting saved"
         json_add_string apply_state pending_manual_activation; json_dump; exit 0
         ;;
