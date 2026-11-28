@@ -103,7 +103,7 @@ set_portal_startup() {
 # Optional DDNS/SQM profile controls, not a replacement for their daemons.
 service_profile() {
   case "$1" in ddns) package=ddns; section=service;; sqm) package=sqm; section=queue;; *) fail unsupported_service;; esac
-  state=absent; revision=""; enabled=0; runtime=unknown
+  state=absent; revision=""; enabled=0; runtime=unknown; boot=unknown
   installed_app "$package" || return 0
   [ -x "/etc/init.d/$package" ] || return 0
   state=unconfigured
@@ -146,6 +146,7 @@ optional_toggle() {
     *) fail confirmation_required;;
   esac
   exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
   # Serialize SQM enable with the existing native firewall writer.
   if [ "$service" = sqm ]; then
     exec 8</usr/libexec/rpcd/veci.v2.firewall; flock -n 8 || fail firewall_busy
@@ -186,12 +187,14 @@ optional_toggle() {
   fi
   tmp=$(mktemp -d /tmp/veci2-optional.XXXXXX) || fail stage_failed
   trap 'rm -rf "$tmp"' EXIT
+  cp -p "$config" "$tmp/original" || fail backup_failed
+  restore_profile() { cp -p "$tmp/original" "$config" || fail rollback_failed; fail commit_failed_rollback; }
   uci -q -t "$tmp" set "$package.veci.enabled=$enabled_request" || fail stage_failed
   [ "$(sha256sum "$config")" = "$digest" ] || fail stale_configuration
   changes=$(uci -q changes "$package") || fail config_unavailable
   [ -z "$changes" ] || fail pending_changes
-  uci -q -t "$tmp" commit "$package" || fail commit_failed
-  [ "$(uci -q get "$package.veci.enabled")" = "$enabled_request" ] || fail commit_failed
+  uci -q -t "$tmp" commit "$package" || restore_profile
+  [ "$(uci -q get "$package.veci.enabled" || :)" = "$enabled_request" ] || restore_profile
   # Save only. No service restart or network reload.
   optional_status "$service"
 }
@@ -223,6 +226,7 @@ sqm_save() {
   done
   case "$qdisc:$script" in cake:piece_of_cake.qos|cake:layer_cake.qos|fq_codel:simple.qos) ;; *) fail unsupported_queue;; esac
   exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
   exec 8</usr/libexec/rpcd/veci.v2.firewall; flock -n 8 || fail firewall_busy
   service_profile sqm
   [ -n "$revision" ] && [ "$revision" = "$expected" ] || fail stale_configuration
@@ -235,6 +239,8 @@ sqm_save() {
   [ -z "$changes" ] || fail pending_changes
   tmp=$(mktemp -d /tmp/veci2-sqm.XXXXXX) || fail stage_failed
   trap 'rm -rf "$tmp"' EXIT
+  cp -p "$config" "$tmp/original" || fail backup_failed
+  restore_profile() { cp -p "$tmp/original" "$config" || fail rollback_failed; fail commit_failed_rollback; }
   change() { uci -q -t "$tmp" "$@"; }
   change set sqm.veci=queue &&
     change set sqm.veci.enabled=0 &&
@@ -246,8 +252,13 @@ sqm_save() {
   [ "$(sha256sum "$config")" = "$digest" ] || fail stale_configuration
   changes=$(uci -q changes sqm) || fail config_unavailable
   [ -z "$changes" ] || fail pending_changes
-  change commit sqm || fail commit_failed
-  [ "$(uci -q get sqm.veci.enabled)" = 0 ] || fail commit_failed
+  change commit sqm || restore_profile
+  [ "$(uci -q get sqm.veci.enabled || :)" = 0 ] &&
+  [ "$(uci -q get sqm.veci.interface || :)" = "$iface" ] &&
+  [ "$(uci -q get sqm.veci.download || :)" = "$download" ] &&
+  [ "$(uci -q get sqm.veci.upload || :)" = "$upload" ] &&
+  [ "$(uci -q get sqm.veci.qdisc || :)" = "$qdisc" ] &&
+  [ "$(uci -q get sqm.veci.script || :)" = "$script" ] || restore_profile
   optional_status sqm
 }
 
@@ -286,6 +297,7 @@ openvpn_status() {
 }
 openvpn_toggle() {
   exec 9>/var/lock/veci2-optional-services.lock; flock -n 9 || fail busy
+  [ ! -e /var/run/veci2-reboot-requested ] || fail reboot_pending
   input=$(head -c 513)
   [ "${#input}" -le 512 ] && json_load "$input" || fail invalid_request
   json_get_var expected revision; json_get_var confirm confirmation; json_get_var requested enabled
@@ -301,12 +313,14 @@ openvpn_toggle() {
   [ -z "$changes" ] || fail pending_changes
   tmp=$(mktemp -d /tmp/veci2-openvpn.XXXXXX) || fail stage_failed
   trap 'rm -rf "$tmp"' EXIT
+  cp -p "$config" "$tmp/original" || fail backup_failed
+  restore_profile() { cp -p "$tmp/original" "$config" || fail rollback_failed; fail commit_failed_rollback; }
   uci -q -t "$tmp" set "openvpn.sample_client.enabled=$requested" || fail stage_failed
   [ "$(sha256sum "$config")" = "$digest" ] || fail stale_configuration
   changes=$(uci -q changes openvpn) || fail config_unavailable
   [ -z "$changes" ] || fail pending_changes
-  uci -q -t "$tmp" commit openvpn || fail commit_failed
-  [ "$(uci -q get openvpn.sample_client.enabled)" = "$requested" ] || fail commit_failed
+  uci -q -t "$tmp" commit openvpn || restore_profile
+  [ "$(uci -q get openvpn.sample_client.enabled || :)" = "$requested" ] || restore_profile
   openvpn_status
 }
 
