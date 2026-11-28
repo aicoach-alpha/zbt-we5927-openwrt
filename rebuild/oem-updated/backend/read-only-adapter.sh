@@ -510,7 +510,7 @@ case "$1" in
                 target="$(field "@.entries[$idx].target")" || error "route target unavailable"
                 case "$target" in */*) prefix="${target##*/}"; target="${target%/*}";; *) prefix="";; esac
                 mask=""
-                case "$prefix" in '') ;; *[!0-9]*) error "route prefix invalid";; *) [ "$prefix" -le 32 ] || error "route prefix invalid"; mask="$(awk -v p="$prefix" 'BEGIN {for(i=0;i<4;i++){n=p>8?8:p;if(n<0)n=0;printf "%s%d",i?".":"",256-2^(8-n);p-=n}}')";; esac
+                case "$prefix" in '') ;; *[!0-9]*) error "route prefix invalid";; *) [ "$prefix" -le 32 ] || error "route prefix invalid"; mask="$(awk -v p="$prefix" 'BEGIN {for(i=0;i<4;i++){n=p>8?8:p;if(n<0)n=0;block=1;for(j=n;j<8;j++)block*=2;printf "%s%d",i?".":"",256-block;p-=n}}')";; esac
                 json_add_object ""
                 json_add_string name "$section"
                 json_add_string target "$target"
@@ -1114,6 +1114,8 @@ case "$1" in
         ;;
     get_parents_ctrl_rule|get_parents_ctrl_status)
         native="$(native_read veci.v2.firewall parentStatus)" || error "parental schedule unavailable"
+        (json_load "$native" && json_get_type typ rules && [ "$typ" = array ]) || error "schedule inventory invalid"
+        seen=" "
         success "native scheduled LAN policy"
         json_add_string revision "$(field '@.revision')"
         json_add_string timezone UTC
@@ -1124,6 +1126,9 @@ case "$1" in
             slot="$(field "@.rules[$idx].slot" || true)"
             [ -n "$slot" ] || break
             case "$slot" in [1-8]) ;; *) error "invalid schedule slot";; esac
+            case "$seen" in *" $slot "*) error "duplicate schedule slot";; esac
+            seen="$seen$slot "
+            [ "$(field "@.rules[$idx].timezone")" = UTC ] || error "unexpected schedule timezone"
             enabled="$(field "@.rules[$idx].enabled")" || error "invalid schedule state"
             case "$enabled" in 0) ;; 1) active=$((active+1));; *) error "invalid schedule state";; esac
             json_add_object ""
@@ -1137,6 +1142,7 @@ case "$1" in
             count=$((count+1)); idx=$((idx+1))
         done
         json_close_array
+        [ -z "$(field '@.rules[8].slot' || true)" ] || error "schedule inventory oversized"
         json_add_string parents_ctrl_enabled "$(if [ "$active" -gt 0 ]; then echo 1; else echo 0; fi)"
         json_add_int rule_count "$count"; json_add_int enabled_count "$active"
         json_add_string management_scope per_rule
@@ -1305,15 +1311,19 @@ case "$1" in
         json_close_object
         ;;
     get_nat_acceleration)
-        # Use the actual modern firewall option; this is not a hardware claim.
-        offload="$(get firewall.@defaults[0].flow_offloading || true)"
-        case "$offload" in 1) enabled=1;; ''|0) enabled=0;; *) error "invalid flow offload setting";; esac
+        # Read flags and revision from the same native snapshot.
         native="$(native_read veci.v2.firewall status)" || error "firewall revision unavailable"
+        offload="$(field '@.flow_offloading' || true)"
+        hardware="$(field '@.flow_offloading_hw' || true)"
+        case "$offload" in 1) enabled=1;; ''|0) enabled=0;; *) error "invalid flow offload setting";; esac
+        case "$hardware" in ''|0|1) ;; *) error "invalid hardware flag";; esac
         revision="$(field '@.revision')" || error "firewall revision unavailable"
         success "get net acceleration success"
         json_add_string revision "$revision"
         json_add_object data
         json_add_string status "$enabled"
+        json_add_string hardware_configured "$hardware"
+        json_add_string runtime_verified false
         json_close_object
         ;;
     get_web_msg)
