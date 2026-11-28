@@ -72,6 +72,7 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
           make defconfig
+          python3 "$GITHUB_WORKSPACE/rebuild/oem-updated/check_build_config.py" .config
           grep -Fxq 'CONFIG_PACKAGE_oem-updated-ui-dev=y' .config
           grep -Fxq 'CONFIG_PACKAGE_we5927-lte=y' .config
           if grep -E '^CONFIG_PACKAGE_(veci-v2-ui|veci-default-ui|veci-cellular-we5927|luci([-A-Za-z0-9_]*)?)=y$' .config; then

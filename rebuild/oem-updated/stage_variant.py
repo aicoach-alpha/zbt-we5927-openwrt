@@ -37,13 +37,13 @@ REPLACEMENTS = (
 MAKEFILE = """include $(TOPDIR)/rules.mk
 PKG_NAME:=oem-updated-ui-dev
 PKG_VERSION:=0.1
-PKG_RELEASE:=8
+PKG_RELEASE:=9
 include $(INCLUDE_DIR)/package.mk
 define Package/oem-updated-ui-dev
   SECTION:=admin
   CATEGORY:=Administration
   TITLE:=ZBT OEM Updated UI development package
-  DEPENDS:=+uhttpd +uhttpd-mod-ubus +rpcd +libubox +libustream-mbedtls +px5g-mbedtls +veci-v2-runtime
+  DEPENDS:=+uhttpd +uhttpd-mod-ubus +rpcd +libubox +libustream-mbedtls +px5g-mbedtls +veci-v2-runtime +veci-v2-sms +veci-v2-ipv6 +veci-v2-package-manager +coreutils-timeout +ip-tiny +firewall4
 endef
 define Build/Compile
 endef
