@@ -793,20 +793,24 @@ case "$1" in
         up="$(live '@.up')" || error "link state unavailable"
         case "$up" in true|false) ;; *) error "invalid link state";; esac
         dev="$(live '@.l3_device' || live '@.device' || true)"
-        case "$dev" in ''|.|..|-*|*[!a-zA-Z0-9_.-]*) error "interface unavailable";; esac
+        case "$dev" in '') [ "$up" = false ] || error "interface unavailable";; .|..|-*|*[!a-zA-Z0-9_.-]*) error "interface unavailable";; esac
         proto="$(live '@.proto' || get "network.$network.proto")" || error "protocol unavailable"
         address="$(live '@["ipv4-address"][0].address' || true)"
         ipv6="$(live '@["ipv6-address"][*].address' || true)"
         uptime="$(live '@.uptime' || true)"
         [ "$up" = true ] || { address=""; ipv6=""; uptime=0; }
-        mac="$(cat "/sys/class/net/$dev/address" 2>/dev/null || true)"
-        rx="$(cat "/sys/class/net/$dev/statistics/rx_bytes" 2>/dev/null)" || error "RX unavailable"
-        tx="$(cat "/sys/class/net/$dev/statistics/tx_bytes" 2>/dev/null)" || error "TX unavailable"
-        case "$rx:$tx" in *[!0-9:]*|:*|*:) error "invalid counters";; esac
+        mac=""; rx=""; tx=""
+        if [ -n "$dev" ]; then
+            mac="$(cat "/sys/class/net/$dev/address" 2>/dev/null || true)"
+            rx="$(cat "/sys/class/net/$dev/statistics/rx_bytes" 2>/dev/null || true)"
+            tx="$(cat "/sys/class/net/$dev/statistics/tx_bytes" 2>/dev/null || true)"
+            case "$rx" in *[!0-9]*) rx="";; esac
+            case "$tx" in *[!0-9]*) tx="";; esac
+        fi
         # Bounded sampling; never fabricate rates from link speed or use a
         # shell-sourced shared cache. On counter reset, rate is unknown.
         rx_rate=""; tx_rate=""
-        if [ "$up" = true ]; then
+        if [ "$up" = true ] && [ -n "$rx" ] && [ -n "$tx" ]; then
             t1="$(cut -d' ' -f1 /proc/uptime)"
             sleep 1
             next_rx="$(cat "/sys/class/net/$dev/statistics/rx_bytes" 2>/dev/null || true)"
@@ -822,7 +826,7 @@ case "$1" in
                 rx="$next_rx"; tx="$next_tx";;
             esac
             else
-                address=""; ipv6=""; uptime=""; rx=""; tx=""
+                address=""; ipv6=""; uptime=""; rx=""; tx=""; mac=""; up=unknown
             fi
         fi
         success "get interface status success"
@@ -831,14 +835,17 @@ case "$1" in
         json_add_string rxall "$rx"; json_add_string txall "$tx"
         json_add_string uptime "$uptime"; json_add_string proto "$proto"
         json_add_string ipaddr "$address"; json_add_string macaddr "$mac"
+        json_add_string link_state "$up"
         json_add_array ipv6
         for ip in $ipv6; do json_add_string "" "$ip"; done
         json_close_array; json_close_object
         ;;
     get_system_status)
         uptime="$(cut -d. -f1 /proc/uptime)" || error "uptime unavailable"
-        load="$(awk '{print $1" "$2" "$3}' /proc/loadavg)"
-        memory="$(awk '/^MemTotal:/{t=$2}/^MemAvailable:/{a=$2;found=1}END{if(t>0&&found&&a<=t)printf "%.0f",100*(t-a)/t}' /proc/meminfo)"
+        case "$uptime" in ''|*[!0-9]*) error "invalid uptime";; esac
+        load="$(awk 'NF>=3 && $1~/^[0-9]+[.][0-9]+$/ && $2~/^[0-9]+[.][0-9]+$/ && $3~/^[0-9]+[.][0-9]+$/{print $1" "$2" "$3;exit}' /proc/loadavg)"
+        [ -n "$load" ] || error "load unavailable"
+        memory="$(awk '/^MemTotal:/{t=$2}/^MemAvailable:/{a=$2;found=1}END{if(t>0&&found&&a>=0&&a<=t)printf "%.0f",100*(t-a)/t}' /proc/meminfo)"
         [ -n "$memory" ] || error "memory unavailable"
         first="$(awk '/^cpu /{s=0;for(i=2;i<=9;i++)s+=$i;print s,$5+$6;exit}' /proc/stat)"
         sleep 1
@@ -989,12 +996,16 @@ case "$1" in
         success "get storage inventory success"
         json_add_array data
         for mount in /overlay /tmp; do
-            stats="$(df -Pk "$mount" | awk 'NR==2{print $2,$3,$4,$5}')" || error "storage unavailable"
+            fstype="$(awk -v m="$mount" '$2==m{print $3;exit}' /proc/mounts)"
+            [ -n "$fstype" ] || error "mount unavailable"
+            raw="$(df -Pk "$mount")" || error "storage unavailable"
+            stats="$(printf '%s\n' "$raw" | awk 'NR==2{print $2,$3,$4,$5}')"
             set -- $stats
             [ "$#" = 4 ] || error "invalid storage counters"
             case "$1:$2:$3" in *[!0-9:]*|:*|*:) error "invalid storage counters";; esac
             json_add_object ""
-            json_add_string disk_type "$(awk -v m="$mount" '$2==m{print $3;exit}' /proc/mounts)"
+            printf '%s\n' "$1 $2 $3 $4" | awk '$1>0&&$2<=$1&&$3<=$1&&$4~/^[0-9]+%$/{ok=1}END{exit !ok}' || error "invalid storage counters"
+            json_add_string disk_type "$fstype"
             json_add_string disk_size "${1} KiB"
             json_add_string disk_used "${2} KiB"
             json_add_string disk_available "${3} KiB"
